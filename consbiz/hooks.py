@@ -4,7 +4,70 @@ app_publisher = "Siricons"
 app_description = "Construction Business ERP"
 app_email = "info@siricons.com"
 app_license = "mit"
+app_logo_url = "/assets/consbiz/images/logo.png"
 
+add_to_apps_screen = [
+    {
+        "name": "consbiz",
+        "logo": "/assets/consbiz/images/logo.png",
+        "title": "ConsBiz",
+        "route": "/app/consbiz"
+    }
+]
+
+fixtures = [
+    {
+        "doctype": "Property Setter",
+        "filters": [
+            ["module", "=", "ConsBiz"],
+            ["is_system_generated", "=", 0] # เอาเฉพาะที่เราแก้เอง มือหมุนเอง
+        ]
+    },
+    {
+        "doctype": "Custom Field",
+        "filters": [
+            ["module", "=", "ConsBiz"],
+            ["is_system_generated", "=", 0] # ป้องกันฟิลด์ที่แอปอื่นสร้างแทรกมา
+        ]
+    }
+]
+
+
+app_include_css = "/assets/consbiz/css/style.css"
+app_include_js = "/assets/consbiz/js/utils.js"
+
+naming_series_variables = {
+    "ABBR": "consbiz.utils.parse_naming_series_variable"
+}
+
+doctype_js = {
+    "Quotation": "public/js/quotation_cal.js",
+    "Sales Order": "public/js/sales_order_cal.js",
+    "Sales Invoice": "public/js/sales_invoice_cal.js",
+    "Purchase Order": "public/js/purchase_order.js",
+    "Purchase Invoice": "public/js/purchase_invoice.js",
+    "Payment Entry": "public/js/payment_entry_deduction.js"
+}
+
+doc_events = {
+    "Payment Entry": {
+        "on_submit": "consbiz.api.update_si_tax" # เปลี่ยน path ให้ตรงกับที่อยู่ไฟล์จริง
+    }
+}
+
+scheduler_events = {
+    "daily": [
+        # สั่งให้รันฟังก์ชันนี้ทุกวัน (เปลี่ยน path.to.your.app เป็น path จริงของคุณ)
+        "consbiz.doctype.retention_receivable.retention_receivable.update_overdue_status_all"
+    ]
+}
+
+
+#doc_events = {
+#  "Sales Invoice": {
+#       "on_submit": "consbiz.api.create_retention_receivable"
+#   }
+#}
 # Apps
 # ------------------
 

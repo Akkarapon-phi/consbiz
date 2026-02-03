@@ -1,0 +1,23 @@
+{
+ "app": "consbiz",
+ "creation": "2026-01-27 01:14:30.158718",
+ "docstatus": 0,
+ "doctype": "Desktop Icon",
+ "hidden": 0,
+ "icon": "building-2",
+ "icon_type": "Link",
+ "idx": 0,
+ "label": "Consbiz",
+ "link": "/app/consbiz",
+ "link_to": "ConsBiz",
+ "link_type": "Workspace Sidebar",
+ "logo_url": "/assets/consbiz/images/logo.png",
+ "modified": "2026-02-01 23:25:48.584031",
+ "modified_by": "Administrator",
+ "name": "Consbiz",
+ "owner": "Administrator",
+ "restrict_removal": 0,
+ "roles": [],
+ "sidebar": "",
+ "standard": 1
+}

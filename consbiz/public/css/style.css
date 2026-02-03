@@ -1,0 +1,7 @@
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@300;400;500;600;700&display=swap');
+
+:root {
+    --font-stack: "Noto Sans Thai", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
+    --sans-font: "Noto Sans Thai", sans-serif !important;
+    --heading-font-stack: "Noto Sans Thai", sans-serif !important;
+}
