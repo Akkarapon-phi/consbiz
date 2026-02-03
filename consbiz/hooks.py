@@ -34,7 +34,11 @@ fixtures = [
 
 
 app_include_css = "/assets/consbiz/css/style.css"
-app_include_js = "/assets/consbiz/js/utils.js"
+app_include_js = [
+    "/assets/consbiz/js/utils.js",
+    "/assets/consbiz/js/company_switcher.js"
+]
+
 
 naming_series_variables = {
     "ABBR": "consbiz.utils.parse_naming_series_variable"

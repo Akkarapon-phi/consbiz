@@ -20,7 +20,7 @@ frappe.ui.form.on('Retention Invoice', {
 
         // ปุ่ม Create Payment (แสดงตอน Submit แล้ว)
         if (frm.doc.docstatus === 1) {
-            frm.add_custom_button(__('Payment Entry'), function() {
+            frm.add_custom_button(__('Payment'), function() {
                 create_payment_entry(frm);
             }, __('Create'));
         }

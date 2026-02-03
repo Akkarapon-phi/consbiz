@@ -151,3 +151,15 @@ def check_retention_payable_exists(invoice_name):
         return existing[0][0]
     
     return None
+
+    #--------------------------------------------------
+
+@frappe.whitelist()
+def set_user_default_company(company):
+    # ตรวจสอบว่าบริษัทมีจริงหรือไม่เพื่อความปลอดภัย
+    if frappe.db.exists("Company", company):
+        # บันทึกค่า Default แยกตาม User ที่กำลังใช้งาน
+        frappe.defaults.set_user_default("company", company)
+        frappe.clear_cache(user=frappe.session.user)
+        return True
+    return False

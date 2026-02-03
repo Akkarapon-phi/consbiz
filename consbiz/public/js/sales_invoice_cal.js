@@ -226,9 +226,9 @@ frappe.ui.form.on('Sales Invoice', {
                 args: { invoice_name: frm.doc.name },
                 callback: function(r) {
                     if (r.message) {
-                        frm.add_custom_button(__('View Retention'), function() {
+                        frm.add_custom_button(__('Retention'), function() {
                             frappe.set_route('Form', 'Retention Receivable', r.message);
-                        }, __('View')).removeClass('btn-default').addClass('btn-success');
+                        }, __('View'));
                     } else {
                         frm.add_custom_button(__('Retention Receivable'), function() {
                             create_retention_receivable(frm);
