@@ -53,9 +53,31 @@ doctype_js = {
     "Payment Entry": "public/js/payment_entry_deduction.js"
 }
 
+# ----------------------------------------
+# Auto Cancel Exemption (สำคัญมาก)
+# ----------------------------------------
+# บอกระบบว่าไม่ต้อง Block ถ้ามีเอกสารเหล่านี้ Link อยู่ (เราจะจัดการ Cancel เองใน Code)
+auto_cancel_exempted_doctypes = ["Retention Receivable"]
+
+
 doc_events = {
     "Payment Entry": {
-        "on_submit": "consbiz.api.update_si_tax" # เปลี่ยน path ให้ตรงกับที่อยู่ไฟล์จริง
+        "on_submit": "consbiz.api.update_si_tax" 
+    },
+    "Journal Entry": {
+        "on_submit": "consbiz.api.update_retention_on_payment_submit",
+        "on_cancel": "consbiz.api.update_retention_on_payment_cancel"
+    },
+    "Sales Invoice": {
+        "on_submit": [
+            "consbiz.api.create_retention_receivable",
+            "consbiz.api.create_transmittal_entry"
+        ],
+
+        "before_cancel": [
+            "consbiz.api.cancel_linked_retention_receivable",
+            "consbiz.api.cancel_transmittal_entry"
+        ]
     }
 }
 

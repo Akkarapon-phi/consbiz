@@ -6,19 +6,71 @@
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
-  "section_break_tz1k"
+  "reference",
+  "document_no",
+  "column_break_hbsn",
+  "receipt",
+  "tax",
+  "wht",
+  "retention"
  ],
  "fields": [
   {
-   "fieldname": "section_break_tz1k",
-   "fieldtype": "Section Break"
+   "fetch_from": "reference.document_no",
+   "fieldname": "document_no",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Document No"
+  },
+  {
+   "fieldname": "column_break_hbsn",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "fetch_from": "reference.receipt",
+   "fieldname": "receipt",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Receipt"
+  },
+  {
+   "default": "0",
+   "fetch_from": "reference.tax",
+   "fieldname": "tax",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Tax"
+  },
+  {
+   "default": "0",
+   "fetch_from": "reference.wht",
+   "fieldname": "wht",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "WHT"
+  },
+  {
+   "default": "0",
+   "fetch_from": "reference.retention",
+   "fieldname": "retention",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": " Retention"
+  },
+  {
+   "fieldname": "reference",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Reference",
+   "options": "Transmittal Entry"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2026-02-04 00:50:03.716906",
+ "modified": "2026-02-14 11:37:26.556086",
  "modified_by": "Administrator",
  "module": "ConsBiz",
  "name": "Transmittal Item",

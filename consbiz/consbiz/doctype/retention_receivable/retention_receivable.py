@@ -13,25 +13,28 @@ class RetentionReceivable(Document):
 
     def check_duplicate_invoice(self):
         """
-        ตรวจสอบว่า Sales Invoice ในรายการนี้ เคยถูกเอาไปสร้าง Retention Receivable ใบอื่นหรือยัง
+        ตรวจสอบว่า Sales Invoice (Reference No) ในรายการนี้ เคยถูกเอาไปสร้าง Retention Receivable ใบอื่นหรือยัง
         (ต้องเช็คทั้งแบบ Draft และ Submit แต่ไม่เช็ค Cancel)
         """
         for item in self.retention_items:
-            if item.sales_invoice:
+            # ใช้ reference_no เป็นหลัก หรือ fallback ไปที่ sales_invoice_no
+            ref_no = item.sales_invoice_no
+            
+            if ref_no:
                 # Query หาว่ามีใบอื่น (t2) ที่ไม่ใช่ใบนี้ (self.name) ใช้อินวอยซ์เดียวกันไหม
                 duplicate = frappe.db.sql("""
                     SELECT t2.name 
                     FROM `tabRetention Items` t1
                     LEFT JOIN `tabRetention Receivable` t2 ON t1.parent = t2.name
-                    WHERE t1.sales_invoice = %s
+                    WHERE t1.sales_invoice_no = %s
                     AND t1.parenttype = 'Retention Receivable'
                     AND t2.docstatus < 2
                     AND t2.name != %s
-                """, (item.sales_invoice, self.name or "New Document"))
+                """, (ref_no, self.name or "New Document"))
                 
                 # ถ้าเจอ -> โวยวายทันที และห้ามบันทึก
                 if duplicate:
-                    frappe.throw(_("ไม่สามารถสร้างได้: Sales Invoice {0} ถูกใช้งานแล้วในเอกสาร <a href='/app/retention-receivable/{1}'>{1}</a>").format(item.sales_invoice, duplicate[0][0]))
+                    frappe.throw(_("ไม่สามารถสร้างได้: Sales Invoice {0} ถูกใช้งานแล้วในเอกสาร <a href='/app/retention-receivable/{1}'>{1}</a>").format(ref_no, duplicate[0][0]))
 
     def set_status(self):
         if self.docstatus == 0:

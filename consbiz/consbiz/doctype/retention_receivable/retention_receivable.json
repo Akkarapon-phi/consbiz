@@ -13,7 +13,6 @@
   "column_break_dpro",
   "posting_date",
   "due_date",
-  "status",
   "column_break_ypwu",
   "amended_from",
   "project",
@@ -24,7 +23,10 @@
   "column_break_jyin",
   "column_break_eeqc",
   "grand_total",
-  "in_words"
+  "in_words",
+  "more_info_section",
+  "status",
+  "column_break_ixim"
  ],
  "fields": [
   {
@@ -128,14 +130,24 @@
    "fieldname": "status",
    "fieldtype": "Select",
    "label": "Status",
-   "options": "Draft\nActive\nOverdue\nBilled\nPaid"
+   "options": "Draft\nActive\nOverdue\nBilled\nPaid\nCancelled"
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "more_info_section",
+   "fieldtype": "Section Break",
+   "label": "More info"
+  },
+  {
+   "fieldname": "column_break_ixim",
+   "fieldtype": "Column Break"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-01-26 00:19:10.747449",
+ "modified": "2026-02-04 20:52:27.435480",
  "modified_by": "Administrator",
  "module": "ConsBiz",
  "name": "Retention Receivable",
@@ -163,11 +175,15 @@
  "sort_order": "DESC",
  "states": [
   {
+   "color": "Gray",
+   "title": "Draft"
+  },
+  {
    "color": "Green",
    "title": "Active"
   },
   {
-   "color": "Red",
+   "color": "Orange",
    "title": "Overdue"
   },
   {
@@ -177,6 +193,10 @@
   {
    "color": "Green",
    "title": "Paid"
+  },
+  {
+   "color": "Red",
+   "title": "Cancelled"
   }
  ],
  "track_changes": 1

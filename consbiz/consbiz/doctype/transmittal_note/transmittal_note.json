@@ -1,0 +1,107 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "naming_series:",
+ "creation": "2026-02-13 00:23:04.099817",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "section_break_dp5t",
+  "naming_series",
+  "type",
+  "form_date",
+  "to_date",
+  "column_break_rroo",
+  "amended_from",
+  "status",
+  "section_break_huey",
+  "transmittal_item"
+ ],
+ "fields": [
+  {
+   "fieldname": "section_break_dp5t",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "Transmittal Note",
+   "print_hide": 1,
+   "read_only": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "label": "Series"
+  },
+  {
+   "fieldname": "type",
+   "fieldtype": "Select",
+   "label": "Type",
+   "options": "\u0e23\u0e32\u0e22\u0e23\u0e31\u0e1a\n\u0e23\u0e32\u0e22\u0e08\u0e48\u0e32\u0e22\n\u0e01\u0e32\u0e23\u0e08\u0e48\u0e32\u0e22\u0e40\u0e07\u0e34\u0e19\u0e40\u0e14\u0e37\u0e2d\u0e19"
+  },
+  {
+   "fieldname": "form_date",
+   "fieldtype": "Date",
+   "label": "Form Date"
+  },
+  {
+   "fieldname": "to_date",
+   "fieldtype": "Date",
+   "label": "To Date"
+  },
+  {
+   "fieldname": "column_break_rroo",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Status",
+   "options": "Draft\nSubmitted\nSend\nCancelled"
+  },
+  {
+   "fieldname": "section_break_huey",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "transmittal_item",
+   "fieldtype": "Table",
+   "label": "Transmittal Item",
+   "options": "Transmittal Item"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "is_submittable": 1,
+ "links": [],
+ "modified": "2026-02-14 11:23:00.527347",
+ "modified_by": "Administrator",
+ "module": "ConsBiz",
+ "name": "Transmittal Note",
+ "naming_rule": "By \"Naming Series\" field",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

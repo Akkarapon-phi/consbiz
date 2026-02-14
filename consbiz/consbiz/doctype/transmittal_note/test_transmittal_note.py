@@ -13,9 +13,9 @@ IGNORE_TEST_RECORD_DEPENDENCIES = []  # eg. ["User"]
 
 
 
-class IntegrationTestTransmittal(IntegrationTestCase):
+class IntegrationTestTransmittalNote(IntegrationTestCase):
 	"""
-	Integration tests for Transmittal.
+	Integration tests for TransmittalNote.
 	Use this class for testing interactions between multiple components.
 	"""
 

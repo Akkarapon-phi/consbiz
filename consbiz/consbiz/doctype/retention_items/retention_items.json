@@ -8,10 +8,10 @@
  "field_order": [
   "posting_date",
   "due_date",
-  "sales_invoice",
   "column_break_tjda",
-  "purchase_invoice",
-  "supplier_invoice",
+  "sales_invoice_no",
+  "purchase_invoice_no",
+  "reference_no",
   "section_break_phkm",
   "description",
   "totals_section",
@@ -34,28 +34,8 @@
    "label": "Due Date"
   },
   {
-   "fieldname": "sales_invoice",
-   "fieldtype": "Link",
-   "in_list_view": 1,
-   "label": "Sales Invoice",
-   "options": "Sales Invoice"
-  },
-  {
    "fieldname": "column_break_tjda",
    "fieldtype": "Column Break"
-  },
-  {
-   "fieldname": "purchase_invoice",
-   "fieldtype": "Link",
-   "in_list_view": 1,
-   "label": "Purchase Invoice",
-   "options": "Purchase Invoice"
-  },
-  {
-   "fieldname": "supplier_invoice",
-   "fieldtype": "Data",
-   "in_list_view": 1,
-   "label": "Supplier Invoice"
   },
   {
    "fieldname": "section_break_phkm",
@@ -94,13 +74,30 @@
    "fieldtype": "Currency",
    "in_list_view": 1,
    "label": "Amount"
+  },
+  {
+   "fieldname": "reference_no",
+   "fieldtype": "Data",
+   "label": "Reference No"
+  },
+  {
+   "fieldname": "sales_invoice_no",
+   "fieldtype": "Link",
+   "label": "Sales Invoice No",
+   "options": "Sales Invoice"
+  },
+  {
+   "fieldname": "purchase_invoice_no",
+   "fieldtype": "Link",
+   "label": "Purchase Invoice No",
+   "options": "Purchase Invoice"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2026-01-25 17:24:26.138770",
+ "modified": "2026-02-04 13:35:15.975266",
  "modified_by": "Administrator",
  "module": "ConsBiz",
  "name": "Retention Items",

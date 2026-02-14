@@ -2,14 +2,14 @@
 
 // ฟังก์ชันประกาศแบบ Hoisted
 function fetch_company_settings(frm) {
-    if(!frm.doc.company) return;
+    if (!frm.doc.company) return;
     frappe.db.get_value('Company', frm.doc.company, ['abbr', 'custom_wht_receivable', 'custom_retention_receivable', 'cost_center'], (r) => {
         if (r) {
             frm.custom_abbr = r.abbr;
             frm.custom_wht_acc = r.custom_wht_receivable;
             frm.custom_ret_acc = r.custom_retention_receivable;
             frm.custom_company_cc = r.cost_center;
-            calculate_paid_amount(frm); 
+            calculate_paid_amount(frm);
         }
     });
 }
@@ -17,17 +17,17 @@ function fetch_company_settings(frm) {
 function calculate_paid_amount(frm) {
     // --- แก้ไข: ใช้ net_total เป็นฐานคำนวณ เพื่อรองรับกรณี VAT Inclusive ---
     let net_total = flt(frm.doc.net_total);
-    
+
     let grand_total = flt(frm.doc.grand_total);
     let total_advance = flt(frm.doc.total_advance);
     let rounding_adjustment = flt(frm.doc.rounding_adjustment);
-    
+
     // ตั้งค่าเริ่มต้น
-    let abbr = frm.custom_abbr || ""; 
+    let abbr = frm.custom_abbr || "";
     let wht_account = frm.custom_wht_acc ? frm.custom_wht_acc : `ถูกหัก ณ ที่จ่าย - ${abbr}`;
     let ret_account = frm.custom_ret_acc ? frm.custom_ret_acc : `เงินประกันผลงาน - ${abbr}`;
 
-    let wht_cost_center = frm.custom_company_cc; 
+    let wht_cost_center = frm.custom_company_cc;
     let ret_cost_center = frm.doc.cost_center ? frm.doc.cost_center : wht_cost_center;
 
     // 1. คำนวณยอดหัก (จากยอด net_total)
@@ -35,7 +35,7 @@ function calculate_paid_amount(frm) {
     if (frm.doc.custom_subject_to_wht && flt(frm.doc.custom_wht_percent) > 0) {
         wht_amt_local = flt((net_total * flt(frm.doc.custom_wht_percent) / 100), 2);
     }
-    
+
     let ret_amt_local = 0;
     if (frm.doc.custom_subject_to_retention && flt(frm.doc.custom_retention_percent) > 0) {
         ret_amt_local = flt((net_total * flt(frm.doc.custom_retention_percent) / 100), 2);
@@ -81,7 +81,7 @@ function calculate_paid_amount(frm) {
             total_deduction_table += flt(d.amount);
         });
     }
-    
+
     if (flt(frm.doc.custom_total_deductions) !== flt(total_deduction_table, 2)) {
         frm.set_value('custom_total_deductions', flt(total_deduction_table, 2));
     }
@@ -89,7 +89,7 @@ function calculate_paid_amount(frm) {
     // 4. คำนวณยอดสุทธิ
     let paid_amount = grand_total - total_advance - total_deduction_table + rounding_adjustment;
     paid_amount = flt(paid_amount, 2);
-    
+
     if (flt(frm.doc.custom_net_paid_amount) !== paid_amount) {
         frm.set_value('custom_net_paid_amount', paid_amount);
     }
@@ -103,10 +103,10 @@ function calculate_paid_amount(frm) {
 function sync_deduction_to_table(frm, account_name, amount, description, target_cost_center) {
     let table_name = 'custom_payment_entry_deduction';
     if (!frm.doc[table_name]) frm.doc[table_name] = [];
-    
+
     let existing_rows = frm.doc[table_name].filter(d => d.account === account_name);
     let changed = false;
-    
+
     if (amount > 0) {
         if (existing_rows.length > 0) {
             let row = existing_rows[0];
@@ -115,8 +115,8 @@ function sync_deduction_to_table(frm, account_name, amount, description, target_
                 changed = true;
             }
             if (target_cost_center && row.cost_center !== target_cost_center) {
-                 frappe.model.set_value(row.doctype, row.name, 'cost_center', target_cost_center);
-                 changed = true;
+                frappe.model.set_value(row.doctype, row.name, 'cost_center', target_cost_center);
+                changed = true;
             }
         } else {
             if (target_cost_center) {
@@ -131,7 +131,7 @@ function sync_deduction_to_table(frm, account_name, amount, description, target_
     } else {
         if (existing_rows.length > 0) {
             existing_rows.forEach(row => {
-                frappe.model.clear_doc(row.doctype, row.name); 
+                frappe.model.clear_doc(row.doctype, row.name);
             });
             frm.doc[table_name] = frm.doc[table_name].filter(d => d.account !== account_name);
             changed = true;
@@ -141,36 +141,60 @@ function sync_deduction_to_table(frm, account_name, amount, description, target_
 }
 
 function update_thai_labels(frm, paid_amount, grand_total) {
-    let text_paid = paid_amount !== 0 ? 
+    let text_paid = paid_amount !== 0 ?
         (paid_amount > 0 ? thai_baht_text(paid_amount) : 'ติดลบ' + thai_baht_text(Math.abs(paid_amount))) : 'ศูนย์บาทถ้วน';
-    
+
     if (frm.doc.custom_paid_amount_in_words !== text_paid) {
         frm.set_value('custom_paid_amount_in_words', text_paid);
         frm.refresh_field('custom_paid_amount_in_words');
     }
 
-    let text_grand = grand_total !== 0 ? 
+    let text_grand = grand_total !== 0 ?
         (grand_total > 0 ? thai_baht_text(grand_total) : 'ติดลบ' + thai_baht_text(Math.abs(grand_total))) : 'ศูนย์บาทถ้วน';
-        
+
     if (frm.doc.custom_in_words_th !== text_grand) {
         frm.set_value('custom_in_words_th', text_grand);
         frm.refresh_field('custom_in_words_th');
     }
 }
 
-function create_retention_receivable(frm) {
-    frappe.model.with_doctype('Retention Receivable', function() {
-        var doc = frappe.model.get_new_doc('Retention Receivable');
+// Function to create Transmittal Entry manually from Sales Invoice
+function create_transmittal_entry(frm) {
+    frappe.model.with_doctype('Transmittal Entry', function() {
+        var doc = frappe.model.get_new_doc('Transmittal Entry');
+
+        // Map Fields
+        doc.type = 'รายรับ';
+        doc.document_no = frm.doc.name;
+        doc.posting_date = frm.doc.posting_date;
+        doc.company = frm.doc.company;
+        doc.customer = frm.doc.customer;
+        doc.project = frm.doc.project;
+        doc.subject = `นำส่งเอกสารวางบิล ${frm.doc.name}`;
         
+        // Map Checkboxes
+        doc.receipt = 1;
+        doc.tax = frm.doc.total_taxes_and_charges > 0 ? 1 : 0;
+        doc.wht = frm.doc.custom_subject_to_wht ? 1 : 0;
+        doc.retention = frm.doc.custom_subject_to_retention ? 1 : 0;
+
+        frappe.set_route('Form', 'Transmittal Entry', doc.name);
+    });
+}
+
+function create_retention_receivable(frm) {
+    frappe.model.with_doctype('Retention Receivable', function () {
+        var doc = frappe.model.get_new_doc('Retention Receivable');
+
         doc.company = frm.doc.company;
         doc.customer = frm.doc.customer;
         doc.posting_date = frm.doc.posting_date;
         doc.due_date = frm.doc.due_date;
         doc.project = frm.doc.project;
         doc.customer_po = frm.doc.po_no;
-        
+
         var child = frappe.model.add_child(doc, 'Retention Items', 'retention_items');
-        child.sales_invoice = frm.doc.name;
+        child.sales_invoice_no = frm.doc.name;
         child.posting_date = frm.doc.posting_date;
         child.due_date = frm.doc.due_date;
         child.description = "Retention from " + frm.doc.name;
@@ -184,20 +208,20 @@ function create_retention_receivable(frm) {
 
 // Main Trigger
 frappe.ui.form.on('Sales Invoice', {
-    setup: function(frm) {
+    setup: function (frm) {
         if (frm.doc.company) fetch_company_settings(frm);
     },
-    company: function(frm) {
+    company: function (frm) {
         fetch_company_settings(frm);
     },
-    
+
     custom_subject_to_wht: (frm) => calculate_paid_amount(frm),
     custom_wht_percent: (frm) => calculate_paid_amount(frm),
     custom_subject_to_retention: (frm) => calculate_paid_amount(frm),
     custom_retention_percent: (frm) => calculate_paid_amount(frm),
     total_advance: (frm) => calculate_paid_amount(frm),
-    
-    posting_date: function(frm) {
+
+    posting_date: function (frm) {
         if (frm.doc.posting_date && frm.doc.payment_terms_template) {
             if (frm.events.payment_terms_template) {
                 frm.events.payment_terms_template(frm);
@@ -207,35 +231,55 @@ frappe.ui.form.on('Sales Invoice', {
         }
     },
 
-    payment_terms_template: function(frm) {
+    payment_terms_template: function (frm) {
         if (!frm.doc.payment_terms_template) {
             frm.clear_table('payment_schedule');
             frm.refresh_field('payment_schedule');
         }
     },
-    
-    validate: function(frm) { calculate_paid_amount(frm); },
-    
-    refresh: function(frm) { 
-        calculate_paid_amount(frm); 
+
+    validate: function (frm) { calculate_paid_amount(frm); },
+
+    refresh: function (frm) {
+        calculate_paid_amount(frm);
 
         // Logic ปุ่ม Create/View Retention
         if (frm.doc.docstatus === 1 && frm.doc.custom_subject_to_retention && frm.doc.custom_retention_amount > 0) {
             frappe.call({
                 method: 'consbiz.api.check_retention_exists',
                 args: { invoice_name: frm.doc.name },
-                callback: function(r) {
+                callback: function (r) {
                     if (r.message) {
-                        frm.add_custom_button(__('Retention'), function() {
+                        frm.add_custom_button(__('View Retention'), function () {
                             frappe.set_route('Form', 'Retention Receivable', r.message);
                         }, __('View'));
                     } else {
-                        frm.add_custom_button(__('Retention Receivable'), function() {
+                        frm.add_custom_button(__('Retention Receivable'), function () {
                             create_retention_receivable(frm);
                         }, __('Create'));
                     }
                 }
             });
         }
+
+            // --- 2. Logic ปุ่ม Transmittal Entry (Create/View) ---
+            // สร้างปุ่มเสมอสำหรับ Sales Invoice ที่ Submit แล้ว
+            frappe.call({
+                method: 'consbiz.api.check_transmittal_exists',
+                args: { document_no: frm.doc.name },
+                callback: function (r) {
+                    if (r.message) {
+                        // ถ้ามีแล้ว -> View
+                        frm.add_custom_button(__('Transmittal Entry'), function () {
+                            frappe.set_route('Form', 'Transmittal Entry', r.message);
+                        }, __('View'));
+                    } else {
+                        // ถ้ายังไม่มี (หรือถูกลบไป) -> Create
+                        frm.add_custom_button(__('Transmittal Entry'), function () {
+                            create_transmittal_entry(frm);
+                        }, __('Create'));
+                    }
+                }
+            });
     }
 });

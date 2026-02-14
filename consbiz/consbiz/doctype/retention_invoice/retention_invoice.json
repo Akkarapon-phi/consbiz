@@ -12,16 +12,21 @@
   "customer",
   "column_break_dpro",
   "posting_date",
+  "credit_day",
   "due_date",
-  "status",
   "column_break_ypwu",
   "amended_from",
   "project",
   "customer_po",
+  "status",
   "section_break_pwlb",
   "retention_items",
   "totals_section",
   "column_break_jyin",
+  "mode_of_payment",
+  "account",
+  "bank",
+  "bank_account_no",
   "column_break_eeqc",
   "grand_total",
   "in_words"
@@ -73,7 +78,7 @@
    "fieldtype": "Link",
    "label": "Amended From",
    "no_copy": 1,
-   "options": "Retention Claim",
+   "options": "Retention Invoice",
    "print_hide": 1,
    "read_only": 1,
    "search_index": 1
@@ -127,14 +132,52 @@
    "fieldname": "status",
    "fieldtype": "Select",
    "label": "Status",
-   "options": "Draft\nUnpaid\nPaid"
+   "no_copy": 1,
+   "options": "Draft\nUnpaid\nOverdue\nPaid\nCancelled",
+   "read_only": 1
+  },
+  {
+   "fieldname": "mode_of_payment",
+   "fieldtype": "Link",
+   "label": "Mode of Payment",
+   "no_copy": 1,
+   "options": "Mode of Payment",
+   "read_only": 1
+  },
+  {
+   "fieldname": "account",
+   "fieldtype": "Link",
+   "label": "Account",
+   "no_copy": 1,
+   "options": "Account",
+   "read_only": 1
+  },
+  {
+   "fieldname": "bank",
+   "fieldtype": "Data",
+   "label": "Bank",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "bank_account_no",
+   "fieldtype": "Data",
+   "label": "Bank Account No",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "default": "7",
+   "fieldname": "credit_day",
+   "fieldtype": "Data",
+   "label": "Credit (Day)"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-01-26 00:18:21.799497",
+ "modified": "2026-02-04 20:30:43.770942",
  "modified_by": "Administrator",
  "module": "ConsBiz",
  "name": "Retention Invoice",
@@ -161,8 +204,12 @@
  "sort_order": "DESC",
  "states": [
   {
-   "color": "Orange",
+   "color": "Yellow",
    "title": "Unpaid"
+  },
+  {
+   "color": "Orange",
+   "title": "Overdue"
   },
   {
    "color": "Green",
