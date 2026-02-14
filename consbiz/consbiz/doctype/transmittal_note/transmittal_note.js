@@ -6,17 +6,14 @@ frappe.ui.form.on('Transmittal Note', {
         // กรณีสถานะ Draft
         // ------------------------------------------------
         if (frm.doc.docstatus === 0) {
-            // ปุ่มที่ 1: ดึงข้อมูลแบบเลือกช่วงเวลา (Get by Date) - แบบเดิม
             frm.add_custom_button(__('Get Submitted Entries'), function() {
                 show_date_filter_dialog(frm);
             }, __('Get Items'));
 
-            // ปุ่มที่ 2: ดึงข้อมูลทั้งหมด (Get All) - แบบเดิม
             frm.add_custom_button(__('Get All Submitted Entries'), function() {
                 get_submitted_entries(frm, null, null);
             }, __('Get Items'));
 
-            // ปุ่มที่ 3: ตรวจสอบและลบรายการที่ไม่พร้อมใช้งาน
             frm.add_custom_button(__('Check & Remove Invalid'), function() {
                 validate_and_cleanup_entries(frm);
             }, __('Get Items'));
@@ -26,10 +23,36 @@ frappe.ui.form.on('Transmittal Note', {
         // กรณีสถานะ Submitted
         // ------------------------------------------------
         if (frm.doc.docstatus === 1) {
-            // ปุ่มเพิ่มเอกสารทีหลัง (Custom Dialog แบบตาราง)
-            frm.add_custom_button(__('Add Submitted Entry'), function() {
-                add_submitted_entry_custom_dialog(frm);
-            }, __('Get Items'));
+            // ** เงื่อนไข: แสดงปุ่ม Add เฉพาะตอนที่สถานะ *ไม่ใช่* Sent **
+            if (frm.doc.status !== 'Sent') {
+                frm.add_custom_button(__('Add Submitted Entry'), function() {
+                    add_submitted_entry_custom_dialog(frm);
+                }, __('Get Items'));
+            }
+
+            // ปุ่ม SEND (แสดงเมื่อยังไม่ Sent)
+            if (frm.doc.status !== 'Sent') {
+                frm.add_custom_button(__('Send'), function() {
+                    frappe.confirm(
+                        __('ยืนยันการส่งเอกสาร? สถานะของ Transmittal Entry ทั้งหมดจะถูกเปลี่ยนเป็น "Sent"'),
+                        function() {
+                            frm.call({
+                                method: 'set_status_sent',
+                                doc: frm.doc,
+                                freeze: true,
+                                freeze_message: __('Sending...'),
+                                callback: function(r) {
+                                    if (!r.exc) {
+                                        // รีโหลดหน้าจอเพื่อให้เห็นสถานะ Sent และปุ่มต่างๆ หายไป
+                                        frm.reload_doc();
+                                        frappe.show_alert({message: __('เอกสารถูกส่งเรียบร้อยแล้ว (Sent)'), indicator: 'green'});
+                                    }
+                                }
+                            });
+                        }
+                    );
+                }).addClass('btn-primary'); 
+            }
         }
     },
     
@@ -51,7 +74,8 @@ frappe.ui.form.on('Transmittal Note', {
                         doctype: 'Transmittal Entry',
                         filters: {
                             name: ['in', refs],
-                            status: ['!=', 'Submitted']
+                            // อนุญาต: Submitted, Prepared, Sent
+                            status: ['not in', ['Submitted', 'Prepared', 'Sent']] 
                         },
                         fields: ['name', 'status']
                     },
@@ -60,12 +84,14 @@ frappe.ui.form.on('Transmittal Note', {
                             let invalid_docs = r.message.map(d => d.name + " (" + d.status + ")").join(', ');
                             frappe.msgprint({
                                 title: __('พบเอกสารไม่พร้อมใช้งาน'),
-                                message: __('มีเอกสารบางรายการที่สถานะไม่ใช่ <b>Submitted</b> (อาจถูกยกเลิก หรือถูกนำส่งไปแล้ว):<br><b>{0}</b><br><br>กรุณากดปุ่ม <b>"Check & Remove Invalid"</b> (ในสถานะ Draft) เพื่อลบรายการเหล่านี้ออก', [invalid_docs]),
+                                message: __('มีเอกสารบางรายการที่สถานะผิดปกติ:<br><b>{0}</b><br><br>กรุณากดปุ่ม <b>"Check & Remove Invalid"</b> เพื่อตรวจสอบ', [invalid_docs]),
                                 indicator: 'red'
                             });
                         } else {
                             frm.doc.flags.ignore_validate_references = true;
+                            // ถ้าเป็น Draft ให้ Save, ถ้า Submitted ให้ผ่าน Validation (เพราะเราจะ Save ในฟังก์ชัน Add)
                             if (frm.doc.docstatus === 0) frm.save();
+                            else frappe.validated = true; 
                         }
                     }
                 });
@@ -80,9 +106,7 @@ frappe.ui.form.on('Transmittal Note', {
     }
 });
 
-// ============================================================
-// Section 1: Functions for Draft State (Original Get Buttons)
-// ============================================================
+// ... (ฟังก์ชัน Get / Show Dialog / Validate เดิม คงไว้เหมือนเดิม) ...
 
 function show_date_filter_dialog(frm) {
     let d = new frappe.ui.Dialog({
@@ -188,7 +212,7 @@ function validate_and_cleanup_entries(frm) {
             doctype: 'Transmittal Entry',
             filters: {
                 name: ['in', refs],
-                status: ['!=', 'Submitted'] 
+                status: ['not in', ['Submitted', 'Prepared', 'Sent']] 
             },
             fields: ['name']
         },
@@ -219,7 +243,7 @@ function validate_and_cleanup_entries(frm) {
             } else {
                 frappe.msgprint({
                     title: __('ตรวจสอบเรียบร้อย'),
-                    message: __('เอกสารทั้งหมดสถานะปกติ (Submitted)'),
+                    message: __('เอกสารทั้งหมดสถานะปกติ'),
                     indicator: 'green'
                 });
             }
@@ -227,15 +251,12 @@ function validate_and_cleanup_entries(frm) {
     });
 }
 
-// ============================================================
-// Section 2: Functions for Submitted State (Custom Dialog)
-// ============================================================
+// ... (ฟังก์ชัน Custom Dialog และ Add Entry เหมือนเดิม) ...
 
 function add_submitted_entry_custom_dialog(frm) {
-    // สร้าง Dialog แบบ Custom เพื่อแสดงตารางและตัวกรองครบถ้วน
     let d = new frappe.ui.Dialog({
         title: __('Add Submitted Entry'),
-        size: 'extra-large', // แก้ไข: ปรับขนาดให้กว้างขึ้น (extra-large)
+        size: 'extra-large',
         fields: [
             {
                 fieldtype: 'Section Break', label: __('Filters')
@@ -243,7 +264,7 @@ function add_submitted_entry_custom_dialog(frm) {
             {
                 fieldname: 'from_date', label: __('From Date'), fieldtype: 'Date',
                 default: frappe.datetime.add_months(frappe.datetime.get_today(), -1),
-                change: () => refresh_dialog_table() // รีเฟรชทันทีที่เปลี่ยนวันที่
+                change: () => refresh_dialog_table()
             },
             {
                 fieldname: 'to_date', label: __('To Date'), fieldtype: 'Date',
@@ -271,7 +292,6 @@ function add_submitted_entry_custom_dialog(frm) {
         ],
         primary_action_label: __('Add Selected'),
         primary_action: function() {
-            // ดึงค่า ID จาก Checkbox ที่ถูกติ๊ก
             let selected_entries = [];
             d.$wrapper.find('.entry-checkbox:checked').each(function() {
                 selected_entries.push($(this).attr('data-name'));
@@ -286,7 +306,6 @@ function add_submitted_entry_custom_dialog(frm) {
         }
     });
 
-    // ฟังก์ชันสำหรับดึงข้อมูลและวาดตาราง HTML
     let refresh_dialog_table = function() {
         let values = d.get_values();
         let existing_refs = (frm.doc.transmittal_item || []).map(d => d.reference);
@@ -294,7 +313,7 @@ function add_submitted_entry_custom_dialog(frm) {
         let filters = [
             ['docstatus', '=', 1],
             ['status', '=', 'Submitted'],
-            ['name', 'not in', existing_refs] // กรองตัวที่มีแล้วออก
+            ['name', 'not in', existing_refs]
         ];
 
         if (values.from_date) filters.push(['posting_date', '>=', values.from_date]);
@@ -310,7 +329,7 @@ function add_submitted_entry_custom_dialog(frm) {
                 doctype: 'Transmittal Entry',
                 filters: filters,
                 fields: ['name', 'document_no', 'posting_date', 'receipt', 'tax', 'wht', 'retention'],
-                limit_page_length: 50 // Limit เพื่อไม่ให้โหลดนานเกินไป
+                limit_page_length: 50
             },
             freeze: true,
             callback: function(r) {
@@ -353,7 +372,6 @@ function add_submitted_entry_custom_dialog(frm) {
                 html += `</tbody></table></div>`;
                 d.fields_dict.html_results.$wrapper.html(html);
 
-                // Bind Select All Checkbox
                 d.$wrapper.find('#select-all-entries').on('change', function() {
                     let checked = $(this).is(':checked');
                     d.$wrapper.find('.entry-checkbox').prop('checked', checked);
@@ -363,7 +381,7 @@ function add_submitted_entry_custom_dialog(frm) {
     };
 
     d.show();
-    refresh_dialog_table(); // โหลดครั้งแรก
+    refresh_dialog_table();
 }
 
 function fetch_and_add_entries(frm, selections) {
@@ -393,10 +411,7 @@ function fetch_and_add_entries(frm, selections) {
                 if (added_count > 0) {
                     renumber_items(frm);
                     frm.refresh_field('transmittal_item');
-                    
-                    // สำคัญ: เนื่องจากเป็นสถานะ Submitted ต้องกด Save เพื่อให้ข้อมูลเข้า Database จริง
                     frm.save();
-                    
                     frappe.show_alert({message: __('เพิ่มเอกสาร ' + added_count + ' รายการและบันทึกแล้ว'), indicator: 'green'});
                 }
             }
@@ -404,7 +419,6 @@ function fetch_and_add_entries(frm, selections) {
     });
 }
 
-// Common Utility
 function renumber_items(frm) {
     if (frm.doc.transmittal_item && frm.doc.transmittal_item.length > 0) {
         frm.doc.transmittal_item.forEach((row, index) => {

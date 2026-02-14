@@ -259,7 +259,7 @@ function fetch_from_parents(frm, parent_names) {
     let existing_keys = [];
     (frm.doc[TABLE_FIELD_NAME] || []).forEach(d => {
         if (d.reference_no) existing_keys.push(d.reference_no);
-        if (d.sales_invoice) existing_keys.push(d.sales_invoice);
+        if (d.sales_invoice_no) existing_keys.push(d.sales_invoice_no);
         if (d.purchase_invoice) existing_keys.push(d.purchase_invoice);
         if (d.supplier_invoice) existing_keys.push(d.supplier_invoice);
     });
@@ -279,7 +279,7 @@ function fetch_from_parents(frm, parent_names) {
                     source_items.forEach(item => {
                         let is_duplicate = false;
                         if (item.reference_no && existing_keys.includes(item.reference_no)) is_duplicate = true;
-                        if (item.sales_invoice && existing_keys.includes(item.sales_invoice)) is_duplicate = true;
+                        if (item.sales_invoice_no && existing_keys.includes(item.sales_invoice_no)) is_duplicate = true;
                         if (item.purchase_invoice && existing_keys.includes(item.purchase_invoice)) is_duplicate = true;
                         if (item.supplier_invoice && existing_keys.includes(item.supplier_invoice)) is_duplicate = true;
                         if (parent_doc.name && existing_keys.includes(parent_doc.name)) is_duplicate = true;
@@ -290,7 +290,7 @@ function fetch_from_parents(frm, parent_names) {
                             row.posting_date = item.posting_date;
                             row.due_date = item.due_date;
                             row.reference_no = parent_doc.name; 
-                            row.sales_invoice = item.sales_invoice_no || item.sales_invoice; 
+                            row.sales_invoice_no = item.sales_invoice_no_no || item.sales_invoice_no; 
                             row.purchase_invoice = item.purchase_invoice;
                             row.supplier_invoice = item.supplier_invoice;
                             row.description = item.description;
@@ -299,7 +299,7 @@ function fetch_from_parents(frm, parent_names) {
                             row.amount = item.amount;
 
                             if (parent_doc.name) existing_keys.push(parent_doc.name);
-                            if (item.sales_invoice_no) existing_keys.push(item.sales_invoice_no);
+                            if (item.sales_invoice_no_no) existing_keys.push(item.sales_invoice_no_no);
 
                             added_count++;
                         }

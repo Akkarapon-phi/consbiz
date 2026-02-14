@@ -54,14 +54,14 @@
    "fieldtype": "Column Break"
   },
   {
+   "allow_on_submit": 1,
    "default": "Draft",
    "fieldname": "status",
    "fieldtype": "Select",
    "in_standard_filter": 1,
    "label": "Status",
    "no_copy": 1,
-   "options": "Draft\nSubmitted\nPrepare\nSend\nCancelled",
-   "read_only": 1
+   "options": "Draft\nSubmitted\nPrepared\nSent\nCancelled"
   },
   {
    "default": "0",
@@ -106,7 +106,7 @@
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-02-14 11:22:47.216775",
+ "modified": "2026-02-14 16:13:12.968418",
  "modified_by": "Administrator",
  "module": "ConsBiz",
  "name": "Transmittal Entry",
@@ -134,11 +134,11 @@
  "states": [
   {
    "color": "Cyan",
-   "title": "Prepare"
+   "title": "Prepared"
   },
   {
    "color": "Green",
-   "title": "Send"
+   "title": "Sent"
   }
  ]
 }

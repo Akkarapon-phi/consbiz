@@ -227,6 +227,91 @@ def cancel_transmittal_entry(doc, method):
         )
 
 # ---------------------------------------------------------
+# Transmittal Entry Logic for Retention Invoice (เพิ่มใหม่)
+# ---------------------------------------------------------
+
+def create_transmittal_from_retention(doc, method):
+    """
+    สร้าง Transmittal Entry อัตโนมัติเมื่อ Retention Invoice ถูก Submit
+    """
+    try:
+        # ตรวจสอบว่าเคยสร้างไปแล้วหรือยัง
+        if frappe.db.exists("Transmittal Entry", {"document_no": doc.name, "docstatus": 1}):
+            return
+
+        # สร้างเอกสาร Transmittal Entry
+        te_doc = frappe.get_doc({
+            "doctype": "Transmittal Entry",
+            "type": "รายรับ",              # type = รายรับ
+            "posting_date": doc.posting_date, # posting_date = posting_date
+            "document_no": doc.name,        # document_no = doc.name
+            "receipt": 1,                   # Receipt = 1
+            "tax": 0,                       # Retention มักไม่มี Tax แยกในใบนี้ (หรือถ้ามีให้ปรับ logic)
+            "wht": 0,                       # ปกติ Retention ไม่โดนหัก ณ ที่จ่ายซ้ำ
+            "retention": 0,                 # ตัวมันเองคือ Retention (อาจจะไม่ต้องติ๊กช่อง Retention ซ้อน)
+            
+            # Map ข้อมูลเพิ่มเติมเพื่อให้เอกสารสมบูรณ์
+            "company": doc.company,
+            "customer": doc.customer,
+            "project": doc.project,
+            "subject": f"นำส่งเอกสารวางบิล Retention {doc.name}",
+            "status": "Draft"
+        })
+
+        te_doc.insert(ignore_permissions=True)
+        te_doc.submit()
+        
+        # อัปเดตสถานะเป็น Submitted
+        te_doc.db_set("status", "Submitted")
+
+        frappe.msgprint(
+            msg=f"สร้างใบนำส่งเอกสาร <a href='/app/transmittal-entry/{te_doc.name}'><b>{te_doc.name}</b></a> เรียบร้อยแล้ว",
+            indicator='green',
+            alert=True
+        )
+
+    except Exception as e:
+        frappe.log_error(frappe.get_traceback(), "Retention Transmittal Creation Error")
+        frappe.msgprint(
+            msg=_("ไม่สามารถสร้าง Transmittal Entry สำหรับ Retention ได้ (ดู Error Log)"),
+            indicator='orange',
+            alert=True
+        )
+
+def cancel_transmittal_from_retention(doc, method):
+    """
+    ยกเลิก Transmittal Entry เมื่อ Retention Invoice ถูก Cancel
+    """
+    try:
+        # ค้นหาเอกสารที่ Submit แล้วและอ้างอิงถึง Retention นี้
+        te_name = frappe.db.get_value("Transmittal Entry", {"document_no": doc.name, "docstatus": 1}, "name")
+        
+        if te_name:
+            te_doc = frappe.get_doc("Transmittal Entry", te_name)
+            
+            # ข้าม Permission Check
+            te_doc.flags.ignore_permissions = True
+            
+            te_doc.cancel()
+            
+            # อัปเดตสถานะเป็น Cancelled
+            te_doc.db_set("status", "Cancelled")
+            
+            frappe.msgprint(
+                msg=f"ยกเลิกใบนำส่งเอกสาร {te_name} เรียบร้อยแล้ว",
+                indicator='green',
+                alert=True
+            )
+
+    except Exception as e:
+        frappe.log_error(frappe.get_traceback(), "Retention Transmittal Cancellation Error")
+        frappe.msgprint(
+            msg=_("เกิดข้อผิดพลาดในการยกเลิก Transmittal Entry"),
+            indicator='red',
+            alert=True
+        )
+
+# ---------------------------------------------------------
 # Update Tax No. to Sales Invoice
 # ---------------------------------------------------------
 

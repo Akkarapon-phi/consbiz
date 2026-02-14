@@ -64,10 +64,17 @@ doc_events = {
     "Payment Entry": {
         "on_submit": "consbiz.api.update_si_tax" 
     },
+    
     "Journal Entry": {
         "on_submit": "consbiz.api.update_retention_on_payment_submit",
         "on_cancel": "consbiz.api.update_retention_on_payment_cancel"
     },
+
+    "Retention Invoice": {
+        "on_submit": "consbiz.api.create_transmittal_from_retention",
+        "before_cancel": "consbiz.api.cancel_transmittal_from_retention"
+    },
+
     "Sales Invoice": {
         "on_submit": [
             "consbiz.api.create_retention_receivable",

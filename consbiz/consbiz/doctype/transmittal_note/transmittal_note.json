@@ -9,11 +9,11 @@
   "section_break_dp5t",
   "naming_series",
   "type",
-  "form_date",
-  "to_date",
+  "posting_date",
   "column_break_rroo",
-  "amended_from",
   "status",
+  "send_date",
+  "amended_from",
   "section_break_huey",
   "transmittal_item"
  ],
@@ -44,16 +44,6 @@
    "options": "\u0e23\u0e32\u0e22\u0e23\u0e31\u0e1a\n\u0e23\u0e32\u0e22\u0e08\u0e48\u0e32\u0e22\n\u0e01\u0e32\u0e23\u0e08\u0e48\u0e32\u0e22\u0e40\u0e07\u0e34\u0e19\u0e40\u0e14\u0e37\u0e2d\u0e19"
   },
   {
-   "fieldname": "form_date",
-   "fieldtype": "Date",
-   "label": "Form Date"
-  },
-  {
-   "fieldname": "to_date",
-   "fieldtype": "Date",
-   "label": "To Date"
-  },
-  {
    "fieldname": "column_break_rroo",
    "fieldtype": "Column Break"
   },
@@ -68,17 +58,28 @@
    "fieldtype": "Section Break"
   },
   {
+   "allow_on_submit": 1,
    "fieldname": "transmittal_item",
    "fieldtype": "Table",
    "label": "Transmittal Item",
    "options": "Transmittal Item"
+  },
+  {
+   "fieldname": "posting_date",
+   "fieldtype": "Date",
+   "label": "Date"
+  },
+  {
+   "fieldname": "send_date",
+   "fieldtype": "Date",
+   "label": "Send Date"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-02-14 11:23:00.527347",
+ "modified": "2026-02-14 16:22:47.675042",
  "modified_by": "Administrator",
  "module": "ConsBiz",
  "name": "Transmittal Note",
@@ -103,5 +104,10 @@
  "rows_threshold_for_grid_search": 20,
  "sort_field": "creation",
  "sort_order": "DESC",
- "states": []
+ "states": [
+  {
+   "color": "Green",
+   "title": "Sent"
+  }
+ ]
 }
