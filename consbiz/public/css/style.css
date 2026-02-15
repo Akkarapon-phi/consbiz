@@ -27,7 +27,6 @@ h1, h2, h3, h4, h5, h6, p, span, div, a, label, input, textarea, select, button,
 .form-tabs .nav-item .nav-link {
     font-weight: 400 !important; /* ปรับความหนาให้ชัด */
     color: #525252 !important;
-    font-size: 1.00rem !important;
     letter-spacing: 0.00rem;
 }
 
