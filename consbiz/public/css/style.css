@@ -1,7 +1,55 @@
-@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@300;400;500;600;700&display=swap');
+/* 1. ดึง Noto Sans Thai มาให้ครบทุกน้ำหนัก */
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@300;400;500;600;700;800;900&display=swap');
 
 :root {
-    --font-stack: "Noto Sans Thai", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
-    --sans-font: "Noto Sans Thai", sans-serif !important;
-    --heading-font-stack: "Noto Sans Thai", sans-serif !important;
+    /* ใช้ Inter สำหรับอังกฤษ และ Noto สำหรับไทย */
+    --font-stack: "Inter", "system-ui", "-apple-system", "Noto Sans Thai", sans-serif !important;
+}
+
+/* 2. บังคับใช้กับทุกจุด รวมถึงส่วนที่วงไว้ */
+body, .navbar, .page-title, .page-content, .sidebar, .sidebar-menu, 
+.list-row, .list-item, .form-layout, .frappe-control, .control-label, 
+.control-value, .btn, .modal, .msgprint, .indicator, .dropdown-menu, 
+.navbar-nav, .breadcrumb, .comment, .timeline-item, .grid-row, 
+.data-row, .report-wrapper, .dt-cell, .dt-header, 
+h1, h2, h3, h4, h5, h6, p, span, div, a, label, input, textarea, select, button,
+.awesomplete, .frappe-card, .layout-main-section, .layout-side-section,
+.page-head, .page-body, .page-wrapper, .desk-page,
+.widget, .widget-head, .widget-body, .shortcut, .desk-sidebar, .desk-body {
+    font-family: var(--font-stack) !important;
+    line-height: 1.6 !important;
+    -webkit-font-smoothing: antialiased; /* ทำให้ฟอนต์ดูคมและเรียบเนียน */
+    -moz-osx-font-smoothing: grayscale;
+    font-synthesis: none; /* ห้ามเบราว์เซอร์ถมดำเอง ให้ใช้ไฟล์ฟอนต์จริง */
+}
+
+/* 3. จุดที่วงไว้ด้านบน: Tabs (Details, ใบกำกับภาษี ฯลฯ) */
+.form-tabs .nav-item .nav-link {
+    font-weight: 400 !important; /* ปรับความหนาให้ชัด */
+    color: #525252 !important;
+    font-size: 1.00rem !important;
+    letter-spacing: 0.00rem;
+}
+
+/* เมื่อ Tab ถูกเลือก (Active) ให้หนาที่สุด */
+.form-tabs .nav-item .nav-link.active {
+    font-weight: 600 !important;
+    color: #383838 !important;
+}
+
+/* 4. จุดที่วงไว้ด้านล่าง: Section Headings (Commission, ทีมขาย ฯลฯ) */
+.section-head, 
+.section-title, 
+.form-section .collapse-indicator, 
+.form-section .section-label,
+.form-section.collapsible .section-head .section-label {
+    font-weight: 600 !important; /* หนาพิเศษเพื่อให้แยกจากเนื้อหาชัดเจน */
+    color: #383838 !important;
+    font-size: 1.0rem !important;
+}
+
+/* 5. ปรับตัวเลขและหัวตาราง (ที่ฝั่งขวาดูดีกว่า) */
+.dt-cell--number, .list-item__content--number, .text-right, .dt-header .dt-cell {
+    font-weight: 600 !important;
+    color: #383838 !important;
 }
