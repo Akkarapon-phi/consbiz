@@ -64,7 +64,7 @@ doc_events = {
     "Payment Entry": {
         "on_submit": "consbiz.api.update_si_tax" 
     },
-    
+
     "Journal Entry": {
         "on_submit": "consbiz.api.update_retention_on_payment_submit",
         "on_cancel": "consbiz.api.update_retention_on_payment_cancel"
@@ -73,6 +73,12 @@ doc_events = {
     "Retention Invoice": {
         "on_submit": "consbiz.api.create_transmittal_from_retention",
         "before_cancel": "consbiz.api.cancel_transmittal_from_retention"
+    },
+
+    "Purchase Invoice": {
+        "on_submit": "consbiz.api.create_transmittal_entry_for_pi",
+        # ใช้ฟังก์ชัน cancel เดียวกันกับ SI ได้ เพราะค้นหาจาก document_no
+        "before_cancel": "consbiz.api.cancel_transmittal_entry"
     },
 
     "Sales Invoice": {

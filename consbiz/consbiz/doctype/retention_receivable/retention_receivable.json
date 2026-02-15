@@ -13,7 +13,6 @@
   "column_break_dpro",
   "posting_date",
   "due_date",
-  "retention_no",
   "column_break_ypwu",
   "amended_from",
   "project",
@@ -142,18 +141,13 @@
   {
    "fieldname": "column_break_ixim",
    "fieldtype": "Column Break"
-  },
-  {
-   "fieldname": "retention_no",
-   "fieldtype": "Data",
-   "label": "Retention No"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-02-14 16:53:07.739922",
+ "modified": "2026-02-14 23:01:13.895674",
  "modified_by": "Administrator",
  "module": "ConsBiz",
  "name": "Retention Receivable",

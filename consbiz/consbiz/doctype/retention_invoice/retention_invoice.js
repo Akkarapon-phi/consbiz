@@ -1,338 +1,257 @@
 // Script for DocType: Retention Invoice
 
-// Config ชื่อ Field ตาราง (ต้องตรงกับในหน้าจอ)
-const TABLE_FIELD_NAME = 'retention_items';
-// ชื่อ Child DocType ที่ใช้ใน Events
-const CHILD_DOCTYPE_NAME = 'Retention Items';
+// ============================================================
+// 1. Function Declarations (ฟังก์ชันหลักสำหรับ Dialog)
+// ============================================================
 
-frappe.ui.form.on('Retention Invoice', {
-    refresh: function (frm) {
-        // Fix: Amend Status and clear No Copy fields manually if they carry over
-        if (frm.doc.amended_from && frm.doc.docstatus === 0) {
-            if (frm.doc.status !== 'Draft') frm.set_value('status', 'Draft');
-            if (frm.doc.mode_of_payment) frm.set_value('mode_of_payment', '');
-            if (frm.doc.account) frm.set_value('account', '');
-            if (frm.doc.bank) frm.set_value('bank', '');
-            if (frm.doc.bank_account_no) frm.set_value('bank_account_no', '');
-        }
+function get_retention_receivable_dialog(frm) {
+    let raw_data = [];
 
-        // ปุ่มสำหรับดึงข้อมูล (แสดงตอน Draft)
-        if (frm.doc.docstatus === 0) {
-            frm.add_custom_button(__('Get All Retentions'), function () {
-                get_all_retentions(frm);
-            }, __('Get Items'));
-
-            frm.add_custom_button(__('Select Retentions'), function () {
-                select_retentions(frm);
-            }, __('Get Items'));
-        }
-
-        // Create Payment / View Journal Entry Logic
-        if (frm.doc.docstatus === 1) {
-            frappe.call({
-                method: 'consbiz.api.get_linked_journal_entry',
-                args: { retention_invoice: frm.doc.name },
-                callback: function (r) {
-                    if (r.message) {
-                        frm.add_custom_button(__('View Journal Entry'), function () {
-                            frappe.set_route('Form', 'Journal Entry', r.message);
-                        });
-                    } else {
-                        if (frm.doc.status !== 'Paid') {
-                            frm.add_custom_button(__('Payment'), function () {
-                                create_payment_entry(frm);
-                            }, __('Create'));
-                        }
-                    }
-                }
-            });
-        }
-    },
-    validate: function (frm) {
-        calculate_totals(frm);
-    },
-    
-    // Trigger เมื่อเปลี่ยน Credit Day (คำนวณ Due Date ใหม่)
-    credit_day: function(frm) {
-        calculate_due_date(frm);
-    },
-    
-    // Trigger เมื่อเปลี่ยนวันที่เอกสาร (คำนวณ Due Date ใหม่)
-    posting_date: function(frm) {
-        calculate_due_date(frm);
-    }
-});
-
-frappe.ui.form.on(CHILD_DOCTYPE_NAME, {
-    base_amount: function (frm, cdt, cdn) {
-        calculate_row_amount(frm, cdt, cdn);
-    },
-    retention_percent: function (frm, cdt, cdn) {
-        calculate_row_amount(frm, cdt, cdn);
-    },
-    amount: function (frm, cdt, cdn) {
-        calculate_totals(frm);
-    },
-    retention_items_remove: function (frm) {
-        calculate_totals(frm);
-    }
-});
-
-// ฟังก์ชันคำนวณ Due Date จาก Credit Day (Posting Date + Credit Day)
-function calculate_due_date(frm) {
-    if (frm.doc.posting_date) {
-        let days = flt(frm.doc.credit_day || 0); // ใช้ 0 หากไม่มีค่า
-        let new_due_date = frappe.datetime.add_days(frm.doc.posting_date, days);
-        frm.set_value('due_date', new_due_date);
-    }
-}
-
-// ฟังก์ชันสร้าง Payment Entry
-function create_payment_entry(frm) {
-    let allowed_accounts = null;
-
-    const dialog = new frappe.ui.Dialog({
-        title: __('Create Payment'),
+    let d = new frappe.ui.Dialog({
+        title: __('Select Retention Receivables'),
+        size: 'extra-large',
         fields: [
-            {
-                label: 'Mode of Payment',
-                fieldname: 'mode_of_payment',
-                fieldtype: 'Link',
-                options: 'Mode of Payment',
-                reqd: 1,
-                change: function () {
-                    let mop = dialog.get_value('mode_of_payment');
-                    dialog.set_value('account', ''); 
-
-                    if (mop) {
-                        allowed_accounts = [];
-                        frappe.call({
-                            method: 'frappe.client.get',
-                            args: { doctype: 'Mode of Payment', name: mop },
-                            callback: function (r) {
-                                if (r.message && r.message.accounts) {
-                                    let valid_rows = r.message.accounts.filter(d => d.company === frm.doc.company);
-                                    allowed_accounts = valid_rows.map(d => d.default_account);
-                                    if (allowed_accounts.length === 1) {
-                                        dialog.set_value('account', allowed_accounts[0]);
-                                    }
-                                }
-                            }
-                        });
-                    } else {
-                        allowed_accounts = null;
-                    }
-                }
+            { fieldtype: 'Section Break', label: __('Filters') },
+            { fieldname: 'col1', fieldtype: 'Column Break' },
+            { fieldname: 'company', fieldtype: 'Link', options: 'Company', label: 'Company', default: frm.doc.company, read_only: 1 },
+            { fieldname: 'customer', fieldtype: 'Link', options: 'Customer', label: 'Customer', default: frm.doc.customer, read_only: 1 },
+            { fieldname: 'col2', fieldtype: 'Column Break' },
+            { fieldname: 'project', fieldtype: 'Link', options: 'Project', label: 'Project', default: frm.doc.project, read_only: 1 },
+            { fieldname: 'customer_po', fieldtype: 'Data', label: "Customer's Purchase Order", default: frm.doc.customer_po, read_only: 1 },
+            { fieldtype: 'Section Break' },
+            { 
+                fieldname: 'search_term', fieldtype: 'Data', 
+                label: __('Search'),
+                placeholder: 'Search Ref No / Invoice No / Retention No...',
+                onchange: function() { render_table(); }
             },
-            {
-                label: 'Account',
-                fieldname: 'account',
-                fieldtype: 'Link',
-                options: 'Account',
-                reqd: 1,
-                get_query: function () {
-                    let filters = {
-                        'company': frm.doc.company,
-                        'is_group': 0
-                    };
-                    if (allowed_accounts !== null) {
-                        if (allowed_accounts.length > 0) {
-                            filters['name'] = ['in', allowed_accounts];
-                        } else {
-                            filters['name'] = '#######';
-                        }
-                    }
-                    return { filters: filters };
-                }
-            }
+            { fieldname: 'results_area', fieldtype: 'HTML' }
         ],
-        primary_action_label: __('Create Journal Entry'),
-        primary_action: function (values) {
-            frappe.call({
-                method: 'consbiz.consbiz.doctype.retention_invoice.retention_invoice.create_payment_entry',
-                args: {
-                    docname: frm.doc.name,
-                    mode_of_payment: values.mode_of_payment,
-                    account: values.account
-                },
-                freeze: true,
-                callback: function (r) {
-                    if (r.message) {
-                        dialog.hide();
-                        frappe.model.sync(r.message);
-                        frappe.set_route('Form', 'Journal Entry', r.message.name);
-                    }
-                }
-            });
+        primary_action_label: __('Add Selected'),
+        primary_action: function() {
+            add_selected_items(d, frm);
         }
     });
 
-    dialog.show();
-}
+    function fetch_data() {
+        d.fields_dict.results_area.$wrapper.html('<div class="text-center text-muted p-4">' + __('Loading...') + '</div>');
 
-function calculate_row_amount(frm, cdt, cdn) {
-    let row = locals[cdt][cdn];
-    if (row.base_amount && row.retention_percent) {
-        let new_amount = (flt(row.base_amount) * flt(row.retention_percent)) / 100;
-        frappe.model.set_value(cdt, cdn, 'amount', new_amount);
-    }
-}
-
-function get_all_retentions(frm) {
-    if (!frm.doc.customer) {
-        frappe.msgprint(__('กรุณาเลือก Customer ก่อน'));
-        return;
-    }
-
-    let filters = [
-        ['customer', '=', frm.doc.customer],
-        ['docstatus', '=', 1],
-        ['status', 'in', ['Active', 'Overdue']]
-    ];
-    if (frm.doc.company) filters.push(['company', '=', frm.doc.company]);
-    if (frm.doc.project) filters.push(['project', '=', frm.doc.project]);
-    if (frm.doc.customer_po) filters.push(['customer_po', '=', frm.doc.customer_po]); 
-
-    frappe.call({
-        method: 'frappe.client.get_list',
-        args: {
-            doctype: 'Retention Receivable',
-            filters: filters,
-            fields: ['name']
-        },
-        callback: function (r) {
-            if (r.message && r.message.length > 0) {
-                let names = r.message.map(d => d.name);
-                fetch_from_parents(frm, names);
-            } else {
-                frappe.msgprint(__('ไม่พบเอกสาร Retention Receivable ที่ Active หรือ Overdue'));
-            }
-        }
-    });
-}
-
-function select_retentions(frm) {
-    if (!frm.doc.customer) {
-        frappe.msgprint(__('กรุณาเลือก Customer ก่อน'));
-        return;
-    }
-
-    let filters = {
-        'customer': frm.doc.customer,
-        'docstatus': 1,
-        'status': ['in', ['Active', 'Overdue']]
-    };
-    if (frm.doc.company) filters['company'] = frm.doc.company;
-    if (frm.doc.project) filters['project'] = frm.doc.project;
-    
-    // --- Filter Customer PO ---
-    if (frm.doc.customer_po) {
-        filters['customer_po'] = frm.doc.customer_po;
-    }
-
-    new frappe.ui.form.MultiSelectDialog({
-        doctype: "Retention Receivable",
-        target: frm,
-        setters: {
+        let filters = {
             customer: frm.doc.customer,
             company: frm.doc.company,
-            project: frm.doc.project
-        },
-        add_filters_group: 1,
-        get_query: function () {
-            return { filters: filters };
-        },
-        action: function (selections) {
-            if (selections.length > 0) {
-                fetch_from_parents(frm, selections);
-                cur_dialog.hide();
-            }
-        }
-    });
-}
+            docstatus: 1,
+            status: ['in', ['Active', 'Overdue']]
+        };
+        if (frm.doc.project) filters.project = frm.doc.project;
+        if (frm.doc.customer_po) filters.customer_po = frm.doc.customer_po;
 
-function fetch_from_parents(frm, parent_names) {
-    let target_child_doctype = frm.fields_dict[TABLE_FIELD_NAME].grid.doctype;
-    let processed_count = 0;
-    let added_count = 0;
-
-    let existing_keys = [];
-    (frm.doc[TABLE_FIELD_NAME] || []).forEach(d => {
-        if (d.reference_no) existing_keys.push(d.reference_no);
-        if (d.sales_invoice_no) existing_keys.push(d.sales_invoice_no);
-        if (d.purchase_invoice) existing_keys.push(d.purchase_invoice);
-        if (d.supplier_invoice) existing_keys.push(d.supplier_invoice);
-    });
-
-    parent_names.forEach(parent_name => {
         frappe.call({
-            method: 'frappe.client.get',
+            method: 'frappe.client.get_list',
             args: {
                 doctype: 'Retention Receivable',
-                name: parent_name
+                filters: filters,
+                fields: ['name']
             },
-            callback: function (r) {
-                if (r.message) {
-                    let parent_doc = r.message;
-                    let source_items = parent_doc[TABLE_FIELD_NAME] || [];
+            callback: function(r) {
+                let parent_names = (r.message || []).map(p => p.name);
+                if (parent_names.length === 0) {
+                    raw_data = [];
+                    render_table();
+                    return;
+                }
 
-                    source_items.forEach(item => {
-                        let is_duplicate = false;
-                        if (item.reference_no && existing_keys.includes(item.reference_no)) is_duplicate = true;
-                        if (item.sales_invoice_no && existing_keys.includes(item.sales_invoice_no)) is_duplicate = true;
-                        if (item.purchase_invoice && existing_keys.includes(item.purchase_invoice)) is_duplicate = true;
-                        if (item.supplier_invoice && existing_keys.includes(item.supplier_invoice)) is_duplicate = true;
-                        if (parent_doc.name && existing_keys.includes(parent_doc.name)) is_duplicate = true;
+                let processed = 0;
+                let all_items = [];
 
-                        if (!is_duplicate) {
-                            let row = frappe.model.add_child(frm.doc, target_child_doctype, TABLE_FIELD_NAME);
-
-                            row.posting_date = item.posting_date;
-                            row.due_date = item.due_date;
-                            row.reference_no = parent_doc.name; 
-                            row.sales_invoice_no = item.sales_invoice_no_no || item.sales_invoice_no; 
-                            row.purchase_invoice = item.purchase_invoice;
-                            row.supplier_invoice = item.supplier_invoice;
-                            row.description = item.description;
-                            row.base_amount = item.base_amount;
-                            row.retention_percent = item.retention_percent;
-                            row.amount = item.amount;
-
-                            if (parent_doc.name) existing_keys.push(parent_doc.name);
-                            if (item.sales_invoice_no_no) existing_keys.push(item.sales_invoice_no_no);
-
-                            added_count++;
+                parent_names.forEach(name => {
+                    frappe.call({
+                        method: 'frappe.client.get',
+                        args: { doctype: 'Retention Receivable', name: name },
+                        callback: function(res) {
+                            if (res.message) {
+                                let doc = res.message;
+                                (doc.retention_items || []).forEach(item => {
+                                    all_items.push({
+                                        ...item,
+                                        reference_no: doc.name,
+                                        retention_no: item.retention_no,
+                                        posting_date: doc.posting_date,
+                                        due_date: doc.due_date
+                                    });
+                                });
+                            }
+                            processed++;
+                            if (processed === parent_names.length) {
+                                // เรียงตามเลขเอกสาร Reference No
+                                raw_data = all_items.sort((a, b) => a.reference_no.localeCompare(b.reference_no));
+                                render_table();
+                            }
                         }
                     });
-                }
-
-                processed_count++;
-                if (processed_count === parent_names.length) {
-                    frm.refresh_field(TABLE_FIELD_NAME);
-                    calculate_totals(frm);
-
-                    if (added_count > 0) {
-                        frappe.show_alert({ message: __('เพิ่มรายการใหม่ ' + added_count + ' รายการ'), indicator: 'green' });
-                    } else {
-                        frappe.show_alert({ message: __('ไม่มีรายการใหม่ หรือรายการซ้ำกันทั้งหมด'), indicator: 'orange' });
-                    }
-                }
+                });
             }
         });
-    });
+    }
+
+    function render_table() {
+        let search_val = (d.get_value('search_term') || '').toLowerCase();
+        
+        // --- ส่วนป้องกันข้อมูลซ้ำ: ดึง Key ปัจจุบันจากหน้าฟอร์มมาเช็คทุกครั้งที่ Render ---
+        let existing_keys = (frm.doc.retention_items || []).map(row => 
+            `${row.reference_no}_${row.sales_invoice_no}_${row.retention_no}`
+        );
+
+        let filtered_data = raw_data.filter(item => {
+            let key = `${item.reference_no}_${item.sales_invoice_no}_${item.retention_no}`;
+            
+            // ถ้ามีในตารางหลักแล้ว ไม่ต้องแสดงใน List
+            if (existing_keys.includes(key)) return false;
+            
+            if (search_val) {
+                return (item.reference_no || '').toLowerCase().includes(search_val) || 
+                       (item.sales_invoice_no || '').toLowerCase().includes(search_val) ||
+                       (item.retention_no || '').toLowerCase().includes(search_val);
+            }
+            return true;
+        });
+
+        let html = `
+            <style>
+                .ret-table-container { max-height: 450px; overflow-y: auto; border: 1px solid #d1d8dd; border-radius: 8px; }
+                .ret-table { margin-bottom: 0; font-size: 13px; }
+                .ret-table thead th { position: sticky; top: 0; background-color: #f4f5f6; z-index: 2; border-bottom: 2px solid #d1d8dd !important; }
+                .text-bold { font-weight: 600; color: #1d1e1f; }
+            </style>
+            <div class="ret-table-container">
+                <table class="table table-bordered table-hover ret-table">
+                    <thead>
+                        <tr>
+                            <th width="40px" class="text-center"><input type="checkbox" id="select-all-rets"></th>
+                            <th>${__('Reference No')}</th>
+                            <th>${__('Sales Invoice No')}</th>
+                            <th>${__('Retention No')}</th>
+                            <th>${__('Due Date')}</th>
+                            <th class="text-right">${__('Amount')}</th>
+                        </tr>
+                    </thead>
+                    <tbody>`;
+
+        if (filtered_data.length > 0) {
+            filtered_data.forEach(row => {
+                let row_json = encodeURIComponent(JSON.stringify(row));
+                html += `
+                    <tr class="clickable-row" style="cursor: pointer;">
+                        <td class="text-center"><input type="checkbox" class="ret-checkbox" data-row="${row_json}"></td>
+                        <td class="text-bold">${row.reference_no}</td>
+                        <td>${row.sales_invoice_no || '-'}</td>
+                        <td><span class="label label-default">${row.retention_no || '-'}</span></td>
+                        <td>${frappe.datetime.str_to_user(row.due_date)}</td>
+                        <td class="text-right text-bold">${format_currency(row.amount, frm.doc.currency)}</td>
+                    </tr>`;
+            });
+        } else {
+            html += `<tr><td colspan="6" class="text-center text-muted p-5">${__('No matching records found')}</td></tr>`;
+        }
+        html += `</tbody></table></div>`;
+        
+        d.fields_dict.results_area.$wrapper.html(html);
+
+        let $wrapper = d.fields_dict.results_area.$wrapper;
+        $wrapper.find('#select-all-rets').on('change', function() {
+            $wrapper.find('.ret-checkbox').prop('checked', $(this).is(':checked'));
+        });
+        $wrapper.find('.clickable-row').on('click', function(e) {
+            if (e.target.type !== 'checkbox') {
+                let $cb = $(this).find('.ret-checkbox');
+                $cb.prop('checked', !$cb.prop('checked'));
+            }
+        });
+    }
+
+    d.show();
+    fetch_data();
 }
 
-function calculate_totals(frm) {
-    let total_amount = 0;
-    (frm.doc[TABLE_FIELD_NAME] || []).forEach(d => {
-        total_amount += flt(d.amount);
+// --- ฟังก์ชันนำข้อมูลที่เลือกเข้าสู่ตารางหลัก ---
+function add_selected_items(d, frm) {
+    let count = 0;
+    let current_keys = (frm.doc.retention_items || []).map(row => 
+        `${row.reference_no}_${row.sales_invoice_no}_${row.retention_no}`
+    );
+
+    d.$wrapper.find('.ret-checkbox:checked').each(function() {
+        let data = JSON.parse(decodeURIComponent($(this).attr('data-row')));
+        let new_key = `${data.reference_no}_${data.sales_invoice_no}_${data.retention_no}`;
+
+        if (!current_keys.includes(new_key)) {
+            let row = frm.add_child('retention_items');
+            row.reference_no = data.reference_no;
+            row.sales_invoice_no = data.sales_invoice_no;
+            row.retention_no = data.retention_no; 
+            row.amount = data.amount;
+            row.base_amount = data.base_amount;
+            row.retention_percent = data.retention_percent;
+            row.posting_date = data.posting_date;
+            row.due_date = data.due_date;
+            row.description = data.description || `Retention from ${data.reference_no}`;
+            
+            current_keys.push(new_key);
+            count++;
+        }
     });
 
-    frm.set_value('grand_total', total_amount);
-
-    if (frm.fields_dict['in_words']) {
-        let text_val = total_amount !== 0 ?
-            (total_amount > 0 ? thai_baht_text(total_amount) : 'ติดลบ' + thai_baht_text(Math.abs(total_amount))) : 'ศูนย์บาทถ้วน';
-        frm.set_value('in_words', text_val);
+    if (count > 0) {
+        frm.refresh_field('retention_items');
+        calculate_totals(frm);
+        
+        // บังคับปิด Dialog
+        if (d) d.hide();
+        else if (cur_dialog) cur_dialog.hide();
+        
+        frappe.show_alert({ message: __('Added ' + count + ' items'), indicator: 'green' });
+    } else {
+        frappe.msgprint(__('ไม่มีรายการใหม่ถูกเพิ่ม หรือรายการถูกเลือกไปหมดแล้ว'));
     }
 }
+
+// --- ฟังก์ชันคำนวณยอดรวมและตัวอักษรภาษาไทย ---
+var calculate_totals = function(frm) {
+    let total = 0;
+    (frm.doc.retention_items || []).forEach(d => { total += flt(d.amount); });
+    
+    frm.set_value('grand_total', total);
+    
+    if (typeof thai_baht_text === 'function') {
+        let text_val = total !== 0 ? 
+            (total > 0 ? thai_baht_text(total) : 'ติดลบ' + thai_baht_text(Math.abs(total))) : 
+            'ศูนย์บาทถ้วน';
+        frm.set_value('in_words', text_val);
+    }
+};
+
+// ============================================================
+// 2. Form Events
+// ============================================================
+
+frappe.ui.form.on('Retention Invoice', {
+    refresh: function(frm) {
+        // แสดงปุ่มเฉพาะสถานะ Draft
+        if (frm.doc.docstatus === 0) {
+            frm.add_custom_button(__('Get Retention Receivables'), function() {
+                if (!frm.doc.customer) {
+                    frappe.msgprint(__('กรุณาเลือก Customer ก่อน'));
+                    return;
+                }
+                get_retention_receivable_dialog(frm);
+            }, __('Get Items'));
+        }
+    },
+    validate: function(frm) {
+        calculate_totals(frm);
+    }
+});
+
+frappe.ui.form.on('Retention Items', {
+    amount: function(frm, cdt, cdn) { calculate_totals(frm); },
+    retention_items_remove: function(frm) { calculate_totals(frm); }
+});

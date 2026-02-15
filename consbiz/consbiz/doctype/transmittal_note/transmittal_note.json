@@ -10,9 +10,10 @@
   "naming_series",
   "type",
   "posting_date",
+  "send_date",
   "column_break_rroo",
   "status",
-  "send_date",
+  "company",
   "amended_from",
   "section_break_huey",
   "transmittal_item"
@@ -40,6 +41,8 @@
   {
    "fieldname": "type",
    "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
    "label": "Type",
    "options": "\u0e23\u0e32\u0e22\u0e23\u0e31\u0e1a\n\u0e23\u0e32\u0e22\u0e08\u0e48\u0e32\u0e22\n\u0e01\u0e32\u0e23\u0e08\u0e48\u0e32\u0e22\u0e40\u0e07\u0e34\u0e19\u0e40\u0e14\u0e37\u0e2d\u0e19"
   },
@@ -67,19 +70,29 @@
   {
    "fieldname": "posting_date",
    "fieldtype": "Date",
+   "in_list_view": 1,
    "label": "Date"
   },
   {
    "fieldname": "send_date",
    "fieldtype": "Date",
+   "in_list_view": 1,
    "label": "Send Date"
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Company",
+   "options": "Company"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-02-14 16:22:47.675042",
+ "modified": "2026-02-14 22:53:42.863796",
  "modified_by": "Administrator",
  "module": "ConsBiz",
  "name": "Transmittal Note",

@@ -264,6 +264,7 @@ frappe.ui.form.on('Sales Invoice', {
 
             // --- 2. Logic ปุ่ม Transmittal Entry (Create/View) ---
             // สร้างปุ่มเสมอสำหรับ Sales Invoice ที่ Submit แล้ว
+            if (frm.doc.docstatus === 1) {
             frappe.call({
                 method: 'consbiz.api.check_transmittal_exists',
                 args: { document_no: frm.doc.name },
@@ -281,5 +282,6 @@ frappe.ui.form.on('Sales Invoice', {
                     }
                 }
             });
+        }
     }
 });

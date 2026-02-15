@@ -23,14 +23,14 @@ frappe.ui.form.on('Transmittal Note', {
         // กรณีสถานะ Submitted
         // ------------------------------------------------
         if (frm.doc.docstatus === 1) {
-            // ** เงื่อนไข: แสดงปุ่ม Add เฉพาะตอนที่สถานะ *ไม่ใช่* Sent **
+            // ปุ่ม Add (แสดงเมื่อยังไม่ Sent)
             if (frm.doc.status !== 'Sent') {
                 frm.add_custom_button(__('Add Submitted Entry'), function() {
                     add_submitted_entry_custom_dialog(frm);
                 }, __('Get Items'));
             }
 
-            // ปุ่ม SEND (แสดงเมื่อยังไม่ Sent)
+            // ปุ่ม Send (แสดงเมื่อยังไม่ Sent)
             if (frm.doc.status !== 'Sent') {
                 frm.add_custom_button(__('Send'), function() {
                     frappe.confirm(
@@ -43,7 +43,6 @@ frappe.ui.form.on('Transmittal Note', {
                                 freeze_message: __('Sending...'),
                                 callback: function(r) {
                                     if (!r.exc) {
-                                        // รีโหลดหน้าจอเพื่อให้เห็นสถานะ Sent และปุ่มต่างๆ หายไป
                                         frm.reload_doc();
                                         frappe.show_alert({message: __('เอกสารถูกส่งเรียบร้อยแล้ว (Sent)'), indicator: 'green'});
                                     }
@@ -74,7 +73,6 @@ frappe.ui.form.on('Transmittal Note', {
                         doctype: 'Transmittal Entry',
                         filters: {
                             name: ['in', refs],
-                            // อนุญาต: Submitted, Prepared, Sent
                             status: ['not in', ['Submitted', 'Prepared', 'Sent']] 
                         },
                         fields: ['name', 'status']
@@ -89,7 +87,6 @@ frappe.ui.form.on('Transmittal Note', {
                             });
                         } else {
                             frm.doc.flags.ignore_validate_references = true;
-                            // ถ้าเป็น Draft ให้ Save, ถ้า Submitted ให้ผ่าน Validation (เพราะเราจะ Save ในฟังก์ชัน Add)
                             if (frm.doc.docstatus === 0) frm.save();
                             else frappe.validated = true; 
                         }
@@ -106,7 +103,7 @@ frappe.ui.form.on('Transmittal Note', {
     }
 });
 
-// ... (ฟังก์ชัน Get / Show Dialog / Validate เดิม คงไว้เหมือนเดิม) ...
+// ... (ฟังก์ชัน Get เดิม) ...
 
 function show_date_filter_dialog(frm) {
     let d = new frappe.ui.Dialog({
@@ -151,8 +148,6 @@ function fetch_entries_from_server(frm, from_date, to_date) {
     if (frm.doc.type) filters.push(['type', '=', frm.doc.type]);
     if (from_date) filters.push(['posting_date', '>=', from_date]);
     if (to_date) filters.push(['posting_date', '<=', to_date]);
-    if (frm.doc.customer) filters.push(['customer', '=', frm.doc.customer]);
-    if (frm.doc.project) filters.push(['project', '=', frm.doc.project]);
     if (frm.doc.company) filters.push(['company', '=', frm.doc.company]);
 
     var existing_refs = (frm.doc.transmittal_item || []).map(d => d.reference);
@@ -251,9 +246,12 @@ function validate_and_cleanup_entries(frm) {
     });
 }
 
-// ... (ฟังก์ชัน Custom Dialog และ Add Entry เหมือนเดิม) ...
+// ============================================================
+// Section 2: Functions for Submitted State (Custom Dialog)
+// ============================================================
 
 function add_submitted_entry_custom_dialog(frm) {
+    // Single Dialog implementation
     let d = new frappe.ui.Dialog({
         title: __('Add Submitted Entry'),
         size: 'extra-large',
@@ -275,12 +273,9 @@ function add_submitted_entry_custom_dialog(frm) {
                 fieldtype: 'Column Break'
             },
             {
-                fieldname: 'customer', label: __('Customer'), fieldtype: 'Link', options: 'Customer',
-                default: frm.doc.customer, read_only: 1
-            },
-            {
-                fieldname: 'project', label: __('Project'), fieldtype: 'Link', options: 'Project',
-                default: frm.doc.project, read_only: 1
+                fieldname: 'company', label: __('Company'), fieldtype: 'Link', options: 'Company',
+                default: frm.doc.company || frappe.defaults.get_user_default("company"),
+                change: () => refresh_dialog_table()
             },
             {
                 fieldtype: 'Section Break', label: __('Select Documents')
@@ -308,6 +303,12 @@ function add_submitted_entry_custom_dialog(frm) {
 
     let refresh_dialog_table = function() {
         let values = d.get_values();
+        if (!values) return; // Prevent errors if dialog not fully loaded
+
+        // Show Loading
+        d.fields_dict.html_results.$wrapper.html('<div class="text-center text-muted p-3">' + __('Loading...') + '</div>');
+
+        // Filter out already added items
         let existing_refs = (frm.doc.transmittal_item || []).map(d => d.reference);
 
         let filters = [
@@ -319,9 +320,9 @@ function add_submitted_entry_custom_dialog(frm) {
         if (values.from_date) filters.push(['posting_date', '>=', values.from_date]);
         if (values.to_date) filters.push(['posting_date', '<=', values.to_date]);
         if (frm.doc.type) filters.push(['type', '=', frm.doc.type]);
-        if (values.customer) filters.push(['customer', '=', values.customer]);
-        if (values.project) filters.push(['project', '=', values.project]);
-        if (frm.doc.company) filters.push(['company', '=', frm.doc.company]);
+        
+        // Filter by Dialog Values
+        if (values.company) filters.push(['company', '=', values.company]);
 
         frappe.call({
             method: 'frappe.client.get_list',
@@ -329,9 +330,9 @@ function add_submitted_entry_custom_dialog(frm) {
                 doctype: 'Transmittal Entry',
                 filters: filters,
                 fields: ['name', 'document_no', 'posting_date', 'receipt', 'tax', 'wht', 'retention'],
-                limit_page_length: 50
+                limit_page_length: 50,
+                order_by: 'posting_date desc'
             },
-            freeze: true,
             callback: function(r) {
                 let html = `
                     <div style="max-height: 400px; overflow-y: auto;">
@@ -355,7 +356,7 @@ function add_submitted_entry_custom_dialog(frm) {
                         html += `
                             <tr>
                                 <td class="text-center"><input type="checkbox" class="entry-checkbox" data-name="${row.name}"></td>
-                                <td>${row.name}</td>
+                                <td><a href="/app/transmittal-entry/${row.name}" target="_blank">${row.name}</a></td>
                                 <td>${row.document_no || '-'}</td>
                                 <td>${frappe.datetime.str_to_user(row.posting_date)}</td>
                                 <td class="text-center">${row.receipt ? '✔' : ''}</td>
@@ -372,9 +373,18 @@ function add_submitted_entry_custom_dialog(frm) {
                 html += `</tbody></table></div>`;
                 d.fields_dict.html_results.$wrapper.html(html);
 
+                // Checkbox Logic
                 d.$wrapper.find('#select-all-entries').on('change', function() {
                     let checked = $(this).is(':checked');
                     d.$wrapper.find('.entry-checkbox').prop('checked', checked);
+                });
+                
+                // Row click to toggle check
+                d.$wrapper.find('tbody tr').on('click', function(e) {
+                     if (e.target.type !== 'checkbox' && e.target.tagName !== 'A') {
+                         let checkbox = $(this).find('.entry-checkbox');
+                         checkbox.prop('checked', !checkbox.prop('checked'));
+                     }
                 });
             }
         });
@@ -411,8 +421,18 @@ function fetch_and_add_entries(frm, selections) {
                 if (added_count > 0) {
                     renumber_items(frm);
                     frm.refresh_field('transmittal_item');
-                    frm.save();
-                    frappe.show_alert({message: __('เพิ่มเอกสาร ' + added_count + ' รายการและบันทึกแล้ว'), indicator: 'green'});
+                    
+                    // --- Save แล้ว Force Call Python เพื่ออัปเดตสถานะแน่นอน ---
+                    frm.save(null, function() {
+                        frm.call({
+                            method: 'sync_entry_status',
+                            doc: frm.doc,
+                            freeze: true,
+                            callback: function() {
+                                frappe.show_alert({message: __('เพิ่มเอกสาร ' + added_count + ' รายการและบันทึกแล้ว'), indicator: 'green'});
+                            }
+                        });
+                    });
                 }
             }
         }

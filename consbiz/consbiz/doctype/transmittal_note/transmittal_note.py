@@ -2,23 +2,18 @@ import frappe
 from frappe.model.document import Document
 
 class TransmittalNote(Document):
-    def validate(self):
-        # เก็บรายการ Reference เดิมที่มีอยู่ใน Database ก่อนที่จะถูกบันทึกทับ
-        # เพื่อใช้ตรวจสอบว่ารายการไหนถูกลบออกไปบ้างในขั้นตอน on_update
-        if not self.is_new():
-            self.flags.old_refs = frappe.db.sql(
-                "SELECT reference FROM `tabTransmittal Item` WHERE parent=%s", 
-                self.name, pluck=True
-            ) or []
-
     def on_update(self):
         """
-        ทำงานเมื่อกดปุ่ม Save/Update:
-        1. เปลี่ยนสถานะของรายการปัจจุบันในตารางเป็น 'Prepared'
-        2. คืนสถานะรายการที่ถูกลบออกจากตารางกลับเป็น 'Submitted'
+        ทำงานเมื่อกดปุ่ม Save (Draft)
         """
-        if self.docstatus < 2: # Draft หรือ Submitted
+        if self.docstatus < 2: 
             self.sync_entry_status()
+
+    def on_update_after_submit(self):
+        """
+        ทำงานเมื่อกดปุ่ม Save (Submitted)
+        """
+        self.sync_entry_status()
 
     def on_submit(self):
         # เมื่อ Submit: ย้ำสถานะเป็น 'Prepared'
@@ -32,48 +27,62 @@ class TransmittalNote(Document):
         # เมื่อ Delete: คืนสถานะทั้งหมดกลับเป็น 'Submitted'
         self.update_linked_entry_status("Submitted")
 
+    @frappe.whitelist() # เพิ่มบรรทัดนี้เพื่อให้ JavaScript เรียกใช้ได้
     def sync_entry_status(self):
-        # 1. รายการปัจจุบันในตาราง -> บังคับ Set เป็น 'Prepared'
-        current_refs = [d.reference for d in self.transmittal_item if d.reference]
+        """
+        ฟังก์ชันหลักในการเปลี่ยนสถานะ:
+        1. รายการที่เหลืออยู่ -> 'Prepared'
+        2. รายการที่หายไป (ถูกลบ) -> 'Submitted'
+        """
+        # 1. รายการปัจจุบัน (Current Items)
+        items = self.get("transmittal_item") or []
+        current_refs = set(d.reference for d in items if d.reference)
         
+        # 1.1 อัปเดตรายการปัจจุบันเป็น 'Prepared' (จองไว้)
         if current_refs:
-            # ใช้ SQL Update โดยตรงเพื่อความแน่นอน (ข้าม Permission/Validations)
-            # แก้เฉพาะตัวที่ยังไม่เป็น Sent (เพื่อไม่ให้ไปแตะต้องตัวที่ส่งจริงไปแล้ว)
-            frappe.db.sql("""
+            placeholders = ', '.join(['%s'] * len(current_refs))
+            # อัปเดตเป็น Prepared (เฉพาะที่ยังไม่ Sent เพื่อไม่ให้ทับสถานะส่งแล้ว)
+            frappe.db.sql(f"""
                 UPDATE `tabTransmittal Entry` 
                 SET status = 'Prepared' 
-                WHERE name IN %s AND status != 'Sent'
-            """, (tuple(current_refs),))
+                WHERE name IN ({placeholders}) AND status != 'Sent'
+            """, tuple(current_refs))
 
-        # 2. รายการที่ถูกลบออก -> Revert เป็น 'Submitted'
-        # ดึงค่าเก่าที่เราเก็บไว้ใน validate
-        old_refs = self.flags.old_refs if hasattr(self.flags, 'old_refs') else []
-        removed_refs = set(old_refs) - set(current_refs)
+        # 2. หาความแตกต่างเพื่อดูว่ามีอะไรถูกลบไปบ้าง (Removed Items)
+        # ใช้ get_doc_before_save() เพื่อดึงข้อมูลก่อนบันทึก (แม่นยำกว่า before_save hook)
+        old_doc = self.get_doc_before_save()
+        old_refs = set()
+        if old_doc and old_doc.get("transmittal_item"):
+            old_refs = set(d.reference for d in old_doc.transmittal_item if d.reference)
         
+        removed_refs = old_refs - current_refs
+        
+        # 2.1 คืนสถานะรายการที่ถูกลบเป็น 'Submitted' (ปล่อยจอง)
         if removed_refs:
-            frappe.db.sql("""
+            placeholders_rm = ', '.join(['%s'] * len(removed_refs))
+            # คืนสถานะเป็น Submitted เฉพาะตัวที่เป็น Prepared (ถ้า Cancelled อยู่แล้วก็ปล่อยไว้)
+            frappe.db.sql(f"""
                 UPDATE `tabTransmittal Entry` 
                 SET status = 'Submitted' 
-                WHERE name IN %s
-            """, (tuple(removed_refs),))
+                WHERE name IN ({placeholders_rm}) AND status = 'Prepared'
+            """, tuple(removed_refs))
 
     def update_linked_entry_status(self, new_status):
-        refs = [d.reference for d in self.transmittal_item if d.reference]
+        items = self.get("transmittal_item") or []
+        refs = [d.reference for d in items if d.reference]
         if refs:
-            frappe.db.sql("""
+            placeholders = ', '.join(['%s'] * len(refs))
+            params = (new_status,) + tuple(refs)
+            frappe.db.sql(f"""
                 UPDATE `tabTransmittal Entry` 
                 SET status = %s 
-                WHERE name IN %s
-            """, (new_status, tuple(refs)))
+                WHERE name IN ({placeholders})
+            """, params)
 
     @frappe.whitelist()
     def set_status_sent(self):
         """
         Custom Action: เปลี่ยนสถานะตัวเองและลูกๆ เป็น 'Sent'
         """
-        # 1. เปลี่ยนสถานะเอกสารลูก (Entries) -> Sent
         self.update_linked_entry_status("Sent")
-        
-        # 2. เปลี่ยนสถานะตัวเอง (Note) -> Sent
-        # ใช้ db_set เพื่อเปลี่ยนค่าใน DB โดยตรง (ไม่ต้องผ่าน validate อีก)
         self.db_set("status", "Sent")

@@ -1,6 +1,9 @@
 // Script for DocType: Purchase Invoice
 
-// ฟังก์ชันประกาศแบบ Hoisted
+// ============================================================
+// Helper Functions (Calculations & Settings)
+// ============================================================
+
 function fetch_company_settings(frm) {
     if(!frm.doc.company) return;
     frappe.db.get_value('Company', frm.doc.company, ['abbr', 'custom_wht_payable', 'custom_retention_payable', 'cost_center'], (r) => {
@@ -15,7 +18,7 @@ function fetch_company_settings(frm) {
 }
 
 function calculate_paid_amount(frm) {
-    // --- แก้ไข: ใช้ net_total เป็นฐานคำนวณ ---
+    // --- ใช้ net_total เป็นฐานคำนวณ ---
     let net_total = flt(frm.doc.net_total);
     
     let grand_total = flt(frm.doc.grand_total);
@@ -47,7 +50,7 @@ function calculate_paid_amount(frm) {
         frm.set_value('custom_retention_amount', ret_amt_local);
     }
 
-    // 2. Sync ลงตาราง
+    // 2. Sync ลงตาราง Deduction
     if (abbr || (frm.custom_wht_acc && frm.custom_ret_acc)) {
         if (frm.fields_dict['custom_payment_entry_deduction']) {
             let need_refresh_table = false;
@@ -156,29 +159,66 @@ function update_thai_labels(frm, paid_amount, grand_total) {
     }
 }
 
+// ============================================================
+// Action Functions (Buttons)
+// ============================================================
+
+// ฟังก์ชันสร้าง Retention Payable (Manual from Button)
 function create_retention_payable(frm) {
     frappe.model.with_doctype('Retention Payable', function() {
         var doc = frappe.model.get_new_doc('Retention Payable');
-        doc.company = frm.doc.company;
-        doc.supplier = frm.doc.supplier; 
-        doc.posting_date = frm.doc.posting_date;
-        doc.due_date = frm.doc.due_date;
-        doc.project = frm.doc.project;
         
-        var child = frappe.model.add_child(doc, 'Retention Items', 'retention_items');
-        child.purchase_invoice = frm.doc.name; 
-        child.posting_date = frm.doc.posting_date;
-        child.due_date = frm.doc.due_date;
-        child.description = "Retention from " + frm.doc.name;
-        child.base_amount = frm.doc.net_total;
-        child.retention_percent = frm.doc.custom_retention_percent;
-        child.amount = frm.doc.custom_retention_amount;
+        doc.company = frm.doc.company;
+        doc.supplier = frm.doc.supplier;
+        doc.project = frm.doc.project;
+        doc.posting_date = frm.doc.posting_date;
+        
+        if (frm.doc.items && frm.doc.items.length > 0) {
+            // ดึงค่าจาก column purchase_order ในตาราง items ของ PI
+            doc.po = frm.doc.items[0].purchase_order; 
+        }
+
+        var row = frappe.model.add_child(doc, 'Retention Items', 'retention_items');
+        
+        // --- FIXED: ใช้ purchase_invoice_no ให้ตรงกับชื่อฟิลด์ใน Doctype ---
+        row.purchase_invoice_no = frm.doc.name; 
+        row.reference_no = frm.doc.bill_no;
+        row.posting_date = frm.doc.posting_date
+        row.description = "Retention from Invoice " + frm.doc.name;
+        row.base_amount = frm.doc.net_total; 
+        row.retention_percent = frm.doc.custom_retention_percent;
+        row.amount = frm.doc.custom_retention_amount;
 
         frappe.set_route('Form', 'Retention Payable', doc.name);
     });
 }
 
-// Main Trigger
+// ฟังก์ชันสร้าง Transmittal Entry (Manual from Button)
+function create_transmittal_entry(frm) {
+    frappe.model.with_doctype('Transmittal Entry', function() {
+        var doc = frappe.model.get_new_doc('Transmittal Entry');
+
+        doc.type = 'รายจ่าย'; // PI เป็นรายจ่าย
+        doc.document_no = frm.doc.name;
+        doc.posting_date = frm.doc.posting_date;
+        doc.company = frm.doc.company;
+        doc.supplier = frm.doc.supplier;
+        doc.project = frm.doc.project;
+        doc.subject = `นำส่งเอกสารเจ้าหนี้ ${frm.doc.name}`;
+        
+        doc.receipt = 1;
+        doc.tax = frm.doc.total_taxes_and_charges > 0 ? 1 : 0;
+        doc.wht = frm.doc.custom_subject_to_wht ? 1 : 0;
+        doc.retention = frm.doc.custom_subject_to_retention ? 1 : 0;
+
+        frappe.set_route('Form', 'Transmittal Entry', doc.name);
+    });
+}
+
+// ============================================================
+// Main Triggers
+// ============================================================
+
 frappe.ui.form.on('Purchase Invoice', {
     setup: function(frm) {
         if (frm.doc.company) fetch_company_settings(frm);
@@ -187,6 +227,7 @@ frappe.ui.form.on('Purchase Invoice', {
         fetch_company_settings(frm);
     },
     
+    // Triggers for calculation
     custom_subject_to_wht: (frm) => calculate_paid_amount(frm),
     custom_wht_percent: (frm) => calculate_paid_amount(frm),
     custom_subject_to_retention: (frm) => calculate_paid_amount(frm),
@@ -215,19 +256,40 @@ frappe.ui.form.on('Purchase Invoice', {
     refresh: function(frm) { 
         calculate_paid_amount(frm); 
 
-        // Logic ปุ่ม Create/View Retention Payable
-        if (frm.doc.docstatus === 1 && frm.doc.custom_subject_to_retention && frm.doc.custom_retention_amount > 0) {
+        // --- Logic ปุ่ม Create/View Retention Payable & Transmittal Entry ---
+        if (frm.doc.docstatus === 1) {
+            
+            // 1. Retention Payable Button
+            if (frm.doc.custom_subject_to_retention && frm.doc.custom_retention_amount > 0) {
+                frappe.call({
+                    method: 'consbiz.api.check_retention_payable_exists',
+                    args: { invoice_name: frm.doc.name },
+                    callback: function (r) {
+                        if (r.message) {
+                            frm.add_custom_button(__('View Retention'), function () {
+                                frappe.set_route('Form', 'Retention Payable', r.message);
+                            }, __('View'));
+                        } else {
+                            frm.add_custom_button(__('Retention Payable'), function () {
+                                create_retention_payable(frm);
+                            }, __('Create'));
+                        }
+                    }
+                });
+            }
+
+            // 2. Transmittal Entry Button
             frappe.call({
-                method: 'consbiz.api.check_retention_payable_exists',
-                args: { invoice_name: frm.doc.name },
-                callback: function(r) {
+                method: 'consbiz.api.check_transmittal_exists',
+                args: { document_no: frm.doc.name },
+                callback: function (r) {
                     if (r.message) {
-                        frm.add_custom_button(__('View Retention'), function() {
-                            frappe.set_route('Form', 'Retention Payable', r.message);
-                        }, __('View')).removeClass('btn-default').addClass('btn-success');
+                        frm.add_custom_button(__('Transmittal Entry'), function () {
+                            frappe.set_route('Form', 'Transmittal Entry', r.message);
+                        }, __('View'));
                     } else {
-                        frm.add_custom_button(__('Retention Payable'), function() {
-                            create_retention_payable(frm);
+                        frm.add_custom_button(__('Transmittal Entry'), function () {
+                            create_transmittal_entry(frm);
                         }, __('Create'));
                     }
                 }

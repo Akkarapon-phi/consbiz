@@ -1,12 +1,32 @@
 {
  "actions": [],
  "allow_rename": 1,
+ "autoname": "naming_series:",
  "creation": "2026-01-26 23:39:52.979716",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
   "section_break_m4wf",
-  "amended_from"
+  "naming_series",
+  "company",
+  "supplier",
+  "column_break_gwpn",
+  "posting_date",
+  "period",
+  "due_date",
+  "column_break_hpob",
+  "amended_from",
+  "po",
+  "project",
+  "section_break_snsi",
+  "retention_items",
+  "totals_section",
+  "column_break_yljz",
+  "column_break_iajw",
+  "grand_total",
+  "in_words",
+  "more_info_section",
+  "status"
  ],
  "fields": [
   {
@@ -22,16 +42,121 @@
    "print_hide": 1,
    "read_only": 1,
    "search_index": 1
+  },
+  {
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "label": "Series"
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "label": "Company",
+   "options": "Company"
+  },
+  {
+   "fieldname": "supplier",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Supplier",
+   "options": "Supplier"
+  },
+  {
+   "fieldname": "column_break_gwpn",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "posting_date",
+   "fieldtype": "Date",
+   "label": "Date"
+  },
+  {
+   "fieldname": "due_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Due Date"
+  },
+  {
+   "fieldname": "column_break_hpob",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "po",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Purchase Order",
+   "options": "Purchase Order"
+  },
+  {
+   "fieldname": "project",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Project",
+   "options": "Project"
+  },
+  {
+   "fieldname": "totals_section",
+   "fieldtype": "Section Break",
+   "label": "Totals"
+  },
+  {
+   "fieldname": "column_break_yljz",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_iajw",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "grand_total",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Grand Total"
+  },
+  {
+   "fieldname": "in_words",
+   "fieldtype": "Data",
+   "label": "In Words"
+  },
+  {
+   "fieldname": "more_info_section",
+   "fieldtype": "Section Break",
+   "label": "More info"
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Status",
+   "options": "Draft\nActive\nOverdue\nBilled\nPaid\nCancelled"
+  },
+  {
+   "fieldname": "retention_items",
+   "fieldtype": "Table",
+   "label": "Retention Items",
+   "options": "Retention Items"
+  },
+  {
+   "fieldname": "section_break_snsi",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "period",
+   "fieldtype": "Data",
+   "label": "Period (Day)"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-01-26 23:39:52.979716",
+ "modified": "2026-02-14 22:52:02.833791",
  "modified_by": "Administrator",
  "module": "ConsBiz",
  "name": "Retention Payable",
+ "naming_rule": "By \"Naming Series\" field",
  "owner": "Administrator",
  "permissions": [
   {
@@ -52,5 +177,22 @@
  "rows_threshold_for_grid_search": 20,
  "sort_field": "creation",
  "sort_order": "DESC",
- "states": []
+ "states": [
+  {
+   "color": "Green",
+   "title": "Active"
+  },
+  {
+   "color": "Blue",
+   "title": "Billed"
+  },
+  {
+   "color": "Orange",
+   "title": "Overdue"
+  },
+  {
+   "color": "Green",
+   "title": "Paid"
+  }
+ ]
 }

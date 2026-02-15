@@ -17,7 +17,7 @@ class RetentionReceivable(Document):
         (ต้องเช็คทั้งแบบ Draft และ Submit แต่ไม่เช็ค Cancel)
         """
         for item in self.retention_items:
-            # ใช้ reference_no เป็นหลัก หรือ fallback ไปที่ sales_invoice_no
+            # ใช้ sales_invoice_no สำหรับฝั่งลูกหนี้
             ref_no = item.sales_invoice_no
             
             if ref_no:
