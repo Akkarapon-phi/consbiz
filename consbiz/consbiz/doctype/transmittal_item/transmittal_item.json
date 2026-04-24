@@ -63,6 +63,7 @@
    "fieldtype": "Link",
    "in_list_view": 1,
    "label": "Reference",
+   "link_filters": "[[\"Transmittal Entry\",\"status\",\"=\",\"Submitted\"]]",
    "options": "Transmittal Entry"
   }
  ],
@@ -70,7 +71,7 @@
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2026-02-14 11:37:26.556086",
+ "modified": "2026-02-21 20:03:42.483998",
  "modified_by": "Administrator",
  "module": "ConsBiz",
  "name": "Transmittal Item",

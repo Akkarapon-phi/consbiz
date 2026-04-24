@@ -77,7 +77,7 @@ frappe.ui.CompanySwitcher = class CompanySwitcher {
                     }
                     #sidebar-company-switcher .dropdown-menu {
                         margin-bottom: 0px;
-                        width: 240px;
+                        width: 200px;
                         border-radius: 8px;
                         overflow-y: auto;
                         max-height: 300px;

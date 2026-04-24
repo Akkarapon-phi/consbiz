@@ -1,6 +1,3 @@
-// Script for DocType: Payment Entry
-
-// --- 1. ปิดปาก Error เรื่อง Precision ---
 if (typeof cur_frm !== 'undefined') {
     cur_frm.get_field_precision = function(df, doc) {
         if (df && df.fieldname === "amount" && df.parent === "Payment Entry Deduction") {

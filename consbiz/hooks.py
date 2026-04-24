@@ -15,22 +15,22 @@ add_to_apps_screen = [
     }
 ]
 
-fixtures = [
-    {
-        "doctype": "Property Setter",
-        "filters": [
-            ["module", "=", "ConsBiz"],
-            ["is_system_generated", "=", 0] # เอาเฉพาะที่เราแก้เอง มือหมุนเอง
-        ]
-    },
-    {
-        "doctype": "Custom Field",
-        "filters": [
-            ["module", "=", "ConsBiz"],
-            ["is_system_generated", "=", 0] # ป้องกันฟิลด์ที่แอปอื่นสร้างแทรกมา
-        ]
-    }
-]
+#fixtures = [
+#    {
+#        "doctype": "Property Setter",
+#        "filters": [
+#            ["module", "=", "ConsBiz"],
+#            ["is_system_generated", "=", 0] # เอาเฉพาะที่เราแก้เอง มือหมุนเอง
+#        ]
+#    },
+#    {
+#        "doctype": "Custom Field",
+#        "filters": [
+#            ["module", "=", "ConsBiz"],
+#            ["is_system_generated", "=", 0] # ป้องกันฟิลด์ที่แอปอื่นสร้างแทรกมา
+#        ]
+#    }
+#]
 
 
 app_include_css = "/assets/consbiz/css/style.css"
