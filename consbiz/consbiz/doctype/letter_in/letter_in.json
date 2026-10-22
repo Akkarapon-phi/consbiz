@@ -1,0 +1,282 @@
+{
+ "actions": [],
+ "allow_bulk_edit": 1,
+ "autoname": "naming_series:",
+ "creation": "2026-09-08 00:06:10.104265",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "section_break_stkl",
+  "stepper_html",
+  "section_break_yhwn",
+  "document_no",
+  "title",
+  "document_date",
+  "column_break_wsjm",
+  "company",
+  "project",
+  "section_break_zxvh",
+  "column_break_yjbt",
+  "receiver",
+  "receiver_name",
+  "receive_date",
+  "column_break_apvp",
+  "status",
+  "approver",
+  "approver_name",
+  "approve_date",
+  "approve_remark",
+  "more_tab",
+  "more_section",
+  "column_break_dwcv",
+  "naming_series",
+  "amended_from",
+  "project_abbr"
+ ],
+ "fields": [
+  {
+   "fieldname": "section_break_stkl",
+   "fieldtype": "Section Break",
+   "hide_border": 1
+  },
+  {
+   "fieldname": "stepper_html",
+   "fieldtype": "HTML",
+   "label": "Stepper HTML"
+  },
+  {
+   "fieldname": "section_break_yhwn",
+   "fieldtype": "Section Break",
+   "label": "\u0e23\u0e32\u0e22\u0e25\u0e30\u0e40\u0e2d\u0e35\u0e22\u0e14\u0e40\u0e2d\u0e01\u0e2a\u0e32\u0e23"
+  },
+  {
+   "fieldname": "document_no",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "\u0e40\u0e25\u0e02\u0e17\u0e35\u0e48\u0e40\u0e2d\u0e01\u0e2a\u0e32\u0e23",
+   "reqd": 1
+  },
+  {
+   "fieldname": "title",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "\u0e0a\u0e37\u0e48\u0e2d\u0e40\u0e23\u0e37\u0e48\u0e2d\u0e07",
+   "reqd": 1
+  },
+  {
+   "fieldname": "document_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "\u0e25\u0e07\u0e27\u0e31\u0e19\u0e17\u0e35\u0e48",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_wsjm",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "label": "\u0e1a\u0e23\u0e34\u0e29\u0e31\u0e17",
+   "options": "Company",
+   "reqd": 1
+  },
+  {
+   "fieldname": "project",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "\u0e42\u0e04\u0e23\u0e07\u0e01\u0e32\u0e23",
+   "link_filters": "[[\"Project\",\"company\",\"=\",\"eval:doc.company\"]]",
+   "options": "Project"
+  },
+  {
+   "fieldname": "section_break_zxvh",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "column_break_yjbt",
+   "fieldtype": "Column Break"
+  },
+  {
+   "allow_on_submit": 1,
+   "default": "User",
+   "fieldname": "receiver",
+   "fieldtype": "Link",
+   "label": "\u0e1c\u0e39\u0e49\u0e23\u0e31\u0e1a",
+   "options": "User",
+   "reqd": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "fetch_from": "receiver.full_name",
+   "fieldname": "receiver_name",
+   "fieldtype": "Data",
+   "label": "\u0e0a\u0e37\u0e48\u0e2d\u0e1c\u0e39\u0e49\u0e23\u0e31\u0e1a",
+   "read_only": 1
+  },
+  {
+   "default": "Today",
+   "fieldname": "receive_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "\u0e25\u0e07\u0e23\u0e31\u0e1a\u0e27\u0e31\u0e19\u0e17\u0e35\u0e48",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_apvp",
+   "fieldtype": "Column Break"
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "\u0e2a\u0e16\u0e32\u0e19\u0e30\u0e40\u0e2d\u0e01\u0e2a\u0e32\u0e23",
+   "options": "\u0e23\u0e2d\u0e40\u0e2a\u0e19\u0e2d\n\u0e40\u0e2a\u0e19\u0e2d\u0e2d\u0e19\u0e38\u0e21\u0e31\u0e15\u0e34\n\u0e2d\u0e19\u0e38\u0e21\u0e31\u0e15\u0e34\n\u0e44\u0e21\u0e48\u0e2d\u0e19\u0e38\u0e21\u0e31\u0e15\u0e34",
+   "reqd": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "depends_on": "eval:doc.document_status!='\u0e23\u0e2d\u0e40\u0e2a\u0e19\u0e2d'",
+   "fieldname": "approver",
+   "fieldtype": "Link",
+   "label": "\u0e1c\u0e39\u0e49\u0e2d\u0e19\u0e38\u0e21\u0e31\u0e15\u0e34",
+   "options": "User"
+  },
+  {
+   "allow_on_submit": 1,
+   "depends_on": "eval:doc.document_status!='\u0e23\u0e2d\u0e40\u0e2a\u0e19\u0e2d'",
+   "fetch_from": "approver.full_name",
+   "fieldname": "approver_name",
+   "fieldtype": "Data",
+   "label": "\u0e0a\u0e37\u0e48\u0e2d\u0e1c\u0e39\u0e49\u0e2d\u0e19\u0e38\u0e21\u0e31\u0e15\u0e34"
+  },
+  {
+   "allow_on_submit": 1,
+   "depends_on": "eval:doc.document_status!='\u0e23\u0e2d\u0e40\u0e2a\u0e19\u0e2d'",
+   "fieldname": "approve_date",
+   "fieldtype": "Date",
+   "label": "\u0e27\u0e31\u0e19\u0e17\u0e35\u0e48\u0e2d\u0e19\u0e38\u0e21\u0e31\u0e15\u0e34"
+  },
+  {
+   "allow_on_submit": 1,
+   "depends_on": "eval:doc.document_status=='\u0e44\u0e21\u0e48\u0e2d\u0e19\u0e38\u0e21\u0e31\u0e15\u0e34'",
+   "fieldname": "approve_remark",
+   "fieldtype": "Small Text",
+   "label": "\u0e2b\u0e21\u0e32\u0e22\u0e40\u0e2b\u0e15\u0e38"
+  },
+  {
+   "fieldname": "more_tab",
+   "fieldtype": "Tab Break",
+   "label": "More"
+  },
+  {
+   "fieldname": "more_section",
+   "fieldtype": "Section Break",
+   "label": "\u0e40\u0e1e\u0e34\u0e48\u0e21\u0e40\u0e15\u0e34\u0e21"
+  },
+  {
+   "fieldname": "column_break_dwcv",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "naming_series",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "label": "Naming Series"
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "Letter In",
+   "print_hide": 1,
+   "read_only": 1,
+   "search_index": 1
+  },
+  {
+   "fetch_from": "project.custom_abbr",
+   "fieldname": "project_abbr",
+   "fieldtype": "Data",
+   "label": "\u0e15\u0e31\u0e27\u0e22\u0e48\u0e2d\u0e42\u0e04\u0e23\u0e07\u0e01\u0e32\u0e23"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "is_submittable": 1,
+ "links": [],
+ "modified": "2026-10-22 09:07:06.727547",
+ "modified_by": "Administrator",
+ "module": "ConsBiz",
+ "name": "Letter In",
+ "naming_rule": "By \"Naming Series\" field",
+ "owner": "akkarapon@siricons.com",
+ "permissions": [
+  {
+   "cancel": 1,
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Admin Officer",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Approver",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "show_name_in_global_search": 1,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [
+  {
+   "color": "Yellow",
+   "title": "\u0e23\u0e2d\u0e40\u0e2a\u0e19\u0e2d"
+  },
+  {
+   "color": "Blue",
+   "title": "\u0e40\u0e2a\u0e19\u0e2d\u0e2d\u0e19\u0e38\u0e21\u0e31\u0e15\u0e34"
+  },
+  {
+   "color": "Green",
+   "title": "\u0e2d\u0e19\u0e38\u0e21\u0e31\u0e15\u0e34"
+  },
+  {
+   "color": "Red",
+   "title": "\u0e44\u0e21\u0e48\u0e2d\u0e19\u0e38\u0e21\u0e31\u0e15\u0e34"
+  }
+ ],
+ "track_changes": 1
+}
