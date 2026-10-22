@@ -1,6 +1,7 @@
 # ConsBiz
 
-แอป Frappe v16 สำหรับธุรกิจก่อสร้าง (โมดูลเดียวชื่อ `ConsBiz`) ทำงานบน ERPNext ร่วมกับ `hrms`, `erpnext_thailand` และ `print_designer`
+แอป Frappe v16 สำหรับธุรกิจก่อสร้าง ทำงานบน ERPNext ร่วมกับ `hrms`, `erpnext_thailand` และ `print_designer`
+มีโมดูลเดียว: `ConsBiz`
 
 **repo นี้เป็น public** ห้าม commit รหัสผ่าน, token, `site_config.json`, ไฟล์ backup หรือข้อมูลลูกค้า/พนักงานจริง
 
@@ -33,20 +34,38 @@
 - การ import ไฟล์ DocType ตอน migrate จะข้ามถ้าฐานข้อมูลมี `modified` ใหม่กว่าไฟล์
 - ถ้าชื่อ record บนเซิร์ฟเวอร์ต่างจากชื่อในไฟล์ (เช่น Dock ชื่อ hash กับ Dock ชื่อ `consbiz`) migrate จะชน unique key
   ให้เขียน patch ใน `[pre_model_sync]` ลบหรือเปลี่ยนชื่อตัวเก่าก่อน ดู `consbiz/patches/remove_hash_named_dock.py`
+- เพิ่มโมดูลใหม่ใน `modules.txt` แล้ว migrate รอบแรกจะข้าม DocType/Page ของโมดูลนั้น เพราะ migrate ใช้รายชื่อโมดูลที่ redis จำไว้
+  ต้องมี patch ใน `[pre_model_sync]` สร้างรายชื่อใหม่ก่อน: `frappe.cache.delete_value("app_modules")` แล้ว `frappe.setup_module_map()`
+  (patch รันครั้งเดียวต่อไซต์ โมดูลใหม่แต่ละครั้งต้องเพิ่ม patch ชื่อใหม่)
 
 ## โครงสร้าง
 
 - `consbiz/hooks.py`: `doc_events`, `doctype_js`, `fixtures`, `scheduler_events`
 - `consbiz/api.py`: logic ที่ผูกกับ doc_events (Retention, Transmittal)
-- `consbiz/utils.py`: ตัวแปร naming series `ABBR`
+- `consbiz/utils.py`: ตัวแปร naming series `ABBR` และ `thai_date()` (วันที่ไทย พ.ศ. ใช้ใน Print Format ผ่าน `jinja` ใน hooks)
 - `consbiz/public/js/`: สคริปต์ฝั่งฟอร์ม (`doctype_js`) และ helper กลางใน `utils.js` เช่น `thai_baht_text()`
 - `consbiz/public/js/company_switcher.js`: ปุ่มเปลี่ยนบริษัท 2 ที่ ใช้ avatar และเมนูชุดเดียวกัน
   - Dock: กล่อง `.dock-company` เหนือ `.dock-user` ห้ามใส่ใน `.dock-user` เพราะ Frappe ผูกคลิกทั้งกล่องกับเมนูผู้ใช้
   - Sidebar: แถวที่ใช้ class แถวผู้ใช้ของ Frappe (`.dropdown-navbar-user`) จึงซ่อนตอน Dock แบบ Pinned และแสดงตอน Floating
 - `consbiz/public/css/style.css`: ฟอนต์และสีของหน้าจอ desk แบ่งเป็นส่วนมีหมายเลข
 - `consbiz/public/fonts/`: ไฟล์ฟอนต์ที่แอปส่งเอง (Noto Sans Thai, OFL)
+- แผนงานก่อสร้าง: DocType `Construction Management` (+ Task) ความคืบหน้าจริงเก็บใน `Construction Progress Entry`
+  (บัญชีที่ระบบสร้างเอง ไม่กรอกตรง) ซึ่งเกิดจากการ Submit `Daily Report` หรือการกรอกในหน้า Gantt
+  - หน้า Gantt: Page `construction-gantt` (route ชื่อนี้เพราะ `construction-management` ชนกับ list ของ DocType)
+    โหลด Vue bundle `public/js/construction_management/` (คำนวณ %แผน/S-Curve ใน `schedule.js` ตรงกับฝั่ง Python)
+- แผนตัดเหล็ก: `Bar Cut Plan` ใช้ `Rebar Type` และ `Bar Shape` (สูตรความยาว + รูป SVG) ตัวจัดตัดอยู่ใน `bar_cut_plan/optimizer.py`
+  รูปทรงและขนาดเหล็กมาตรฐานสร้างด้วย patch `seed_bar_cut_masters` (ข้ามที่มีอยู่แล้ว)
+- Print Format แบบ standard (`consbiz/consbiz/print_format/<name>/`): แก้ HTML ที่ไฟล์ `<name>.html` ไม่ใช่ช่อง HTML บนเว็บ
+  (Frappe อ่านไฟล์ก่อน) CSS กลางอยู่ที่ `consbiz/templates/print/print_style.html` ใช้ `{% include %}` class ขึ้นต้น `pf-`
 - `consbiz/patches/`: patch ที่รันตอน migrate (ลงทะเบียนใน `patches.txt`)
 - `consbiz/fixtures/`: ไฟล์ที่ export จาก `export-fixtures` อย่าแก้ด้วยมือ ให้แก้ในหน้าเว็บแล้ว export ใหม่
+
+## คำแปลภาษาไทย
+
+- Frappe รวมคำแปลจากทุกแอปตามลำดับที่ติดตั้ง แอปหลังทับแอปหน้า consbiz ติดตั้งท้ายสุด
+  คำแปลใน `consbiz/translations/th.csv` จึงทับคำแปลของ frappe/erpnext/hrms ได้ (ข้อความเดียวกันได้คำแปลเดียวกันทั้งระบบ)
+- แก้ th.csv ต้องคงตัวแปร (`{0}`, `%s`, แท็ก HTML) ให้ครบเหมือนต้นฉบับ
+- คำแปลที่บันทึกใน DocType `Translation` (ฐานข้อมูล) ทับไฟล์ทุกไฟล์
 
 ## แนวทางเขียนโค้ด
 
@@ -77,3 +96,14 @@
 - งานที่เปลี่ยน DocType, fixtures, Sidebar หรือ Dock: restore backup ล่าสุดของเซิร์ฟเวอร์จริงลงไซต์ทดสอบ แล้ว migrate
   เพื่อดูว่าข้อมูลไม่หายและไม่มี record ถูกลบเป็น orphan (ดูบรรทัด "Orphaned ... found" ใน log)
 - ตอนอัปเดตเซิร์ฟเวอร์จริง `apps/print_designer` ต้องดึงจาก fork `Akkarapon-phi/print_designer` (มีฟอนต์ไทย)
+- DocType ที่มี Link ไป DocType ของ ERPNext (เช่น Project) ให้ใส่ชื่อนั้นใน `IGNORE_TEST_RECORD_DEPENDENCIES` ของไฟล์ test
+  ไม่งั้น test จะสร้าง test record ของ ERPNext ทั้งชุดแล้วชนข้อมูลเดิม
+
+## PDF
+
+- wkhtmltopdf ในเครื่อง dev เป็นแบบไม่ patch: ไม่รองรับ `--header-html` และ `@media print` และตัวหนาของ variable font
+  Print Format ของแอปจึงทำหัว/ท้ายกระดาษซ้ำด้วย `<thead>`/`<tfoot>` (ใช้ได้ทั้งพิมพ์จากเบราว์เซอร์และ Chrome PDF)
+- wkhtmltopdf โหลด CSS/ฟอนต์จาก URL ของไซต์ ชื่อไซต์ต้องอยู่ใน `/etc/hosts` (`127.0.0.1 erp.localhost`) ไม่งั้นได้ `HostNotFoundError`
+- PDF Generator แบบ `chrome` ใช้ `frappe-bench/chromium` ต้องติดตั้ง `libnss3 libasound2t64` ก่อน ไม่งั้นได้ "Chromium took too long to start"
+- ขอบหน้า PDF: Frappe อ่านจากกฎ `.print-format { margin-* }` (ต้องเขียนตรงตัว) ไม่อ่าน `@page` ของเรา
+- Jinja ใน Print Format ใช้ `frappe.get_cached_value` ไม่ได้ ให้ใช้ `frappe.db.get_value`
