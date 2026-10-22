@@ -1,0 +1,195 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "creation": "2026-10-22 16:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "wbs",
+  "item_name",
+  "is_group",
+  "indent",
+  "boq_detail",
+  "quantity",
+  "uom",
+  "rate",
+  "amount",
+  "weight",
+  "column_break_dates",
+  "start_date",
+  "end_date",
+  "duration",
+  "section_break_baseline",
+  "baseline_start_date",
+  "baseline_end_date",
+  "column_break_actual",
+  "actual_qty",
+  "progress",
+  "plan_distribution",
+  "baseline_distribution"
+ ],
+ "fields": [
+  {
+   "columns": 1,
+   "fieldname": "wbs",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "WBS",
+   "read_only": 1
+  },
+  {
+   "columns": 3,
+   "fieldname": "item_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Item Name",
+   "read_only": 1
+  },
+  {
+   "fieldname": "is_group",
+   "fieldtype": "Check",
+   "label": "Is Group",
+   "read_only": 1
+  },
+  {
+   "fieldname": "indent",
+   "fieldtype": "Int",
+   "hidden": 1,
+   "label": "Indent",
+   "read_only": 1
+  },
+  {
+   "fieldname": "boq_detail",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "label": "BOQ Item Detail",
+   "read_only": 1
+  },
+  {
+   "fieldname": "quantity",
+   "fieldtype": "Float",
+   "label": "Quantity",
+   "read_only": 1
+  },
+  {
+   "fieldname": "uom",
+   "fieldtype": "Link",
+   "label": "UOM",
+   "options": "UOM",
+   "read_only": 1
+  },
+  {
+   "fieldname": "rate",
+   "fieldtype": "Currency",
+   "label": "Rate",
+   "read_only": 1
+  },
+  {
+   "fieldname": "amount",
+   "fieldtype": "Currency",
+   "label": "Amount",
+   "read_only": 1
+  },
+  {
+   "columns": 1,
+   "fieldname": "weight",
+   "fieldtype": "Percent",
+   "in_list_view": 1,
+   "label": "Weight",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_dates",
+   "fieldtype": "Column Break"
+  },
+  {
+   "columns": 2,
+   "fieldname": "start_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Start Date"
+  },
+  {
+   "columns": 2,
+   "fieldname": "end_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "End Date"
+  },
+  {
+   "columns": 1,
+   "description": "คำนวณจากวันเริ่มและวันจบ ถ้าไม่ใส่วันจบ ระบบคำนวณวันจบจากจำนวนวันให้",
+   "fieldname": "duration",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "Duration (Days)"
+  },
+  {
+   "fieldname": "section_break_baseline",
+   "fieldtype": "Section Break",
+   "label": "Baseline / Actual"
+  },
+  {
+   "fieldname": "baseline_start_date",
+   "fieldtype": "Date",
+   "label": "Baseline Start Date",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "baseline_end_date",
+   "fieldtype": "Date",
+   "label": "Baseline End Date",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_actual",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "actual_qty",
+   "fieldtype": "Float",
+   "label": "Actual Qty",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "progress",
+   "fieldtype": "Percent",
+   "label": "Actual Progress",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "description": "% แผนที่กำหนดเองรายช่วง { unit, weights } (ตั้งจากหน้า Gantt)",
+   "fieldname": "plan_distribution",
+   "fieldtype": "JSON",
+   "hidden": 1,
+   "label": "Plan Distribution",
+   "read_only": 1
+  },
+  {
+   "fieldname": "baseline_distribution",
+   "fieldtype": "JSON",
+   "hidden": 1,
+   "label": "Baseline Distribution",
+   "no_copy": 1,
+   "read_only": 1
+  }
+ ],
+ "grid_page_length": 50,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-10-23 18:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "ConsBiz",
+ "name": "Construction Management Task",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

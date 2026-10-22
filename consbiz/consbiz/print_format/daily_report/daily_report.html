@@ -1,0 +1,208 @@
+{#-
+	รายงานประจำวัน (Daily Report)
+	- หัวกระดาษ (ชื่อเอกสาร + โครงการ) อยู่ใน <thead> และท้ายกระดาษอยู่ใน <tfoot> ของตาราง .pf-page
+	  เบราว์เซอร์และ Chrome PDF พิมพ์ซ้ำให้ทุกหน้าเอง ไม่ต้องพึ่ง #header-html (wkhtmltopdf แบบไม่ patch ใช้ไม่ได้)
+	- เลขหน้าใช้ @page margin box (Chrome 131 ขึ้นไป)
+	- thai_date มาจาก consbiz.utils (ลงทะเบียน jinja ใน hooks.py)
+-#}
+{%- set cm = frappe.get_doc("Construction Management", doc.construction_management) -%}
+{%- set project_name = frappe.db.get_value("Project", doc.project, "project_name") if doc.project else "" -%}
+{%- set prepared_by = doc.supervisor_name or frappe.db.get_value("User", doc.owner, "full_name") or doc.owner -%}
+{%- set money = "{:,.2f}" -%}
+
+{% include "consbiz/templates/print/print_style.html" %}
+
+<div class="pf">
+	<table class="pf-page">
+		<thead>
+			<tr>
+				<td>
+					<div class="pf-title">
+						<h1>รายงานประจำวัน (Daily Report)</h1>
+						<div>{{ project_name or "" }}</div>
+					</div>
+				</td>
+			</tr>
+		</thead>
+
+		<tfoot>
+			<tr>
+				<td>
+					<div class="pf-footer">
+						<div>พิมพ์เมื่อ {{ thai_date(frappe.utils.nowdate()) }} {{ frappe.utils.nowtime()[:5] }} น.</div>
+						<div class="text-right">{{ doc.name }}</div>
+					</div>
+				</td>
+			</tr>
+		</tfoot>
+
+		<tbody>
+			<tr>
+				<td>
+					{#- 1 ข้อมูลรายงาน -#}
+					<div class="pf-section">
+						<span><span class="no">1</span><span class="name">ข้อมูลรายงาน</span></span>
+						<span class="rule"></span>
+					</div>
+					<table class="pf-grid pf-info">
+						<tbody>
+							<tr>
+								<td class="pf-k">เลขที่รายงาน</td>
+								<td class="pf-v">{{ doc.name }}</td>
+								<td class="pf-k">วันที่</td>
+								<td class="pf-v">{{ thai_date(doc.date) }}</td>
+							</tr>
+							<tr>
+								<td class="pf-k">สภาพอากาศ</td>
+								<td class="pf-v">{{ doc.weather or "-" }}</td>
+								<td class="pf-k">ผลกระทบ</td>
+								<td class="pf-v">{{ doc.weather_impact or "-" }}</td>
+							</tr>
+						</tbody>
+					</table>
+
+					{#- 2 ผลงานที่ดำเนินการ -#}
+					<div class="pf-section">
+						<span><span class="no">2</span><span class="name">ผลงานที่ดำเนินการ</span></span>
+						<span class="rule"></span>
+					</div>
+					<table class="pf-grid">
+						<thead>
+							<tr>
+								<th class="text-center" style="width: 6%">ลำดับ</th>
+								<th style="width: 34%">กิจกรรม</th>
+								<th class="text-right" style="width: 11%">ปริมาณวันนี้</th>
+								<th class="text-center" style="width: 7%">หน่วย</th>
+								<th class="text-right" style="width: 11%">ราคาต่อหน่วย</th>
+								<th class="text-right" style="width: 12%">มูลค่าบันทึก</th>
+								<th style="width: 19%">หมายเหตุ</th>
+							</tr>
+						</thead>
+						<tbody>
+							{%- for row in doc.items %}
+							<tr>
+								<td class="text-center">{{ loop.index }}</td>
+								<td>
+									<strong>{{ row.wbs }}</strong> {{ row.item_name }}
+									{%- if row.group_path %}<span class="path">{{ row.group_path }}</span>{% endif %}
+								</td>
+								<td class="text-right">
+									{%- if row.boq_qty %}{{ frappe.format(row.qty, {"fieldtype": "Float"}) }}
+									{%- else %}{{ "{:,.2f}".format(row.percent or 0) }}%{% endif -%}
+								</td>
+								<td class="text-center">{{ row.uom or "" }}</td>
+								<td class="text-right">{{ money.format(row.rate or 0) }}</td>
+								<td class="text-right">{{ money.format(row.amount or 0) }}</td>
+								<td>{{ row.remarks or "" }}</td>
+							</tr>
+							{%- else %}
+							<tr><td colspan="7" class="empty">ไม่มีรายการ</td></tr>
+							{%- endfor %}
+						</tbody>
+					</table>
+					<div class="pf-total">
+						<span>มูลค่าที่บันทึก</span>
+						<span class="text-right">{{ money.format(doc.total_amount or 0) }} บาท</span>
+					</div>
+
+					{#- 3 บันทึกประกอบ (หัวข้อ ตาราง และปัญหา/อุปสรรคอยู่หน้าเดียวกัน) -#}
+					<div class="pf-keep">
+					<div class="pf-section">
+						<span><span class="no">3</span><span class="name">บันทึกประกอบ</span></span>
+						<span class="rule"></span>
+					</div>
+					<table class="pf-columns">
+						<tbody>
+							<tr>
+								<td>
+									<div class="pf-subtitle">บุคลากร</div>
+									<table class="pf-grid">
+										<thead>
+											<tr>
+												<th class="text-center" style="width: 12%">ลำดับ</th>
+												<th>ตำแหน่ง / ประเภท</th>
+												<th class="text-right" style="width: 18%">จำนวน (คน)</th>
+												<th style="width: 30%">หมายเหตุ</th>
+											</tr>
+										</thead>
+										<tbody>
+											{%- for row in doc.labour %}
+											<tr>
+												<td class="text-center">{{ loop.index }}</td>
+												<td>{{ row.role }}</td>
+												<td class="text-right">{{ row.qty or 0 }}</td>
+												<td>{{ row.remarks or "" }}</td>
+											</tr>
+											{%- else %}
+											<tr><td colspan="4" class="empty">-</td></tr>
+											{%- endfor %}
+										</tbody>
+										{%- if doc.labour %}
+										<tfoot>
+											<tr>
+												<td colspan="2">รวม</td>
+												<td class="text-right">{{ doc.labour | sum(attribute="qty") }}</td>
+												<td>คน</td>
+											</tr>
+										</tfoot>
+										{%- endif %}
+									</table>
+								</td>
+								<td>
+									<div class="pf-subtitle">เครื่องจักร / อุปกรณ์</div>
+									<table class="pf-grid">
+										<thead>
+											<tr>
+												<th class="text-center" style="width: 12%">ลำดับ</th>
+												<th>รายการ</th>
+												<th class="text-right" style="width: 13%">จำนวน</th>
+												<th class="text-right" style="width: 13%">ชั่วโมง</th>
+												<th style="width: 26%">หมายเหตุ</th>
+											</tr>
+										</thead>
+										<tbody>
+											{%- for row in doc.equipment %}
+											<tr>
+												<td class="text-center">{{ loop.index }}</td>
+												<td>{{ row.equipment }}</td>
+												<td class="text-right">{{ row.qty or 0 }}</td>
+												<td class="text-right">{{ "{:,.1f}".format(row.hours or 0) }}</td>
+												<td>{{ row.remarks or "" }}</td>
+											</tr>
+											{%- else %}
+											<tr><td colspan="5" class="empty">-</td></tr>
+											{%- endfor %}
+										</tbody>
+									</table>
+								</td>
+							</tr>
+						</tbody>
+					</table>
+					<div class="pf-note">
+						<b>ปัญหา / อุปสรรค</b><br />{{ (doc.problems or "-") | e | replace("\n", "<br />") }}
+					</div>
+					</div>
+					{%- if doc.remarks %}
+					<div class="pf-note">
+						<b>หมายเหตุ</b><br />{{ doc.remarks | e | replace("\n", "<br />") }}
+					</div>
+					{%- endif %}
+
+					<table class="pf-sign pf-keep">
+						<tbody>
+							<tr>
+								<td>
+									<div class="line">ลงชื่อ ........................................................</div>
+									<div>({{ prepared_by }})</div>
+									<div>ผู้จัดทำ</div>
+									<div class="muted">วันที่ {{ thai_date(doc.date) }}</div>
+								</td>
+								<td></td>
+							</tr>
+						</tbody>
+					</table>
+				</td>
+			</tr>
+		</tbody>
+	</table>
+</div>

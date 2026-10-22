@@ -1,0 +1,137 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "creation": "2026-10-25 09:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "mark",
+  "shape",
+  "rebar_type",
+  "a",
+  "b",
+  "c",
+  "d",
+  "qty",
+  "cut_length",
+  "column_break_result",
+  "total_length",
+  "weight",
+  "remarks",
+  "shape_preview"
+ ],
+ "fields": [
+  {
+   "columns": 1,
+   "description": "เลขเหล็ก/ตำแหน่ง เช่น C1-1",
+   "fieldname": "mark",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Bar Mark"
+  },
+  {
+   "columns": 1,
+   "fieldname": "shape",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Shape",
+   "options": "Bar Shape",
+   "reqd": 1
+  },
+  {
+   "columns": 1,
+   "fieldname": "rebar_type",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Rebar Type",
+   "options": "Rebar Type",
+   "reqd": 1
+  },
+  {
+   "columns": 1,
+   "fieldname": "a",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "A (mm)"
+  },
+  {
+   "columns": 1,
+   "fieldname": "b",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "B (mm)"
+  },
+  {
+   "columns": 1,
+   "fieldname": "c",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "C (mm)"
+  },
+  {
+   "columns": 1,
+   "fieldname": "d",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "D (mm)"
+  },
+  {
+   "columns": 1,
+   "fieldname": "qty",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "Qty",
+   "reqd": 1
+  },
+  {
+   "columns": 1,
+   "fieldname": "cut_length",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Cut Length (mm)",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_result",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "total_length",
+   "fieldtype": "Float",
+   "label": "Total Length (m)",
+   "precision": "2",
+   "read_only": 1
+  },
+  {
+   "fieldname": "weight",
+   "fieldtype": "Float",
+   "label": "Weight (kg)",
+   "precision": "2",
+   "read_only": 1
+  },
+  {
+   "fieldname": "remarks",
+   "fieldtype": "Data",
+   "label": "Remarks"
+  },
+  {
+   "fieldname": "shape_preview",
+   "fieldtype": "HTML",
+   "label": "Shape Preview"
+  }
+ ],
+ "grid_page_length": 50,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-10-25 09:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "ConsBiz",
+ "name": "Bar Cut Item",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

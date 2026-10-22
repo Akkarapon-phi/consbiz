@@ -5,3 +5,4 @@ consbiz.patches.remove_hash_named_dock
 
 [post_model_sync]
 # Patches added in this section will be executed after doctypes are migrated
+consbiz.patches.seed_bar_cut_masters

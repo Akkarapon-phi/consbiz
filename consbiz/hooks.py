@@ -173,6 +173,12 @@ scheduler_events = {
 # ----------
 
 # add methods and filters to jinja environment
+jinja = {
+	"methods": [
+		"consbiz.utils.thai_date",
+		"consbiz.consbiz.doctype.bar_cut_plan.bar_cut_plan.shape_svg",
+	]
+}
 # jinja = {
 # 	"methods": "consbiz.utils.jinja_methods",
 # 	"filters": "consbiz.utils.jinja_filters"

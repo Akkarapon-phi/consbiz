@@ -1,0 +1,172 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "autoname": "field:shape_code",
+ "creation": "2026-10-25 09:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "shape_code",
+  "shape_name",
+  "dimensions",
+  "sides_formula",
+  "column_break_main",
+  "bends_45",
+  "bends_90",
+  "bends_135",
+  "bends_180",
+  "hooks_135",
+  "hooks_180",
+  "section_break_svg",
+  "svg",
+  "preview",
+  "is_standard"
+ ],
+ "fields": [
+  {
+   "fieldname": "shape_code",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Shape Code",
+   "reqd": 1,
+   "unique": 1
+  },
+  {
+   "fieldname": "shape_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Shape Name",
+   "reqd": 1
+  },
+  {
+   "default": "A",
+   "description": "ด้านที่ต้องกรอก คั่นด้วยจุลภาค เช่น A,B,C (สูงสุด A-D หน่วย มม.)",
+   "fieldname": "dimensions",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Dimensions",
+   "reqd": 1
+  },
+  {
+   "default": "A",
+   "description": "ผลรวมความยาวด้าน ใช้ A B C D และ d (ขนาดเหล็ก มม.) เช่น 2*(A+B)",
+   "fieldname": "sides_formula",
+   "fieldtype": "Data",
+   "label": "Sum of Sides Formula",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_main",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "bends_45",
+   "fieldtype": "Int",
+   "label": "Bends 45°"
+  },
+  {
+   "fieldname": "bends_90",
+   "fieldtype": "Int",
+   "label": "Bends 90°"
+  },
+  {
+   "fieldname": "bends_135",
+   "fieldtype": "Int",
+   "label": "Bends 135°"
+  },
+  {
+   "fieldname": "bends_180",
+   "fieldtype": "Int",
+   "label": "Bends 180°"
+  },
+  {
+   "description": "จำนวนขอ 135° (เช่นปลอก)",
+   "fieldname": "hooks_135",
+   "fieldtype": "Int",
+   "label": "Hooks 135°"
+  },
+  {
+   "description": "จำนวนขอ 180° (เช่นปลายเหล็ก RB)",
+   "fieldname": "hooks_180",
+   "fieldtype": "Int",
+   "label": "Hooks 180°"
+  },
+  {
+   "fieldname": "section_break_svg",
+   "fieldtype": "Section Break",
+   "label": "Drawing"
+  },
+  {
+   "description": "รูป SVG ใส่ <text data-dim=\"A\">A</text> ตรงตำแหน่งป้ายของแต่ละด้าน",
+   "fieldname": "svg",
+   "fieldtype": "Code",
+   "label": "SVG",
+   "options": "HTML"
+  },
+  {
+   "fieldname": "preview",
+   "fieldtype": "HTML",
+   "label": "Preview"
+  },
+  {
+   "description": "รูปทรงมาตรฐานที่ระบบสร้างให้",
+   "fieldname": "is_standard",
+   "fieldtype": "Check",
+   "label": "Is Standard",
+   "read_only": 1
+  }
+ ],
+ "grid_page_length": 50,
+ "links": [],
+ "modified": "2026-10-25 09:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "ConsBiz",
+ "name": "Bar Shape",
+ "naming_rule": "By fieldname",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Projects Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Projects User",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "search_fields": "shape_name",
+ "show_title_field_in_link": 1,
+ "sort_field": "shape_code",
+ "sort_order": "ASC",
+ "states": [],
+ "title_field": "shape_name"
+}

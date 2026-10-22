@@ -79,3 +79,133 @@
 #sidebar-company-switcher + .dropdown-navbar-user {
     margin-top: 0 !important;
 }
+
+/* 7. หน้าแผนงานก่อสร้าง (Gantt + S-Curve, public/js/construction_management)
+   อ้างตัวแปรสีของ Frappe จึงเปลี่ยนตามธีมมืด/สว่างเอง */
+:root {
+    --consbiz-gantt-bar: var(--blue-500);
+    --consbiz-gantt-group: var(--gray-700);
+    --consbiz-gantt-today: var(--red-500);
+    --consbiz-gantt-plan: var(--blue-500);
+    --consbiz-gantt-actual: var(--green-500);
+    --consbiz-gantt-baseline: var(--gray-500);
+    --consbiz-gantt-status-date: var(--purple-500);
+    --consbiz-gantt-done: var(--green-500);
+    --consbiz-gantt-late: var(--orange-500);
+    --consbiz-gantt-critical: var(--red-500);
+    --consbiz-gantt-holiday: var(--subtle-fg);
+    --consbiz-gantt-row-hover: var(--highlight-color);
+}
+
+/* 8. แผนตัดเหล็ก (Bar Cut Plan): รูปทรงการดัด และแผนภาพการตัด */
+:root {
+    --consbiz-cut-piece: var(--blue-100);
+    --consbiz-cut-piece-border: var(--blue-400);
+    --consbiz-cut-reusable: var(--green-100);
+    --consbiz-cut-scrap: var(--red-100);
+}
+.consbiz-shape-gallery {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    gap: var(--padding-sm);
+}
+.consbiz-shape-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: var(--padding-sm);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-md);
+    background: var(--card-bg);
+    color: var(--text-color);
+    font-size: var(--text-xs);
+}
+.consbiz-shape-card:hover {
+    border-color: var(--gray-500);
+}
+.consbiz-shape-card.active {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 1px var(--primary);
+    background: var(--subtle-accent);
+}
+.consbiz-shape-card svg,
+.consbiz-shape-preview svg,
+.consbiz-bar-shape svg {
+    width: 100%;
+    height: auto;
+    overflow: visible;
+}
+.consbiz-shape-preview {
+    max-width: 320px;
+    margin: 0 auto var(--padding-sm);
+    color: var(--text-color);
+}
+.consbiz-cut-length {
+    margin-top: var(--padding-sm);
+    padding: var(--padding-sm);
+    border-radius: var(--border-radius);
+    background: var(--subtle-fg);
+    text-align: center;
+}
+.consbiz-cut-totals {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--padding-xs) var(--padding-lg);
+    margin-bottom: var(--padding-md);
+}
+.consbiz-cut-group {
+    margin-bottom: var(--padding-md);
+}
+.consbiz-cut-title {
+    display: flex;
+    gap: var(--padding-sm);
+    margin-bottom: var(--padding-xs);
+}
+.consbiz-cut-row {
+    display: flex;
+    align-items: center;
+    gap: var(--padding-sm);
+    margin-bottom: 4px;
+}
+.consbiz-cut-label {
+    flex: 0 0 80px;
+    font-size: var(--text-sm);
+    text-align: right;
+}
+.consbiz-cut-bar {
+    flex: 1;
+    display: flex;
+    height: 24px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    overflow: hidden;
+}
+.consbiz-cut-piece,
+.consbiz-cut-offcut {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: var(--text-xs);
+    white-space: nowrap;
+    overflow: hidden;
+}
+.consbiz-cut-piece {
+    background: var(--consbiz-cut-piece);
+    border-right: 1px solid var(--consbiz-cut-piece-border);
+}
+.consbiz-cut-offcut.reusable,
+.consbiz-cut-swatch.reusable {
+    background: var(--consbiz-cut-reusable);
+}
+.consbiz-cut-offcut.scrap,
+.consbiz-cut-swatch.scrap {
+    background: var(--consbiz-cut-scrap);
+}
+.consbiz-cut-swatch {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    margin-right: 4px;
+    border-radius: 2px;
+}
