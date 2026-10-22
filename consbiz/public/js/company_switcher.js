@@ -1,143 +1,163 @@
 frappe.provide('frappe.ui');
 
+// ปุ่มเปลี่ยนบริษัท มี 2 ที่ ใช้ avatar และเมนู (frappe.ui.Dropdown) ชุดเดียวกัน:
+// - Dock (แถบซ้ายของ Frappe v16): ปุ่มกลมในกล่อง .dock-company เหนือ .dock-user (Avatar)
+//   ห้ามใส่ไว้ใน .dock-user เพราะ Frappe ผูกคลิกทั้งกล่องนั้นกับเมนูผู้ใช้
+// - Sidebar: แถวเหนือแถวผู้ใช้ หน้าตาเหมือนแถวผู้ใช้ของ Frappe
+//   แสดง/ซ่อนพร้อมแถวผู้ใช้: ซ่อนตอน Dock แบบ Pinned, แสดงตอน Floating (ตั้งค่าผู้ใช้ > Dock)
 frappe.ui.CompanySwitcher = class CompanySwitcher {
     constructor() {
         this.current_company = frappe.defaults.get_user_default("company") || "เลือกบริษัท";
-        this.companies = [];
+        this.companies = null;
         this.setup();
     }
 
     setup() {
-        const observer = new MutationObserver((mutations) => {
-            if ($('#sidebar-company-switcher').length) return;
+        const observer = new MutationObserver(() => {
+            const dock = $('#desk-dock');
+            if (dock.length && !dock.find('.dock-company').length) {
+                this.load_companies().then(() => this.render_dock(dock));
+            }
 
             const footer = $('.body-sidebar-bottom');
-            if (footer.length) {
-                this.get_companies_and_render(footer);
+            if (footer.length && !$('#sidebar-company-switcher').length) {
+                this.load_companies().then(() => this.render_sidebar(footer));
             }
         });
 
         observer.observe(document.body, { childList: true, subtree: true });
     }
 
-    get_companies_and_render(footer) {
+    load_companies() {
+        if (!this.companies_promise) {
+            this.companies_promise = frappe
+                .call({
+                    method: "frappe.client.get_list",
+                    args: {
+                        doctype: "Company",
+                        fields: ["name", "company_logo"]
+                    }
+                })
+                .then((r) => (this.companies = r.message || []));
+        }
+        return this.companies_promise;
+    }
+
+    current_logo() {
+        const current = this.companies.find((c) => c.name === this.current_company);
+        return current ? current.company_logo : null;
+    }
+
+    switch_company(company_name) {
+        frappe.call({
+            method: 'consbiz.api.set_user_default_company',
+            args: { company: company_name },
+            callback: (r) => { if (r.message) window.location.reload(); }
+        });
+    }
+
+    // โลโก้บริษัทปัจจุบันในกรอบ avatar ขนาดเดียวกับ Avatar ผู้ใช้
+    // ไฟล์โลโก้หาย (เช่นเครื่อง dev ที่ไม่มีไฟล์แนบ) ให้แสดงตัวย่อชื่อบริษัทแทนรูปเสีย
+    make_avatar() {
+        const logo = this.current_logo();
+        const abbr = frappe.get_abbr(this.current_company);
+        const frame_html = logo
+            ? `<img src="${encodeURI(logo)}" alt="${frappe.utils.escape_html(this.current_company)}">`
+            : abbr;
+
+        const $avatar = $(`
+            <span class="avatar avatar-medium company-avatar">
+                <span class="avatar-frame standard-image">${frame_html}</span>
+            </span>`);
+        $avatar.find('img').on('error', (e) => $(e.currentTarget).replaceWith(abbr));
+        return $avatar;
+    }
+
+    make_menu(trigger, side, align) {
+        new frappe.ui.Dropdown({
+            trigger,
+            side,
+            align,
+            options: [
+                {
+                    group: __("เปลี่ยนบริษัท"),
+                    options: this.companies.map((co) => ({
+                        label: co.name,
+                        image: co.company_logo || undefined,
+                        icon: co.company_logo ? undefined : "building-2",
+                        selected: co.name === this.current_company,
+                        onclick: () => {
+                            if (co.name !== this.current_company) this.switch_company(co.name);
+                        }
+                    }))
+                }
+            ]
+        });
+    }
+
+    // ---------------------------------------------------------------
+    // Dock
+    // ---------------------------------------------------------------
+
+    render_dock(dock) {
+        if (dock.find('.dock-company').length) return;
+
+        const $wrapper = $(`
+            <div class="dock-company">
+                <button class="dock-item dock-company-button" aria-label="${__("เปลี่ยนบริษัท")}"></button>
+            </div>`);
+        const $button = $wrapper.find('.dock-company-button').append(this.make_avatar());
+
+        const dock_user = dock.find('.dock-user');
+        if (dock_user.length) {
+            dock_user.before($wrapper);
+        } else {
+            dock.append($wrapper);
+        }
+
+        this.make_menu($button, "right", "end");
+
+        new frappe.ui.Tooltip($button[0], {
+            text: this.current_company,
+            side: "right",
+            delay: 0,
+            offset: 10,
+            class: "es-tooltip--plain"
+        });
+    }
+
+    // ---------------------------------------------------------------
+    // Sidebar (ผู้ใช้ที่ปิด Dock)
+    // ---------------------------------------------------------------
+
+    render_sidebar(footer) {
         if ($('#sidebar-company-switcher').length) return;
 
-        frappe.call({
-            method: "frappe.client.get_list",
-            args: {
-                doctype: "Company",
-                fields: ["name", "company_logo"] // เพิ่ม company_logo เข้ามา
-            },
-            callback: (r) => {
-                if (r.message && !$('#sidebar-company-switcher').length) {
-                    this.companies = r.message;
-                    this.render_ui(footer);
-                    this.setup_events();
-                }
-            }
-        });
-    }
-
-    render_ui(footer) {
-        // หาข้อมูลโลโก้ของบริษัทปัจจุบัน
-        const current_co_data = this.companies.find(c => c.name === this.current_company);
-        const current_logo = current_co_data ? current_co_data.company_logo : null;
-
-        const company_items = this.companies
-            .map((co) => {
-                // ส่วนแสดงผลโลโก้ในรายการ Dropdown
-                const item_logo_html = co.company_logo
-                    ? `<img src="${co.company_logo}" style="width: 20px; height: 20px; object-fit: contain; margin-right: 8px; border-radius: 4px;">`
-                    : `<div class="mr-2 d-inline-flex align-center justify-center" style="width: 20px; height: 20px; background: var(--bg-light-gray); border-radius: 4px; font-size: 10px;">🏢</div>`;
-
-                return `
-                <li>
-                    <button class="btn-reset dropdown-item d-flex align-items-center" data-company="${co.name}">
-                        ${item_logo_html}
-                        <span class="text-truncate">${co.name}</span>
-                    </button>
-                </li>`;
-            })
-            .join('');
-
-        // ส่วนแสดงผลโลโก้บนปุ่มหลัก
-        const main_logo_html = current_logo
-            ? `<img src="${current_logo}" style="width: 100%; height: 100%; object-fit: contain; padding: 2px;">`
-            : `<div class="avatar-frame standard-image" style="background-color: var(--blue-avatar-bg); color: var(--blue-avatar-color)">🏢</div>`;
-
-        const html = `
-            <div id="sidebar-company-switcher" class="nav-item dropup dropdown-navbar-user dropdown-mobile mt-2">
-                <style>
-                    #sidebar-company-switcher .btn-company-switcher {
-                        width: 100%;
-                        height: 40px;
-                        text-decoration: none;
-                        margin-bottom: -10px !important;
-                    }
-                    #sidebar-company-switcher .dropdown-menu {
-                        margin-bottom: 0px;
-                        width: 200px;
-                        border-radius: 8px;
-                        overflow-y: auto;
-                        max-height: 300px;
-                    }
-                    #sidebar-company-switcher .avatar-frame {
-                        display: flex;
-                        align-items: center;
-                        justify-content: center;
-                        overflow: hidden;
-                        background: white; /* พื้นหลังขาวเพื่อให้โลโก้เด่น */
-                        width: 28px !important;
-                        height: 28px !important;
-                    }
-                    body.sidebar-collapsed #sidebar-company-switcher .avatar-name-email {
-                        display: none !important;
-                    }
-                    body.sidebar-collapsed #sidebar-company-switcher .btn-company-switcher {
-                        justify-content: center !important;
-                    }
-                </style>
-                
-                <button class="align-center btn-reset flex nav-link btn-company-switcher" data-toggle="dropdown" aria-label="Company Menu" aria-expanded="false">
-                    <div class="avatar avatar-medium" title="${this.current_company}">
-                        <div class="avatar-frame standard-image">
-                            ${main_logo_html}
-                        </div>
+        // ใช้ class เดียวกับแถวผู้ใช้ของ Frappe (sidebar.html) เพื่อให้ได้ขนาด สี hover
+        // และการย่อเหลือแค่ avatar ตอนพับ sidebar แบบเดียวกัน
+        // Frappe ผูกเมนูผู้ใช้กับ .dropdown-navbar-user ครั้งเดียวตอนสร้าง sidebar ก่อนแถวนี้ถูกแทรก
+        const $row = $(`
+            <div id="sidebar-company-switcher" class="nav-item dropdown-navbar-user dropdown-mobile mt-3">
+                <a class="align-center btn-reset flex nav-link sidebar-user-button"
+                    style="width: 100%; min-height: 40px;"
+                    aria-label="${__("เปลี่ยนบริษัท")}">
+                    <div class="company-avatar-slot"></div>
+                    <div class="avatar-name-email overflow-hidden" style="margin-left: 8px;">
+                        <span class="d-block text-truncate">${frappe.utils.escape_html(this.current_company)}</span>
+                        <span class="d-block text-truncate">${__("เปลี่ยนบริษัท")}</span>
                     </div>
-                    <div class="avatar-name-email ml-2 text-small overflow-hidden w-75 text-left">
-                        <span class="d-block text-truncate font-weight-bold" style="color: var(--text-color);">
-                            ${this.current_company}
-                        </span>
-                        <span class="d-block text-secondary text-truncate">
-                            เปลี่ยนบริษัท <i class="fa fa-caret-up ml-1" style="font-size: 8px;"></i>
-                        </span>
-                    </div>
-                </button>
-                <div class="dropdown-menu dropdown-menu-left shadow-lg" role="menu">
-                    ${company_items}
-                </div>
-            </div>`;
+                </a>
+            </div>`);
+        $row.find('.company-avatar-slot').append(this.make_avatar());
 
-        const user_section = footer.find('.dropdown-navbar-user');
-        if (user_section.length) {
-            user_section.before(html);
+        const user_row = footer.find('.dropdown-navbar-user').not('#sidebar-company-switcher');
+        if (user_row.length) {
+            user_row.first().before($row);
         } else {
-            footer.append(html);
+            footer.append($row);
         }
-    }
 
-    setup_events() {
-        $('body').off('click', '#sidebar-company-switcher .dropdown-item').on('click', '#sidebar-company-switcher .dropdown-item', (e) => {
-            e.preventDefault();
-            const company_name = $(e.currentTarget).data('company');
-
-            frappe.call({
-                method: 'consbiz.api.set_user_default_company',
-                args: { company: company_name },
-                callback: (r) => { if (r.message) window.location.reload(); }
-            });
-        });
+        this.make_menu($row.find('.sidebar-user-button'), "top", "start");
     }
 };
 
