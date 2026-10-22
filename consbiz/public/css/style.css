@@ -1,26 +1,25 @@
-/* 1. ดึง Noto Sans Thai มาให้ครบทุกน้ำหนัก */
-@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@300;400;500;600;700;800;900&display=swap');
-
-:root {
-    /* ใช้ Inter สำหรับอังกฤษ และ Noto สำหรับไทย */
-    --font-stack: "Inter", "system-ui", "-apple-system", "Noto Sans Thai", sans-serif !important;
+/* 1. Noto Sans Thai เก็บไว้ในแอปเอง (public/fonts) ไม่พึ่ง Google และไม่ขึ้นกับว่าเครื่องติดตั้งฟอนต์หรือไม่
+      ไฟล์เดียวเป็น variable font ครอบคลุมน้ำหนัก 100-900 ใช้เฉพาะตัวอักษรไทย (unicode-range)
+      ที่มา: @fontsource-variable/noto-sans-thai 5.3.0 สัญญาอนุญาต OFL-1.1 (fonts/noto-sans-thai/OFL.txt) */
+@font-face {
+    font-family: "Noto Sans Thai";
+    font-style: normal;
+    font-weight: 100 900;
+    font-display: swap;
+    src: url("/assets/consbiz/fonts/noto-sans-thai/NotoSansThai-Variable-thai.woff2") format("woff2");
+    unicode-range: U+02D7, U+0303, U+0331, U+0E01-0E5B, U+200C-200D, U+25CC;
 }
 
-/* 2. บังคับใช้กับทุกจุด รวมถึงส่วนที่วงไว้ */
-body, .navbar, .page-title, .page-content, .sidebar, .sidebar-menu, 
-.list-row, .list-item, .form-layout, .frappe-control, .control-label, 
-.control-value, .btn, .modal, .msgprint, .indicator, .dropdown-menu, 
-.navbar-nav, .breadcrumb, .comment, .timeline-item, .grid-row, 
-.data-row, .report-wrapper, .dt-cell, .dt-header, 
-h1, h2, h3, h4, h5, h6, p, span, div, a, label, input, textarea, select, button,
-.awesomplete, .frappe-card, .layout-main-section, .layout-side-section,
-.page-head, .page-body, .page-wrapper, .desk-page,
-.widget, .widget-head, .widget-body, .shortcut, .desk-sidebar, .desk-body {
-    font-family: var(--font-stack) !important;
-    line-height: 1.6 !important;
-    -webkit-font-smoothing: antialiased; /* ทำให้ฟอนต์ดูคมและเรียบเนียน */
-    -moz-osx-font-smoothing: grayscale;
-    font-synthesis: none; /* ห้ามเบราว์เซอร์ถมดำเอง ให้ใช้ไฟล์ฟอนต์จริง */
+/* 2. ฟอนต์ทั้งระบบ: Frappe ใช้ตัวแปร --font-stack กับ body แล้ว element ลูกรับต่อเอง
+      จึงเปลี่ยนแค่ค่าตัวแปร ห้ามใส่ font-family !important ให้ทุก element
+      เพราะจะทับฟอนต์ที่ส่วนอื่นตั้งไว้เอง เช่นฟอนต์ที่เลือกใน Print Designer
+
+      Inter ไม่มีตัวอักษรไทย เบราว์เซอร์จึงข้ามไปหา Noto Sans Thai ทันที
+      ต้องวาง Noto ไว้ก่อน system-ui เพราะ system-ui ของ Mac/iPhone/Android มีตัวไทย
+      system-ui / -apple-system ต้องไม่ใส่เครื่องหมายคำพูด ไม่งั้นจะกลายเป็นชื่อฟอนต์ที่ไม่มีอยู่จริง
+      !important ตรงนี้มีผลแค่กับตัวแปร ให้ชนะค่าเดิมของ Frappe ไม่ได้ทับ style ของ element ใด */
+:root {
+    --font-stack: InterVariable, "Inter", "Noto Sans Thai", system-ui, -apple-system, sans-serif !important;
 }
 
 /* 3. จุดที่วงไว้ด้านบน: Tabs (Details, ใบกำกับภาษี ฯลฯ) */
