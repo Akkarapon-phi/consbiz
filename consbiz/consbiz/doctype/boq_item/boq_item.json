@@ -1,0 +1,96 @@
+{
+ "actions": [],
+ "allow_bulk_edit": 1,
+ "allow_rename": 1,
+ "autoname": "naming_series:",
+ "creation": "2026-09-14 20:41:31.151367",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "naming_series",
+  "item_group",
+  "item_name",
+  "uom",
+  "column_break_wtgs",
+  "material_rate",
+  "labour_rate",
+  "section_break_yxgo",
+  "description"
+ ],
+ "fields": [
+  {
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "label": "Series"
+  },
+  {
+   "fieldname": "item_group",
+   "fieldtype": "Link",
+   "label": "Item Group",
+   "options": "BOQ Item Group"
+  },
+  {
+   "fieldname": "item_name",
+   "fieldtype": "Data",
+   "label": "Item Name"
+  },
+  {
+   "fieldname": "uom",
+   "fieldtype": "Link",
+   "label": "UOM",
+   "options": "UOM"
+  },
+  {
+   "fieldname": "column_break_wtgs",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "material_rate",
+   "fieldtype": "Currency",
+   "label": "Material Rate"
+  },
+  {
+   "fieldname": "labour_rate",
+   "fieldtype": "Currency",
+   "label": "Labour Rate"
+  },
+  {
+   "fieldname": "section_break_yxgo",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "description",
+   "fieldtype": "Text Editor",
+   "label": "Description"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-10-22 09:07:06.394537",
+ "modified_by": "Administrator",
+ "module": "ConsBiz",
+ "name": "BOQ Item",
+ "naming_rule": "By \"Naming Series\" field",
+ "owner": "akkarapon@siricons.com",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "search_fields": "item_name,description,item_group",
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

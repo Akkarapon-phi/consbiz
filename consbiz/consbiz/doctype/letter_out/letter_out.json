@@ -1,0 +1,198 @@
+{
+ "actions": [],
+ "allow_bulk_edit": 1,
+ "autoname": "naming_series:",
+ "creation": "2026-09-08 11:37:17.345613",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "section_break_rhjf",
+  "title",
+  "document_date",
+  "column_break_dagp",
+  "company",
+  "project",
+  "section_break_mhjz",
+  "sender",
+  "sender_name",
+  "sent_date",
+  "column_break_vpgo",
+  "receiver",
+  "receive_date",
+  "document_status",
+  "more_tab",
+  "column_break_qzpt",
+  "naming_series",
+  "amended_from",
+  "project_abbr",
+  "column_break_bztj"
+ ],
+ "fields": [
+  {
+   "fieldname": "section_break_rhjf",
+   "fieldtype": "Section Break"
+  },
+  {
+   "allow_in_quick_entry": 1,
+   "fieldname": "title",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "\u0e0a\u0e37\u0e48\u0e2d\u0e40\u0e23\u0e37\u0e48\u0e2d\u0e07",
+   "reqd": 1
+  },
+  {
+   "allow_in_quick_entry": 1,
+   "fieldname": "document_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "\u0e25\u0e07\u0e27\u0e31\u0e19\u0e17\u0e35\u0e48",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_dagp",
+   "fieldtype": "Column Break"
+  },
+  {
+   "allow_in_quick_entry": 1,
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "label": "\u0e1a\u0e23\u0e34\u0e29\u0e31\u0e17",
+   "options": "Company",
+   "reqd": 1
+  },
+  {
+   "allow_in_quick_entry": 1,
+   "fieldname": "project",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "label": "\u0e42\u0e04\u0e23\u0e07\u0e01\u0e32\u0e23",
+   "link_filters": "[[\"Project\",\"company\",\"=\",\"eval:doc.company\"]]",
+   "options": "Project"
+  },
+  {
+   "fieldname": "section_break_mhjz",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "sender",
+   "fieldtype": "Link",
+   "label": "\u0e1c\u0e39\u0e49\u0e2a\u0e48\u0e07",
+   "options": "User",
+   "reqd": 1
+  },
+  {
+   "fetch_from": "sender.full_name",
+   "fieldname": "sender_name",
+   "fieldtype": "Data",
+   "label": "\u0e0a\u0e37\u0e48\u0e2d\u0e1c\u0e39\u0e49\u0e2a\u0e48\u0e07"
+  },
+  {
+   "fieldname": "sent_date",
+   "fieldtype": "Date",
+   "label": "\u0e27\u0e31\u0e19\u0e17\u0e35\u0e48\u0e2a\u0e48\u0e07",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_vpgo",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "receiver",
+   "fieldtype": "Data",
+   "label": "\u0e0a\u0e37\u0e48\u0e2d\u0e1c\u0e39\u0e49\u0e23\u0e31\u0e1a"
+  },
+  {
+   "fieldname": "receive_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "\u0e27\u0e31\u0e19\u0e17\u0e35\u0e48\u0e23\u0e31\u0e1a"
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "document_status",
+   "fieldtype": "Select",
+   "in_standard_filter": 1,
+   "label": "\u0e2a\u0e16\u0e32\u0e19\u0e30\u0e40\u0e2d\u0e01\u0e2a\u0e32\u0e23",
+   "options": "\u0e14\u0e33\u0e40\u0e19\u0e34\u0e19\u0e01\u0e32\u0e23\n\u0e1e\u0e34\u0e08\u0e32\u0e23\u0e13\u0e32\n\u0e2d\u0e19\u0e38\u0e21\u0e31\u0e15\u0e34\n\u0e44\u0e21\u0e48\u0e2d\u0e19\u0e38\u0e21\u0e31\u0e15\u0e34"
+  },
+  {
+   "fieldname": "more_tab",
+   "fieldtype": "Tab Break",
+   "label": "More"
+  },
+  {
+   "fieldname": "column_break_qzpt",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "label": "Naming Series"
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "Letter Out",
+   "print_hide": 1,
+   "read_only": 1,
+   "search_index": 1
+  },
+  {
+   "fetch_from": "project.custom_abbr",
+   "fieldname": "project_abbr",
+   "fieldtype": "Data",
+   "label": "\u0e15\u0e31\u0e27\u0e22\u0e48\u0e2d\u0e42\u0e04\u0e23\u0e07\u0e01\u0e32\u0e23"
+  },
+  {
+   "fieldname": "column_break_bztj",
+   "fieldtype": "Column Break"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "is_submittable": 1,
+ "links": [],
+ "modified": "2026-10-22 09:07:06.535519",
+ "modified_by": "Administrator",
+ "module": "ConsBiz",
+ "name": "Letter Out",
+ "naming_rule": "By \"Naming Series\" field",
+ "owner": "akkarapon@siricons.com",
+ "permissions": [
+  {
+   "cancel": 1,
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Admin Officer",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  }
+ ],
+ "quick_entry": 1,
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

@@ -1,0 +1,99 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "creation": "2026-10-25 09:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "rebar_type",
+  "stock_length",
+  "bars",
+  "cuts",
+  "offcut",
+  "offcut_type",
+  "total_offcut",
+  "pieces"
+ ],
+ "fields": [
+  {
+   "columns": 1,
+   "fieldname": "rebar_type",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Rebar Type",
+   "options": "Rebar Type",
+   "read_only": 1
+  },
+  {
+   "columns": 1,
+   "fieldname": "stock_length",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Stock (m)",
+   "read_only": 1
+  },
+  {
+   "columns": 1,
+   "fieldname": "bars",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "Bars",
+   "read_only": 1
+  },
+  {
+   "columns": 4,
+   "fieldname": "cuts",
+   "fieldtype": "Small Text",
+   "in_list_view": 1,
+   "label": "Cuts",
+   "read_only": 1
+  },
+  {
+   "columns": 1,
+   "fieldname": "offcut",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Offcut / Bar (m)",
+   "precision": "3",
+   "read_only": 1
+  },
+  {
+   "columns": 1,
+   "fieldname": "offcut_type",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Offcut Type",
+   "options": "Scrap\nReusable",
+   "read_only": 1
+  },
+  {
+   "columns": 1,
+   "fieldname": "total_offcut",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Total Offcut (m)",
+   "precision": "3",
+   "read_only": 1
+  },
+  {
+   "fieldname": "pieces",
+   "fieldtype": "JSON",
+   "hidden": 1,
+   "label": "Pieces",
+   "read_only": 1
+  }
+ ],
+ "grid_page_length": 50,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-10-25 09:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "ConsBiz",
+ "name": "Bar Cut Pattern",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

@@ -1,0 +1,317 @@
+{#-
+	แผนการตัด (Barcut List)
+	- CSS กลางและโครงหน้า (หัว/ท้ายกระดาษซ้ำทุกหน้า) ใช้ร่วมกับรายงานประจำวัน: consbiz/templates/print/print_style.html
+	- หัวกระดาษ: ชื่อเอกสาร + โครงการ + ข้อมูลเอกสาร (แผนการตัด / วันที่ / เลขที่) ซ้ำทุกหน้า
+	- รูปทรงพร้อมขนาดจริงจาก shape_svg และวันที่ไทยจาก thai_date (ลงทะเบียน jinja ใน hooks.py)
+	- ตัวเลขทั้งหมดมาจากที่ระบบคำนวณตอนบันทึก (items, patterns, summary)
+-#}
+{%- set project = frappe.get_doc("Project", doc.project) if doc.project else None -%}
+{%- set prepared_by = frappe.db.get_value("User", doc.owner, "full_name") or doc.owner -%}
+{%- set m2 = "{:,.2f}" -%}
+{%- set m0 = "{:,.0f}" -%}
+
+{% include "consbiz/templates/print/print_style.html" %}
+<style>
+	.pf .pf-title {
+		margin-bottom: 10px;
+	}
+	/* ชื่อแผนการตัดกว้าง วันที่และเลขที่แคบ */
+	.pf-card td {
+		width: 20%;
+	}
+	.pf-card td:first-child {
+		width: 60%;
+	}
+	.pf-card .pf-k {
+		display: block;
+		width: auto;
+		font-size: 6.5pt;
+		color: var(--pf-muted);
+	}
+	.pf-shape {
+		width: 74px;
+		color: var(--pf-ink);
+	}
+	.pf-shape svg {
+		width: 100%;
+		height: auto;
+		overflow: visible;
+	}
+	.pf-small {
+		font-size: 6.5pt;
+		color: var(--pf-muted);
+	}
+	.pf-grid td.pf-middle {
+		vertical-align: middle;
+	}
+	/* แถบแทนเหล็ก 1 เส้นในแผนการตัด */
+	.pf-bar {
+		display: table;
+		width: 100%;
+		table-layout: fixed;
+		height: 18px;
+		border: 1px solid var(--pf-line);
+		border-radius: 4px;
+		overflow: hidden;
+		font-size: 6pt;
+	}
+	.pf-bar > span {
+		display: table-cell;
+		text-align: center;
+		vertical-align: middle;
+		white-space: nowrap;
+		overflow: hidden;
+		border-right: 1px solid var(--pf-line);
+		background: #eef2f6;
+	}
+	.pf-bar > span.reusable {
+		background: #e4faeb;
+	}
+	.pf-bar > span.scrap {
+		background: #ffe7e7;
+	}
+	.pf-bar > span:last-child {
+		border-right: 0;
+	}
+	.pf-cuts {
+		margin-top: 3px;
+		font-size: 6.5pt;
+		color: var(--pf-muted);
+	}
+</style>
+
+<div class="pf">
+	<table class="pf-page">
+		<thead>
+			<tr>
+				<td>
+					<div class="pf-title">
+						<h1>แผนการตัด (Barcut List)</h1>
+						<div>{{ (project.project_name if project else "") or "" }}</div>
+					</div>
+					<div class="pf-card">
+						<table>
+							<tr>
+								<td><span class="pf-k">แผนการตัด</span>{{ doc.title }}</td>
+								<td><span class="pf-k">วันที่</span>{{ thai_date(doc.date) or "-" }}</td>
+								<td><span class="pf-k">เลขที่</span>{{ doc.name }}</td>
+							</tr>
+						</table>
+					</div>
+				</td>
+			</tr>
+		</thead>
+
+		<tfoot>
+			<tr>
+				<td>
+					<div class="pf-footer">
+						<div>พิมพ์เมื่อ {{ thai_date(frappe.utils.nowdate()) }} {{ frappe.utils.nowtime()[:5] }} น.</div>
+						<div class="text-right">{{ doc.name }} — {{ doc.title }}</div>
+					</div>
+				</td>
+			</tr>
+		</tfoot>
+
+		<tbody>
+			<tr>
+				<td>
+					{#- 1 เกณฑ์การคำนวณ -#}
+					<div class="pf-section">
+						<span><span class="no">1</span><span class="name">เกณฑ์การคำนวณ</span></span>
+						<span class="rule"></span>
+					</div>
+					<table class="pf-grid pf-info">
+						<tbody>
+							<tr>
+								<td class="pf-k">ความยาวตัด</td>
+								<td class="pf-v">
+									{%- if doc.use_bend_deduction %}
+									หักระยะที่จุดดัด 45° {{ "{:g}".format(doc.bend_45 or 0) }}d · 90° {{ "{:g}".format(doc.bend_90 or 0) }}d
+									· 135° {{ "{:g}".format(doc.bend_135 or 0) }}d · 180° {{ "{:g}".format(doc.bend_180 or 0) }}d
+									{%- else %}
+									ผลรวมด้าน (ไม่หักระยะที่จุดดัด)
+									{%- endif %}
+								</td>
+								<td class="pf-k">ระยะขอ</td>
+								<td class="pf-v">135° {{ "{:g}".format(doc.hook_135 or 0) }}d · 180° {{ "{:g}".format(doc.hook_180 or 0) }}d</td>
+							</tr>
+							<tr>
+								<td class="pf-k">ปัดความยาวตัด</td>
+								<td class="pf-v">{{ "ขึ้นทีละ %s มม." % doc.round_up if doc.round_up else "ไม่ปัด" }}</td>
+								<td class="pf-k">รอยตัด / เศษเก็บ</td>
+								<td class="pf-v">{{ "{:g}".format(doc.kerf or 0) }} มม. · เศษ ≥ {{ m2.format(doc.min_reusable or 0) }} ม. เก็บใช้ต่อ</td>
+							</tr>
+						</tbody>
+					</table>
+
+					{#- 2 รายการเหล็กที่ต้องตัด -#}
+					<div class="pf-section">
+						<span><span class="no">2</span><span class="name">รายการเหล็กที่ต้องตัด</span></span>
+						<span class="rule"></span>
+					</div>
+					<table class="pf-grid">
+						<thead>
+							<tr>
+								<th style="width: 5%">ลำดับ</th>
+								<th style="width: 9%">เลขเหล็ก</th>
+								<th style="width: 16%">รูปทรง</th>
+								<th style="width: 8%">ประเภท</th>
+								<th style="width: 17%">ขนาด (มม.)</th>
+								<th style="width: 11%">ความยาวตัด (มม.)</th>
+								<th style="width: 8%">จำนวน</th>
+								<th style="width: 12%">ยาวรวม (ม.)</th>
+								<th style="width: 14%">น้ำหนัก (กก.)</th>
+							</tr>
+						</thead>
+						<tbody>
+							{%- for row in doc.items %}
+							<tr>
+								<td class="text-center pf-middle">{{ loop.index }}</td>
+								<td class="pf-middle"><strong>{{ row.mark or "" }}</strong></td>
+								<td>
+									<div class="pf-shape">{{ shape_svg(row.shape, row) }}</div>
+									<div class="pf-small">{{ row.shape }} · {{ frappe.db.get_value("Bar Shape", row.shape, "shape_name") }}</div>
+								</td>
+								<td class="pf-middle">{{ row.rebar_type }}</td>
+								<td class="pf-middle">
+									{%- for dim in ["a", "b", "c", "d"] if row[dim] %}
+									{{ dim | upper }} {{ m0.format(row[dim]) }}{% if not loop.last %} · {% endif %}
+									{%- endfor %}
+								</td>
+								<td class="text-right pf-middle"><strong>{{ m0.format(row.cut_length or 0) }}</strong></td>
+								<td class="text-right pf-middle">{{ row.qty }}</td>
+								<td class="text-right pf-middle">{{ m2.format(row.total_length or 0) }}</td>
+								<td class="text-right pf-middle">{{ m2.format(row.weight or 0) }}</td>
+							</tr>
+							{%- endfor %}
+						</tbody>
+						<tfoot>
+							<tr>
+								<td colspan="6">รวม</td>
+								<td class="text-right">{{ doc.items | sum(attribute="qty") }}</td>
+								<td class="text-right">{{ m2.format(doc.total_required_length or 0) }}</td>
+								<td class="text-right">{{ m2.format(doc.items | sum(attribute="weight")) }}</td>
+							</tr>
+						</tfoot>
+					</table>
+
+					{#- 3 แผนการตัด -#}
+					<div class="pf-section">
+						<span><span class="no">3</span><span class="name">แผนการตัด</span></span>
+						<span class="rule"></span>
+					</div>
+					<table class="pf-grid">
+						<thead>
+							<tr>
+								<th style="width: 9%">ประเภท</th>
+								<th style="width: 12%">เหล็ก × เส้น</th>
+								<th style="width: 67%">การตัด (ต่อเส้น)</th>
+								<th style="width: 12%">เศษ/เส้น (ม.)</th>
+							</tr>
+						</thead>
+						<tbody>
+							{%- for p in doc.patterns %}
+							{%- set stock = p.stock_length * 1000 %}
+							{%- set pieces = frappe.utils.parse_json(p.pieces) if p.pieces is string else (p.pieces or []) %}
+							<tr>
+								<td class="pf-middle"><strong>{{ p.rebar_type }}</strong></td>
+								<td class="text-right pf-middle">{{ "{:g}".format(p.stock_length) }} ม. × <strong>{{ p.bars }}</strong></td>
+								<td>
+									<div class="pf-bar">
+										{%- for piece in pieces %}{% for _ in range(piece.count) %}
+										<span style="width: {{ piece.length / stock * 100 }}%">{{ "{:.2f}".format(piece.length / 1000) if piece.length / stock > 0.06 else "" }}</span>
+										{%- endfor %}{% endfor %}
+										{%- if p.offcut > 0 %}
+										<span class="{{ 'reusable' if p.offcut_type == 'Reusable' else 'scrap' }}" style="width: {{ p.offcut / p.stock_length * 100 }}%">{{ "{:.2f}".format(p.offcut) if p.offcut / p.stock_length > 0.06 else "" }}</span>
+										{%- endif %}
+									</div>
+									<div class="pf-cuts">{{ (p.cuts or "").replace("\n", " · ") }}</div>
+								</td>
+								<td class="text-right pf-middle">
+									{{ "{:,.3f}".format(p.offcut or 0) }}
+									<div class="pf-small">{{ "เศษเก็บ" if p.offcut_type == "Reusable" else "เศษทิ้ง" }}</div>
+								</td>
+							</tr>
+							{%- else %}
+							<tr><td colspan="4" class="empty">ยังไม่ได้คำนวณ</td></tr>
+							{%- endfor %}
+						</tbody>
+					</table>
+
+					{#- 4 สรุปเหล็กที่ต้องใช้ -#}
+					<div class="pf-keep">
+					<div class="pf-section">
+						<span><span class="no">4</span><span class="name">สรุปเหล็กที่ต้องใช้</span></span>
+						<span class="rule"></span>
+					</div>
+					<table class="pf-grid">
+						<thead>
+							<tr>
+								<th style="width: 12%">ประเภท</th>
+								<th style="width: 11%">ความยาว (ม.)</th>
+								<th style="width: 11%">จำนวนเส้น</th>
+								<th style="width: 14%">น้ำหนัก (กก.)</th>
+								<th style="width: 14%">ความยาวตัด (ม.)</th>
+								<th style="width: 13%">เศษเก็บ (ม.)</th>
+								<th style="width: 13%">เศษทิ้ง (ม.)</th>
+								<th style="width: 12%">Loss</th>
+							</tr>
+						</thead>
+						<tbody>
+							{%- for row in doc.summary %}
+							<tr>
+								<td><strong>{{ row.rebar_type }}</strong></td>
+								<td class="text-right">{{ "{:g}".format(row.stock_length) }}</td>
+								<td class="text-right"><strong>{{ row.bars }}</strong></td>
+								<td class="text-right">{{ m2.format(row.stock_weight or 0) }}</td>
+								<td class="text-right">{{ m2.format(row.required_length or 0) }}</td>
+								<td class="text-right">{{ m2.format(row.reusable_offcut or 0) }}</td>
+								<td class="text-right">{{ m2.format(row.scrap or 0) }}</td>
+								<td class="text-right">{{ m2.format(row.loss_percent or 0) }}%</td>
+							</tr>
+							{%- else %}
+							<tr><td colspan="8" class="empty">ยังไม่ได้คำนวณ</td></tr>
+							{%- endfor %}
+						</tbody>
+						{%- if doc.summary %}
+						<tfoot>
+							<tr>
+								<td colspan="2">รวม</td>
+								<td class="text-right">{{ doc.summary | sum(attribute="bars") }}</td>
+								<td class="text-right">{{ m2.format(doc.total_weight or 0) }}</td>
+								<td class="text-right">{{ m2.format(doc.total_required_length or 0) }}</td>
+								<td class="text-right">{{ m2.format(doc.reusable_offcut or 0) }}</td>
+								<td class="text-right">{{ m2.format(doc.scrap or 0) }}</td>
+								<td class="text-right">{{ m2.format(doc.loss_percent or 0) }}%</td>
+							</tr>
+						</tfoot>
+						{%- endif %}
+					</table>
+					<div class="pf-total">
+						<span>เหล็กที่ใช้ {{ m2.format(doc.total_stock_length or 0) }} ม. ({{ m2.format(doc.total_weight or 0) }} กก.)</span>
+						<span class="text-right">Loss {{ m2.format(doc.loss_percent or 0) }}%</span>
+					</div>
+					</div>
+
+					<table class="pf-sign pf-keep">
+						<tbody>
+							<tr>
+								<td>
+									<div class="line">ลงชื่อ ........................................................</div>
+									<div>({{ prepared_by }})</div>
+									<div>ผู้จัดทำ</div>
+								</td>
+								<td>
+									<div class="line">ลงชื่อ ........................................................</div>
+									<div>(........................................)</div>
+									<div>ผู้ตรวจสอบ</div>
+								</td>
+							</tr>
+						</tbody>
+					</table>
+				</td>
+			</tr>
+		</tbody>
+	</table>
+</div>

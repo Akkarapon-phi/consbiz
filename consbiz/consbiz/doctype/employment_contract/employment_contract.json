@@ -1,0 +1,167 @@
+{
+ "actions": [],
+ "allow_bulk_edit": 1,
+ "allow_rename": 1,
+ "autoname": "naming_series:",
+ "creation": "2026-07-30 00:37:09.707117",
+ "default_print_format": "Employment Contract",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "section_break_pitz",
+  "company",
+  "employee",
+  "salutation",
+  "full_name",
+  "base",
+  "column_break_crxh",
+  "naming_series",
+  "date",
+  "prob_start_date",
+  "prob_days",
+  "prob_end_date",
+  "probation",
+  "amended_from"
+ ],
+ "fields": [
+  {
+   "fieldname": "section_break_pitz",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "label": "\u0e1a\u0e23\u0e34\u0e29\u0e31\u0e17",
+   "options": "Company",
+   "reqd": 1
+  },
+  {
+   "fieldname": "employee",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "\u0e1e\u0e19\u0e31\u0e01\u0e07\u0e32\u0e19",
+   "options": "Employee",
+   "reqd": 1
+  },
+  {
+   "fetch_from": "employee.salutation",
+   "fieldname": "salutation",
+   "fieldtype": "Data",
+   "label": "\u0e04\u0e33\u0e19\u0e33\u0e2b\u0e19\u0e49\u0e32",
+   "read_only": 1
+  },
+  {
+   "fetch_from": "employee.employee_name",
+   "fieldname": "full_name",
+   "fieldtype": "Data",
+   "label": "\u0e0a\u0e37\u0e48\u0e2d - \u0e19\u0e32\u0e21\u0e2a\u0e01\u0e38\u0e25",
+   "read_only": 1
+  },
+  {
+   "fieldname": "base",
+   "fieldtype": "Currency",
+   "label": "\u0e40\u0e07\u0e34\u0e19\u0e40\u0e14\u0e37\u0e2d\u0e19\u0e40\u0e23\u0e34\u0e48\u0e21\u0e15\u0e49\u0e19"
+  },
+  {
+   "fieldname": "column_break_crxh",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "naming_series",
+   "fieldtype": "Data",
+   "label": "\u0e40\u0e25\u0e02\u0e17\u0e35\u0e48\u0e40\u0e2d\u0e01\u0e2a\u0e32\u0e23",
+   "reqd": 1
+  },
+  {
+   "default": "Today",
+   "fieldname": "date",
+   "fieldtype": "Date",
+   "label": "\u0e27\u0e31\u0e19\u0e17\u0e35\u0e48",
+   "reqd": 1
+  },
+  {
+   "fieldname": "prob_start_date",
+   "fieldtype": "Date",
+   "label": "\u0e27\u0e31\u0e19\u0e17\u0e35\u0e48\u0e40\u0e23\u0e34\u0e48\u0e21\u0e17\u0e14\u0e25\u0e2d\u0e07\u0e07\u0e32\u0e19"
+  },
+  {
+   "fieldname": "prob_days",
+   "fieldtype": "Select",
+   "label": "\u0e08\u0e33\u0e19\u0e27\u0e19\u0e27\u0e31\u0e19\u0e17\u0e35\u0e48\u0e17\u0e14\u0e25\u0e2d\u0e07\u0e07\u0e32\u0e19",
+   "options": "30\n60\n90\n119"
+  },
+  {
+   "fieldname": "prob_end_date",
+   "fieldtype": "Date",
+   "label": "\u0e27\u0e31\u0e19\u0e17\u0e35\u0e48\u0e2a\u0e34\u0e49\u0e19\u0e2a\u0e38\u0e14\u0e17\u0e14\u0e25\u0e2d\u0e07\u0e07\u0e32\u0e19"
+  },
+  {
+   "fieldname": "probation",
+   "fieldtype": "Select",
+   "label": "\u0e2a\u0e16\u0e32\u0e19\u0e30\u0e17\u0e14\u0e25\u0e2d\u0e07\u0e07\u0e32\u0e19",
+   "options": "\n\u0e1c\u0e48\u0e32\u0e19\n\u0e44\u0e21\u0e48\u0e1c\u0e48\u0e32\u0e19"
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "Employment Contract",
+   "print_hide": 1,
+   "read_only": 1,
+   "search_index": 1
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "is_submittable": 1,
+ "links": [],
+ "modified": "2026-10-22 09:07:06.933920",
+ "modified_by": "Administrator",
+ "module": "ConsBiz",
+ "name": "Employment Contract",
+ "naming_rule": "By \"Naming Series\" field",
+ "owner": "akkarapon@siricons.com",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [
+  {
+   "color": "Gray",
+   "title": "\u0e23\u0e48\u0e32\u0e07"
+  },
+  {
+   "color": "Blue",
+   "title": "\u0e17\u0e14\u0e25\u0e2d\u0e07\u0e07\u0e32\u0e19"
+  },
+  {
+   "color": "Green",
+   "title": "\u0e1c\u0e48\u0e32\u0e19"
+  },
+  {
+   "color": "Orange",
+   "title": "\u0e44\u0e21\u0e48\u0e1c\u0e48\u0e32\u0e19"
+  },
+  {
+   "color": "Red",
+   "title": "\u0e22\u0e01\u0e40\u0e25\u0e34\u0e01"
+  }
+ ],
+ "track_changes": 1
+}

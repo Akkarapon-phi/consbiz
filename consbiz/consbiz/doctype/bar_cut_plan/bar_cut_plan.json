@@ -1,0 +1,331 @@
+{
+ "actions": [],
+ "autoname": "naming_series:",
+ "creation": "2026-10-25 09:00:00",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "naming_series",
+  "title",
+  "project",
+  "column_break_title",
+  "date",
+  "section_break_items",
+  "items",
+  "section_break_result",
+  "cut_diagram",
+  "summary",
+  "patterns",
+  "section_break_totals",
+  "total_stock_length",
+  "total_required_length",
+  "column_break_totals",
+  "reusable_offcut",
+  "scrap",
+  "column_break_loss",
+  "total_weight",
+  "loss_percent",
+  "stock_tab",
+  "stock",
+  "settings_tab",
+  "section_break_bend",
+  "use_bend_deduction",
+  "bend_45",
+  "bend_90",
+  "bend_135",
+  "bend_180",
+  "column_break_hook",
+  "hook_135",
+  "hook_180",
+  "round_up",
+  "section_break_cutting",
+  "kerf",
+  "column_break_cutting",
+  "min_reusable"
+ ],
+ "fields": [
+  {
+   "default": "BCP-.YYYY.MM.####",
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "hidden": 1,
+   "label": "Series",
+   "options": "BCP-.YYYY.MM.####",
+   "print_hide": 1,
+   "reqd": 1
+  },
+  {
+   "description": "\u0e40\u0e0a\u0e48\u0e19 \u0e40\u0e2a\u0e32\u0e0a\u0e31\u0e49\u0e19 1 \u0e2d\u0e32\u0e04\u0e32\u0e23 A",
+   "fieldname": "title",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Title",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_title",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "Today",
+   "fieldname": "date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Date"
+  },
+  {
+   "fieldname": "section_break_items",
+   "fieldtype": "Section Break",
+   "label": "Bars to Cut"
+  },
+  {
+   "fieldname": "items",
+   "fieldtype": "Table",
+   "label": "Items",
+   "options": "Bar Cut Item",
+   "reqd": 1
+  },
+  {
+   "fieldname": "section_break_result",
+   "fieldtype": "Section Break",
+   "label": "Cutting Result"
+  },
+  {
+   "fieldname": "cut_diagram",
+   "fieldtype": "HTML",
+   "label": "Cut Diagram"
+  },
+  {
+   "fieldname": "summary",
+   "fieldtype": "Table",
+   "label": "Summary",
+   "options": "Bar Cut Summary",
+   "read_only": 1
+  },
+  {
+   "fieldname": "patterns",
+   "fieldtype": "Table",
+   "label": "Patterns",
+   "options": "Bar Cut Pattern",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_totals",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "total_stock_length",
+   "fieldtype": "Float",
+   "label": "Stock Used (m)",
+   "precision": "2",
+   "read_only": 1
+  },
+  {
+   "fieldname": "total_required_length",
+   "fieldtype": "Float",
+   "label": "Cut Length (m)",
+   "precision": "2",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_totals",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "reusable_offcut",
+   "fieldtype": "Float",
+   "label": "Reusable Offcut (m)",
+   "precision": "2",
+   "read_only": 1
+  },
+  {
+   "fieldname": "scrap",
+   "fieldtype": "Float",
+   "label": "Scrap (m)",
+   "precision": "2",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_loss",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "total_weight",
+   "fieldtype": "Float",
+   "label": "Stock Weight (kg)",
+   "precision": "2",
+   "read_only": 1
+  },
+  {
+   "fieldname": "loss_percent",
+   "fieldtype": "Percent",
+   "in_list_view": 1,
+   "label": "Loss %",
+   "read_only": 1
+  },
+  {
+   "fieldname": "stock_tab",
+   "fieldtype": "Tab Break",
+   "label": "Stock"
+  },
+  {
+   "description": "\u0e40\u0e2b\u0e25\u0e47\u0e01\u0e17\u0e35\u0e48\u0e21\u0e35\u0e43\u0e2b\u0e49\u0e15\u0e31\u0e14 \u0e08\u0e33\u0e19\u0e27\u0e19 0 = \u0e44\u0e21\u0e48\u0e08\u0e33\u0e01\u0e31\u0e14 \u0e16\u0e49\u0e32\u0e44\u0e21\u0e48\u0e23\u0e30\u0e1a\u0e38\u0e1b\u0e23\u0e30\u0e40\u0e20\u0e17\u0e40\u0e2b\u0e25\u0e47\u0e01\u0e43\u0e14 \u0e23\u0e30\u0e1a\u0e1a\u0e43\u0e0a\u0e49\u0e04\u0e27\u0e32\u0e21\u0e22\u0e32\u0e27\u0e21\u0e32\u0e15\u0e23\u0e10\u0e32\u0e19\u0e02\u0e2d\u0e07\u0e1b\u0e23\u0e30\u0e40\u0e20\u0e17\u0e19\u0e31\u0e49\u0e19\u0e41\u0e1a\u0e1a\u0e44\u0e21\u0e48\u0e08\u0e33\u0e01\u0e31\u0e14",
+   "fieldname": "stock",
+   "fieldtype": "Table",
+   "label": "Available Stock",
+   "options": "Bar Cut Stock"
+  },
+  {
+   "fieldname": "settings_tab",
+   "fieldtype": "Tab Break",
+   "label": "Settings"
+  },
+  {
+   "description": "\u0e04\u0e27\u0e32\u0e21\u0e22\u0e32\u0e27\u0e15\u0e31\u0e14 = \u0e1c\u0e25\u0e23\u0e27\u0e21\u0e14\u0e49\u0e32\u0e19 \u2212 \u0e23\u0e30\u0e22\u0e30\u0e2b\u0e31\u0e01\u0e17\u0e35\u0e48\u0e08\u0e38\u0e14\u0e14\u0e31\u0e14 + \u0e23\u0e30\u0e22\u0e30\u0e02\u0e2d \u0e41\u0e25\u0e49\u0e27\u0e1b\u0e31\u0e14\u0e02\u0e36\u0e49\u0e19 (\u0e04\u0e48\u0e32\u0e40\u0e1b\u0e47\u0e19\u0e08\u0e33\u0e19\u0e27\u0e19\u0e40\u0e17\u0e48\u0e32\u0e02\u0e2d\u0e07\u0e02\u0e19\u0e32\u0e14\u0e40\u0e2b\u0e25\u0e47\u0e01 d)",
+   "fieldname": "section_break_bend",
+   "fieldtype": "Section Break",
+   "label": "Cut Length"
+  },
+  {
+   "default": "1",
+   "description": "\u0e15\u0e34\u0e4a\u0e01 = \u0e2b\u0e31\u0e01\u0e23\u0e30\u0e22\u0e30\u0e17\u0e35\u0e48\u0e08\u0e38\u0e14\u0e14\u0e31\u0e14\u0e15\u0e32\u0e21\u0e04\u0e48\u0e32\u0e14\u0e49\u0e32\u0e19\u0e25\u0e48\u0e32\u0e07 \u0e44\u0e21\u0e48\u0e15\u0e34\u0e4a\u0e01 = \u0e43\u0e0a\u0e49\u0e1c\u0e25\u0e23\u0e27\u0e21\u0e14\u0e49\u0e32\u0e19\u0e15\u0e23\u0e07\u0e46",
+   "fieldname": "use_bend_deduction",
+   "fieldtype": "Check",
+   "label": "Deduct Bends (Standard)"
+  },
+  {
+   "default": "1",
+   "depends_on": "use_bend_deduction",
+   "fieldname": "bend_45",
+   "fieldtype": "Float",
+   "label": "Bend 45\u00b0 (\u00d7d)"
+  },
+  {
+   "default": "2",
+   "depends_on": "use_bend_deduction",
+   "fieldname": "bend_90",
+   "fieldtype": "Float",
+   "label": "Bend 90\u00b0 (\u00d7d)"
+  },
+  {
+   "default": "3",
+   "depends_on": "use_bend_deduction",
+   "fieldname": "bend_135",
+   "fieldtype": "Float",
+   "label": "Bend 135\u00b0 (\u00d7d)"
+  },
+  {
+   "default": "4",
+   "depends_on": "use_bend_deduction",
+   "fieldname": "bend_180",
+   "fieldtype": "Float",
+   "label": "Bend 180\u00b0 (\u00d7d)"
+  },
+  {
+   "fieldname": "column_break_hook",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "10",
+   "description": "\u0e1a\u0e27\u0e01\u0e15\u0e48\u0e2d\u0e02\u0e2d 1 \u0e02\u0e49\u0e32\u0e07",
+   "fieldname": "hook_135",
+   "fieldtype": "Float",
+   "label": "Hook 135\u00b0 (\u00d7d)"
+  },
+  {
+   "default": "10",
+   "description": "\u0e1a\u0e27\u0e01\u0e15\u0e48\u0e2d\u0e02\u0e2d 1 \u0e02\u0e49\u0e32\u0e07",
+   "fieldname": "hook_180",
+   "fieldtype": "Float",
+   "label": "Hook 180\u00b0 (\u00d7d)"
+  },
+  {
+   "default": "10",
+   "description": "0 = \u0e44\u0e21\u0e48\u0e1b\u0e31\u0e14",
+   "fieldname": "round_up",
+   "fieldtype": "Int",
+   "label": "Round Up Cut Length (mm)"
+  },
+  {
+   "fieldname": "section_break_cutting",
+   "fieldtype": "Section Break",
+   "label": "Cutting"
+  },
+  {
+   "default": "0",
+   "description": "\u0e04\u0e27\u0e32\u0e21\u0e01\u0e27\u0e49\u0e32\u0e07\u0e23\u0e2d\u0e22\u0e15\u0e31\u0e14\u0e15\u0e48\u0e2d\u0e04\u0e23\u0e31\u0e49\u0e07 (\u0e15\u0e31\u0e14\u0e14\u0e49\u0e27\u0e22\u0e01\u0e23\u0e23\u0e44\u0e01\u0e23 = 0)",
+   "fieldname": "kerf",
+   "fieldtype": "Float",
+   "label": "Kerf (mm)"
+  },
+  {
+   "fieldname": "column_break_cutting",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "1",
+   "description": "\u0e40\u0e28\u0e29\u0e17\u0e35\u0e48\u0e22\u0e32\u0e27\u0e15\u0e31\u0e49\u0e07\u0e41\u0e15\u0e48\u0e04\u0e48\u0e32\u0e19\u0e35\u0e49\u0e19\u0e31\u0e1a\u0e40\u0e1b\u0e47\u0e19\u0e40\u0e28\u0e29\u0e40\u0e01\u0e47\u0e1a\u0e44\u0e27\u0e49\u0e43\u0e0a\u0e49\u0e15\u0e48\u0e2d \u0e44\u0e21\u0e48\u0e19\u0e31\u0e1a\u0e40\u0e1b\u0e47\u0e19 Loss",
+   "fieldname": "min_reusable",
+   "fieldtype": "Float",
+   "label": "Min Reusable Offcut (m)"
+  },
+  {
+   "fieldname": "project",
+   "fieldtype": "Link",
+   "label": "Project",
+   "options": "Project"
+  }
+ ],
+ "grid_page_length": 50,
+ "links": [],
+ "modified": "2026-10-22 22:56:55.720373",
+ "modified_by": "Administrator",
+ "module": "ConsBiz",
+ "name": "Bar Cut Plan",
+ "naming_rule": "By \"Naming Series\" field",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Projects Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Projects User",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "title",
+ "track_changes": 1
+}

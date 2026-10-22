@@ -1,0 +1,44 @@
+[
+ {
+  "add_total_row": 0,
+  "add_translate_data": 0,
+  "columns": [],
+  "disable_prepared_report_automation": 0,
+  "disabled": 0,
+  "docstatus": 0,
+  "doctype": "Report",
+  "doctype_to_sync": [],
+  "documentation_url": null,
+  "filters": [],
+  "is_standard": "No",
+  "javascript": null,
+  "json": "{\"columns\":[{\"label\":\"Salary Slip ID\",\"fieldname\":\"salary_slip_id\",\"fieldtype\":\"Link\",\"options\":\"Salary Slip\",\"width\":150,\"id\":\"salary_slip_id\",\"name\":\"Salary Slip ID\",\"editable\":false,\"compareValue\":null},{\"label\":\"Start Date\",\"fieldname\":\"start_date\",\"fieldtype\":\"Data\",\"width\":80,\"id\":\"start_date\",\"name\":\"Start Date\",\"editable\":false,\"compareValue\":null},{\"label\":\"End Date\",\"fieldname\":\"end_date\",\"fieldtype\":\"Data\",\"width\":120,\"id\":\"end_date\",\"name\":\"End Date\",\"editable\":false,\"compareValue\":null},{\"label\":\"Employee\",\"fieldname\":\"employee\",\"fieldtype\":\"Link\",\"options\":\"Employee\",\"width\":120,\"id\":\"employee\",\"name\":\"Employee\",\"editable\":false,\"compareValue\":null},{\"fieldname\":\"salutation\",\"fieldtype\":\"Link\",\"label\":\"Salutation\",\"insert_after_index\":2,\"link_field\":{\"fieldname\":\"employee\",\"names\":{}},\"doctype\":\"Employee\",\"options\":\"Salutation\",\"width\":100,\"id\":\"salutation\",\"name\":\"Salutation\",\"editable\":false,\"compareValue\":null},{\"label\":\"Employee Name\",\"fieldname\":\"employee_name\",\"fieldtype\":\"Data\",\"width\":140,\"id\":\"employee_name\",\"name\":\"Employee Name\",\"editable\":false,\"compareValue\":null},{\"label\":\"Designation\",\"fieldname\":\"designation\",\"fieldtype\":\"Link\",\"options\":\"Designation\",\"width\":120,\"id\":\"designation\",\"name\":\"Designation\",\"editable\":false,\"compareValue\":null},{\"label\":\"Branch\",\"fieldname\":\"branch\",\"fieldtype\":\"Link\",\"options\":\"Branch\",\"width\":-1,\"id\":\"branch\",\"name\":\"Branch\",\"editable\":false,\"compareValue\":null},{\"label\":\"Department\",\"fieldname\":\"department\",\"fieldtype\":\"Link\",\"options\":\"Department\",\"width\":120,\"id\":\"department\",\"name\":\"Department\",\"editable\":false,\"compareValue\":null},{\"label\":\"Company\",\"fieldname\":\"company\",\"fieldtype\":\"Link\",\"options\":\"Company\",\"width\":120,\"id\":\"company\",\"name\":\"Company\",\"editable\":false,\"compareValue\":null},{\"label\":\"Leave Without Pay\",\"fieldname\":\"leave_without_pay\",\"fieldtype\":\"Float\",\"width\":50,\"id\":\"leave_without_pay\",\"name\":\"Leave Without Pay\",\"editable\":false,\"compareValue\":null},{\"label\":\"Absent Days\",\"fieldname\":\"absent_days\",\"fieldtype\":\"Float\",\"width\":50,\"id\":\"absent_days\",\"name\":\"Absent Days\",\"editable\":false,\"compareValue\":null},{\"label\":\"Payment Days\",\"fieldname\":\"payment_days\",\"fieldtype\":\"Float\",\"width\":120,\"id\":\"payment_days\",\"name\":\"Payment Days\",\"editable\":false,\"compareValue\":null},{\"label\":\"\\u0e40\\u0e07\\u0e34\\u0e19\\u0e40\\u0e14\\u0e37\\u0e2d\\u0e19/\\u0e04\\u0e48\\u0e32\\u0e08\\u0e49\\u0e32\\u0e07\",\"fieldname\":\"\\u0e40\\u0e07\\u0e34\\u0e19\\u0e40\\u0e14\\u0e37\\u0e2d\\u0e19/\\u0e04\\u0e48\\u0e32\\u0e08\\u0e49\\u0e32\\u0e07\",\"fieldtype\":\"Currency\",\"options\":\"currency\",\"width\":120,\"id\":\"\\u0e40\\u0e07\\u0e34\\u0e19\\u0e40\\u0e14\\u0e37\\u0e2d\\u0e19/\\u0e04\\u0e48\\u0e32\\u0e08\\u0e49\\u0e32\\u0e07\",\"name\":\"\\u0e40\\u0e07\\u0e34\\u0e19\\u0e40\\u0e14\\u0e37\\u0e2d\\u0e19/\\u0e04\\u0e48\\u0e32\\u0e08\\u0e49\\u0e32\\u0e07\",\"editable\":false,\"compareValue\":null},{\"label\":\"\\u0e04\\u0e48\\u0e32\\u0e25\\u0e48\\u0e27\\u0e07\\u0e40\\u0e27\\u0e25\\u0e32\",\"fieldname\":\"\\u0e04\\u0e48\\u0e32\\u0e25\\u0e48\\u0e27\\u0e07\\u0e40\\u0e27\\u0e25\\u0e32\",\"fieldtype\":\"Currency\",\"options\":\"currency\",\"width\":120,\"id\":\"\\u0e04\\u0e48\\u0e32\\u0e25\\u0e48\\u0e27\\u0e07\\u0e40\\u0e27\\u0e25\\u0e32\",\"name\":\"\\u0e04\\u0e48\\u0e32\\u0e25\\u0e48\\u0e27\\u0e07\\u0e40\\u0e27\\u0e25\\u0e32\",\"editable\":false,\"compareValue\":null},{\"label\":\"\\u0e42\\u0e1a\\u0e19\\u0e31\\u0e2a\",\"fieldname\":\"\\u0e42\\u0e1a\\u0e19\\u0e31\\u0e2a\",\"fieldtype\":\"Currency\",\"options\":\"currency\",\"width\":120,\"id\":\"\\u0e42\\u0e1a\\u0e19\\u0e31\\u0e2a\",\"name\":\"\\u0e42\\u0e1a\\u0e19\\u0e31\\u0e2a\",\"editable\":false,\"compareValue\":null},{\"label\":\"Gross Pay\",\"fieldname\":\"gross_pay\",\"fieldtype\":\"Currency\",\"options\":\"currency\",\"width\":120,\"id\":\"gross_pay\",\"name\":\"Gross Pay\",\"editable\":false,\"compareValue\":null},{\"label\":\"\\u0e1b\\u0e23\\u0e30\\u0e01\\u0e31\\u0e19\\u0e2a\\u0e31\\u0e07\\u0e04\\u0e21\",\"fieldname\":\"\\u0e1b\\u0e23\\u0e30\\u0e01\\u0e31\\u0e19\\u0e2a\\u0e31\\u0e07\\u0e04\\u0e21\",\"fieldtype\":\"Currency\",\"options\":\"currency\",\"width\":120,\"id\":\"\\u0e1b\\u0e23\\u0e30\\u0e01\\u0e31\\u0e19\\u0e2a\\u0e31\\u0e07\\u0e04\\u0e21\",\"name\":\"\\u0e1b\\u0e23\\u0e30\\u0e01\\u0e31\\u0e19\\u0e2a\\u0e31\\u0e07\\u0e04\\u0e21\",\"editable\":false,\"compareValue\":null},{\"label\":\"\\u0e20\\u0e32\\u0e29\\u0e35\\u0e2b\\u0e31\\u0e01 \\u0e13 \\u0e17\\u0e35\\u0e48\\u0e08\\u0e48\\u0e32\\u0e22\",\"fieldname\":\"\\u0e20\\u0e32\\u0e29\\u0e35\\u0e2b\\u0e31\\u0e01_\\u0e13_\\u0e17\\u0e35\\u0e48\\u0e08\\u0e48\\u0e32\\u0e22\",\"fieldtype\":\"Currency\",\"options\":\"currency\",\"width\":120,\"id\":\"\\u0e20\\u0e32\\u0e29\\u0e35\\u0e2b\\u0e31\\u0e01_\\u0e13_\\u0e17\\u0e35\\u0e48\\u0e08\\u0e48\\u0e32\\u0e22\",\"name\":\"\\u0e20\\u0e32\\u0e29\\u0e35\\u0e2b\\u0e31\\u0e01 \\u0e13 \\u0e17\\u0e35\\u0e48\\u0e08\\u0e48\\u0e32\\u0e22\",\"editable\":false,\"compareValue\":null},{\"label\":\"\\u0e40\\u0e07\\u0e34\\u0e19\\u0e40\\u0e14\\u0e37\\u0e2d\\u0e19\\u0e08\\u0e48\\u0e32\\u0e22\\u0e25\\u0e48\\u0e27\\u0e07\\u0e2b\\u0e19\\u0e49\\u0e32\",\"fieldname\":\"\\u0e40\\u0e07\\u0e34\\u0e19\\u0e40\\u0e14\\u0e37\\u0e2d\\u0e19\\u0e08\\u0e48\\u0e32\\u0e22\\u0e25\\u0e48\\u0e27\\u0e07\\u0e2b\\u0e19\\u0e49\\u0e32\",\"fieldtype\":\"Currency\",\"options\":\"currency\",\"width\":120,\"id\":\"\\u0e40\\u0e07\\u0e34\\u0e19\\u0e40\\u0e14\\u0e37\\u0e2d\\u0e19\\u0e08\\u0e48\\u0e32\\u0e22\\u0e25\\u0e48\\u0e27\\u0e07\\u0e2b\\u0e19\\u0e49\\u0e32\",\"name\":\"\\u0e40\\u0e07\\u0e34\\u0e19\\u0e40\\u0e14\\u0e37\\u0e2d\\u0e19\\u0e08\\u0e48\\u0e32\\u0e22\\u0e25\\u0e48\\u0e27\\u0e07\\u0e2b\\u0e19\\u0e49\\u0e32\",\"editable\":false,\"compareValue\":null},{\"label\":\"\\u0e23\\u0e32\\u0e22\\u0e01\\u0e32\\u0e23\\u0e2b\\u0e31\\u0e01\\u0e2d\\u0e37\\u0e48\\u0e19 \\u0e46\",\"fieldname\":\"\\u0e23\\u0e32\\u0e22\\u0e01\\u0e32\\u0e23\\u0e2b\\u0e31\\u0e01\\u0e2d\\u0e37\\u0e48\\u0e19_\\u0e46\",\"fieldtype\":\"Currency\",\"options\":\"currency\",\"width\":120,\"id\":\"\\u0e23\\u0e32\\u0e22\\u0e01\\u0e32\\u0e23\\u0e2b\\u0e31\\u0e01\\u0e2d\\u0e37\\u0e48\\u0e19_\\u0e46\",\"name\":\"\\u0e23\\u0e32\\u0e22\\u0e01\\u0e32\\u0e23\\u0e2b\\u0e31\\u0e01\\u0e2d\\u0e37\\u0e48\\u0e19 \\u0e46\",\"editable\":false,\"compareValue\":null},{\"label\":\"Total Deduction\",\"fieldname\":\"total_deduction\",\"fieldtype\":\"Currency\",\"options\":\"currency\",\"width\":120,\"id\":\"total_deduction\",\"name\":\"Total Deduction\",\"editable\":false,\"compareValue\":null},{\"label\":\"Net Pay\",\"fieldname\":\"net_pay\",\"fieldtype\":\"Currency\",\"options\":\"currency\",\"width\":120,\"id\":\"net_pay\",\"name\":\"Net Pay\",\"editable\":false,\"compareValue\":null},{\"fieldname\":\"bank_name\",\"fieldtype\":\"Data\",\"label\":\"Bank Name\",\"insert_after_index\":23,\"link_field\":{\"fieldname\":\"salary_slip_id\",\"names\":{}},\"doctype\":\"Salary Slip\",\"width\":100,\"id\":\"bank_name\",\"name\":\"Bank Name\",\"editable\":false,\"compareValue\":null},{\"fieldname\":\"bank_account_no\",\"fieldtype\":\"Data\",\"label\":\"Bank Account No\",\"insert_after_index\":24,\"link_field\":{\"fieldname\":\"salary_slip_id\",\"names\":{}},\"doctype\":\"Salary Slip\",\"width\":100,\"id\":\"bank_account_no\",\"name\":\"Bank Account No\",\"editable\":false,\"compareValue\":null}],\"filters\":{\"from_date\":\"2026-01-01\",\"to_date\":\"2026-01-31\",\"currency\":\"THB\",\"company\":\"\\u0e1a\\u0e08\\u0e01.\\u0e2a\\u0e34\\u0e23\\u0e34\\u0e18\\u0e19\\u0e34\\u0e19\\u0e17\\u0e23\\u0e4c\",\"docstatus\":\"Submitted\"}}",
+  "letter_head": "Company Letterhead - Grey",
+  "modified": "2026-04-07 14:17:57.850577",
+  "module": "Payroll",
+  "name": "Salary Slip Report",
+  "prepared_report": 0,
+  "query": null,
+  "ref_doctype": "Salary Slip",
+  "reference_report": "Salary Register",
+  "report_name": "Salary Slip Report",
+  "report_script": null,
+  "report_type": "Custom Report",
+  "roles": [
+   {
+    "role": "HR Manager"
+   },
+   {
+    "role": "HR User"
+   },
+   {
+    "role": "Employee"
+   },
+   {
+    "role": "Employee Self Service"
+   }
+  ],
+  "snapshot_report": 0,
+  "timeout": 0
+ }
+]

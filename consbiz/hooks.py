@@ -15,22 +15,16 @@ add_to_apps_screen = [
     }
 ]
 
-#fixtures = [
-#    {
-#        "doctype": "Property Setter",
-#        "filters": [
-#            ["module", "=", "ConsBiz"],
-#            ["is_system_generated", "=", 0] # เอาเฉพาะที่เราแก้เอง มือหมุนเอง
-#        ]
-#    },
-#    {
-#        "doctype": "Custom Field",
-#        "filters": [
-#            ["module", "=", "ConsBiz"],
-#            ["is_system_generated", "=", 0] # ป้องกันฟิลด์ที่แอปอื่นสร้างแทรกมา
-#        ]
-#    }
-#]
+# ของที่สร้างผ่านหน้าเว็บ ให้ตั้ง Module = ConsBiz แล้วรัน
+# bench --site <site> export-fixtures --app consbiz
+# (ไม่กรอง is_system_generated เพราะ Property Setter ที่ระบบสร้างแทนเรา เช่น default_print_format ก็ต้องตามไปด้วย)
+fixtures = [
+    {"doctype": "Custom Field", "filters": [["module", "=", "ConsBiz"]]},
+    {"doctype": "Property Setter", "filters": [["module", "=", "ConsBiz"]]},
+    {"doctype": "Client Script", "filters": [["module", "=", "ConsBiz"]]},
+    {"doctype": "Print Format", "filters": [["module", "=", "ConsBiz"], ["standard", "=", "No"]]},
+    {"doctype": "Report", "filters": [["name", "in", ["Salary Slip Report"]]]},
+]
 
 
 app_include_css = "/assets/consbiz/css/style.css"
@@ -179,6 +173,12 @@ scheduler_events = {
 # ----------
 
 # add methods and filters to jinja environment
+jinja = {
+	"methods": [
+		"consbiz.utils.thai_date",
+		"consbiz.consbiz.doctype.bar_cut_plan.bar_cut_plan.shape_svg",
+	]
+}
 # jinja = {
 # 	"methods": "consbiz.utils.jinja_methods",
 # 	"filters": "consbiz.utils.jinja_filters"

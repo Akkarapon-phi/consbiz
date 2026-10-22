@@ -1,0 +1,282 @@
+{
+ "actions": [],
+ "autoname": "naming_series:",
+ "creation": "2026-10-22 16:00:00",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "section_break_info",
+  "boq",
+  "project",
+  "contract_no",
+  "start_date",
+  "finish_date",
+  "duration",
+  "column_break_main",
+  "naming_series",
+  "status",
+  "customer",
+  "company",
+  "employer",
+  "contractor",
+  "supervisor",
+  "section_break_tasks",
+  "tasks",
+  "section_break_progress",
+  "actual_progress",
+  "column_break_progress",
+  "baseline_date",
+  "section_break_total",
+  "total_amount",
+  "settings_tab",
+  "section_break_calculation",
+  "use_working_days",
+  "holiday_list",
+  "column_break_calculation",
+  "week_by_month"
+ ],
+ "fields": [
+  {
+   "fieldname": "section_break_info",
+   "fieldtype": "Section Break",
+   "label": "ข้อมูลโครงการและสัญญา"
+  },
+  {
+   "fieldname": "boq",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "BOQ",
+   "options": "BOQ",
+   "reqd": 1,
+   "set_only_once": 1
+  },
+  {
+   "fieldname": "project",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Project",
+   "options": "Project",
+   "read_only": 0
+  },
+  {
+   "description": "เลขที่สัญญาจ้าง (แสดงในหัวรายงานประจำวัน)",
+   "fieldname": "contract_no",
+   "fieldtype": "Data",
+   "label": "Contract No"
+  },
+  {
+   "fieldname": "start_date",
+   "fieldtype": "Date",
+   "label": "วันที่เริ่มสัญญา"
+  },
+  {
+   "description": "วันสิ้นสุดตามสัญญา (กรอกเอง)",
+   "fieldname": "finish_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "วันที่สิ้นสุดสัญญา"
+  },
+  {
+   "description": "จำนวนวัน = วันที่สิ้นสุด − วันที่เริ่ม + 1 (นับวันแรกด้วย)",
+   "fieldname": "duration",
+   "fieldtype": "Int",
+   "label": "ระยะเวลาสัญญา",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_main",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "CM-.YYYY.MM.####",
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "hidden": 1,
+   "label": "Series",
+   "options": "CM-.YYYY.MM.####",
+   "print_hide": 1,
+   "reqd": 1
+  },
+  {
+   "default": "Active",
+   "description": "BOQ หนึ่งฉบับมีแผนที่ใช้งาน (Active) ได้ฉบับเดียว",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Status",
+   "options": "Active\nInactive"
+  },
+  {
+   "description": "ข้อมูลภายใน",
+   "fetch_from": "boq.customer",
+   "fieldname": "customer",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "label": "Customer",
+   "options": "Customer",
+   "read_only": 1
+  },
+  {
+   "fetch_from": "boq.company",
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "label": "Company",
+   "options": "Company",
+   "read_only": 1
+  },
+  {
+   "fieldname": "employer",
+   "fieldtype": "Data",
+   "label": "ผู้ว่าจ้าง"
+  },
+  {
+   "fieldname": "contractor",
+   "fieldtype": "Data",
+   "label": "ผู้รับจ้าง"
+  },
+  {
+   "fieldname": "supervisor",
+   "fieldtype": "Data",
+   "label": "ผู้ควบคุมงาน"
+  },
+  {
+   "fieldname": "section_break_tasks",
+   "fieldtype": "Section Break",
+   "label": "Tasks"
+  },
+  {
+   "fieldname": "tasks",
+   "fieldtype": "Table",
+   "label": "Tasks",
+   "options": "Construction Management Task"
+  },
+  {
+   "fieldname": "section_break_progress",
+   "fieldtype": "Section Break",
+   "label": "Progress"
+  },
+  {
+   "description": "ความคืบหน้าจริงรวม (ถ่วงน้ำหนักตามมูลค่างาน) จาก Construction Progress Entry",
+   "fieldname": "actual_progress",
+   "fieldtype": "Percent",
+   "in_list_view": 1,
+   "label": "Actual Progress",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_progress",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "วันที่บันทึก Baseline ล่าสุด (กดปุ่มในหน้า Gantt)",
+   "fieldname": "baseline_date",
+   "fieldtype": "Date",
+   "label": "Baseline Date",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_total",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "total_amount",
+   "fieldtype": "Currency",
+   "label": "Total Amount",
+   "options": "Company:company:default_currency",
+   "read_only": 1
+  },
+  {
+   "fieldname": "settings_tab",
+   "fieldtype": "Tab Break",
+   "label": "Settings"
+  },
+  {
+   "description": "%Plan ของแต่ละงานกระจายเท่าๆ กันทุกวันทำงาน ยกเว้นงานที่คลิกแถบใน Gantt แล้วกำหนด % รายวัน/สัปดาห์/เดือนเอง",
+   "fieldname": "section_break_calculation",
+   "fieldtype": "Section Break",
+   "label": "Plan Calculation"
+  },
+  {
+   "default": "0",
+   "description": "นับจำนวนวันเฉพาะวันทำงาน (ไม่นับวันหยุดใน Holiday List)",
+   "fieldname": "use_working_days",
+   "fieldtype": "Check",
+   "label": "Count Working Days Only"
+  },
+  {
+   "depends_on": "use_working_days",
+   "fieldname": "holiday_list",
+   "fieldtype": "Link",
+   "label": "Holiday List",
+   "mandatory_depends_on": "use_working_days",
+   "options": "Holiday List"
+  },
+  {
+   "fieldname": "column_break_calculation",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "description": "เปิด: สัปดาห์เริ่มวันที่ 1, 8, 15, 22 ของเดือน (สัปดาห์สุดท้ายถึงสิ้นเดือน) ปิด: สัปดาห์เริ่มวันจันทร์ ใช้กับหัว timeline รายสัปดาห์และการกำหนด % รายสัปดาห์",
+   "fieldname": "week_by_month",
+   "fieldtype": "Check",
+   "label": "Split Weeks by Month (7-7-7-Rest)"
+  }
+ ],
+ "grid_page_length": 50,
+ "links": [],
+ "modified": "2026-10-26 15:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "ConsBiz",
+ "name": "Construction Management",
+ "naming_rule": "By \"Naming Series\" field",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Projects Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Projects User",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "search_fields": "boq,project",
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "project",
+ "track_changes": 1
+}

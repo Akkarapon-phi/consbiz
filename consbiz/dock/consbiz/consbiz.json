@@ -1,0 +1,31 @@
+{
+ "app": "consbiz",
+ "creation": "2026-10-22 12:34:11.762509",
+ "docstatus": 0,
+ "doctype": "Dock",
+ "idx": 0,
+ "items": [
+  {
+   "added": 0,
+   "hidden": 0,
+   "icon": "factory-duotone",
+   "link_to": "Construction",
+   "link_type": "Sidebar",
+   "title": "Construction"
+  },
+  {
+   "added": 0,
+   "hidden": 0,
+   "icon": "receipt-card-duotone",
+   "link_to": "Docs",
+   "link_type": "Sidebar",
+   "title": "Documents"
+  }
+ ],
+ "modified": "2026-10-22 12:34:11.762509",
+ "modified_by": "Administrator",
+ "name": "consbiz",
+ "owner": "Administrator",
+ "standard": 1,
+ "user": ""
+}

@@ -1,26 +1,25 @@
-/* 1. ดึง Noto Sans Thai มาให้ครบทุกน้ำหนัก */
-@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@300;400;500;600;700;800;900&display=swap');
-
-:root {
-    /* ใช้ Inter สำหรับอังกฤษ และ Noto สำหรับไทย */
-    --font-stack: "Inter", "system-ui", "-apple-system", "Noto Sans Thai", sans-serif !important;
+/* 1. Noto Sans Thai เก็บไว้ในแอปเอง (public/fonts) ไม่พึ่ง Google และไม่ขึ้นกับว่าเครื่องติดตั้งฟอนต์หรือไม่
+      ไฟล์เดียวเป็น variable font ครอบคลุมน้ำหนัก 100-900 ใช้เฉพาะตัวอักษรไทย (unicode-range)
+      ที่มา: @fontsource-variable/noto-sans-thai 5.3.0 สัญญาอนุญาต OFL-1.1 (fonts/noto-sans-thai/OFL.txt) */
+@font-face {
+    font-family: "Noto Sans Thai";
+    font-style: normal;
+    font-weight: 100 900;
+    font-display: swap;
+    src: url("/assets/consbiz/fonts/noto-sans-thai/NotoSansThai-Variable-thai.woff2") format("woff2");
+    unicode-range: U+02D7, U+0303, U+0331, U+0E01-0E5B, U+200C-200D, U+25CC;
 }
 
-/* 2. บังคับใช้กับทุกจุด รวมถึงส่วนที่วงไว้ */
-body, .navbar, .page-title, .page-content, .sidebar, .sidebar-menu, 
-.list-row, .list-item, .form-layout, .frappe-control, .control-label, 
-.control-value, .btn, .modal, .msgprint, .indicator, .dropdown-menu, 
-.navbar-nav, .breadcrumb, .comment, .timeline-item, .grid-row, 
-.data-row, .report-wrapper, .dt-cell, .dt-header, 
-h1, h2, h3, h4, h5, h6, p, span, div, a, label, input, textarea, select, button,
-.awesomplete, .frappe-card, .layout-main-section, .layout-side-section,
-.page-head, .page-body, .page-wrapper, .desk-page,
-.widget, .widget-head, .widget-body, .shortcut, .desk-sidebar, .desk-body {
-    font-family: var(--font-stack) !important;
-    line-height: 1.6 !important;
-    -webkit-font-smoothing: antialiased; /* ทำให้ฟอนต์ดูคมและเรียบเนียน */
-    -moz-osx-font-smoothing: grayscale;
-    font-synthesis: none; /* ห้ามเบราว์เซอร์ถมดำเอง ให้ใช้ไฟล์ฟอนต์จริง */
+/* 2. ฟอนต์ทั้งระบบ: Frappe ใช้ตัวแปร --font-stack กับ body แล้ว element ลูกรับต่อเอง
+      จึงเปลี่ยนแค่ค่าตัวแปร ห้ามใส่ font-family !important ให้ทุก element
+      เพราะจะทับฟอนต์ที่ส่วนอื่นตั้งไว้เอง เช่นฟอนต์ที่เลือกใน Print Designer
+
+      Inter ไม่มีตัวอักษรไทย เบราว์เซอร์จึงข้ามไปหา Noto Sans Thai ทันที
+      ต้องวาง Noto ไว้ก่อน system-ui เพราะ system-ui ของ Mac/iPhone/Android มีตัวไทย
+      system-ui / -apple-system ต้องไม่ใส่เครื่องหมายคำพูด ไม่งั้นจะกลายเป็นชื่อฟอนต์ที่ไม่มีอยู่จริง
+      !important ตรงนี้มีผลแค่กับตัวแปร ให้ชนะค่าเดิมของ Frappe ไม่ได้ทับ style ของ element ใด */
+:root {
+    --font-stack: InterVariable, "Inter", "Noto Sans Thai", system-ui, -apple-system, sans-serif !important;
 }
 
 /* 3. จุดที่วงไว้ด้านบน: Tabs (Details, ใบกำกับภาษี ฯลฯ) */
@@ -51,4 +50,162 @@ h1, h2, h3, h4, h5, h6, p, span, div, a, label, input, textarea, select, button,
 .dt-cell--number, .list-item__content--number, .text-right, .dt-header .dt-cell {
     font-weight: 600 !important;
     color: #383838 !important;
+}
+
+/* 6. ปุ่มเปลี่ยนบริษัท (public/js/company_switcher.js) */
+/* แถวใน sidebar ใช้ class ของ Frappe (.dropdown-navbar-user / .sidebar-user-button) จึงได้ขนาด สี hover
+   และการซ่อนเหมือนแถวผู้ใช้: Frappe ซ่อนแถวนี้เองตอน Dock แบบ Pinned และแสดงตอน Floating */
+
+/* ใน Dock: กล่องของตัวเองเหนือ .dock-user จัดกลางแบบเดียวกับกล่อง Avatar */
+.dock-company {
+    display: flex;
+    justify-content: center;
+}
+
+/* โลโก้บริษัท (ทั้ง Dock และ sidebar) พื้นขาวให้โลโก้เด่น */
+.company-avatar .avatar-frame {
+    background: white;
+    overflow: hidden;
+}
+
+.company-avatar .avatar-frame img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    padding: 2px;
+}
+
+/* แถวผู้ใช้ที่อยู่ถัดจากแถวบริษัท ไม่ต้องเว้นระยะด้านบน (Frappe ใส่ mt-3 ไว้) */
+#sidebar-company-switcher + .dropdown-navbar-user {
+    margin-top: 0 !important;
+}
+
+/* 7. หน้าแผนงานก่อสร้าง (Gantt + S-Curve, public/js/construction_management)
+   อ้างตัวแปรสีของ Frappe จึงเปลี่ยนตามธีมมืด/สว่างเอง */
+:root {
+    --consbiz-gantt-bar: var(--blue-500);
+    --consbiz-gantt-group: var(--gray-700);
+    --consbiz-gantt-today: var(--red-500);
+    --consbiz-gantt-plan: var(--blue-500);
+    --consbiz-gantt-actual: var(--green-500);
+    --consbiz-gantt-baseline: var(--gray-500);
+    --consbiz-gantt-status-date: var(--purple-500);
+    --consbiz-gantt-done: var(--green-500);
+    --consbiz-gantt-late: var(--orange-500);
+    --consbiz-gantt-critical: var(--red-500);
+    --consbiz-gantt-holiday: var(--subtle-fg);
+    --consbiz-gantt-row-hover: var(--highlight-color);
+}
+
+/* 8. แผนตัดเหล็ก (Bar Cut Plan): รูปทรงการดัด และแผนภาพการตัด */
+:root {
+    --consbiz-cut-piece: var(--blue-100);
+    --consbiz-cut-piece-border: var(--blue-400);
+    --consbiz-cut-reusable: var(--green-100);
+    --consbiz-cut-scrap: var(--red-100);
+}
+.consbiz-shape-gallery {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    gap: var(--padding-sm);
+}
+.consbiz-shape-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: var(--padding-sm);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-md);
+    background: var(--card-bg);
+    color: var(--text-color);
+    font-size: var(--text-xs);
+}
+.consbiz-shape-card:hover {
+    border-color: var(--gray-500);
+}
+.consbiz-shape-card.active {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 1px var(--primary);
+    background: var(--subtle-accent);
+}
+.consbiz-shape-card svg,
+.consbiz-shape-preview svg,
+.consbiz-bar-shape svg {
+    width: 100%;
+    height: auto;
+    overflow: visible;
+}
+.consbiz-shape-preview {
+    max-width: 320px;
+    margin: 0 auto var(--padding-sm);
+    color: var(--text-color);
+}
+.consbiz-cut-length {
+    margin-top: var(--padding-sm);
+    padding: var(--padding-sm);
+    border-radius: var(--border-radius);
+    background: var(--subtle-fg);
+    text-align: center;
+}
+.consbiz-cut-totals {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--padding-xs) var(--padding-lg);
+    margin-bottom: var(--padding-md);
+}
+.consbiz-cut-group {
+    margin-bottom: var(--padding-md);
+}
+.consbiz-cut-title {
+    display: flex;
+    gap: var(--padding-sm);
+    margin-bottom: var(--padding-xs);
+}
+.consbiz-cut-row {
+    display: flex;
+    align-items: center;
+    gap: var(--padding-sm);
+    margin-bottom: 4px;
+}
+.consbiz-cut-label {
+    flex: 0 0 80px;
+    font-size: var(--text-sm);
+    text-align: right;
+}
+.consbiz-cut-bar {
+    flex: 1;
+    display: flex;
+    height: 24px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    overflow: hidden;
+}
+.consbiz-cut-piece,
+.consbiz-cut-offcut {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: var(--text-xs);
+    white-space: nowrap;
+    overflow: hidden;
+}
+.consbiz-cut-piece {
+    background: var(--consbiz-cut-piece);
+    border-right: 1px solid var(--consbiz-cut-piece-border);
+}
+.consbiz-cut-offcut.reusable,
+.consbiz-cut-swatch.reusable {
+    background: var(--consbiz-cut-reusable);
+}
+.consbiz-cut-offcut.scrap,
+.consbiz-cut-swatch.scrap {
+    background: var(--consbiz-cut-scrap);
+}
+.consbiz-cut-swatch {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    margin-right: 4px;
+    border-radius: 2px;
 }

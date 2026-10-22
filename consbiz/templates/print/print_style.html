@@ -1,0 +1,368 @@
+{#-
+	CSS กลางของ Print Format ของ ConsBiz (รายงานประจำวัน, แผนตัดเหล็ก) ใช้ {% include "consbiz/templates/print/print_style.html" %}
+	- โทนเทา ขอบมน เส้นตาราง #BFBFBF class ขึ้นต้น pf- ทั้งหมด (.label ของ Bootstrap ใน Frappe จะทับถ้าใช้ชื่อทั่วไป)
+	- โครงหน้า: ตาราง .pf-page ใส่หัวกระดาษใน <thead> ท้ายกระดาษใน <tfoot> เบราว์เซอร์และ Chrome PDF พิมพ์ซ้ำทุกหน้าเอง
+	- เลขหน้าใช้ @page margin box (Chrome 131 ขึ้นไป)
+-#}
+<style>
+	@font-face {
+		font-family: "Noto Sans Thai";
+		font-weight: 100 900;
+		src: url("{{ frappe.utils.get_url() }}/assets/consbiz/fonts/noto-sans-thai/NotoSansThai-Variable-thai.woff2")
+			format("woff2");
+		unicode-range: U+02D7, U+0303, U+0331, U+0E01-0E5B, U+200C-200D, U+25CC;
+	}
+	/* Inter สำหรับตัวเลข/อังกฤษ (หน้าพิมพ์ไม่ได้โหลด CSS ฟอนต์ของ desk ถ้าไม่ใส่จะใช้ฟอนต์ระบบที่ขนาดไม่เข้ากับไทย) */
+	@font-face {
+		font-family: InterVariable;
+		font-style: normal;
+		font-weight: 100 900;
+		src: url("{{ frappe.utils.get_url() }}/assets/frappe/css/fonts/inter/InterVariable.woff2") format("woff2");
+	}
+	/* ระยะขอบกระดาษสำหรับปุ่ม PDF ของ Frappe: Frappe อ่านกฎ ".print-format { margin-* }" (ต้องเขียนตรงตัวแบบนี้)
+	   ไปเป็นขอบหน้า PDF ไม่งั้นใช้ 15 มม. ส่วนการแสดงผลจริงยกเลิก margin นี้ด้วย div.print-format ซึ่ง parser
+	   ของ Frappe ไม่อ่าน จึงเหลือขอบหน้าชั้นเดียว (wkhtmltopdf แบบไม่ patch ไม่ใช้ @media print จึงพึ่งไม่ได้) */
+	.print-format {
+		margin-top: 8mm;
+		margin-bottom: 10mm;
+		margin-left: 10mm;
+		margin-right: 10mm;
+	}
+	div.print-format {
+		margin: 0 !important;
+	}
+	@page {
+		size: A4;
+		margin: 8mm 10mm 10mm;
+		@bottom-right {
+			content: "หน้า " counter(page) "/" counter(pages);
+			font-size: 7pt;
+			color: #8c8c8c;
+		}
+	}
+
+	.pf {
+		--pf-ink: #383838;
+		--pf-text: #525252;
+		--pf-muted: #8c8c8c;
+		--pf-line: #bfbfbf;
+		--pf-soft: #f4f4f5;
+		--pf-head: #e9e9eb;
+		--pf-radius: 8px;
+		font-family: InterVariable, "Inter", "Noto Sans Thai", system-ui, -apple-system, sans-serif;
+		font-size: 8pt;
+		line-height: 1.45;
+		color: var(--pf-text);
+		-webkit-print-color-adjust: exact;
+		print-color-adjust: exact;
+	}
+	.pf table {
+		width: 100%;
+		margin: 0;
+		border-collapse: separate;
+		border-spacing: 0;
+	}
+	/* ขนาดตัวอักษรเท่ากันทั้งเอกสาร (9pt) ยกเว้นที่ตั้งไว้เฉพาะ เช่นหัวตาราง ข้อความรอง */
+	.pf th,
+	.pf td {
+		font-size: inherit;
+		padding: 0;
+		border: 0;
+		vertical-align: top;
+		text-align: left;
+	}
+	.pf .text-right {
+		text-align: right;
+	}
+	.pf .text-center {
+		text-align: center;
+	}
+	.pf .muted {
+		color: var(--pf-muted);
+	}
+	.pf b,
+	.pf strong {
+		color: var(--pf-ink);
+	}
+
+	/* โครงหน้า: thead/tfoot ซ้ำทุกหน้า */
+	.pf-page > thead {
+		display: table-header-group;
+	}
+	.pf-page > tfoot {
+		display: table-footer-group;
+	}
+	.pf-page tr,
+	.pf-grid tbody tr {
+		page-break-inside: avoid;
+		break-inside: avoid;
+	}
+
+	/* หัวกระดาษ */
+	.pf-brand {
+		display: table;
+		width: 100%;
+		padding-bottom: 6px;
+		margin-bottom: 8px;
+		border-bottom: 1px solid var(--pf-line);
+		font-size: 7pt;
+		letter-spacing: 0.04em;
+	}
+	.pf-brand > div {
+		display: table-cell;
+	}
+	.pf-brand .company {
+		font-weight: 700;
+		color: var(--pf-ink);
+		text-transform: uppercase;
+	}
+	.pf-card {
+		background: var(--pf-soft);
+		border: 1px solid var(--pf-line);
+		border-radius: var(--pf-radius);
+		padding: 8px 12px;
+		margin-bottom: 12px;
+	}
+	.pf-card td {
+		padding: 2px 0;
+	}
+	.pf-card .pf-k {
+		width: 15%;
+		font-weight: 700;
+		color: var(--pf-ink);
+	}
+	.pf-card .pf-v {
+		width: 35%;
+		padding-right: 12px;
+	}
+
+	/* class ขึ้นต้น pf- ทั้งหมด: .label ของ Bootstrap ใน Frappe จะทับถ้าใช้ชื่อทั่วไป */
+	.pf-k {
+		font-size: 8pt;
+		vertical-align: top;
+	}
+
+	/* ไม่ให้หัวข้อส่วนค้างท้ายหน้าโดยไม่มีเนื้อหาตาม */
+	.pf-section {
+		break-after: avoid;
+		page-break-after: avoid;
+	}
+	.pf-keep {
+		break-inside: avoid;
+		page-break-inside: avoid;
+	}
+
+	/* ชื่อเอกสาร */
+	.pf-title {
+		text-align: center;
+		padding-bottom: 10px;
+		margin-bottom: 14px;
+		border-bottom: 3px solid var(--pf-ink);
+		border-radius: 0 0 2px 2px;
+	}
+	.pf-title h1 {
+		margin: 0;
+		font-size: 14pt;
+		font-weight: 700;
+		color: var(--pf-ink);
+	}
+	.pf-title div {
+		color: var(--pf-muted);
+	}
+
+	/* หัวข้อส่วน: เลขในกรอบมน + เส้น */
+	.pf-section {
+		display: table;
+		width: 100%;
+		margin: 14px 0 6px;
+	}
+	.pf-section > span {
+		display: table-cell;
+		white-space: nowrap;
+		vertical-align: middle;
+	}
+	.pf-section .no {
+		display: inline-block;
+		width: 18px;
+		height: 18px;
+		margin-right: 6px;
+		border-radius: 5px;
+		background: var(--pf-ink);
+		color: #fff;
+		text-align: center;
+		font-size: 7.5pt;
+		font-weight: 700;
+		line-height: 18px;
+	}
+	.pf-section .name {
+		font-weight: 700;
+		color: var(--pf-ink);
+		padding-right: 8px;
+	}
+	/* เส้นยาวกึ่งกลางความสูงของหัวข้อ */
+	.pf-section .rule {
+		width: 100%;
+		background: linear-gradient(var(--pf-line), var(--pf-line)) center / 100% 1px no-repeat;
+	}
+
+	/* ตารางมีขอบมน: เส้นขอบอยู่ที่ช่อง ไม่ใช่ที่ตัวตาราง
+	   ตารางที่ถูกตัดข้ามหน้าจึงปิดขอบครบทั้งสองหน้า และหัวตารางที่พิมพ์ซ้ำในหน้าใหม่มีเส้นบนของตัวเอง */
+	.pf .pf-grid th {
+		background: var(--pf-head);
+		color: var(--pf-ink);
+		font-weight: 700;
+		font-size: 7.5pt;
+		padding: 6px 8px;
+		text-align: center;
+		vertical-align: middle;
+	}
+	.pf-grid td {
+		padding: 5px 8px;
+	}
+	.pf-grid th,
+	.pf-grid td {
+		border-bottom: 1px solid var(--pf-line);
+	}
+	.pf-grid thead th,
+	.pf-grid > tbody:first-child > tr:first-child > td {
+		border-top: 1px solid var(--pf-line);
+	}
+	.pf-grid th,
+	.pf-grid td {
+		border-right: 1px solid var(--pf-line);
+	}
+	.pf-grid tr > :first-child {
+		border-left: 1px solid var(--pf-line);
+	}
+	.pf-grid thead tr:first-child > :first-child,
+	.pf-grid > tbody:first-child > tr:first-child > :first-child {
+		border-top-left-radius: var(--pf-radius);
+	}
+	.pf-grid thead tr:first-child > :last-child,
+	.pf-grid > tbody:first-child > tr:first-child > :last-child {
+		border-top-right-radius: var(--pf-radius);
+	}
+	.pf-grid > :last-child > tr:last-child > :first-child {
+		border-bottom-left-radius: var(--pf-radius);
+	}
+	.pf-grid > :last-child > tr:last-child > :last-child {
+		border-bottom-right-radius: var(--pf-radius);
+	}
+	.pf-grid tfoot td {
+		background: var(--pf-soft);
+		font-weight: 700;
+		color: var(--pf-ink);
+	}
+	.pf-grid .empty {
+		color: var(--pf-muted);
+		text-align: center;
+	}
+	.pf-grid .path {
+		display: block;
+		font-size: 6.5pt;
+		color: var(--pf-muted);
+	}
+
+	/* ตารางข้อมูลแบบ หัวข้อ | ค่า */
+	.pf-info .pf-k {
+		width: 17%;
+		background: var(--pf-soft);
+		font-weight: 700;
+		color: var(--pf-ink);
+	}
+	.pf-info .pf-v {
+		width: 33%;
+	}
+
+	.pf-pill {
+		display: inline-block;
+		padding: 0 9px;
+		border-radius: 9px;
+		font-size: 7pt;
+		font-weight: 700;
+	}
+	.pf-pill.gray {
+		background: #ececec;
+		color: #383838;
+	}
+	.pf-pill.green {
+		background: #e4faeb;
+		color: #14804d;
+	}
+	.pf-pill.red {
+		background: #ffe7e7;
+		color: #b41d1d;
+	}
+
+	.pf-total {
+		display: table;
+		width: 100%;
+		margin-top: 6px;
+		padding: 7px 12px;
+		background: var(--pf-soft);
+		border: 1px solid var(--pf-line);
+		border-radius: var(--pf-radius);
+	}
+	.pf-total > span {
+		display: table-cell;
+		font-weight: 700;
+		color: var(--pf-ink);
+	}
+
+	.pf-columns > tbody > tr > td {
+		width: 50%;
+	}
+	.pf-columns > tbody > tr > td:first-child {
+		padding-right: 6px;
+	}
+	.pf-columns > tbody > tr > td:last-child {
+		padding-left: 6px;
+	}
+	.pf-subtitle {
+		margin-bottom: 4px;
+		font-weight: 700;
+		font-size: 7.5pt;
+		color: var(--pf-ink);
+	}
+	.pf-note {
+		margin-top: 10px;
+		padding: 8px 12px;
+		border: 1px solid var(--pf-line);
+		border-radius: var(--pf-radius);
+	}
+
+	.pf .pf-sign {
+		margin-top: 28px;
+	}
+	.pf-sign > tbody > tr > td {
+		width: 50%;
+		text-align: center;
+	}
+	.pf-sign .line {
+		margin-bottom: 4px;
+		color: var(--pf-muted);
+	}
+	.pf-sign .box {
+		display: inline-block;
+		min-width: 60%;
+		padding: 10px 16px;
+		text-align: left;
+		background: var(--pf-soft);
+		border: 1px solid var(--pf-line);
+		border-radius: var(--pf-radius);
+	}
+
+	/* ท้ายกระดาษ */
+	.pf-footer {
+		display: table;
+		width: 100%;
+		margin-top: 10px;
+		padding-top: 5px;
+		border-top: 1px solid var(--pf-line);
+		font-size: 6.5pt;
+		color: var(--pf-muted);
+	}
+	.pf-footer > div {
+		display: table-cell;
+	}
+</style>

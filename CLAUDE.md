@@ -1,0 +1,109 @@
+# ConsBiz
+
+แอป Frappe v16 สำหรับธุรกิจก่อสร้าง ทำงานบน ERPNext ร่วมกับ `hrms`, `erpnext_thailand` และ `print_designer`
+มีโมดูลเดียว: `ConsBiz`
+
+**repo นี้เป็น public** ห้าม commit รหัสผ่าน, token, `site_config.json`, ไฟล์ backup หรือข้อมูลลูกค้า/พนักงานจริง
+
+## Branch และการขึ้นระบบ
+
+- พัฒนาบน `develop` เท่านั้น ห้าม commit ตรงเข้า `main`
+- ขึ้นระบบจริงด้วย PR `develop` → `main` เซิร์ฟเวอร์จริงดึงจาก `main`
+- ห้ามแก้ DocType หรือ customization บนเซิร์ฟเวอร์จริง ทุกอย่างทำในเครื่อง dev แล้วผ่าน git
+- อัปเดตเซิร์ฟเวอร์จริง: backup → `git pull` → `bench --site <site> migrate` → `bench build --app consbiz` → `bench restart`
+
+## ของที่สร้างผ่านหน้าเว็บ ต้องเข้า git อย่างไร
+
+เครื่อง dev เปิด `developer_mode` ไว้
+
+- **DocType**: แก้ผ่านหน้าเว็บได้เลย ระบบจะเขียนไฟล์ลง `consbiz/consbiz/doctype/<name>/` เอง ต้องเป็น standard (ไม่ติ๊ก Is Custom) และ Module = `ConsBiz`
+- **Custom Field, Property Setter, Client Script, Print Format**: ตั้ง Module = `ConsBiz` แล้วรัน
+  `bench --site <dev-site> export-fixtures --app consbiz` (ตัวกรองอยู่ใน `fixtures` ของ `hooks.py`)
+- **Report** ที่ไม่ใช่ standard: เพิ่มชื่อในรายการ `Report` ของ `fixtures`
+- **Sidebar, Dock, Workspace**: ติ๊ก Standard และ Module/App = ConsBiz แล้วกด Save ระบบเขียนไฟล์เอง
+  (`consbiz/consbiz/sidebar/<name>/`, `consbiz/dock/consbiz/`, `consbiz/consbiz/workspace/<name>/`)
+- ห้ามแก้ Sidebar/Dock/DocType ของแอปอื่น (frappe, erpnext, hrms) ในเครื่อง dev ไฟล์จะไปเขียนในแอปนั้นและหายตอนอัปเดต
+- ห้ามติดป้าย `ConsBiz` ให้ field ที่แอปอื่นสร้าง (hrms, erpnext_thailand, print_designer) ไม่งั้นจะชนกันตอนอัปเกรด
+
+สิ่งที่เคยพลาด:
+
+- DocType แบบ standard ห้ามมี `default_print_format` ให้ย้ายไปเป็น Property Setter (เหมือนที่ Customize Form ทำ)
+- โฟลเดอร์ DocType ใหม่ต้องมี `__init__.py`
+- ของแบบ standard (DocType, Sidebar, Dock, Workspace, Report) ที่อยู่ในฐานข้อมูลแต่ไม่มีไฟล์ใน repo
+  จะถูก `migrate` ลบทิ้งเป็น orphan (เคยเกิดกับ WHT Employee, Dock และ Sidebar "Docs")
+- การ import ไฟล์ DocType ตอน migrate จะข้ามถ้าฐานข้อมูลมี `modified` ใหม่กว่าไฟล์
+- ถ้าชื่อ record บนเซิร์ฟเวอร์ต่างจากชื่อในไฟล์ (เช่น Dock ชื่อ hash กับ Dock ชื่อ `consbiz`) migrate จะชน unique key
+  ให้เขียน patch ใน `[pre_model_sync]` ลบหรือเปลี่ยนชื่อตัวเก่าก่อน ดู `consbiz/patches/remove_hash_named_dock.py`
+- เพิ่มโมดูลใหม่ใน `modules.txt` แล้ว migrate รอบแรกจะข้าม DocType/Page ของโมดูลนั้น เพราะ migrate ใช้รายชื่อโมดูลที่ redis จำไว้
+  ต้องมี patch ใน `[pre_model_sync]` สร้างรายชื่อใหม่ก่อน: `frappe.cache.delete_value("app_modules")` แล้ว `frappe.setup_module_map()`
+  (patch รันครั้งเดียวต่อไซต์ โมดูลใหม่แต่ละครั้งต้องเพิ่ม patch ชื่อใหม่)
+
+## โครงสร้าง
+
+- `consbiz/hooks.py`: `doc_events`, `doctype_js`, `fixtures`, `scheduler_events`
+- `consbiz/api.py`: logic ที่ผูกกับ doc_events (Retention, Transmittal)
+- `consbiz/utils.py`: ตัวแปร naming series `ABBR` และ `thai_date()` (วันที่ไทย พ.ศ. ใช้ใน Print Format ผ่าน `jinja` ใน hooks)
+- `consbiz/public/js/`: สคริปต์ฝั่งฟอร์ม (`doctype_js`) และ helper กลางใน `utils.js` เช่น `thai_baht_text()`
+- `consbiz/public/js/company_switcher.js`: ปุ่มเปลี่ยนบริษัท 2 ที่ ใช้ avatar และเมนูชุดเดียวกัน
+  - Dock: กล่อง `.dock-company` เหนือ `.dock-user` ห้ามใส่ใน `.dock-user` เพราะ Frappe ผูกคลิกทั้งกล่องกับเมนูผู้ใช้
+  - Sidebar: แถวที่ใช้ class แถวผู้ใช้ของ Frappe (`.dropdown-navbar-user`) จึงซ่อนตอน Dock แบบ Pinned และแสดงตอน Floating
+- `consbiz/public/css/style.css`: ฟอนต์และสีของหน้าจอ desk แบ่งเป็นส่วนมีหมายเลข
+- `consbiz/public/fonts/`: ไฟล์ฟอนต์ที่แอปส่งเอง (Noto Sans Thai, OFL)
+- แผนงานก่อสร้าง: DocType `Construction Management` (+ Task) ความคืบหน้าจริงเก็บใน `Construction Progress Entry`
+  (บัญชีที่ระบบสร้างเอง ไม่กรอกตรง) ซึ่งเกิดจากการ Submit `Daily Report` หรือการกรอกในหน้า Gantt
+  - หน้า Gantt: Page `construction-gantt` (route ชื่อนี้เพราะ `construction-management` ชนกับ list ของ DocType)
+    โหลด Vue bundle `public/js/construction_management/` (คำนวณ %แผน/S-Curve ใน `schedule.js` ตรงกับฝั่ง Python)
+- แผนตัดเหล็ก: `Bar Cut Plan` ใช้ `Rebar Type` และ `Bar Shape` (สูตรความยาว + รูป SVG) ตัวจัดตัดอยู่ใน `bar_cut_plan/optimizer.py`
+  รูปทรงและขนาดเหล็กมาตรฐานสร้างด้วย patch `seed_bar_cut_masters` (ข้ามที่มีอยู่แล้ว)
+- Print Format แบบ standard (`consbiz/consbiz/print_format/<name>/`): แก้ HTML ที่ไฟล์ `<name>.html` ไม่ใช่ช่อง HTML บนเว็บ
+  (Frappe อ่านไฟล์ก่อน) CSS กลางอยู่ที่ `consbiz/templates/print/print_style.html` ใช้ `{% include %}` class ขึ้นต้น `pf-`
+- `consbiz/patches/`: patch ที่รันตอน migrate (ลงทะเบียนใน `patches.txt`)
+- `consbiz/fixtures/`: ไฟล์ที่ export จาก `export-fixtures` อย่าแก้ด้วยมือ ให้แก้ในหน้าเว็บแล้ว export ใหม่
+
+## คำแปลภาษาไทย
+
+- Frappe รวมคำแปลจากทุกแอปตามลำดับที่ติดตั้ง แอปหลังทับแอปหน้า consbiz ติดตั้งท้ายสุด
+  คำแปลใน `consbiz/translations/th.csv` จึงทับคำแปลของ frappe/erpnext/hrms ได้ (ข้อความเดียวกันได้คำแปลเดียวกันทั้งระบบ)
+- แก้ th.csv ต้องคงตัวแปร (`{0}`, `%s`, แท็ก HTML) ให้ครบเหมือนต้นฉบับ
+- คำแปลที่บันทึกใน DocType `Translation` (ฐานข้อมูล) ทับไฟล์ทุกไฟล์
+
+## แนวทางเขียนโค้ด
+
+- Python: indent ด้วย tab, เครื่องหมายคำพูดคู่, ruff ตาม `pyproject.toml`
+- JS: prettier ตาม `.pre-commit-config.yaml`
+- ข้อความที่แสดงผู้ใช้เป็นภาษาไทย และครอบด้วย `_()` / `__()`
+- fieldname ของ Custom Field ขึ้นต้นด้วย `custom_`
+- เอกสารที่ submit ได้ใช้ `autoname = naming_series:` และใช้ `.ABBR.` ได้ถ้าต้องการตัวย่อบริษัท/โครงการ
+- ใช้ `frappe.qb` หรือ `frappe.db.get_*` ก่อน `frappe.db.sql` และใส่ค่าผ่าน parameter เสมอ
+
+## หน้าตา (UI และเอกสารพิมพ์)
+
+- ฟอนต์: Inter สำหรับอังกฤษ (Frappe ส่งมาเอง), Noto Sans Thai สำหรับไทย (`@font-face` จาก `public/fonts`)
+- เปลี่ยนฟอนต์ทั้งระบบด้วยตัวแปร `--font-stack` ใน `:root` เท่านั้น ห้ามใส่ `font-family ... !important`
+  ให้ทุก element เพราะจะทับฟอนต์ที่ Print Designer และ Print Format เลือกไว้
+- ใน font stack ต้องวาง `"Noto Sans Thai"` ก่อน `system-ui` และห้ามใส่เครื่องหมายคำพูดรอบ `system-ui` / `-apple-system`
+- ก่อนแตะ UI ของ Frappe (Dock, sidebar, เมนู) ให้เปิดซอร์สใน `apps/frappe/frappe/public/js/frappe/ui/` ดูโครงสร้างจริงก่อน
+  และใช้ component ของ Frappe (`frappe.ui.Dropdown`, `frappe.ui.Tooltip`, class ของ Frappe) แทนการเขียนเอง
+- สีที่ใช้อยู่: ตัวอักษรหัวข้อ `#383838`, แท็บ `#525252`, เส้นตารางในเอกสารพิมพ์ `#BFBFBF`, พื้นไฮไลต์ `#E8F0FE`
+- สีใหม่ให้ประกาศเป็นตัวแปร `--consbiz-*` ใน `:root` ของ `style.css` แล้วอ้างถึงตัวแปร ไม่ใส่รหัสสีตรงๆ ซ้ำหลายที่
+- ใช้ indicator สีมาตรฐานของ Frappe (green/orange/red/blue/gray) สำหรับสถานะ ไม่สร้างสีสถานะเอง
+
+## ทดสอบก่อนขึ้นระบบ
+
+- หลังแก้ ให้รัน `bench --site <dev-site> migrate` ในเครื่อง dev ต้องไม่มี error
+- หลังแก้ไฟล์ใน `public/` ให้ `bench build --app consbiz` และ `clear-cache`
+  ไฟล์ใน `app_include_js` / `app_include_css` ไม่มีเลขเวอร์ชันใน URL เบราว์เซอร์จะใช้ไฟล์เก่าจนกว่าจะ Ctrl+Shift+R
+- งานที่เปลี่ยน DocType, fixtures, Sidebar หรือ Dock: restore backup ล่าสุดของเซิร์ฟเวอร์จริงลงไซต์ทดสอบ แล้ว migrate
+  เพื่อดูว่าข้อมูลไม่หายและไม่มี record ถูกลบเป็น orphan (ดูบรรทัด "Orphaned ... found" ใน log)
+- ตอนอัปเดตเซิร์ฟเวอร์จริง `apps/print_designer` ต้องดึงจาก fork `Akkarapon-phi/print_designer` (มีฟอนต์ไทย)
+- DocType ที่มี Link ไป DocType ของ ERPNext (เช่น Project) ให้ใส่ชื่อนั้นใน `IGNORE_TEST_RECORD_DEPENDENCIES` ของไฟล์ test
+  ไม่งั้น test จะสร้าง test record ของ ERPNext ทั้งชุดแล้วชนข้อมูลเดิม
+
+## PDF
+
+- wkhtmltopdf ในเครื่อง dev เป็นแบบไม่ patch: ไม่รองรับ `--header-html` และ `@media print` และตัวหนาของ variable font
+  Print Format ของแอปจึงทำหัว/ท้ายกระดาษซ้ำด้วย `<thead>`/`<tfoot>` (ใช้ได้ทั้งพิมพ์จากเบราว์เซอร์และ Chrome PDF)
+- wkhtmltopdf โหลด CSS/ฟอนต์จาก URL ของไซต์ ชื่อไซต์ต้องอยู่ใน `/etc/hosts` (`127.0.0.1 erp.localhost`) ไม่งั้นได้ `HostNotFoundError`
+- PDF Generator แบบ `chrome` ใช้ `frappe-bench/chromium` ต้องติดตั้ง `libnss3 libasound2t64` ก่อน ไม่งั้นได้ "Chromium took too long to start"
+- ขอบหน้า PDF: Frappe อ่านจากกฎ `.print-format { margin-* }` (ต้องเขียนตรงตัว) ไม่อ่าน `@page` ของเรา
+- Jinja ใน Print Format ใช้ `frappe.get_cached_value` ไม่ได้ ให้ใช้ `frappe.db.get_value`
