@@ -36,6 +36,7 @@ class DailyReport(Document):
 				frappe.throw(_("แถว {0}: งาน {1} ซ้ำกับแถวอื่น").format(row.idx, row.wbs))
 			seen.add(task.name)
 			self.set_row(row, task, previous.get(task.name, (0, 0)))
+		self.total_amount = sum(flt(row.amount) for row in self.items)
 
 	def set_row(self, row, task, previous):
 		row.task = task.name
@@ -56,6 +57,10 @@ class DailyReport(Document):
 		else:
 			row.qty = 0
 			row.remaining_qty = 0
+
+		# มูลค่าตาม % ของมูลค่างาน (งานเหมาไม่มีปริมาณก็คิดได้)
+		row.rate = flt(task.rate)
+		row.amount = flt(task.amount) * flt(row.percent) / 100
 
 		if flt(row.percent) <= 0:
 			frappe.throw(_("แถว {0} ({1}): กรอกปริมาณหรือ % ที่ทำได้").format(row.idx, row.wbs))
@@ -119,6 +124,8 @@ def get_leaf_tasks(construction_management):
 			"item_name",
 			"uom",
 			"quantity",
+			"rate",
+			"amount",
 			"start_date",
 			"end_date",
 			"is_group",

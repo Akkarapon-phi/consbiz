@@ -163,6 +163,7 @@ function add_planned_tasks(frm) {
 			group_path: task.group_path,
 			uom: task.uom,
 			boq_qty: task.quantity,
+			rate: task.rate,
 			previous_qty: task.previous_qty,
 			previous_percent: task.previous_percent,
 			remaining_qty: task.quantity ? flt(task.quantity - task.previous_qty, 6) : 0,
