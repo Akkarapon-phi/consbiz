@@ -1,5 +1,6 @@
 // พิมพ์หน้า Gantt: สร้าง HTML + SVG แยกจากหน้าจอแล้วสั่งพิมพ์ผ่าน iframe ที่ซ่อนไว้
-// - fit:   ทั้งแผนใน 1 หน้า ยืด timeline ให้เต็มกระดาษ
+// - fit:   ทั้งแผนใน 1 หน้า ย่อเฉพาะเมื่อแถวสูงเกินหน้า (ไม่ขยาย) timeline ยืดเต็มความกว้างที่เหลือ
+//          งานน้อยแถว พื้นที่ timeline/S-Curve ยืดลงจนเต็มหน้า
 // - pages: แต่ละช่องเวลากว้างคงที่ (PERIOD_PX) แบ่งเป็นหลายหน้า เรียงตามเวลาก่อน (ซ้ายไปขวา) แล้วจึงแถวถัดไป
 //          ทุกหน้าซ้ำหัวตาราง คอลัมน์ WBS และตารางสรุปของช่วงเวลานั้น
 // ช่องเวลา (วัน/สัปดาห์/เดือน/ปี) เลือกในหน้าต่างพิมพ์ ค่าเริ่มต้นตามที่ดูบนจอ
@@ -166,9 +167,16 @@ export function print_gantt(model, options) {
 		pages = layout.paginate(content_w, content_h);
 		if (!pages) return;
 	} else {
-		model = fit_model(model, content_w, content_h);
+		const fit = fit_model(model, content_w, content_h);
+		model = fit.model;
 		layout = new Layout(model);
-		pages = [{ rows: [0, model.rows.length], days: [model.range.start, model.range.end] }];
+		pages = [
+			{
+				rows: [0, model.rows.length],
+				days: [model.range.start, model.range.end],
+				band_h: fit.band_h,
+			},
+		];
 	}
 
 	const html = page_html(
@@ -183,14 +191,19 @@ export function print_gantt(model, options) {
 	print_html(html);
 }
 
-// พอดี 1 หน้า: เลือกความกว้างต่อวันให้สัดส่วนภาพเท่ากับกระดาษ (ภาพเต็มหน้า)
+// พอดี 1 หน้า: ย่อ (scale) เท่าที่แถวต้องใช้ให้ลงความสูงหน้า ไม่ขยายเกินขนาดพิมพ์ปกติ
+// ความกว้างที่เหลือจากคอลัมน์เป็นของ timeline ทั้งหมด และแถบงานยืดลงเต็มหน้า (S-Curve ได้ความสูงเต็ม)
 function fit_model(model, content_w, content_h) {
 	const grid_width = model.columns.reduce((sum, c) => sum + c.width, 0);
-	const height =
-		HEADER + Math.max(model.rows.length, 1) * ROW + model.summary_rows.length * SUMMARY_ROW;
+	const summary_h = model.summary_rows.length * SUMMARY_ROW;
+	const height = HEADER + Math.max(model.rows.length, 1) * ROW + summary_h;
+	const scale = Math.min(content_h / height, 1);
 	const days = model.range.end - model.range.start;
-	const ppd = Math.max(((content_w / content_h) * height - grid_width) / days, 0.3);
-	return { ...model, ppd };
+	const ppd = Math.max((content_w / scale - grid_width) / days, 0.3);
+	return {
+		model: { ...model, ppd },
+		band_h: content_h / scale - HEADER - summary_h,
+	};
 }
 
 function with_range(model, units) {
@@ -269,7 +282,7 @@ class Layout {
 		const slice_w = page.slice_w || (day_to - day_from) * m.ppd;
 		const gx = columns.reduce((sum, c) => sum + c.width, 0);
 		const clip = `tl${index}`;
-		const band_h = Math.max((row_to - row_from) * ROW, ROW);
+		const band_h = Math.max((row_to - row_from) * ROW, ROW, page.band_h || 0);
 		const body_y = HEADER;
 		const summary_y = body_y + band_h;
 		const width = gx + slice_w;

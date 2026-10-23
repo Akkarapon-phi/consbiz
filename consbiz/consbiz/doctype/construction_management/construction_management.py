@@ -25,6 +25,8 @@ TOLERANCE = 0.0001
 
 class ConstructionManagement(Document):
 	def validate(self):
+		if self.is_new() and self.boq and not self.tasks:
+			self.set_from_boq()
 		self.validate_single_active()
 		self.set_duration()
 		holidays = self.get_holidays() if self.use_working_days else set()
@@ -35,6 +37,14 @@ class ConstructionManagement(Document):
 		self.validate_distributions()
 		if not self.is_new():
 			apply_actual_totals(self, get_progress_entries(self.name))
+
+	def set_from_boq(self):
+		"""งานทั้งหมดจาก BOQ ค่าหัวเอกสารที่กรอกไว้แล้วไม่ทับ"""
+		plan = get_boq_plan(self.boq)
+		for key in ("project", "start_date", "holiday_list"):
+			if not self.get(key):
+				self.set(key, plan[key])
+		self.set("tasks", [{**task, "start_date": self.start_date} for task in plan["tasks"]])
 
 	def on_trash(self):
 		frappe.db.delete(PROGRESS_ENTRY, {"construction_management": self.name})
@@ -248,21 +258,27 @@ def validate_task_progress(name, tasks):
 
 @frappe.whitelist()
 def create_from_boq(boq):
+	doc = frappe.new_doc("Construction Management")
+	doc.boq = boq
+	doc.set_from_boq()
+	doc.insert()
+	return doc.name
+
+
+@frappe.whitelist()
+def get_boq_plan(boq):
+	"""ค่าตั้งต้นของแผนจาก BOQ: โครงการ วันเริ่ม ปฏิทินวันหยุด และงาน 1 แถวต่อ 1 แถว BOQ (ยังไม่มีวันเริ่มงาน)"""
 	boq_doc = frappe.get_doc("BOQ", boq)
 	boq_doc.check_permission("read")
 	if boq_doc.docstatus == 2:
 		frappe.throw(_("BOQ {0} ถูกยกเลิกแล้ว").format(boq))
 
-	start_date = boq_doc.date or nowdate()
-	doc = frappe.new_doc("Construction Management")
-	doc.boq = boq
-	doc.project = find_project(boq_doc.project)
-	doc.start_date = start_date
-	if boq_doc.company:
-		doc.holiday_list = frappe.get_cached_value("Company", boq_doc.company, "default_holiday_list")
-	for row in boq_doc.boq_details:
-		doc.append(
-			"tasks",
+	return {
+		"project": find_project(boq_doc.project),
+		"start_date": boq_doc.date or nowdate(),
+		"holiday_list": boq_doc.company
+		and frappe.get_cached_value("Company", boq_doc.company, "default_holiday_list"),
+		"tasks": [
 			{
 				"wbs": row.wbs,
 				"item_name": row.item_name,
@@ -271,12 +287,11 @@ def create_from_boq(boq):
 				"uom": row.uom,
 				"rate": flt(row.material_rate) + flt(row.labour_rate),
 				"amount": row.total_amount,
-				"start_date": start_date,
 				"duration": 1,
-			},
-		)
-	doc.insert()
-	return doc.name
+			}
+			for row in boq_doc.boq_details
+		],
+	}
 
 
 def find_project(value):
