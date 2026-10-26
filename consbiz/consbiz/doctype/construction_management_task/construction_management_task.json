@@ -27,7 +27,18 @@
   "actual_qty",
   "progress",
   "plan_distribution",
-  "baseline_distribution"
+  "baseline_distribution",
+  "baseline_weight",
+  "section_break_variation",
+  "contract_quantity",
+  "contract_amount",
+  "counted_amount",
+  "counted_from",
+  "column_break_variation",
+  "is_variation",
+  "variation_order",
+  "source_wbs",
+  "variation_item"
  ],
  "fields": [
   {
@@ -97,7 +108,8 @@
    "fieldtype": "Percent",
    "in_list_view": 1,
    "label": "Weight",
-   "read_only": 1
+   "read_only": 1,
+   "description": "มูลค่าที่นับ ÷ มูลค่าสัญญาปรับปรุง"
   },
   {
    "fieldname": "column_break_dates",
@@ -177,12 +189,86 @@
    "label": "Baseline Distribution",
    "no_copy": 1,
    "read_only": 1
+  },
+  {
+   "fieldname": "section_break_variation",
+   "fieldtype": "Section Break",
+   "label": "Contract / Variation"
+  },
+  {
+   "description": "ปริมาณตาม BOQ ก่อนหักงานลด",
+   "fieldname": "contract_quantity",
+   "fieldtype": "Float",
+   "label": "Contract Quantity",
+   "read_only": 1
+  },
+  {
+   "description": "มูลค่าตาม BOQ ก่อนหักงานลด",
+   "fieldname": "contract_amount",
+   "fieldtype": "Currency",
+   "label": "Contract Amount",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_variation",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "description": "แถวงานเพิ่มจาก Variation Order (ไม่นับใน % หลัก)",
+   "fieldname": "is_variation",
+   "fieldtype": "Check",
+   "label": "Is Variation",
+   "read_only": 1
+  },
+  {
+   "fieldname": "variation_order",
+   "fieldtype": "Link",
+   "label": "Variation Order",
+   "options": "Variation Order",
+   "read_only": 1
+  },
+  {
+   "description": "WBS ของงานเดิมที่เพิ่มปริมาณ (ว่าง = รายการใหม่)",
+   "fieldname": "source_wbs",
+   "fieldtype": "Data",
+   "label": "Source WBS",
+   "read_only": 1
+  },
+  {
+   "fieldname": "variation_item",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "label": "Variation Order Item",
+   "read_only": 1
+  },
+  {
+   "description": "มูลค่าที่นับในสัญญาปรับปรุง (หักงานลด/รวมงานเพิ่มที่ผู้ว่าจ้างอนุมัติแล้ว) ใช้คิดน้ำหนัก",
+   "fieldname": "counted_amount",
+   "fieldtype": "Currency",
+   "label": "Counted Amount",
+   "read_only": 1
+  },
+  {
+   "description": "งานเพิ่ม: วันที่ผู้ว่าจ้างอนุมัติ เริ่มนับใน % ความคืบหน้าตั้งแต่วันนี้ (ว่าง = ยังไม่นับ)",
+   "fieldname": "counted_from",
+   "fieldtype": "Date",
+   "label": "Counted From",
+   "read_only": 1
+  },
+  {
+   "fieldname": "baseline_weight",
+   "fieldtype": "Percent",
+   "hidden": 1,
+   "label": "Baseline Weight",
+   "no_copy": 1,
+   "read_only": 1
   }
  ],
  "grid_page_length": 50,
  "istable": 1,
  "links": [],
- "modified": "2026-10-23 18:00:00.000000",
+ "modified": "2026-10-27 10:00:00.000000",
  "modified_by": "Administrator",
  "module": "ConsBiz",
  "name": "Construction Management Task",

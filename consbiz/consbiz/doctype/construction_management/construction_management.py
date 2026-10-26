@@ -3,10 +3,15 @@
 
 # แผนงานก่อสร้างจาก BOQ: 1 แถว BOQ = 1 งาน
 # - indent มาจากจำนวนจุดใน WBS ("2" = 0, "2.1" = 1) แถวที่มีแถวลึกกว่าตามหลังคือกลุ่ม
-# - น้ำหนัก (%) = มูลค่างาน / มูลค่ารวมของงานย่อยทั้งหมด กลุ่มรวมค่าจากงานย่อย
+# - น้ำหนัก (%) = มูลค่าที่นับ (counted_amount) / มูลค่าสัญญาปรับปรุง กลุ่มรวมค่าจากงานย่อย
 # - วันที่ของกลุ่ม = วันเริ่มแรกสุดและวันจบหลังสุดของงานย่อย
 # - %แผนกระจายเท่าๆ กันทุกวันทำงาน หรือตาม plan_distribution ที่กำหนดเองรายช่วง (คำนวณในหน้า Gantt: schedule.js)
 # - ความคืบหน้าจริงเก็บเป็นรายวันใน Construction Progress Entry ส่วน actual_qty/progress ในตารางเป็นยอดรวม
+# - งานลด-งานเพิ่มมาจาก Variation Order ที่ Submit แล้ว (apply_variations):
+#   Submit แล้วงานลดลดปริมาณงานเดิม (DR ลงเกินไม่ได้) และงานเพิ่มเป็นแถวใต้กลุ่ม VO ท้ายตาราง (DR ลงได้)
+#   แต่นับในมูลค่าสัญญาและ % ความคืบหน้าเมื่อผู้ว่าจ้างอนุมัติแล้วเท่านั้น (นับตั้งแต่วันที่อนุมัติ counted_from)
+# - % ความคืบหน้า (actual_progress) = มูลค่างานที่ทำแล้ว / มูลค่าสัญญาปรับปรุง (Earned Value)
+#   contract_progress = % ตามสัญญาเดิม (ถ่วงด้วยมูลค่าตามสัญญาของงานเดิม ไม่รวมงานเพิ่ม) ไว้อ้างอิง
 # หน้า Gantt อยู่ที่ consbiz/consbiz/page/construction_gantt
 
 import datetime
@@ -18,6 +23,9 @@ from frappe.model.document import Document
 from frappe.utils import cint, flt, getdate, nowdate
 
 PROGRESS_ENTRY = "Construction Progress Entry"
+VARIATION_ORDER = "Variation Order"
+# WBS ของกลุ่มงานเพิ่มท้ายตาราง งานเพิ่มแต่ละแถวเป็น VO.1, VO.2, ...
+VARIATION_GROUP_WBS = "VO"
 DISTRIBUTION_UNITS = ("day", "week", "mweek", "month", "quarter")
 # เผื่อเศษทศนิยมตอนรวม % จากหลายวัน
 TOLERANCE = 0.0001
@@ -28,6 +36,7 @@ class ConstructionManagement(Document):
 		if self.is_new() and self.boq and not self.tasks:
 			self.set_from_boq()
 		self.validate_single_active()
+		self.apply_variations()
 		self.set_duration()
 		holidays = self.get_holidays() if self.use_working_days else set()
 		self.set_structure()
@@ -46,6 +55,22 @@ class ConstructionManagement(Document):
 				self.set(key, plan[key])
 		self.set("tasks", [{**task, "start_date": self.start_date} for task in plan["tasks"]])
 
+	def on_update(self):
+		# ปริมาณเปลี่ยน (งานลด/แก้ปริมาณงานเพิ่ม) % ของรายการความคืบหน้าเดิมต้องคิดใหม่จาก qty
+		before = self.get_doc_before_save()
+		if not before:
+			return
+		old = {row.name: flt(row.quantity) for row in before.tasks}
+		changed = [
+			row.name
+			for row in self.tasks
+			if not row.is_group and flt(row.quantity) > 0 and old.get(row.name, flt(row.quantity)) != flt(row.quantity)
+		]
+		if changed:
+			refresh_entry_percents(self, changed)
+			validate_task_progress(self.name, changed)
+			update_actual_progress(self.name)
+
 	def on_trash(self):
 		frappe.db.delete(PROGRESS_ENTRY, {"construction_management": self.name})
 
@@ -62,6 +87,94 @@ class ConstructionManagement(Document):
 					self.boq, frappe.utils.get_link_to_form("Construction Management", other)
 				)
 			)
+
+	def apply_variations(self):
+		"""ปริมาณ/มูลค่าของงานเดิม = ตามสัญญา - งานลด และแถวงานเพิ่มใต้กลุ่ม VO ท้ายตาราง
+		ตาม Variation Order ที่ Submit แล้ว (เรียกซ้ำได้ ผลเหมือนเดิม)"""
+		items = [] if self.is_new() else get_variation_items(self.name)
+		omitted, approved_omitted = {}, {}
+		for item in items:
+			item.approved = item.employer_status == "Approved"
+			if item.variation_type == "Omission":
+				omitted[item.task] = omitted.get(item.task, 0) + flt(item.qty)
+				if item.approved:
+					approved_omitted[item.task] = approved_omitted.get(item.task, 0) + flt(item.qty)
+
+		main = [row for row in self.tasks if not row.is_variation]
+		for row in main:
+			if row.is_group:
+				continue
+			# แผนเดิมก่อนมีงานลด: ค่าปัจจุบันคือค่าตามสัญญา
+			if not flt(row.contract_quantity) and not flt(row.contract_amount):
+				row.contract_quantity, row.contract_amount = flt(row.quantity), flt(row.amount)
+			cut = omitted.get(row.name, 0)
+			row.quantity = flt(row.contract_quantity) - cut
+			row.amount = flt(row.contract_amount) - cut * flt(row.rate)
+			row.counted_amount = flt(row.contract_amount) - approved_omitted.get(row.name, 0) * flt(row.rate)
+
+		current = {row.variation_item: row for row in self.tasks if row.is_variation and row.variation_item}
+		group = next((row for row in self.tasks if row.is_variation and not row.variation_item), None)
+		leaves = []
+		for item in items:
+			if item.variation_type != "Addition" or not item.variation_wbs:
+				continue
+			values = {
+				"wbs": item.variation_wbs,
+				"item_name": _("(งานเพิ่ม) {0}").format(item.item_name),
+				"is_variation": 1,
+				"variation_order": item.parent,
+				"variation_item": item.name,
+				"source_wbs": item.wbs,
+				"quantity": flt(item.qty),
+				"uom": item.uom,
+				"rate": flt(item.rate),
+				"amount": flt(item.amount),
+				"contract_quantity": 0,
+				"contract_amount": 0,
+				"counted_amount": flt(item.amount) if item.approved else 0,
+				"counted_from": item.employer_approved_on if item.approved else None,
+			}
+			row = current.pop(item.name, None)
+			if row:
+				row.update(values)
+			else:
+				row = self.append("tasks", values)
+			leaves.append(row)
+
+		# แถวงานเพิ่มที่จะหายไป (Variation Order ถูกยกเลิก หรือลบแถวเองในฟอร์ม) ต้องยังไม่มีความคืบหน้า
+		removed = set(
+			frappe.get_all(
+				"Construction Management Task",
+				filters={"parent": self.name, "parenttype": self.doctype, "is_variation": 1},
+				pluck="name",
+			)
+		) - {row.name for row in leaves}
+		if removed and frappe.db.exists(PROGRESS_ENTRY, {"construction_management": self.name, "task": ("in", list(removed))}):
+			frappe.throw(_("งานเพิ่มที่มีความคืบหน้าแล้ว ลบออกจากแผนหรือยกเลิก Variation Order ไม่ได้"))
+
+		ordered = [row for row in main]
+		if leaves:
+			group = group or self.append("tasks", {})
+			group.update(
+				{
+					"wbs": VARIATION_GROUP_WBS,
+					"item_name": _("งานเพิ่ม-ลด (Variation Order)"),
+					"is_variation": 1,
+					"variation_order": None,
+					"variation_item": None,
+				}
+			)
+			leaves.sort(key=lambda row: cint(row.wbs.rsplit(".", 1)[-1]))
+			ordered += [group, *leaves]
+		self.tasks = ordered
+		for idx, row in enumerate(self.tasks, 1):
+			row.idx = idx
+
+		self.variation_amount = sum(
+			flt(item.amount) * (-1 if item.variation_type == "Omission" else 1)
+			for item in items
+			if item.approved
+		)
 
 	def set_duration(self):
 		"""ระยะเวลาสัญญา (วัน) นับรวมวันแรก"""
@@ -121,10 +234,13 @@ class ConstructionManagement(Document):
 			row.duration = count_working_days(row.start_date, row.end_date, holidays) if row.start_date else 0
 
 	def set_weights(self):
+		"""total_amount = มูลค่าตามสัญญาเดิม, revised_amount = รวมงานเพิ่ม-ลดที่ผู้ว่าจ้างอนุมัติแล้ว
+		น้ำหนัก = มูลค่าที่นับของงาน / มูลค่าสัญญาปรับปรุง (งานเพิ่มที่ยังไม่อนุมัติ = 0)"""
 		leaves = [r for r in self.tasks if not r.is_group]
-		self.total_amount = sum(flt(r.amount) for r in leaves)
+		self.total_amount = sum(flt(r.contract_amount) for r in leaves if not r.is_variation)
+		self.revised_amount = flt(self.total_amount) + flt(self.variation_amount)
 		for row in leaves:
-			row.weight = flt(row.amount) / self.total_amount * 100 if self.total_amount else 0
+			row.weight = flt(row.counted_amount) / self.revised_amount * 100 if self.revised_amount else 0
 		for i, row in enumerate(self.tasks):
 			if row.is_group:
 				row.weight = sum(flt(r.weight) for r in self.get_descendants(i) if not r.is_group)
@@ -195,6 +311,41 @@ def add_working_days(start_date, duration, holidays):
 		day += datetime.timedelta(days=1)
 
 
+def get_variation_items(name):
+	"""รายการของ Variation Order ที่ Submit แล้วของแผนงาน เรียงตามวันที่เอกสาร"""
+	order = frappe.qb.DocType(VARIATION_ORDER)
+	item = frappe.qb.DocType("Variation Order Item")
+	return (
+		frappe.qb.from_(item)
+		.join(order)
+		.on(item.parent == order.name)
+		.select(
+			item.name,
+			item.parent,
+			order.employer_status,
+			order.employer_approved_on,
+			item.variation_type,
+			item.task,
+			item.wbs,
+			item.item_name,
+			item.uom,
+			item.qty,
+			item.rate,
+			item.amount,
+			item.variation_wbs,
+		)
+		.where(
+			(order.construction_management == name)
+			& (order.docstatus == 1)
+			& (item.parenttype == VARIATION_ORDER)
+		)
+		.orderby(order.date)
+		.orderby(order.name)
+		.orderby(item.idx)
+		.run(as_dict=True)
+	)
+
+
 # ---------- ความคืบหน้าจริง ----------
 
 
@@ -223,11 +374,43 @@ def apply_actual_totals(doc, entries):
 			row.progress = min(max(percent.get(row.name, 0), 0), 100)
 	for i, row in enumerate(doc.tasks):
 		if row.is_group:
-			leaves = [r for r in doc.get_descendants(i) if not r.is_group]
-			weight = sum(flt(r.weight) for r in leaves)
 			row.actual_qty = 0
-			row.progress = sum(flt(r.weight) * r.progress for r in leaves) / weight if weight else 0
-	doc.actual_progress = sum(flt(r.weight) * r.progress / 100 for r in doc.tasks if not r.is_group)
+			row.progress = weighted_progress([r for r in doc.get_descendants(i) if not r.is_group])
+	leaves = [r for r in doc.tasks if not r.is_group]
+	# มูลค่างานที่ทำแล้ว (งานเพิ่มนับเมื่อผู้ว่าจ้างอนุมัติแล้ว) / มูลค่าสัญญาปรับปรุง
+	earned = sum(flt(r.amount) * r.progress / 100 for r in leaves if is_counted(r))
+	revised = flt(doc.revised_amount) or flt(doc.total_amount)
+	doc.actual_progress = earned / revised * 100 if revised else 0
+	contract = sum(flt(r.contract_amount) for r in leaves if not r.is_variation)
+	doc.contract_progress = (
+		sum(flt(r.contract_amount) * r.progress for r in leaves if not r.is_variation) / contract
+		if contract
+		else 0
+	)
+
+
+def is_counted(row):
+	"""งานเดิมนับเสมอ งานเพิ่มนับเมื่อผู้ว่าจ้างอนุมัติแล้ว (ต้องตรงกับ is_counted ใน schedule.js)"""
+	return not row.is_variation or bool(row.counted_from)
+
+
+def weighted_progress(leaves):
+	"""% เฉลี่ยถ่วงน้ำหนักของงานย่อย กลุ่มงานเพิ่มที่ยังไม่อนุมัติ (น้ำหนัก 0) ถ่วงด้วยมูลค่าแทน"""
+	key = "weight" if sum(flt(r.weight) for r in leaves) else "amount"
+	total = sum(flt(r.get(key)) for r in leaves)
+	return sum(flt(r.get(key)) * flt(r.progress) for r in leaves) / total if total else 0
+
+
+def refresh_entry_percents(doc, tasks):
+	"""% ของรายการความคืบหน้า = qty / ปริมาณปัจจุบันของงาน (เมื่อปริมาณงานเปลี่ยนจากงานลด-งานเพิ่ม)"""
+	entry = frappe.qb.DocType(PROGRESS_ENTRY)
+	quantities = {row.name: flt(row.quantity) for row in doc.tasks}
+	for task in tasks:
+		(
+			frappe.qb.update(entry)
+			.set(entry.percent, entry.qty * (100 / quantities[task]))
+			.where((entry.construction_management == doc.name) & (entry.task == task))
+		).run()
 
 
 def update_actual_progress(name):
@@ -236,7 +419,10 @@ def update_actual_progress(name):
 	apply_actual_totals(doc, get_progress_entries(name))
 	for row in doc.tasks:
 		row.db_set({"actual_qty": row.actual_qty, "progress": row.progress}, update_modified=False)
-	doc.db_set("actual_progress", doc.actual_progress, update_modified=False)
+	doc.db_set(
+		{"actual_progress": doc.actual_progress, "contract_progress": doc.contract_progress},
+		update_modified=False,
+	)
 
 
 def validate_task_progress(name, tasks):
@@ -327,6 +513,9 @@ def get_schedule_data(name):
 		"progress",
 		"plan_distribution",
 		"baseline_distribution",
+		"baseline_weight",
+		"is_variation",
+		"counted_from",
 	)
 	return {
 		"name": doc.name,
@@ -342,17 +531,49 @@ def get_schedule_data(name):
 		"supervisor": doc.supervisor,
 		"total_amount": doc.total_amount,
 		"actual_progress": doc.actual_progress,
+		"variation_amount": doc.variation_amount,
+		"revised_amount": doc.revised_amount,
+		"contract_progress": doc.contract_progress,
+		"variation_steps": get_variation_steps(doc.name),
 		"baseline_date": doc.baseline_date,
 		"use_working_days": doc.use_working_days,
 		"holiday_list": doc.holiday_list,
 		"week_by_month": doc.week_by_month,
 		"modified": str(doc.modified),
+		"version": schedule_version(doc.name),
 		"can_write": doc.has_permission("write"),
 		"tasks": [{f: row.get(f) for f in fields} for row in doc.tasks],
 		"progress_entries": get_progress_entries(doc.name),
 		# ส่งวันหยุดเสมอเพื่อแรเงาใน timeline แม้จะนับวันแบบปฏิทิน
 		"holidays": get_holiday_dates(doc.holiday_list),
 	}
+
+
+def get_variation_steps(name):
+	"""มูลค่าสัญญาที่เปลี่ยน ณ วันที่ผู้ว่าจ้างอนุมัติ Variation Order แต่ละฉบับ (ตัวหารของ S-Curve จริง)"""
+	return frappe.get_all(
+		VARIATION_ORDER,
+		filters={"construction_management": name, "docstatus": 1, "employer_status": "Approved"},
+		fields=["employer_approved_on as date", "net_amount as amount"],
+		order_by="employer_approved_on asc",
+	)
+
+
+@frappe.whitelist()
+def get_schedule_version(name):
+	"""ค่าที่เปลี่ยนเมื่อแผนงานหรือความคืบหน้าถูกแก้จากที่อื่น หน้า Gantt ใช้ตรวจว่าต้องโหลดใหม่ไหม"""
+	frappe.get_doc("Construction Management", name).check_permission("read")
+	return schedule_version(name)
+
+
+def schedule_version(name):
+	entry = frappe.qb.DocType(PROGRESS_ENTRY)
+	count, last = (
+		frappe.qb.from_(entry)
+		.select(frappe.query_builder.functions.Count("*"), frappe.query_builder.functions.Max(entry.modified))
+		.where(entry.construction_management == name)
+	).run()[0]
+	return f"{frappe.db.get_value('Construction Management', name, 'modified')}|{count}|{last}"
 
 
 def get_doc_for_update(name, modified):
@@ -430,6 +651,7 @@ def set_baseline(name, modified):
 		row.baseline_start_date = row.start_date
 		row.baseline_end_date = row.end_date
 		row.baseline_distribution = row.plan_distribution
+		row.baseline_weight = row.weight
 	doc.baseline_date = nowdate()
 	doc.save()
 	return get_schedule_data(name)

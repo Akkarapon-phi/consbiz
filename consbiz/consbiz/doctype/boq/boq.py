@@ -7,6 +7,7 @@ from frappe.utils import flt
 
 class BOQ(Document):
 	def validate(self):
+		assign_wbs(self.boq_details)
 		self.calculate_totals()
 
 	def calculate_totals(self):
@@ -16,6 +17,21 @@ class BOQ(Document):
 			self.total_material_cost += row.material_amount
 			self.total_labour_cost += row.labour_amount
 			self.grand_total += row.total_amount
+
+
+def assign_wbs(rows):
+	"""รัน WBS ใหม่ตามลำดับแถว โดยคงระดับ (จำนวนส่วนใน WBS) ของแต่ละแถวไว้
+	แถวที่ไม่มี WBS อยู่ระดับเดียวกับแถวก่อนหน้า และลึกกว่าแถวก่อนหน้าได้ไม่เกิน 1 ระดับ
+	ต้องตรงกับ renumber_wbs() ใน boq.js"""
+	counters = []
+	for row in rows:
+		level = len([part for part in (row.wbs or "").split(".") if part.strip()])
+		level = max(1, min(level or len(counters) or 1, len(counters) + 1))
+		counters = counters[:level]
+		if len(counters) < level:
+			counters.append(0)
+		counters[level - 1] += 1
+		row.wbs = ".".join(str(n) for n in counters)
 
 
 def calculate_row(row):

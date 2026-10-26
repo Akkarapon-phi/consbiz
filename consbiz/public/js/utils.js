@@ -129,3 +129,51 @@ consbiz.render_price_history = function (wrapper, item_code) {
             });
         });
 };
+
+//================================================================
+// ปริมาณที่กรอกตามคงเหลือที่แสดง (Daily Report, Daily Request)
+//================================================================
+
+// คงเหลือจริง 0.5488 แสดงเป็น 0.55 กรอกตามที่เห็นแล้วเกินไม่ถึงครึ่งหน่วยของทศนิยมที่แสดง = ทำครบพอดี
+// ปรับเป็นคงเหลือจริง (ต้องตรงกับ fit_to_remaining ใน daily_report.py)
+consbiz.fit_to_remaining = function (row, source) {
+    const field = row.boq_qty > 0 ? "qty" : "percent";
+    if (field !== source || !row[field]) return;
+    const total = field === "qty" ? row.boq_qty : 100;
+    const previous = (field === "qty" ? row.previous_qty : row.previous_percent) || 0;
+    const over = previous + row[field] - total;
+    if (over > 0 && over < 0.5 / Math.pow(10, cint(precision(field, row)) || 3)) {
+        row[field] = total - previous;
+    }
+};
+
+//================================================================
+// Manpower / Equipment ตั้งต้น (Daily Report, Daily Request)
+//================================================================
+
+// เอกสารใหม่: ใส่รายชื่อตั้งต้นให้กรอกแค่จำนวน (รายชื่อจากเอกสารล่าสุดของแผนงานเดียวกัน + รายการมาตรฐาน)
+// เปลี่ยนแผนงานแล้วโหลดใหม่ได้ตราบที่ยังไม่กรอกจำนวน แถวที่ไม่กรอกจำนวนถูกลบตอนบันทึก
+consbiz.fill_default_resources = function (frm) {
+    if (!frm.is_new()) return;
+    const untouched = (field) => !(frm.doc[field] || []).some((row) => row.qty || row.hours);
+    const fill_labour = untouched("labour");
+    const fill_equipment = untouched("equipment");
+    if (!fill_labour && !fill_equipment) return;
+    frappe
+        .call("consbiz.consbiz.doctype.daily_report.daily_report.get_default_resources", {
+            doctype: frm.doctype,
+            construction_management: frm.doc.construction_management,
+        })
+        .then(({ message }) => {
+            if (fill_labour) {
+                frm.clear_table("labour");
+                message.labour.forEach((role) => frm.add_child("labour", { role }));
+                frm.refresh_field("labour");
+            }
+            if (fill_equipment) {
+                frm.clear_table("equipment");
+                message.equipment.forEach((equipment) => frm.add_child("equipment", { equipment }));
+                frm.refresh_field("equipment");
+            }
+        });
+};

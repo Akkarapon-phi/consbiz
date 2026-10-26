@@ -1,0 +1,306 @@
+{
+ "actions": [],
+ "autoname": "naming_series:",
+ "creation": "2026-10-26 23:30:00.000000",
+ "description": "งานลด-งานเพิ่มของแผนงาน Submit = มีผลกับแผนงาน งานเพิ่มเป็นแถวใต้กลุ่ม VO ท้ายตาราง (ไม่นับใน % หลัก) งานลดลดปริมาณงานเดิม",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "section_break_info",
+  "naming_series",
+  "construction_management",
+  "project",
+  "company",
+  "title",
+  "reference_no",
+  "column_break_main",
+  "date",
+  "employer_status",
+  "employer_approved_on",
+  "is_provisional",
+  "extension_days",
+  "amended_from",
+  "section_break_items",
+  "items",
+  "section_break_totals",
+  "addition_amount",
+  "omission_amount",
+  "net_amount",
+  "column_break_totals",
+  "contract_amount",
+  "previous_variation_amount",
+  "revised_amount",
+  "section_break_reason",
+  "reason",
+  "column_break_reason",
+  "remarks"
+ ],
+ "fields": [
+  {
+   "fieldname": "section_break_info",
+   "fieldtype": "Section Break"
+  },
+  {
+   "default": "VO-.YYYY.MM.####",
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "hidden": 1,
+   "label": "Series",
+   "options": "VO-.YYYY.MM.####",
+   "print_hide": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "construction_management",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Construction Management",
+   "options": "Construction Management",
+   "reqd": 1
+  },
+  {
+   "fetch_from": "construction_management.project",
+   "fieldname": "project",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Project",
+   "options": "Project",
+   "read_only": 1
+  },
+  {
+   "fetch_from": "construction_management.company",
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "label": "Company",
+   "options": "Company",
+   "read_only": 1
+  },
+  {
+   "description": "เช่น เพิ่มรางระบายน้ำด้านทิศเหนือ",
+   "fieldname": "title",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Subject",
+   "reqd": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "description": "เลขที่หนังสือหรือคำสั่งเปลี่ยนแปลงงานของผู้ว่าจ้าง",
+   "fieldname": "reference_no",
+   "fieldtype": "Data",
+   "label": "Reference No"
+  },
+  {
+   "fieldname": "column_break_main",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "Today",
+   "fieldname": "date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Date",
+   "reqd": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "default": "Pending",
+   "description": "Submit = มีผลกับแผนงาน (หน้างานลง Daily Report ได้) นับในมูลค่าสัญญาและ % ความคืบหน้าเมื่อเป็น Approved แก้ได้หลัง Submit",
+   "fieldname": "employer_status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Employer Approval",
+   "no_copy": 1,
+   "options": "Pending\nApproved\nRejected"
+  },
+  {
+   "allow_on_submit": 1,
+   "depends_on": "eval:doc.employer_status!='Pending'",
+   "fieldname": "employer_approved_on",
+   "fieldtype": "Date",
+   "label": "Employer Approval Date",
+   "no_copy": 1,
+   "description": "เริ่มนับใน % ความคืบหน้าตั้งแต่วันนี้ ว่างไว้ = วันที่เปลี่ยนเป็น Approved"
+  },
+  {
+   "allow_on_submit": 1,
+   "default": "0",
+   "description": "ปริมาณยังเป็นประมาณการ แก้ Qty/Rate ได้หลัง Submit จนกว่าจะได้ตัวเลขจริง",
+   "fieldname": "is_provisional",
+   "fieldtype": "Check",
+   "label": "Provisional Quantities"
+  },
+  {
+   "allow_on_submit": 1,
+   "description": "อ้างอิงเท่านั้น การขยายเวลาทำเป็นเอกสารแยก",
+   "fieldname": "extension_days",
+   "fieldtype": "Int",
+   "label": "Extension Requested (Days)"
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "Variation Order",
+   "print_hide": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_items",
+   "fieldtype": "Section Break",
+   "hide_border": 1,
+   "label": "Items"
+  },
+  {
+   "fieldname": "items",
+   "fieldtype": "Table",
+   "label": "Items",
+   "options": "Variation Order Item",
+   "reqd": 1
+  },
+  {
+   "fieldname": "section_break_totals",
+   "fieldtype": "Section Break"
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "addition_amount",
+   "fieldtype": "Currency",
+   "label": "Addition Amount",
+   "options": "Company:company:default_currency",
+   "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "omission_amount",
+   "fieldtype": "Currency",
+   "label": "Omission Amount",
+   "options": "Company:company:default_currency",
+   "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "description": "งานเพิ่ม - งานลด ของเอกสารนี้",
+   "fieldname": "net_amount",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Net Amount",
+   "options": "Company:company:default_currency",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_totals",
+   "fieldtype": "Column Break"
+  },
+  {
+   "allow_on_submit": 1,
+   "description": "มูลค่าตามสัญญาของแผนงาน (ไม่รวมงานเพิ่ม-ลด)",
+   "fieldname": "contract_amount",
+   "fieldtype": "Currency",
+   "label": "Original Contract Amount",
+   "options": "Company:company:default_currency",
+   "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "description": "งานเพิ่ม-ลดสุทธิของ Variation Order ฉบับอื่นที่ผู้ว่าจ้างอนุมัติแล้ว",
+   "fieldname": "previous_variation_amount",
+   "fieldtype": "Currency",
+   "label": "Previous Variations",
+   "options": "Company:company:default_currency",
+   "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "revised_amount",
+   "fieldtype": "Currency",
+   "label": "Revised Contract Amount",
+   "options": "Company:company:default_currency",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_reason",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "reason",
+   "fieldtype": "Small Text",
+   "label": "Reason"
+  },
+  {
+   "fieldname": "column_break_reason",
+   "fieldtype": "Column Break"
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "remarks",
+   "fieldtype": "Small Text",
+   "label": "Remarks"
+  }
+ ],
+ "grid_page_length": 50,
+ "is_submittable": 1,
+ "links": [],
+ "modified": "2026-10-27 10:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "ConsBiz",
+ "name": "Variation Order",
+ "naming_rule": "By \"Naming Series\" field",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "amend": 1,
+   "cancel": 1,
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  },
+  {
+   "amend": 1,
+   "cancel": 1,
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Projects Manager",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Projects User",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "search_fields": "title,construction_management",
+ "show_title_field_in_link": 0,
+ "sort_field": "date",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "title",
+ "track_changes": 1
+}

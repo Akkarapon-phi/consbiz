@@ -42,6 +42,21 @@ class IntegrationTestBOQ(IntegrationTestCase):
 		self.assertEqual(doc.total_labour_cost, 60)
 		self.assertEqual(doc.grand_total, 275)
 
+	def test_auto_wbs(self):
+		doc = frappe.new_doc("BOQ")
+		for wbs in ["1", "1.1", "1.1.1", "1.1.1.1", "", "1.5", "7", "3.3", "", "2.9.9.9"]:
+			doc.append("boq_details", {"wbs": wbs})
+		doc.run_method("validate")
+
+		# คงระดับไว้, แถวว่างใช้ระดับแถวก่อนหน้า, ลึกเกินแถวก่อนหน้า 1 ระดับถูกจำกัด
+		self.assertEqual(
+			[row.wbs for row in doc.boq_details],
+			["1", "1.1", "1.1.1", "1.1.1.1", "1.1.1.2", "1.2", "2", "2.1", "2.2", "2.2.1"],
+		)
+		# รันซ้ำได้ผลเดิม และ WBS ไม่ซ้ำกัน
+		doc.run_method("validate")
+		self.assertEqual(len({row.wbs for row in doc.boq_details}), len(doc.boq_details))
+
 	def test_parse_rows(self):
 		item = self.make_item(item_name="คอนกรีต 240 ksc", material_rate=2000, labour_rate=300)
 		rows = [

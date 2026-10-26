@@ -1,0 +1,178 @@
+{#-
+	งานลด-งานเพิ่ม (Variation Order)
+	- โครงหน้าเหมือน Print Format "Daily Request": หัว/ท้ายกระดาษอยู่ใน <thead>/<tfoot> ของ .pf-page
+	- ตารางแยกงานเพิ่ม / งานลด แล้วสรุปมูลค่าสัญญา: ตามสัญญา + งานเพิ่ม-ลดฉบับก่อน + ฉบับนี้ = สัญญาปรับปรุง
+	- ช่องลงนาม: ผู้รับจ้าง ผู้ควบคุมงาน ผู้ว่าจ้าง (ชื่อจากแผนงาน Construction Management)
+-#}
+{%- set plan = frappe.db.get_value("Construction Management", doc.construction_management, ["employer", "contractor", "supervisor", "contract_no"], as_dict=True) or {} -%}
+{%- set project_name = frappe.db.get_value("Project", doc.project, "project_name") if doc.project else "" -%}
+{%- set money = "{:,.2f}" -%}
+{%- set ns = namespace(no=1) -%}
+{%- set sections = [
+	("Addition", "งานเพิ่ม", doc.addition_amount),
+	("Omission", "งานลด", doc.omission_amount),
+] -%}
+
+{% include "consbiz/templates/print/print_style.html" %}
+
+<div class="pf">
+	<table class="pf-page">
+		<thead>
+			<tr>
+				<td>
+					<div class="pf-title">
+						<h1>งานลด-งานเพิ่ม (Variation Order)</h1>
+						<div>{{ project_name or "" }}</div>
+					</div>
+				</td>
+			</tr>
+		</thead>
+
+		<tfoot>
+			<tr>
+				<td>
+					<div class="pf-footer">
+						<div>พิมพ์เมื่อ {{ thai_date(frappe.utils.nowdate()) }} {{ frappe.utils.nowtime()[:5] }} น.</div>
+						<div class="text-right">{{ doc.name }}</div>
+					</div>
+				</td>
+			</tr>
+		</tfoot>
+
+		<tbody>
+			<tr>
+				<td>
+					{#- 1 ข้อมูลเอกสาร -#}
+					<div class="pf-section">
+						<span><span class="no">1</span><span class="name">ข้อมูลเอกสาร</span></span>
+						<span class="rule"></span>
+					</div>
+					<table class="pf-grid pf-info">
+						<tbody>
+							<tr>
+								<td class="pf-k">เลขที่</td>
+								<td class="pf-v">{{ doc.name }}</td>
+								<td class="pf-k">วันที่</td>
+								<td class="pf-v">{{ thai_date(doc.date) }}</td>
+							</tr>
+							<tr>
+								<td class="pf-k">เรื่อง</td>
+								<td class="pf-v">{{ doc.title }}</td>
+								<td class="pf-k">อ้างอิง</td>
+								<td class="pf-v">{{ doc.reference_no or "-" }}</td>
+							</tr>
+							<tr>
+								<td class="pf-k">เลขที่สัญญา</td>
+								<td class="pf-v">{{ plan.contract_no or "-" }}</td>
+								<td class="pf-k">ขอขยายเวลา</td>
+								<td class="pf-v">{{ (doc.extension_days ~ " วัน") if doc.extension_days else "-" }}</td>
+							</tr>
+						</tbody>
+					</table>
+					{%- if doc.reason %}
+					<div class="pf-note">
+						<b>เหตุผลการเปลี่ยนแปลง</b><br />{{ doc.reason | e | replace("\n", "<br />") }}
+					</div>
+					{%- endif %}
+
+					{#- งานเพิ่ม / งานลด (แสดงเฉพาะประเภทที่มีรายการ) -#}
+					{%- for type, label, total in sections %}
+					{%- set rows = doc.items | selectattr("variation_type", "equalto", type) | list %}
+					{%- if rows %}
+					{%- set ns.no = ns.no + 1 %}
+					<div class="pf-section">
+						<span><span class="no">{{ ns.no }}</span><span class="name">{{ label }}</span></span>
+						<span class="rule"></span>
+					</div>
+					<table class="pf-grid">
+						<thead>
+							<tr>
+								<th class="text-center" style="width: 6%">ลำดับ</th>
+								<th style="width: 38%">รายการ</th>
+								<th class="text-right" style="width: 12%">ปริมาณ</th>
+								<th class="text-center" style="width: 8%">หน่วย</th>
+								<th class="text-right" style="width: 13%">ราคาต่อหน่วย</th>
+								<th class="text-right" style="width: 13%">จำนวนเงิน</th>
+								<th style="width: 10%">หมายเหตุ</th>
+							</tr>
+						</thead>
+						<tbody>
+							{%- for row in rows %}
+							<tr>
+								<td class="text-center">{{ loop.index }}</td>
+								<td>
+									{%- if row.variation_wbs %}<strong>{{ row.variation_wbs }}</strong> {% endif -%}
+									{{ row.item_name }}
+									{%- if row.wbs %}<span class="path">งานเดิม WBS {{ row.wbs }}{% if row.contract_qty %} ตามสัญญา {{ frappe.format(row.contract_qty, {"fieldtype": "Float"}) }} {{ row.uom or "" }}{% endif %}</span>{% endif %}
+								</td>
+								<td class="text-right">{{ frappe.format(row.qty, {"fieldtype": "Float"}) if row.qty else "เหมา" }}</td>
+								<td class="text-center">{{ row.uom or "" }}</td>
+								<td class="text-right">{{ money.format(row.rate or 0) if row.qty else "" }}</td>
+								<td class="text-right">{{ money.format(row.amount or 0) }}</td>
+								<td>{{ row.remarks or "" }}</td>
+							</tr>
+							{%- endfor %}
+						</tbody>
+					</table>
+					<div class="pf-total">
+						<span>รวม{{ label }}</span>
+						<span class="text-right">{{ money.format(total or 0) }} บาท</span>
+					</div>
+					{%- endif %}
+					{%- endfor %}
+
+					{#- สรุปมูลค่าสัญญา -#}
+					<div class="pf-keep">
+					<div class="pf-section">
+						<span><span class="no">{{ ns.no + 1 }}</span><span class="name">สรุปมูลค่าสัญญา</span></span>
+						<span class="rule"></span>
+					</div>
+					<table class="pf-grid">
+						<tbody>
+							<tr>
+								<td>มูลค่าตามสัญญาเดิม</td>
+								<td class="text-right" style="width: 25%">{{ money.format(doc.contract_amount or 0) }}</td>
+							</tr>
+							<tr>
+								<td>งานเพิ่ม-ลดสุทธิฉบับก่อนหน้า</td>
+								<td class="text-right">{{ money.format(doc.previous_variation_amount or 0) }}</td>
+							</tr>
+							<tr>
+								<td>งานเพิ่ม {{ money.format(doc.addition_amount or 0) }} - งานลด {{ money.format(doc.omission_amount or 0) }} (ฉบับนี้)</td>
+								<td class="text-right">{{ money.format(doc.net_amount or 0) }}</td>
+							</tr>
+						</tbody>
+					</table>
+					<div class="pf-total">
+						<span>มูลค่าสัญญาหลังปรับปรุง</span>
+						<span class="text-right">{{ money.format(doc.revised_amount or 0) }} บาท</span>
+					</div>
+					{%- if doc.is_provisional %}
+					<div class="pf-note"><b>หมายเหตุ</b> ปริมาณในเอกสารนี้เป็นประมาณการ จะปรับตามปริมาณที่ทำจริง</div>
+					{%- endif %}
+					{%- if doc.remarks %}
+					<div class="pf-note">
+						<b>หมายเหตุ</b><br />{{ doc.remarks | e | replace("\n", "<br />") }}
+					</div>
+					{%- endif %}
+					</div>
+
+					<table class="pf-sign pf-keep">
+						<tbody>
+							<tr>
+								{%- for name, role in [(plan.contractor, "ผู้รับจ้าง"), (plan.supervisor, "ผู้ควบคุมงาน"), (plan.employer, "ผู้ว่าจ้าง")] %}
+								<td>
+									<div class="line">ลงชื่อ ........................................</div>
+									<div>({{ name or "........................................" }})</div>
+									<div>{{ role }}</div>
+									<div class="muted">วันที่ ......../......../........</div>
+								</td>
+								{%- endfor %}
+							</tr>
+						</tbody>
+					</table>
+				</td>
+			</tr>
+		</tbody>
+	</table>
+</div>

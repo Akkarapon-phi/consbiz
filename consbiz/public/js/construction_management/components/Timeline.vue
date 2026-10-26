@@ -662,6 +662,17 @@ defineExpose({ body, scroll_to_day, viewport_width });
 							{{ text }}
 						</text>
 					</g>
+					<!-- เส้นแบ่งกลุ่ม Baseline / แผน / จริง -->
+					<template v-for="(row, i) in summaryRows" :key="'g' + row.key">
+						<line
+							v-if="row.group_start"
+							x1="0"
+							:x2="width"
+							:y1="i * summaryRowHeight + 1.5"
+							:y2="i * summaryRowHeight + 1.5"
+							class="cs-group-line"
+						/>
+					</template>
 				</svg>
 			</div>
 		</div>
@@ -834,6 +845,9 @@ defineExpose({ body, scroll_to_day, viewport_width });
 	z-index: 2;
 	display: block;
 	background: var(--subtle-fg);
+}
+.cs-group-line {
+	stroke: var(--gray-500);
 }
 .cs-summary-cell {
 	fill: var(--subtle-fg);

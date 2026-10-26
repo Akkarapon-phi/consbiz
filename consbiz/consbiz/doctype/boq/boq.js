@@ -6,6 +6,16 @@ const BOQ_EXCEL_METHOD = "consbiz.consbiz.doctype.boq.boq_excel";
 frappe.ui.form.on("BOQ", {
 	refresh(frm) {
 		add_excel_buttons(frm);
+		const grid = frm.fields_dict.boq_details.grid;
+		if (!frm.select_banner_bound) {
+			// Frappe เก็บสถานะการเลือกไว้ที่ row.__checked แล้วอัปเดตตอนคลิกในตาราง
+			// (ติ๊กแถว, ติ๊กทั้งหมด, ปุ่ม Delete) จึงรอให้ Frappe จัดการก่อนแล้วค่อยอ่าน
+			grid.wrapper.on("click touchend", () => setTimeout(() => update_select_banner(frm), 150));
+			frm.select_banner_bound = true;
+		}
+		setup_category_tools(frm);
+		update_select_banner(frm);
+
 		if (frm.is_new() || frm.doc.docstatus === 2) return;
 
 		frappe.db
@@ -40,6 +50,24 @@ frappe.ui.form.on("BOQ Item Detail", {
 		frappe.db
 			.get_value("BOQ Item", row.item_code, ["item_name", "uom", "item_group"])
 			.then(({ message }) => message && frappe.model.set_value(cdt, cdn, message));
+	},
+
+	// WBS รันอัตโนมัติทุกครั้งที่แถวเปลี่ยน พิมพ์ WBS เองได้เพื่อกำหนดระดับ (เช่น 1.1.1 = ระดับ 3)
+	wbs(frm) {
+		refresh_wbs(frm);
+	},
+
+	boq_details_add(frm) {
+		refresh_wbs(frm);
+	},
+
+	boq_details_move(frm) {
+		refresh_wbs(frm);
+	},
+
+	boq_details_remove(frm) {
+		refresh_wbs(frm);
+		update_select_banner(frm);
 	},
 });
 
@@ -276,6 +304,7 @@ function apply_boq_import(frm, { info, warnings }, items, mode) {
 			});
 			if (mode === "replace") frm.clear_table("boq_details");
 			rows.forEach((row) => frm.add_child("boq_details", row));
+			renumber_wbs(frm);
 			set_boq_totals(frm);
 			frm.refresh_field("boq_details");
 			frappe.show_alert({ message: __("นำเข้า {0} รายการ", [rows.length]), indicator: "green" });
@@ -290,5 +319,224 @@ function set_boq_totals(frm) {
 		total_material_cost: sum("material_amount"),
 		total_labour_cost: sum("labour_amount"),
 		grand_total: sum("total_amount"),
+	});
+}
+
+// ---------------------------------------------------------------------------
+// WBS อัตโนมัติ, หมวด และแถบลอยเมื่อเลือกแถว
+// ระดับของแถว = จำนวนส่วนใน WBS (1 = ระดับ 1, 1.1.1 = ระดับ 3) เลขรันใหม่ตามลำดับแถวเสมอ
+// โดยคงระดับไว้ ต้องตรงกับ assign_wbs() ใน boq.py
+// หัวข้องาน (หมวด) = แถวที่ไม่มี Item Code จำนวน และราคา (กฎเดียวกับ boq_excel.py)
+// field ที่ขึ้นต้น __ ไม่ถูกบันทึก: __level = ระดับที่ต้องการ (แถวใหม่/เลื่อนระดับ)
+// __boq_item = แถวว่างที่เพิ่มผ่าน "เพิ่มแถวในหมวด" ให้นับเป็นรายการ ไม่ใช่หมวด
+
+function is_category(row) {
+	if (row.__boq_item) return false;
+	return !(row.item_code || flt(row.quantity) || flt(row.material_rate) || flt(row.labour_rate));
+}
+
+function wbs_level(row) {
+	return row.__level || (row.wbs || "").split(".").filter((part) => part.trim()).length;
+}
+
+// แถวที่ยังไม่มีระดับ (แถวใหม่) อยู่ระดับเดียวกับแถวก่อนหน้า และลึกกว่าแถวก่อนหน้าได้ไม่เกิน 1 ระดับ
+function renumber_wbs(frm) {
+	let counters = [];
+	(frm.doc.boq_details || []).forEach((row) => {
+		const level = Math.max(1, Math.min(wbs_level(row) || counters.length || 1, counters.length + 1));
+		counters = counters.slice(0, level);
+		counters[level - 1] = (counters[level - 1] || 0) + 1;
+		row.wbs = counters.join(".");
+		delete row.__level;
+	});
+}
+
+function refresh_wbs(frm) {
+	renumber_wbs(frm);
+	frm.refresh_field("boq_details");
+}
+
+// แถวลูกทั้งหมดของ row (แถวถัดไปที่ระดับลึกกว่า) นับรวม row เอง
+function subtree(rows, row) {
+	const start = rows.indexOf(row);
+	const level = wbs_level(row);
+	let end = start + 1;
+	while (end < rows.length && wbs_level(rows[end]) > level) end++;
+	return rows.slice(start, end);
+}
+
+function category_label(row) {
+	const indent = "  ".repeat(Math.max(0, wbs_level(row) - 1));
+	return `${indent}${row.wbs || ""} ${row.item_name || __("(ไม่มีชื่อหมวด)")}`.trim();
+}
+
+function category_options(frm, exclude = new Set()) {
+	return (frm.doc.boq_details || [])
+		.filter((row) => is_category(row) && !exclude.has(row.name))
+		.map((row) => ({ label: category_label(row), value: row.name }));
+}
+
+function setup_category_tools(frm) {
+	const grid = frm.fields_dict.boq_details.grid;
+	// ฟอร์มเดียวถูกใช้ซ้ำกับทุกเอกสาร ซ่อนปุ่มก่อน แล้วแสดงเฉพาะตอนเป็น Draft
+	grid.clear_custom_buttons();
+	if (frm.doc.docstatus !== 0) return;
+
+	grid.add_custom_button(__("เพิ่มแถวในหมวด"), () => {
+		const options = category_options(frm);
+		if (!options.length) {
+			frappe.msgprint(
+				__("ยังไม่มีหมวด: เพิ่มแถวที่มีแค่ WBS และชื่อ (ไม่ใส่ Item Code จำนวน ราคา) เป็นหัวหมวดก่อน")
+			);
+			return;
+		}
+		pick_category(
+			__("เพิ่มแถวในหมวด"),
+			__("เพิ่ม"),
+			options,
+			[{ fieldname: "count", fieldtype: "Int", label: __("จำนวนแถว"), default: 1, reqd: 1 }],
+			({ category, count }) => {
+				if (count < 1 || count > 500) {
+					frappe.msgprint(__("จำนวนแถวต้องอยู่ระหว่าง 1 ถึง 500"));
+					return false;
+				}
+				const rows = Array.from({ length: count }, () =>
+					frm.add_child("boq_details", { __boq_item: 1 })
+				);
+				place_rows(frm, rows, category);
+			}
+		);
+	});
+}
+
+function pick_category(title, action_label, options, extra_fields, callback) {
+	const dialog = new frappe.ui.Dialog({
+		title,
+		fields: [
+			{
+				fieldname: "category",
+				fieldtype: "Select",
+				label: __("หมวด"),
+				options,
+				default: options[0].value,
+				reqd: 1,
+			},
+			...extra_fields,
+		],
+		primary_action_label: action_label,
+		primary_action(values) {
+			if (callback(values) !== false) dialog.hide();
+		},
+	});
+	dialog.show();
+}
+
+// ย้าย rows (พร้อมแถวลูก) ไปต่อท้ายหมวด category เป็นระดับใต้หมวดนั้น แล้วรันเลข WBS ใหม่
+function place_rows(frm, rows, category) {
+	const all = frm.doc.boq_details;
+	const target = all.find((row) => row.name === category);
+	const target_level = wbs_level(target);
+
+	// แถวใหม่ยังไม่มีระดับ ถือเป็นระดับเดียวกับรายการในหมวด
+	const moving = [];
+	rows.forEach((row) => {
+		if (moving.includes(row)) return;
+		const root_level = wbs_level(row) || target_level + 1;
+		const branch = row.wbs ? subtree(all, row) : [row];
+		branch.forEach((child) => {
+			child.__level = target_level + 1 + ((wbs_level(child) || root_level) - root_level);
+			moving.push(child);
+		});
+	});
+
+	const remaining = all.filter((row) => !moving.includes(row));
+	const insert_at = remaining.indexOf(target) + subtree(remaining, target).length;
+	remaining.splice(insert_at, 0, ...moving);
+	remaining.forEach((row, i) => (row.idx = i + 1));
+	frm.doc.boq_details = remaining;
+
+	refresh_wbs(frm);
+	frm.dirty();
+}
+
+// เลื่อนระดับแถวที่เลือก (พร้อมแถวลูก) step = 1 ย่อเข้า, -1 ดึงออก
+function shift_level(frm, step) {
+	const all = frm.doc.boq_details;
+	const shifting = new Set();
+	frm.fields_dict.boq_details.grid.get_selected_children().forEach((row) => {
+		subtree(all, row).forEach((child) => shifting.add(child));
+	});
+
+	// อ่านระดับเดิมทุกแถวก่อนแก้ แถวที่ไม่ได้เลือกคงระดับเดิม
+	const levels = new Map(all.map((row) => [row, wbs_level(row)]));
+	all.forEach((row) => {
+		row.__level = shifting.has(row) ? Math.max(1, levels.get(row) + step) : levels.get(row);
+	});
+
+	refresh_wbs(frm);
+	frm.dirty();
+}
+
+function clear_selection(frm) {
+	const grid = frm.fields_dict.boq_details.grid;
+	(frm.doc.boq_details || []).forEach((row) => (row.__checked = 0));
+	grid.wrapper.find(".grid-row-check").prop("checked", false);
+	grid.refresh();
+	update_select_banner(frm);
+}
+
+function update_select_banner(frm) {
+	const grid = frm.fields_dict.boq_details.grid;
+	const selected = frm.doc.docstatus === 0 ? grid.get_selected_children() : [];
+
+	if (!frm.select_banner) {
+		frm.select_banner = $(`
+			<div class="consbiz-select-banner hidden">
+				<span class="banner-count"></span>
+				<button class="btn btn-default btn-sm" data-action="outdent" title="${__("ดึงออก 1 ระดับ")}">
+					← ${__("ลดระดับ")}
+				</button>
+				<button class="btn btn-default btn-sm" data-action="indent" title="${__("ย่อเข้า 1 ระดับ")}">
+					${__("เพิ่มระดับ")} →
+				</button>
+				<button class="btn btn-default btn-sm" data-action="move">${__("ย้ายไปหมวด")}</button>
+				<button class="btn btn-danger btn-sm" data-action="delete">${__("ลบ")}</button>
+				<button class="btn btn-link btn-sm text-muted" data-action="clear" title="${__("ยกเลิกการเลือก")}">
+					${frappe.utils.icon("x", "sm")}
+				</button>
+			</div>
+		`).appendTo(frm.wrapper);
+
+		// เลื่อนระดับแล้วยังเลือกไว้ กดซ้ำได้
+		frm.select_banner.on("click", "[data-action=indent]", () => shift_level(frm, 1));
+		frm.select_banner.on("click", "[data-action=outdent]", () => shift_level(frm, -1));
+		frm.select_banner.on("click", "[data-action=move]", () => move_selected(frm));
+		frm.select_banner.on("click", "[data-action=delete]", () => {
+			grid.delete_rows();
+			setTimeout(() => update_select_banner(frm), 300);
+		});
+		frm.select_banner.on("click", "[data-action=clear]", () => clear_selection(frm));
+	}
+
+	frm.select_banner.toggleClass("hidden", !selected.length);
+	frm.select_banner.find(".banner-count").text(__("เลือก {0} แถว", [selected.length]));
+}
+
+function move_selected(frm) {
+	const all = frm.doc.boq_details;
+	const selected = frm.fields_dict.boq_details.grid.get_selected_children();
+	// ห้ามย้ายไปหมวดที่อยู่ในกลุ่มที่กำลังย้าย (ย้ายไปใต้ตัวเอง)
+	const moving = new Set();
+	selected.forEach((row) => subtree(all, row).forEach((child) => moving.add(child.name)));
+
+	const options = category_options(frm, moving);
+	if (!options.length) {
+		frappe.msgprint(__("ไม่มีหมวดให้ย้ายไป"));
+		return;
+	}
+
+	pick_category(__("ย้าย {0} แถวไปหมวด", [selected.length]), __("ย้าย"), options, [], ({ category }) => {
+		place_rows(frm, selected, category);
+		clear_selection(frm);
 	});
 }

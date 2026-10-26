@@ -116,7 +116,7 @@
     gap: 4px;
     padding: var(--padding-sm);
     border: 1px solid var(--border-color);
-    border-radius: var(--border-radius-md);
+    border-radius: var(--radius-md);
     background: var(--card-bg);
     color: var(--text-color);
     font-size: var(--text-xs);
@@ -144,7 +144,7 @@
 .consbiz-cut-length {
     margin-top: var(--padding-sm);
     padding: var(--padding-sm);
-    border-radius: var(--border-radius);
+    border-radius: var(--radius);
     background: var(--subtle-fg);
     text-align: center;
 }
@@ -178,7 +178,7 @@
     display: flex;
     height: 24px;
     border: 1px solid var(--border-color);
-    border-radius: var(--border-radius);
+    border-radius: var(--radius);
     overflow: hidden;
 }
 .consbiz-cut-piece,
@@ -208,4 +208,28 @@
     height: 10px;
     margin-right: 4px;
     border-radius: 2px;
+}
+
+/* 9. แถบลอยเมื่อเลือกแถวในตาราง BOQ (consbiz/consbiz/doctype/boq/boq.js) */
+.consbiz-select-banner {
+    position: fixed;
+    left: 50%;
+    bottom: var(--padding-xl);
+    z-index: 1020;
+    display: flex;
+    align-items: center;
+    gap: var(--padding-sm);
+    padding: var(--padding-sm) var(--padding-md);
+    transform: translateX(-50%);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    background: var(--card-bg);
+    box-shadow: var(--shadow-lg);
+    color: var(--text-color);
+    font-size: var(--text-base);
+    white-space: nowrap;
+}
+.consbiz-select-banner .banner-count {
+    padding-right: var(--padding-sm);
+    border-right: 1px solid var(--border-color);
 }
