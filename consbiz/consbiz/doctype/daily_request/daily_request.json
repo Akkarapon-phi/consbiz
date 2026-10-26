@@ -1,0 +1,355 @@
+{
+ "actions": [],
+ "autoname": "naming_series:",
+ "creation": "2026-10-26 14:00:00",
+ "description": "ขออนุมัติปฏิบัติงานประจำวันล่วงหน้า: วางแผนงานที่จะทำ กำลังคน และเครื่องจักร Submit = อนุมัติ",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "naming_series",
+  "construction_management",
+  "project",
+  "company",
+  "requested_by",
+  "approver",
+  "approver_name",
+  "column_break_main",
+  "date",
+  "start_time",
+  "end_time",
+  "status",
+  "hide_completed",
+  "amended_from",
+  "section_break_items",
+  "items",
+  "section_break_progress",
+  "current_progress",
+  "column_break_progress",
+  "planned_progress",
+  "column_break_expected",
+  "expected_progress",
+  "section_break_resources",
+  "labour",
+  "column_break_resources",
+  "equipment",
+  "section_break_details",
+  "materials",
+  "column_break_details",
+  "safety_measures",
+  "section_break_remarks",
+  "remarks",
+  "section_break_approval",
+  "approved_by",
+  "approved_on",
+  "column_break_approval",
+  "rejection_reason"
+ ],
+ "fields": [
+  {
+   "default": "DRQ-.YYYY.MM.####",
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "hidden": 1,
+   "label": "Series",
+   "options": "DRQ-.YYYY.MM.####",
+   "print_hide": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "construction_management",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Construction Management",
+   "options": "Construction Management",
+   "reqd": 1
+  },
+  {
+   "fetch_from": "construction_management.project",
+   "fieldname": "project",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Project",
+   "options": "Project",
+   "read_only": 1
+  },
+  {
+   "fetch_from": "construction_management.company",
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "label": "Company",
+   "options": "Company",
+   "read_only": 1
+  },
+  {
+   "description": "ชื่อผู้ขออนุมัติที่ลงนามในเอกสาร",
+   "fieldname": "requested_by",
+   "fieldtype": "Data",
+   "label": "Requested By"
+  },
+  {
+   "description": "ผู้ที่จะอนุมัติคำขอนี้ บันทึกแล้วระบบมอบหมายงานให้",
+   "fieldname": "approver",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "label": "Approver",
+   "options": "User",
+   "reqd": 1
+  },
+  {
+   "fetch_from": "approver.full_name",
+   "fieldname": "approver_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Approver Name",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_main",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "วันที่จะเข้าปฏิบัติงาน",
+   "fieldname": "date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Work Date",
+   "reqd": 1
+  },
+  {
+   "default": "08:00:00",
+   "fieldname": "start_time",
+   "fieldtype": "Time",
+   "label": "Start Time"
+  },
+  {
+   "default": "17:00:00",
+   "fieldname": "end_time",
+   "fieldtype": "Time",
+   "label": "End Time"
+  },
+  {
+   "default": "Pending",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Status",
+   "no_copy": 1,
+   "options": "Pending\nApproved\nCompleted\nRejected\nCancelled",
+   "print_hide": 1,
+   "read_only": 1,
+   "description": "Completed = Submit Daily Report ของคำขอนี้แล้ว"
+  },
+  {
+   "default": "1",
+   "description": "ไม่แสดงงานที่ทำครบปริมาณแล้วในช่องเลือก WBS",
+   "fieldname": "hide_completed",
+   "fieldtype": "Check",
+   "label": "Hide Completed WBS",
+   "print_hide": 1
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "Daily Request",
+   "print_hide": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_items",
+   "fieldtype": "Section Break",
+   "hide_border": 1,
+   "label": "Planned Work"
+  },
+  {
+   "fieldname": "items",
+   "fieldtype": "Table",
+   "label": "Items",
+   "options": "Daily Request Item",
+   "reqd": 1
+  },
+  {
+   "description": "ความคืบหน้าจริงของแผนงาน ณ วันที่บันทึกเอกสาร",
+   "fieldname": "current_progress",
+   "fieldtype": "Percent",
+   "label": "Current Progress",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_progress",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "ความคืบหน้าของทั้งโครงการที่จะเพิ่มขึ้นถ้าทำได้ตามแผนนี้",
+   "fieldname": "planned_progress",
+   "fieldtype": "Percent",
+   "label": "Planned Progress Gain",
+   "precision": "4",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_expected",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "expected_progress",
+   "fieldtype": "Percent",
+   "label": "Expected Progress",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_resources",
+   "fieldtype": "Section Break",
+   "label": "Planned Resources"
+  },
+  {
+   "fieldname": "labour",
+   "fieldtype": "Table",
+   "label": "Manpower",
+   "options": "Daily Report Labour"
+  },
+  {
+   "fieldname": "column_break_resources",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "equipment",
+   "fieldtype": "Table",
+   "label": "Equipment",
+   "options": "Daily Report Equipment"
+  },
+  {
+   "fieldname": "section_break_details",
+   "fieldtype": "Section Break"
+  },
+  {
+   "description": "วัสดุที่ต้องใช้/ต้องเตรียม เช่น คอนกรีต 240 ksc 12 ม³ เข้าหน้างาน 9.00 น.",
+   "fieldname": "materials",
+   "fieldtype": "Small Text",
+   "label": "Materials Required"
+  },
+  {
+   "fieldname": "column_break_details",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "เช่น งานบนที่สูง ใช้ Full body harness, งานเชื่อม ขอ Hot Work Permit",
+   "fieldname": "safety_measures",
+   "fieldtype": "Small Text",
+   "label": "Safety Measures"
+  },
+  {
+   "fieldname": "section_break_remarks",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "remarks",
+   "fieldtype": "Small Text",
+   "label": "Remarks"
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "section_break_approval",
+   "fieldtype": "Section Break",
+   "label": "Approval"
+  },
+  {
+   "fieldname": "approved_by",
+   "fieldtype": "Link",
+   "label": "Approved / Rejected By",
+   "no_copy": 1,
+   "options": "User",
+   "read_only": 1
+  },
+  {
+   "fieldname": "approved_on",
+   "fieldtype": "Datetime",
+   "label": "Approved / Rejected On",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_approval",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "rejection_reason",
+   "fieldtype": "Small Text",
+   "label": "Rejection Reason",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_progress",
+   "fieldtype": "Section Break"
+  }
+ ],
+ "grid_page_length": 50,
+ "is_submittable": 1,
+ "links": [
+  {
+   "link_doctype": "Daily Report",
+   "link_fieldname": "daily_request"
+  }
+ ],
+ "modified": "2026-10-26 22:38:35.000000",
+ "modified_by": "Administrator",
+ "module": "ConsBiz",
+ "name": "Daily Request",
+ "naming_rule": "By \"Naming Series\" field",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "amend": 1,
+   "cancel": 1,
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  },
+  {
+   "amend": 1,
+   "cancel": 1,
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Projects Manager",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Projects User",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "date",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

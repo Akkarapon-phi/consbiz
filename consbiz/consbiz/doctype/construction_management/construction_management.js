@@ -7,8 +7,14 @@ frappe.ui.form.on("Construction Management", {
 			frm.add_custom_button(__("เปิด Gantt"), () =>
 				frappe.set_route("construction-gantt", frm.doc.name)
 			);
+			frm.add_custom_button(__("สร้าง Daily Request"), () =>
+				frappe.new_doc("Daily Request", { construction_management: frm.doc.name })
+			);
 			frm.add_custom_button(__("สร้าง Daily Report"), () =>
 				frappe.new_doc("Daily Report", { construction_management: frm.doc.name })
+			);
+			frm.add_custom_button(__("สร้างงานลด-งานเพิ่ม"), () =>
+				frappe.new_doc("Variation Order", { construction_management: frm.doc.name })
 			);
 		}
 		frm.set_df_property("tasks", "cannot_add_rows", true);

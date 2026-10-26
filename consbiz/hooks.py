@@ -188,7 +188,7 @@ jinja = {
 # ------------
 
 # before_install = "consbiz.install.before_install"
-# after_install = "consbiz.install.after_install"
+after_install = "consbiz.install.after_install"
 
 # Uninstallation
 # ------------

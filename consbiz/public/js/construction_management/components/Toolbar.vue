@@ -1,8 +1,11 @@
 <script setup>
 // แถบเครื่องมือ 2 แถว
-// 1. มาตราส่วนเวลา, ซูม, วันนี้, ระดับ WBS, คอลัมน์, วันที่เลือกดู
-// 2. เปิด/ปิดเส้น S-Curve ทีละเส้น (เป็น legend ไปในตัว), สิ่งที่แสดงบนแถบงาน, ตารางสรุป และค่า % ณ วันที่เลือก
+// 1. แถบคำสั่ง: Undo/Redo + สวิตช์บันทึกอัตโนมัติ | มาตราส่วนเวลา | ซูม | วันที่เลือกดู + วันนี้
+//    ขวา: เมนู WBS / แสดงผล / ตารางสรุป / คอลัมน์
+// 2. ตัวเลข ณ วันที่เลือกดู: % Baseline / แผน / จริง, เร็ว-ช้ากว่าแผน
+//    ขวา: วันเริ่ม-สิ้นสุดสัญญา, ระยะเวลาสัญญา, วันที่แผนเสร็จ, มูลค่าสัญญา
 // settings เป็น reactive ของ App แก้ตรงได้ (App บันทึกลง User Settings เอง)
+// สวิตช์ใช้ class switch-control ของ Frappe, เมนูเป็น dropdown ของ Bootstrap (คลิกในเมนูไม่ปิดเมนู)
 import { computed } from "vue";
 import FrappeControl from "./FrappeControl.vue";
 
@@ -10,34 +13,65 @@ const props = defineProps({
 	scales: Object,
 	settings: Object,
 	curves: Array,
+	summaryOptions: Array,
 	wbsDepth: Number,
 	statusDate: String,
 	readout: Object,
 	finishDate: String,
+	contractStart: String,
 	contractFinish: String,
+	contractDuration: Number,
 	totalAmount: Number,
+	contractAmount: Number,
+	canWrite: Boolean,
+	canUndo: Boolean,
+	canRedo: Boolean,
 });
-defineEmits(["choose-columns", "wbs-level", "today", "zoom", "update:statusDate"]);
+defineEmits([
+	"choose-columns",
+	"wbs-level",
+	"today",
+	"zoom",
+	"undo",
+	"redo",
+	"update:statusDate",
+]);
 
-// ปุ่มเปิด/ปิดสิ่งที่แสดงบนแถบงานและใต้ตาราง (key ใน settings)
-const toggles = [
+// สิ่งที่แสดงบนแถบงาน (key ใน settings)
+const bar_toggles = [
 	{ key: "show_baseline_bars", label: __("แถบ Baseline") },
-	{ key: "show_split", label: __("% ที่แบ่ง"), title: __("แสดง % แผนที่กำหนดเองบนแถบงาน") },
+	{ key: "show_split", label: __("% แผนที่แบ่ง"), title: __("แสดง % แผนที่กำหนดเองบนแถบงาน") },
 	{ key: "show_labels", label: __("ชื่องาน"), title: __("แสดง WBS และชื่องานท้ายแถบ") },
 	{
 		key: "show_progress",
-		label: __("% แผน/จริง"),
+		label: __("% แผน / จริง"),
 		title: __("แสดง % แผนและ % จริง ณ วันที่เลือกดู ท้ายแถบ"),
 	},
 	{
 		key: "show_status",
-		label: __("สี Status"),
+		label: __("สีตามสถานะ"),
 		title: __(
 			"สีแถบงานตามสถานะ ณ วันที่เลือกดู: เขียว = เสร็จแล้ว, ส้ม = ช้ากว่าแผนไม่เกิน 10%, แดง = ช้ากว่าแผนเกิน 10%"
 		),
 	},
-	{ key: "show_summary", label: __("ตารางสรุป") },
 ];
+
+// แถวของตารางสรุปจัดกลุ่มตามเส้น (Baseline / แผน / จริง)
+const summary_groups = computed(() =>
+	props.curves
+		.map((curve) => ({
+			...curve,
+			rows: props.summaryOptions.filter((row) => row.curve === curve.key),
+		}))
+		.filter((group) => group.rows.length)
+);
+
+function toggle_summary_row(key) {
+	const keys = props.settings.summary_keys;
+	props.settings.summary_keys = keys.includes(key)
+		? keys.filter((k) => k !== key)
+		: props.summaryOptions.map((r) => r.key).filter((k) => k === key || keys.includes(k));
+}
 
 // ระดับ WBS: ระดับ 1 = หัวข้อหลัก (1), ระดับ 2 = 1.1, ...
 const levels = computed(() =>
@@ -47,15 +81,15 @@ const levels = computed(() =>
 	}))
 );
 
-// เทียบ % จริงกับแผน ณ วันที่เลือก (ต่างกันไม่ถึง 0.005% ถือว่าตามแผน)
+// เทียบ % จริงกับแผน ณ วันที่เลือก (ต่างกันไม่ถึง 0.005% ถือว่าตามแผน) ใช้ indicator มาตรฐานของ Frappe
 const variance = computed(() => {
 	const { plan, actual } = props.readout;
 	if (plan === null || actual === null) return null;
 	const diff = actual - plan;
-	if (Math.abs(diff) < 0.005) return { text: __("ตามแผน"), class: "text-muted" };
+	if (Math.abs(diff) < 0.005) return { text: __("ตามแผน"), color: "gray" };
 	return diff > 0
-		? { text: __("เร็วกว่าแผน {0}", [percent(diff)]), class: "text-success" }
-		: { text: __("ช้ากว่าแผน {0}", [percent(-diff)]), class: "text-danger" };
+		? { text: __("เร็วกว่าแผน {0}", [percent(diff)]), color: "green" }
+		: { text: __("ช้ากว่าแผน {0}", [percent(-diff)]), color: "red" };
 });
 
 // แผนงานเสร็จหลังวันสิ้นสุดสัญญา
@@ -63,196 +97,440 @@ const late = computed(
 	() => props.finishDate && props.contractFinish && props.finishDate > props.contractFinish
 );
 
+const revised = computed(() => props.contractAmount !== props.totalAmount);
+
+const icon = (name) => frappe.utils.icon(name, "sm");
 const amount = (value) => format_number(value || 0, null, 2);
 const percent = (value) =>
 	value === null || value === undefined ? "-" : format_number(value, null, 2) + "%";
+const date = (value) => frappe.datetime.str_to_user(value);
 </script>
 
 <template>
 	<div class="cs-toolbar">
-		<div class="cs-toolbar-row">
-			<div class="btn-group" role="group">
+		<div class="cs-bar">
+			<template v-if="canWrite">
+				<div class="cs-segment">
+					<button
+						type="button"
+						class="cs-seg-btn"
+						:title="__('ย้อนกลับ (Ctrl+Z)')"
+						:disabled="!canUndo"
+						@click="$emit('undo')"
+						v-html="icon('undo-2')"
+					/>
+					<button
+						type="button"
+						class="cs-seg-btn"
+						:title="__('ทำซ้ำ (Ctrl+Y)')"
+						:disabled="!canRedo"
+						@click="$emit('redo')"
+						v-html="icon('redo-2')"
+					/>
+				</div>
+				<label class="switch-control cs-switch" :title="__('บันทึกให้เองหลังหยุดแก้ไขครู่หนึ่ง')">
+					<span class="switch-text">
+						<span class="label-area">{{ __("บันทึกอัตโนมัติ") }}</span>
+					</span>
+					<span class="input-area"><input v-model="settings.auto_save" type="checkbox" /></span>
+					<span class="switch-visual"><span class="switch-thumb" /></span>
+				</label>
+				<span class="cs-divider" />
+			</template>
+
+			<div class="cs-segment" role="group" :aria-label="__('มาตราส่วนเวลา')">
 				<button
 					v-for="(scale, key) in scales"
 					:key="key"
 					type="button"
-					class="btn btn-default btn-sm"
+					class="cs-seg-btn"
 					:class="{ active: settings.scale === key }"
 					@click="settings.scale = key"
 				>
 					{{ scale.label }}
 				</button>
 			</div>
-			<div class="btn-group" role="group">
+			<div class="cs-segment">
 				<button
 					type="button"
-					class="btn btn-default btn-sm"
+					class="cs-seg-btn"
 					:title="__('ย่อ timeline')"
 					@click="$emit('zoom', 'out')"
-				>
-					−
-				</button>
+					v-html="icon('zoom-out')"
+				/>
 				<button
 					type="button"
-					class="btn btn-default btn-sm"
+					class="cs-seg-btn"
 					:title="__('ขยาย timeline')"
 					@click="$emit('zoom', 'in')"
-				>
-					+
-				</button>
+					v-html="icon('zoom-in')"
+				/>
 				<button
 					type="button"
-					class="btn btn-default btn-sm"
+					class="cs-seg-btn"
 					:title="__('ย่อให้เห็นทั้งโครงการในหน้าจอ')"
 					@click="$emit('zoom', 'fit')"
-				>
-					{{ __("พอดีจอ") }}
-				</button>
+					v-html="icon('scan')"
+				/>
 			</div>
-			<button type="button" class="btn btn-default btn-sm" @click="$emit('today')">
-				{{ __("วันนี้") }}
-			</button>
-			<div class="dropdown">
-				<button
-					type="button"
-					class="btn btn-default btn-sm dropdown-toggle"
-					data-toggle="dropdown"
-					aria-haspopup="true"
-					aria-expanded="false"
-				>
-					{{ __("แสดง WBS") }}
-				</button>
-				<div class="dropdown-menu">
-					<a
-						v-for="item in levels"
-						:key="item.level"
-						class="dropdown-item"
-						href="#"
-						@click.prevent="$emit('wbs-level', item.level)"
-					>
-						{{ __("ถึงระดับ {0} (เช่น {1})", [item.level, item.example]) }}
-					</a>
-					<div class="dropdown-divider" />
-					<a class="dropdown-item" href="#" @click.prevent="$emit('wbs-level', null)">
-						{{ __("ขยายทั้งหมด") }}
-					</a>
-				</div>
-			</div>
-			<button type="button" class="btn btn-default btn-sm" @click="$emit('choose-columns')">
-				{{ __("คอลัมน์") }}
-			</button>
-
-			<div class="cs-status-date">
-				<span class="text-muted">{{ __("ดู ณ วันที่") }}</span>
+			<span class="cs-divider" />
+			<!-- วันที่เลือกดูกับปุ่มวันนี้อยู่กลุ่มเดียวกัน: วันนี้ = ดูค่า ณ วันนี้และเลื่อนไปที่วันนี้ -->
+			<div class="cs-status-date" :title="__('ค่า % และสถานะงานคิด ณ วันที่นี้')">
+				<span>{{ __("ณ วันที่") }}</span>
 				<FrappeControl
 					:df="{ fieldtype: 'Date' }"
 					:model-value="statusDate"
 					@update:model-value="(v) => v && $emit('update:statusDate', v)"
 				/>
+				<button type="button" class="btn btn-default btn-sm" @click="$emit('today')">
+					{{ __("วันนี้") }}
+				</button>
+			</div>
+
+			<div class="cs-bar-end">
+
+				<div class="dropdown">
+					<button
+						type="button"
+						class="btn btn-default btn-sm cs-btn dropdown-toggle"
+						data-toggle="dropdown"
+						aria-haspopup="true"
+						aria-expanded="false"
+					>
+						<span v-html="icon('list-tree')" />{{ __("WBS") }}
+					</button>
+					<div class="dropdown-menu dropdown-menu-right">
+						<a
+							v-for="item in levels"
+							:key="item.level"
+							class="dropdown-item"
+							href="#"
+							@click.prevent="$emit('wbs-level', item.level)"
+						>
+							{{ __("ถึงระดับ {0} (เช่น {1})", [item.level, item.example]) }}
+						</a>
+						<div class="dropdown-divider" />
+						<a class="dropdown-item" href="#" @click.prevent="$emit('wbs-level', null)">
+							{{ __("ขยายทั้งหมด") }}
+						</a>
+					</div>
+				</div>
+
+				<div class="dropdown">
+					<button
+						type="button"
+						class="btn btn-default btn-sm cs-btn dropdown-toggle"
+						data-toggle="dropdown"
+						aria-haspopup="true"
+						aria-expanded="false"
+					>
+						<span v-html="icon('sliders-horizontal')" />{{ __("แสดงผล") }}
+					</button>
+					<div class="dropdown-menu dropdown-menu-right cs-menu" @click.stop>
+						<div class="cs-menu-title">{{ __("เส้น S-Curve") }}</div>
+						<label v-for="curve in curves" :key="curve.key" class="switch-control cs-menu-item">
+							<span class="switch-text">
+								<span class="label-area">
+									<span class="cs-dot" :style="{ background: curve.color }" />
+									{{ curve.label }}
+								</span>
+							</span>
+							<span class="input-area">
+								<input v-model="settings.curves[curve.key]" type="checkbox" />
+							</span>
+							<span class="switch-visual"><span class="switch-thumb" /></span>
+						</label>
+						<div class="dropdown-divider" />
+						<div class="cs-menu-title">{{ __("บนแถบงาน") }}</div>
+						<label
+							v-for="toggle in bar_toggles"
+							:key="toggle.key"
+							class="switch-control cs-menu-item"
+							:title="toggle.title"
+						>
+							<span class="switch-text">
+								<span class="label-area">{{ toggle.label }}</span>
+							</span>
+							<span class="input-area">
+								<input v-model="settings[toggle.key]" type="checkbox" />
+							</span>
+							<span class="switch-visual"><span class="switch-thumb" /></span>
+						</label>
+					</div>
+				</div>
+
+				<div class="dropdown">
+					<button
+						type="button"
+						class="btn btn-default btn-sm cs-btn dropdown-toggle"
+						data-toggle="dropdown"
+						aria-haspopup="true"
+						aria-expanded="false"
+					>
+						<span v-html="icon('table-2')" />{{ __("ตารางสรุป") }}
+					</button>
+					<div class="dropdown-menu dropdown-menu-right cs-menu" @click.stop>
+						<label class="switch-control cs-menu-item">
+							<span class="switch-text">
+								<span class="label-area"
+									><b>{{ __("แสดงตารางสรุป") }}</b></span
+								>
+							</span>
+							<span class="input-area">
+								<input v-model="settings.show_summary" type="checkbox" />
+							</span>
+							<span class="switch-visual"><span class="switch-thumb" /></span>
+						</label>
+						<template v-for="group in summary_groups" :key="group.key">
+							<div class="dropdown-divider" />
+							<div class="cs-menu-title">
+								<span class="cs-dot" :style="{ background: group.color }" />
+								{{ group.label }}
+							</div>
+							<label
+								v-for="row in group.rows"
+								:key="row.key"
+								class="switch-control cs-menu-item"
+							>
+								<span class="switch-text">
+									<span class="label-area">{{ row.label }}</span>
+								</span>
+								<span class="input-area">
+									<input
+										type="checkbox"
+										:checked="settings.summary_keys.includes(row.key)"
+										:disabled="!settings.show_summary"
+										@change="toggle_summary_row(row.key)"
+									/>
+								</span>
+								<span class="switch-visual"><span class="switch-thumb" /></span>
+							</label>
+						</template>
+					</div>
+				</div>
+
+				<button
+					type="button"
+					class="btn btn-default btn-sm cs-btn"
+					@click="$emit('choose-columns')"
+				>
+					<span v-html="icon('columns-3')" />{{ __("คอลัมน์") }}
+				</button>
 			</div>
 		</div>
 
-		<div class="cs-toolbar-row">
-			<span class="text-muted cs-label">{{ __("S-Curve") }}</span>
-			<button
+		<div class="cs-stats">
+			<div
 				v-for="curve in curves"
+				v-show="readout[curve.key] !== null"
 				:key="curve.key"
-				type="button"
-				class="btn btn-default btn-xs cs-chip"
-				:class="{ active: settings.curves[curve.key] }"
-				@click="settings.curves[curve.key] = !settings.curves[curve.key]"
+				class="cs-stat"
 			>
-				<span class="cs-dot" :style="{ background: curve.color }" />
-				{{ curve.label }}
-			</button>
-			<span class="cs-separator" />
-			<span class="text-muted cs-label">{{ __("แสดง") }}</span>
-			<button
-				v-for="toggle in toggles"
-				:key="toggle.key"
-				type="button"
-				class="btn btn-default btn-xs cs-chip"
-				:class="{ active: settings[toggle.key] }"
-				:title="toggle.title"
-				@click="settings[toggle.key] = !settings[toggle.key]"
-			>
-				{{ toggle.label }}
-			</button>
+				<span class="cs-stat-label">
+					<span class="cs-dot" :style="{ background: curve.color }" />{{ curve.label }}
+				</span>
+				<span class="cs-stat-value">{{ percent(readout[curve.key]) }}</span>
+			</div>
+			<span v-if="variance" class="indicator-pill" :class="variance.color">
+				{{ variance.text }}
+			</span>
 
-			<div class="cs-readout">
-				<span v-for="curve in curves" :key="curve.key">
-					<span class="cs-dot" :style="{ background: curve.color }" />
-					{{ curve.label }} <b>{{ percent(readout[curve.key]) }}</b>
-				</span>
-				<span v-if="variance !== null" :class="variance.class">{{ variance.text }}</span>
-				<span
-					v-if="finishDate"
-					:class="late ? 'text-danger' : 'text-muted'"
-					:title="late ? __('แผนงานเสร็จหลังวันสิ้นสุดสัญญา') : ''"
+			<div class="cs-stats-end">
+				<div v-if="contractStart" class="cs-stat">
+					<span class="cs-stat-label">{{ __("เริ่มสัญญา") }}</span>
+					<span class="cs-stat-value">{{ date(contractStart) }}</span>
+				</div>
+				<div v-if="contractFinish" class="cs-stat">
+					<span class="cs-stat-label">{{ __("สิ้นสุดสัญญา") }}</span>
+					<span class="cs-stat-value">{{ date(contractFinish) }}</span>
+				</div>
+				<div v-if="contractDuration" class="cs-stat">
+					<span class="cs-stat-label">{{ __("ระยะเวลาสัญญา") }}</span>
+					<span class="cs-stat-value">{{ __("{0} วัน", [contractDuration]) }}</span>
+				</div>
+				<div v-if="finishDate" class="cs-stat">
+					<span class="cs-stat-label">{{ __("แผนเสร็จ") }}</span>
+					<span
+						class="cs-stat-value"
+						:class="{ 'text-danger': late }"
+						:title="late ? __('แผนงานเสร็จหลังวันสิ้นสุดสัญญา') : ''"
+					>
+						{{ date(finishDate) }}
+					</span>
+				</div>
+				<div
+					class="cs-stat"
+					:title="
+						revised
+							? __('สัญญาเดิม {0} + งานเพิ่ม-ลดที่อนุมัติแล้ว {1}', [
+									amount(contractAmount),
+									amount(totalAmount - contractAmount),
+							  ])
+							: ''
+					"
 				>
-					{{ __("แผนเสร็จ") }} <b>{{ frappe.datetime.str_to_user(finishDate) }}</b>
-				</span>
-				<span class="text-muted" v-if="contractFinish">
-					{{ __("สิ้นสุดสัญญา") }}
-					<b>{{ frappe.datetime.str_to_user(contractFinish) }}</b>
-				</span>
-				<span class="text-muted">
-					{{ __("มูลค่ารวม") }} <b>{{ amount(totalAmount) }}</b>
-				</span>
+					<span class="cs-stat-label">
+						{{ revised ? __("มูลค่าสัญญาปรับปรุง") : __("มูลค่าสัญญา") }}
+					</span>
+					<span class="cs-stat-value">{{ amount(totalAmount) }}</span>
+				</div>
 			</div>
 		</div>
 	</div>
 </template>
 
 <style scoped>
+/* เว้นจากหัวเพจด้านบน */
 .cs-toolbar {
+	padding-top: var(--padding-md);
 	margin-bottom: var(--padding-sm);
 }
-.cs-toolbar-row {
+.cs-bar,
+.cs-stats {
 	display: flex;
 	flex-wrap: wrap;
 	align-items: center;
-	gap: var(--padding-xs) var(--padding-sm);
-	margin-bottom: var(--padding-xs);
+	gap: var(--padding-sm);
+}
+.cs-bar-end,
+.cs-stats-end {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--padding-sm);
+	margin-left: auto;
+}
+
+/* กลุ่มปุ่มแบบ segmented control */
+.cs-segment {
+	display: inline-flex;
+	align-items: center;
+	gap: 2px;
+	padding: 2px;
+	border-radius: var(--radius);
+	background: var(--control-bg);
+}
+.cs-seg-btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-width: 28px;
+	height: 24px;
+	padding: 0 var(--padding-sm);
+	border: 0;
+	border-radius: var(--radius-3);
+	background: transparent;
+	color: var(--text-muted);
+	font-size: var(--text-sm);
+	line-height: 1;
+}
+.cs-seg-btn:hover:not(:disabled) {
+	color: var(--text-color);
+}
+.cs-seg-btn.active {
+	background: var(--card-bg);
+	color: var(--text-color);
+	font-weight: 600;
+	box-shadow: var(--shadow-sm);
+}
+.cs-seg-btn:disabled {
+	opacity: 0.4;
+	cursor: default;
+}
+.cs-btn {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+}
+.cs-switch {
+	width: auto;
+	gap: var(--padding-sm);
+	font-size: var(--text-sm);
+}
+.cs-switch .label-area {
+	font-size: var(--text-sm);
+}
+.cs-divider {
+	width: 1px;
+	height: 20px;
+	background: var(--border-color);
 }
 .cs-status-date {
 	display: flex;
 	align-items: center;
 	gap: var(--padding-xs);
-	margin-left: auto;
 	font-size: var(--text-sm);
+	color: var(--text-muted);
 }
 .cs-status-date :deep(.cs-control) {
 	width: 130px;
 }
-.cs-label {
-	font-size: var(--text-sm);
+
+/* เมนูสวิตช์ */
+.cs-menu {
+	min-width: 230px;
+	border-radius: var(--radius-md);
+	padding: var(--padding-xs) 0;
 }
-.cs-chip {
-	display: inline-flex;
+.cs-menu-title {
+	display: flex;
 	align-items: center;
 	gap: 6px;
+	padding: var(--padding-xs) var(--padding-md) 2px;
+	font-size: var(--text-xs);
+	font-weight: 600;
+	color: var(--text-muted);
 }
-.cs-chip:not(.active) {
-	opacity: 0.55;
+.cs-menu-item {
+	padding: 4px var(--padding-md);
+	margin: 0 var(--padding-xs);
+	width: auto;
+	border-radius: var(--radius-sm);
+	gap: var(--padding-lg);
 }
-.cs-separator {
-	width: 1px;
-	height: 18px;
-	background: var(--border-color);
+.cs-menu-item:hover {
+	background: var(--subtle-fg);
+}
+.cs-menu-item .label-area {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	font-size: var(--text-sm);
+}
+
+/* ตัวเลข ณ วันที่เลือกดู */
+.cs-stats {
+	margin-top: var(--padding-sm);
+	padding: var(--padding-sm) var(--padding-md);
+	gap: var(--padding-sm) var(--padding-xl);
+	border: 1px solid var(--border-color);
+	border-radius: var(--radius-lg);
+	background: var(--card-bg);
+}
+.cs-stats-end {
+	gap: var(--padding-sm) var(--padding-xl);
+}
+.cs-stat {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+.cs-stat-label {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	font-size: var(--text-xs);
+	color: var(--text-muted);
+}
+.cs-stat-value {
+	font-size: var(--text-base);
+	font-weight: 600;
+	color: var(--text-color);
 }
 .cs-dot {
 	display: inline-block;
 	width: 8px;
 	height: 8px;
 	border-radius: 50%;
-}
-.cs-readout {
-	display: flex;
-	flex-wrap: wrap;
-	align-items: center;
-	gap: var(--padding-xs) var(--padding-md);
-	margin-left: auto;
-	font-size: var(--text-sm);
 }
 </style>

@@ -29,7 +29,11 @@ const emit = defineEmits([
 ]);
 
 const body = ref(null);
-defineExpose({ body });
+// App ยกเลิกค่าที่พิมพ์ค้างก่อน Undo/Redo ด้วยคีย์ลัด
+function cancel_edit() {
+	editing.value = null;
+}
+defineExpose({ body, cancel_edit });
 
 const total_width = computed(() => props.columns.reduce((sum, c) => sum + c.width, 0));
 
@@ -50,6 +54,8 @@ function start_edit(task, column) {
 }
 
 function commit(value) {
+	// ถูกยกเลิกไปแล้ว (Escape / คีย์ลัด Undo) แต่ช่องกรอกยังส่ง change ตามมาตอนหลุดโฟกัส
+	if (!editing.value) return;
 	const { task, column } = editing.value;
 	editing.value = null;
 	emit("update", task, column.key, value);
@@ -202,6 +208,7 @@ function on_drop(column) {
 						v-for="row in summaryRows"
 						:key="row.key"
 						class="cs-summary-label"
+						:class="{ 'cs-group-start': row.group_start }"
 						:style="{ height: summaryRowHeight + 'px' }"
 					>
 						<span class="cs-summary-text">
@@ -330,6 +337,10 @@ function on_drop(column) {
 	color: var(--text-muted);
 	border-bottom: 1px solid var(--border-color);
 	box-sizing: border-box;
+}
+/* เส้นแบ่งกลุ่ม Baseline / แผน / จริง (ไม่เพิ่มความสูงแถว) */
+.cs-group-start {
+	box-shadow: inset 0 1px 0 var(--gray-500);
 }
 /* ป้ายติดซ้ายเมื่อเลื่อนตารางแนวนอน */
 .cs-summary-text {

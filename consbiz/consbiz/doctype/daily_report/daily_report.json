@@ -15,6 +15,7 @@
   "date",
   "hide_completed",
   "supervisor_name",
+  "daily_request",
   "amended_from",
   "section_break_items",
   "items",
@@ -105,6 +106,16 @@
    "label": "Supervisor"
   },
   {
+   "description": "\u0e04\u0e33\u0e02\u0e2d\u0e2d\u0e19\u0e38\u0e21\u0e31\u0e15\u0e34\u0e1b\u0e0f\u0e34\u0e1a\u0e31\u0e15\u0e34\u0e07\u0e32\u0e19\u0e17\u0e35\u0e48\u0e40\u0e1b\u0e47\u0e19\u0e15\u0e49\u0e19\u0e17\u0e32\u0e07\u0e02\u0e2d\u0e07\u0e23\u0e32\u0e22\u0e07\u0e32\u0e19\u0e19\u0e35\u0e49",
+   "fieldname": "daily_request",
+   "fieldtype": "Link",
+   "label": "Daily Request",
+   "no_copy": 1,
+   "options": "Daily Request",
+   "read_only": 1,
+   "search_index": 1
+  },
+  {
    "fieldname": "amended_from",
    "fieldtype": "Link",
    "label": "Amended From",
@@ -141,7 +152,7 @@
   {
    "fieldname": "labour",
    "fieldtype": "Table",
-   "label": "Labour",
+   "label": "Manpower",
    "options": "Daily Report Labour"
   },
   {
@@ -176,7 +187,7 @@
  "grid_page_length": 50,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-10-22 23:44:42.207709",
+ "modified": "2026-10-26 22:05:10.000000",
  "modified_by": "Administrator",
  "module": "ConsBiz",
  "name": "Daily Report",

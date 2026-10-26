@@ -1,7 +1,7 @@
 # Copyright (c) 2026, Siricons and contributors
 # For license information, please see license.txt
 
-# แผนตัดเหล็ก: รายการเหล็กที่ต้องตัด (รูปทรง + ขนาดด้าน A-D + จำนวน) -> ความยาวตัด -> จัดตัดจากเหล็กที่มี
+# แผนตัดเหล็ก: รายการเหล็กที่ต้องตัด (รูปทรง + ขนาดด้าน + จำนวน) -> ความยาวตัด -> จัดตัดจากเหล็กที่มี
 # - ความยาวตัด = ผลรวมด้าน (สูตรของ Bar Shape) - ระยะหักที่จุดดัด (ถ้าติ๊ก) + ระยะขอ แล้วปัดขึ้น
 # - จัดตัดแยกตามประเภทเหล็กด้วย optimizer.py ทุกครั้งที่บันทึก ผลจึงตรงกับรายการเสมอ
 # - เศษที่ยาวตั้งแต่ min_reusable นับเป็นเศษเก็บ ที่สั้นกว่านับเป็นเศษทิ้ง Loss % = เศษทิ้ง / เหล็กที่ใช้
@@ -16,14 +16,15 @@ from frappe.model.document import Document
 from frappe.utils import cint, flt
 
 from consbiz.consbiz.doctype.bar_cut_plan.optimizer import NotEnoughStock, plan_cuts
-
-DIMENSIONS = ("A", "B", "C", "D")
+from consbiz.consbiz.doctype.bar_shape.bar_shape import DIMENSIONS
+from consbiz.consbiz.doctype.rebar_type.rebar_type import nominal_mass
 SETTINGS = {
 	"use_bend_deduction": 1,
 	"bend_45": 1,
 	"bend_90": 2,
 	"bend_135": 3,
 	"bend_180": 4,
+	"hook_90": 6,
 	"hook_135": 10,
 	"hook_180": 10,
 	"round_up": 10,
@@ -139,7 +140,7 @@ class BarCutPlan(Document):
 
 
 def get_cut_length(shape, rebar_type, dimensions, settings, idx=None):
-	"""ความยาวตัด (มม.) ของเหล็ก 1 ชิ้น dimensions: dict/row ที่มี a b c d (มม.)"""
+	"""ความยาวตัด (มม.) ของเหล็ก 1 ชิ้น dimensions: dict/row ที่มีค่าด้านเป็นตัวพิมพ์เล็ก (a b c ...)"""
 	shape_doc = frappe.get_cached_doc("Bar Shape", shape)
 	diameter = flt(frappe.get_cached_value("Rebar Type", rebar_type, "diameter"))
 	settings = {**SETTINGS, **{k: v for k, v in (settings or {}).items() if v is not None}}
@@ -157,7 +158,8 @@ def get_cut_length(shape, rebar_type, dimensions, settings, idx=None):
 			for angle in (45, 90, 135, 180)
 		)
 	length += diameter * sum(
-		cint(shape_doc.get(f"hooks_{angle}")) * flt(settings[f"hook_{angle}"]) for angle in (135, 180)
+		cint(shape_doc.get(f"hooks_{angle}")) * flt(settings[f"hook_{angle}"])
+		for angle in (90, 135, 180)
 	)
 	step = cint(settings["round_up"])
 	if step > 0:
@@ -167,7 +169,7 @@ def get_cut_length(shape, rebar_type, dimensions, settings, idx=None):
 
 def get_unit_weight(rebar_type):
 	weight, diameter = frappe.get_cached_value("Rebar Type", rebar_type, ["unit_weight", "diameter"])
-	return flt(weight) or 0.00617 * flt(diameter) ** 2
+	return flt(weight) or nominal_mass(diameter)
 
 
 def parse_lengths(value):
@@ -180,7 +182,7 @@ def format_m(length_mm):
 
 
 def shape_svg(shape, row=None):
-	"""รูป SVG ของรูปทรงที่แทนป้าย A-D ด้วยค่าจริง เช่น A=1,200 (ใช้ใน Print Format ผ่าน jinja)
+	"""รูป SVG ของรูปทรงที่แทนป้ายด้านด้วยค่าจริง เช่น A=1,200 T=45° (ใช้ใน Print Format ผ่าน jinja)
 	ป้ายที่อยู่ซ้าย/ขวาของรูปชิดออกนอกรูป ไม่ให้ทับเส้น (เหมือน shape_svg ใน bar_cut_plan.js)"""
 	svg = frappe.get_cached_value("Bar Shape", shape, "svg") or ""
 
@@ -198,9 +200,18 @@ def shape_svg(shape, row=None):
 			attrs = attrs.replace('text-anchor="middle"', 'text-anchor="start"').replace(
 				f'x="{x:g}"', f'x="{x - 8:g}"'
 			)
-		return f"<text{attrs}>{dim}={value:,.0f}</text>"
+		return f"<text{attrs}>{dim_label(dim, value)}</text>"
 
-	return re.sub(r'<text([^>]*data-dim="([A-D])"[^>]*)>[A-D]</text>', replace, svg)
+	return re.sub(r'<text([^>]*data-dim="([A-Z])"[^>]*)>[A-Z]</text>', replace, svg)
+
+
+def dim_label(dim, value):
+	"""ป้ายด้านบนรูป: มุมมีหน่วยองศา จำนวนรอบไม่มีทศนิยมถ้าลงตัว (เหมือน dim_label ใน bar_cut_plan.js)"""
+	if dim == "T":
+		return f"{value:g}°"
+	if dim == "N":
+		return f"N={value:g}"
+	return f"{dim}={value:,.0f}"
 
 
 @frappe.whitelist()

@@ -15,6 +15,7 @@ frappe.ui.form.on("Daily Report", {
 		if (frm.is_new() && !frm.doc.supervisor_name) {
 			frm.set_value("supervisor_name", frappe.session.user_fullname);
 		}
+		consbiz.fill_default_resources(frm);
 	},
 
 	refresh(frm) {
@@ -27,6 +28,7 @@ frappe.ui.form.on("Daily Report", {
 		frm.refresh_field("items");
 		load_tasks(frm);
 		setup_buttons(frm);
+		consbiz.fill_default_resources(frm);
 	},
 
 	date(frm) {
@@ -67,6 +69,7 @@ function setup_buttons(frm) {
 	if (!frm.doc.construction_management) return;
 	if (frm.doc.docstatus === 0) {
 		frm.add_custom_button(__("ดึงงานตามแผนของวันนี้"), () => add_planned_tasks(frm));
+		frm.add_custom_button(__("สร้างงานลด-งานเพิ่ม"), () => make_variation_order(frm));
 	}
 	frm.add_custom_button(__("เปิด Gantt"), () =>
 		frappe.set_route("construction-gantt", frm.doc.construction_management)
@@ -120,6 +123,7 @@ function set_wbs_options(frm) {
 
 // งานที่มีปริมาณ: qty <-> % แปลงกันตามปริมาณ BOQ, งานเหมา: ใช้ % อย่างเดียว
 function update_amounts(frm, row, source) {
+	consbiz.fit_to_remaining(row, source);
 	if (row.boq_qty > 0) {
 		if (source === "qty") row.percent = ((row.qty || 0) / row.boq_qty) * 100;
 		else row.qty = ((row.percent || 0) * row.boq_qty) / 100;
@@ -173,5 +177,34 @@ function add_planned_tasks(frm) {
 	frappe.show_alert({
 		message: __("เพิ่ม {0} งาน กรอกปริมาณที่ทำได้ แถวที่ไม่ได้ทำให้ลบออก", [tasks.length]),
 		indicator: "green",
+	});
+}
+
+// Variation Order ใหม่ ตั้งต้นเป็นงานเพิ่มเท่ากับส่วนที่เกินปริมาณของงานเดิมในตาราง (ถ้ามี)
+function make_variation_order(frm) {
+	const excess = (frm.doc.items || [])
+		.map((row) => ({
+			row,
+			task: frm._tasks?.[row.wbs],
+			qty: flt((row.previous_qty || 0) + (row.qty || 0) - (row.boq_qty || 0), 6),
+		}))
+		.filter(({ row, task, qty }) => task && !task.is_variation && row.boq_qty > 0 && qty > 0);
+	frappe.model.with_doctype("Variation Order", () => {
+		const doc = frappe.model.get_new_doc("Variation Order");
+		doc.construction_management = frm.doc.construction_management;
+		for (const { row, task, qty } of excess) {
+			Object.assign(frappe.model.add_child(doc, "items"), {
+				variation_type: "Addition",
+				wbs: task.wbs,
+				task: task.name,
+				item_name: task.item_name,
+				uom: task.uom,
+				qty,
+				rate: task.rate,
+				amount: qty * (task.rate || 0),
+				contract_qty: task.contract_quantity || task.quantity,
+			});
+		}
+		frappe.set_route("Form", "Variation Order", doc.name);
 	});
 }

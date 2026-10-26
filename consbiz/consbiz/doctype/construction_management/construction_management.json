@@ -24,10 +24,14 @@
   "tasks",
   "section_break_progress",
   "actual_progress",
+  "contract_progress",
   "column_break_progress",
   "baseline_date",
   "section_break_total",
   "total_amount",
+  "column_break_total",
+  "variation_amount",
+  "revised_amount",
   "settings_tab",
   "section_break_calculation",
   "use_working_days",
@@ -159,7 +163,7 @@
    "label": "Progress"
   },
   {
-   "description": "ความคืบหน้าจริงรวม (ถ่วงน้ำหนักตามมูลค่างาน) จาก Construction Progress Entry",
+   "description": "มูลค่างานที่ทำแล้ว ÷ มูลค่าสัญญาปรับปรุง (รวมงานเพิ่ม-ลดที่ผู้ว่าจ้างอนุมัติแล้ว)",
    "fieldname": "actual_progress",
    "fieldtype": "Percent",
    "in_list_view": 1,
@@ -187,7 +191,8 @@
    "fieldtype": "Currency",
    "label": "Total Amount",
    "options": "Company:company:default_currency",
-   "read_only": 1
+   "read_only": 1,
+   "description": "มูลค่าตามสัญญาเดิม (ไม่รวมงานเพิ่ม-ลด)"
   },
   {
    "fieldname": "settings_tab",
@@ -225,11 +230,46 @@
    "fieldname": "week_by_month",
    "fieldtype": "Check",
    "label": "Split Weeks by Month (7-7-7-Rest)"
+  },
+  {
+   "fieldname": "column_break_total",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "งานเพิ่ม - งานลด ของ Variation Order ที่ผู้ว่าจ้างอนุมัติแล้ว",
+   "fieldname": "variation_amount",
+   "fieldtype": "Currency",
+   "label": "Variation Amount",
+   "options": "Company:company:default_currency",
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "description": "มูลค่าตามสัญญาเดิม + งานเพิ่ม-ลดที่อนุมัติแล้ว ใช้คิดน้ำหนักและ % ความคืบหน้า",
+   "fieldname": "revised_amount",
+   "fieldtype": "Currency",
+   "label": "Revised Contract Amount",
+   "options": "Company:company:default_currency",
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "description": "% ตามสัญญาเดิม: ถ่วงด้วยมูลค่าตามสัญญาของงานเดิม ไม่รวมงานเพิ่ม (ไว้อ้างอิง)",
+   "fieldname": "contract_progress",
+   "fieldtype": "Percent",
+   "label": "Contract Progress",
+   "no_copy": 1,
+   "read_only": 1
   }
  ],
  "grid_page_length": 50,
- "links": [],
- "modified": "2026-10-26 15:00:00.000000",
+ "links": [
+  {
+   "link_doctype": "Variation Order",
+   "link_fieldname": "construction_management"
+  }
+ ],
+ "modified": "2026-10-27 10:00:00.000000",
  "modified_by": "Administrator",
  "module": "ConsBiz",
  "name": "Construction Management",

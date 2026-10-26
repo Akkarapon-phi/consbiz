@@ -15,6 +15,7 @@
   "bends_90",
   "bends_135",
   "bends_180",
+  "hooks_90",
   "hooks_135",
   "hooks_180",
   "section_break_svg",
@@ -40,7 +41,7 @@
   },
   {
    "default": "A",
-   "description": "ด้านที่ต้องกรอก คั่นด้วยจุลภาค เช่น A,B,C (สูงสุด A-D หน่วย มม.)",
+   "description": "ด้านที่ต้องกรอก คั่นด้วยจุลภาค เช่น A,B,C ใช้ได้ A-F และ R (มม.), N (จำนวนรอบ), T (มุม องศา)",
    "fieldname": "dimensions",
    "fieldtype": "Data",
    "in_list_view": 1,
@@ -49,7 +50,7 @@
   },
   {
    "default": "A",
-   "description": "ผลรวมความยาวด้าน ใช้ A B C D และ d (ขนาดเหล็ก มม.) เช่น 2*(A+B)",
+   "description": "ผลรวมความยาวด้าน (มม.) ใช้ตัวแปรใน Dimensions และ d (ขนาดเหล็ก มม.), pi, sqrt() และ sin() cos() tan() ที่รับมุมเป็นองศา เช่น 2*(A+B), A+B/sin(T)+C",
    "fieldname": "sides_formula",
    "fieldtype": "Data",
    "label": "Sum of Sides Formula",
@@ -78,6 +79,12 @@
    "fieldname": "bends_180",
    "fieldtype": "Int",
    "label": "Bends 180°"
+  },
+  {
+   "description": "จำนวนขอ 90° (เช่นขอปลอก)",
+   "fieldname": "hooks_90",
+   "fieldtype": "Int",
+   "label": "Hooks 90°"
   },
   {
    "description": "จำนวนขอ 135° (เช่นปลอก)",
@@ -118,7 +125,7 @@
  ],
  "grid_page_length": 50,
  "links": [],
- "modified": "2026-10-25 09:00:00.000000",
+ "modified": "2026-10-27 10:00:00.000000",
  "modified_by": "Administrator",
  "module": "ConsBiz",
  "name": "Bar Shape",

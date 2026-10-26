@@ -57,20 +57,22 @@ export function roll_up(tasks, holidays) {
 
 // S-Curve จากวันที่ของงาน (แผนปัจจุบันหรือ baseline) แล้วสะสม
 // งานปกติกระจายน้ำหนักเท่าๆ กันทุกวันทำงาน งานที่กำหนด % เองกระจายตาม % ของแต่ละช่วง (task_daily)
+// น้ำหนัก = มูลค่าที่นับ / มูลค่าสัญญาปรับปรุง (baseline ใช้น้ำหนักที่เก็บไว้ตอนตั้ง baseline)
 // คืน { start, cumulative } โดย cumulative[i] = % สะสม ณ สิ้นวัน start + i
 export function curve_of(
 	tasks,
 	holidays,
 	start_key = "start_date",
 	end_key = "end_date",
-	distribution_key = "plan_distribution"
+	distribution_key = "plan_distribution",
+	weight_key = "weight"
 ) {
 	const leaves = tasks
-		.filter((t) => !t.is_group && t[start_key] && t[end_key] && t.weight)
+		.filter((t) => !t.is_group && t[start_key] && t[end_key] && t[weight_key])
 		.map((t) => ({
 			start: to_day(t[start_key]),
 			end: to_day(t[end_key]),
-			weight: t.weight,
+			weight: t[weight_key],
 			distribution: parse_distribution(t[distribution_key]),
 		}));
 	if (!leaves.length) return null;
@@ -156,20 +158,49 @@ export function distribution_fits(start, end, distribution) {
 	);
 }
 
-// S-Curve จริง: ยอด % ของแต่ละวันจาก Construction Progress Entry คูณน้ำหนักงาน
+// งานเดิมนับเสมอ งานเพิ่มนับเมื่อผู้ว่าจ้างอนุมัติแล้ว (ตรงกับ is_counted ใน construction_management.py)
+export function is_counted(task) {
+	return !task.is_variation || Boolean(task.counted_from);
+}
+
+// S-Curve จริงแบบ Earned Value: มูลค่างานที่ทำแล้วสะสม ÷ มูลค่าสัญญา ณ วันนั้น
+// - มูลค่าของรายการ = % ของรายการ × มูลค่างาน (= ปริมาณ × ราคาต่อหน่วย)
+// - งานเพิ่มนับตั้งแต่วันที่ผู้ว่าจ้างอนุมัติ (ทำก่อนอนุมัติ = นับ ณ วันอนุมัติ)
+// - มูลค่าสัญญา = สัญญาเดิม + งานเพิ่ม-ลดของ VO ที่อนุมัติถึงวันนั้น (steps: [{ date, amount }])
+//   % จึงขยับตอนอนุมัติ VO แต่ % ของวันก่อนหน้าไม่เปลี่ยน
 // ลากเส้นถึงวัน until (ปกติคือวันนี้) หรือถึงรายการสุดท้ายถ้าเลยวันนี้
-export function actual_curve(tasks, entries, until) {
-	const weights = new Map(tasks.filter((t) => !t.is_group).map((t) => [t.name, t.weight || 0]));
+// คืน { start, cumulative, money } money[i] = มูลค่างานสะสม (บาท) ณ สิ้นวัน start + i
+export function actual_curve(tasks, entries, until, contract_amount, steps = []) {
+	const leaves = new Map(
+		tasks.filter((t) => !t.is_group && is_counted(t)).map((t) => [t.name, t])
+	);
 	const items = entries
-		.filter((e) => weights.has(e.task) && e.percent)
-		.map((e) => ({ day: to_day(e.date), value: (weights.get(e.task) * e.percent) / 100 }));
+		.filter((e) => leaves.has(e.task) && e.percent)
+		.map((e) => {
+			const task = leaves.get(e.task);
+			const day = to_day(e.date);
+			const from = to_day(task.counted_from);
+			return {
+				day: from !== null && day < from ? from : day,
+				value: ((task.amount || 0) * e.percent) / 100,
+			};
+		});
 	if (!items.length) return null;
 
 	const start = Math.min(...items.map((e) => e.day));
 	const end = Math.max(until, ...items.map((e) => e.day));
 	const daily = new Array(end - start + 1).fill(0);
 	for (const item of items) daily[item.day - start] += item.value;
-	return { start, cumulative: accumulate(daily) };
+	const money = accumulate(daily);
+
+	const changes = steps.map((s) => ({ day: to_day(s.date), amount: s.amount || 0 }));
+	const cumulative = money.map((value, i) => {
+		const total = changes
+			.filter((c) => c.day !== null && c.day <= start + i)
+			.reduce((sum, c) => sum + c.amount, contract_amount || 0);
+		return total ? (value / total) * 100 : 0;
+	});
+	return { start, cumulative, money };
 }
 
 // ค่าสะสม ณ สิ้นวัน day (null = ไม่มีเส้น หรือวันนั้นเลยปลายเส้นจริงไปแล้ว)
@@ -202,23 +233,34 @@ export function sample_curve(curve, periods) {
 }
 
 // ค่าในตารางสรุปของช่วงเวลาหนึ่ง (ช่วงที่อยู่นอกเส้นได้ null = ช่องว่าง)
-// - baseline / plan / actual: % สะสม ณ ปลายช่วง
+// - baseline / plan / actual: % สะสม ณ ปลายช่วง, *_period: % ที่เพิ่มในช่วงนั้น (ผลต่างของ % สะสม
+//   เส้นจริงติดลบได้ในช่วงที่อนุมัติงานเพิ่ม เพราะมูลค่าสัญญาเพิ่ม)
 // - cash_plan / cash_actual: มูลค่างาน (บาท) ตามแผน/ที่ทำจริงในช่วงนั้น, *_cum: มูลค่าสะสม ณ ปลายช่วง
+//   เส้นจริงมีมูลค่าสะสม (money) ของตัวเอง เส้นแผนคิดจาก % × มูลค่าสัญญาปรับปรุง (total_amount)
 export function summary_values(period, curves, total_amount) {
 	const day = period.end - 1;
 	const inside = (curve) => curve && day >= curve.start && period.start <= curve_end(curve);
 	const percent = (curve) => (inside(curve) ? value_at(curve, day) : null);
+	const money_at = (curve, d) =>
+		curve.money
+			? value_at({ start: curve.start, cumulative: curve.money }, d)
+			: (value_at(curve, d) / 100) * (total_amount || 0);
+	const money = (curve) => (inside(curve) ? money_at(curve, day) : null);
 	const change = (curve) =>
+		inside(curve) ? money_at(curve, day) - money_at(curve, period.start - 1) : null;
+	const percent_change = (curve) =>
 		inside(curve) ? value_at(curve, day) - value_at(curve, period.start - 1) : null;
-	const amount = (value) => (value === null ? null : (value / 100) * (total_amount || 0));
 	return {
 		baseline: percent(curves.baseline),
 		plan: percent(curves.plan),
 		actual: percent(curves.actual),
-		cash_plan: amount(change(curves.plan)),
-		cash_plan_cum: amount(percent(curves.plan)),
-		cash_actual: amount(change(curves.actual)),
-		cash_actual_cum: amount(percent(curves.actual)),
+		baseline_period: percent_change(curves.baseline),
+		plan_period: percent_change(curves.plan),
+		actual_period: percent_change(curves.actual),
+		cash_plan: change(curves.plan),
+		cash_plan_cum: money(curves.plan),
+		cash_actual: change(curves.actual),
+		cash_actual_cum: money(curves.actual),
 	};
 }
 

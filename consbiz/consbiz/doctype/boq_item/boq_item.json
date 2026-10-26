@@ -67,7 +67,7 @@
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-10-22 09:07:06.394537",
+ "modified": "2026-10-26 11:00:00.000000",
  "modified_by": "Administrator",
  "module": "ConsBiz",
  "name": "BOQ Item",
@@ -92,5 +92,6 @@
  "search_fields": "item_name,description,item_group",
  "sort_field": "creation",
  "sort_order": "DESC",
- "states": []
+ "states": [],
+ "track_changes": 1
 }

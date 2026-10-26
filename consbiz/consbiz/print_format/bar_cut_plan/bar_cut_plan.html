@@ -175,7 +175,7 @@
 								</td>
 								<td class="pf-middle">{{ row.rebar_type }}</td>
 								<td class="pf-middle">
-									{%- for dim in ["a", "b", "c", "d"] if row[dim] %}
+									{%- for dim in ["a", "b", "c", "d", "e", "f", "r", "n", "t"] if row[dim] %}
 									{{ dim | upper }} {{ m0.format(row[dim]) }}{% if not loop.last %} · {% endif %}
 									{%- endfor %}
 								</td>

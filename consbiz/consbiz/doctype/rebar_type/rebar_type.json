@@ -46,14 +46,14 @@
    "fieldtype": "Column Break"
   },
   {
-   "description": "เช่น SR24, SD40",
+   "description": "เช่น SR24, SD30, SD40, SD50 (ใส่ T ต่อท้ายถ้าเป็นเหล็กผ่านความร้อน) ถ้าใช้ขนาดเดียวกันหลายชั้นคุณภาพ ให้ตั้งชื่อแยก เช่น DB16-SD50",
    "fieldname": "grade",
    "fieldtype": "Data",
    "in_list_view": 1,
    "label": "Grade"
   },
   {
-   "description": "ว่างไว้ ระบบคำนวณจาก 0.00617 × d²",
+   "description": "ว่างไว้ ระบบคำนวณมวลระบุตาม มอก. = 0.00785 × π d² / 4",
    "fieldname": "unit_weight",
    "fieldtype": "Float",
    "label": "Weight (kg/m)",
@@ -69,7 +69,7 @@
  ],
  "grid_page_length": 50,
  "links": [],
- "modified": "2026-10-25 09:00:00.000000",
+ "modified": "2026-10-27 11:00:00.000000",
  "modified_by": "Administrator",
  "module": "ConsBiz",
  "name": "Rebar Type",
