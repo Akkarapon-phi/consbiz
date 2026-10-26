@@ -2,18 +2,21 @@
 // For license information, please see license.txt
 
 // แผนตัดเหล็ก
-// - ปุ่ม "เพิ่มรายการจากรูป" ใต้ตาราง: เลือกรูปทรงจากภาพ กรอกด้าน A-D เห็นความยาวตัดก่อนเพิ่ม
+// - ปุ่ม "เพิ่มรายการจากรูป" ใต้ตาราง: เลือกรูปทรงจากภาพ กรอกด้านที่รูปนั้นใช้ เห็นความยาวตัดก่อนเพิ่ม
 // - ฟอร์มของแต่ละแถวแสดงรูปพร้อมขนาดจริง
 // - แผนภาพการตัด (cut_diagram) วาดจากตาราง patterns ที่ server คำนวณตอนบันทึก
 
 const BCP_API = "consbiz.consbiz.doctype.bar_cut_plan.bar_cut_plan";
-const BCP_DIMS = ["a", "b", "c", "d"];
+// ด้านเป็น มม. ยกเว้น n = จำนวนรอบ, t = มุม (ตรงกับ DIMENSIONS ใน bar_shape.py)
+const BCP_DIMS = ["a", "b", "c", "d", "e", "f", "r", "n", "t"];
+const BCP_DIM_UNITS = { n: __("รอบ"), t: __("องศา") };
 const BCP_SETTINGS = [
 	"use_bend_deduction",
 	"bend_45",
 	"bend_90",
 	"bend_135",
 	"bend_180",
+	"hook_90",
 	"hook_135",
 	"hook_180",
 	"round_up",
@@ -35,10 +38,7 @@ frappe.ui.form.on("Bar Cut Item", {
 		render_row_preview(frm, locals[cdt][cdn]);
 	},
 	shape: on_row_change,
-	a: on_row_change,
-	b: on_row_change,
-	c: on_row_change,
-	d: on_row_change,
+	...Object.fromEntries(BCP_DIMS.map((dim) => [dim, on_row_change])),
 });
 
 function on_row_change(frm, cdt, cdn) {
@@ -66,13 +66,20 @@ function get_shapes() {
 	return shapes_promise;
 }
 
-// รูป SVG ที่แทนป้าย A B C D ด้วยค่าจริง เช่น A=1,200
+// ป้ายด้านบนรูป (เหมือน dim_label ใน bar_cut_plan.py)
+function dim_label(dim, value) {
+	if (dim === "T") return `${value}°`;
+	if (dim === "N") return `N=${value}`;
+	return `${dim}=${format_number(value, null, 0)}`;
+}
+
+// รูป SVG ที่แทนป้ายด้านด้วยค่าจริง เช่น A=1,200
 function shape_svg(svg, values = {}) {
 	const $wrapper = $("<div>").html(svg || "");
 	$wrapper.find("[data-dim]").each(function () {
 		const value = values[this.dataset.dim.toLowerCase()];
 		if (!value) return;
-		this.textContent = `${this.dataset.dim}=${format_number(value, null, 0)}`;
+		this.textContent = dim_label(this.dataset.dim, value);
 		// ป้ายด้านซ้าย/ขวาของรูปยาวขึ้นเมื่อมีค่า ให้ชิดออกนอกรูปจะได้ไม่ทับเส้น
 		const x = Number(this.getAttribute("x"));
 		if (x < 40) {
@@ -150,7 +157,7 @@ function open_add_dialog(frm) {
 				...BCP_DIMS.map((dim) => ({
 					fieldname: dim,
 					fieldtype: "Float",
-					label: `${dim.toUpperCase()} (${__("มม.")})`,
+					label: `${dim.toUpperCase()} (${BCP_DIM_UNITS[dim] || __("มม.")})`,
 					change: () => update_preview(),
 				})),
 			],
@@ -179,7 +186,11 @@ function open_add_dialog(frm) {
 					indicator: "green",
 				});
 				// เพิ่มต่อได้ทันที: คงรูปทรงและประเภทเหล็กไว้ ล้างค่าอื่น
-				dialog.set_values({ mark: "", qty: 1, a: null, b: null, c: null, d: null });
+				dialog.set_values({
+					mark: "",
+					qty: 1,
+					...Object.fromEntries(BCP_DIMS.map((dim) => [dim, null])),
+				});
 				dialog.fields_dict.mark.$input.trigger("focus");
 			},
 			secondary_action_label: __("ปิด"),

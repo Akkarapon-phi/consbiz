@@ -43,6 +43,57 @@ class IntegrationTestBarCutPlan(IntegrationTestCase):
 		with self.assertRaises(frappe.ValidationError):
 			self.make_plan([{"shape": "21", "rebar_type": "DB12", "a": 500, "b": 800, "qty": 1}])
 
+	def test_extended_shapes(self):
+		for code, dimensions, formula, extra in [
+			("T-SPIRAL", "A,B,N", "N*sqrt((pi*(A-d))**2+B**2)", {}),
+			("T-CRANK", "A,B,C,T", "A+B/sin(T)+C", {"bends_45": 2}),
+			("T-SIX", "A,B,C,D,E,F", "A+B+C+D+E+F", {"bends_90": 5}),
+			("T-TIE90", "A,B", "2*(A+B)", {"bends_90": 5, "hooks_90": 2}),
+		]:
+			if not frappe.db.exists("Bar Shape", code):
+				frappe.get_doc(
+					{
+						"doctype": "Bar Shape",
+						"shape_code": code,
+						"shape_name": code,
+						"dimensions": dimensions,
+						"sides_formula": formula,
+						**extra,
+					}
+				).insert()
+
+		doc = self.make_plan(
+			[
+				# 5 รอบ x sqrt((pi*(600-9))^2 + 100^2) = 5 x 1859.38 = 9296.9 -> 9300
+				{"shape": "T-SPIRAL", "rebar_type": "RB9", "a": 600, "b": 100, "n": 5, "qty": 1},
+				# 500 + 200/sin(30) + 500 = 1400 - 2x1d(12) = 1376 -> 1380
+				{"shape": "T-CRANK", "rebar_type": "DB12", "a": 500, "b": 200, "c": 500, "t": 30, "qty": 1},
+				# 100+200+...+600 = 2100 - 5x2d(12) = 1980
+				{
+					"shape": "T-SIX",
+					"rebar_type": "DB12",
+					**dict(zip("abcdef", (100, 200, 300, 400, 500, 600), strict=True)),
+					"qty": 1,
+				},
+				# ปลอกขอ 90°: 2(200+400) - 5x2d(9) + 2x6d(9) = 1218 -> 1220
+				{"shape": "T-TIE90", "rebar_type": "RB9", "a": 200, "b": 400, "qty": 1},
+			]
+		)
+		self.assertEqual([row.cut_length for row in doc.items], [9300, 1380, 1980, 1220])
+
+		with self.assertRaises(frappe.ValidationError):
+			self.make_plan([{"shape": "T-CRANK", "rebar_type": "DB12", "a": 500, "b": 200, "c": 500, "qty": 1}])
+		with self.assertRaises(frappe.ValidationError):
+			frappe.get_doc(
+				{
+					"doctype": "Bar Shape",
+					"shape_code": "T-BAD",
+					"shape_name": "T-BAD",
+					"dimensions": "A,G",
+					"sides_formula": "A",
+				}
+			).insert()
+
 	def test_optimize_totals(self):
 		doc = self.make_plan(
 			[

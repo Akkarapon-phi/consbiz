@@ -7,3 +7,5 @@ consbiz.patches.remove_hash_named_dock
 # Patches added in this section will be executed after doctypes are migrated
 consbiz.patches.seed_bar_cut_masters
 consbiz.patches.set_daily_report_amounts
+consbiz.patches.seed_more_bar_shapes
+consbiz.patches.seed_more_rebar_types
