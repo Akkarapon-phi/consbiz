@@ -8,6 +8,8 @@ from frappe.utils import getdate
 from consbiz.consbiz.doctype.construction_management.construction_management import (
 	add_working_days,
 	count_working_days,
+	plan_progress,
+	target_progress,
 )
 
 EXTRA_TEST_RECORD_DEPENDENCIES = []
@@ -70,6 +72,51 @@ class IntegrationTestConstructionManagement(IntegrationTestCase):
 			self.make_schedule(
 				[{"wbs": "1", "amount": 1, "start_date": "2026-11-05", "end_date": "2026-11-04"}]
 			)
+
+	def test_plan_progress(self):
+		# น้ำหนัก 50/50: งานแรกกระจายเท่ากัน 10 วัน งานที่สองกำหนดเองรายสัปดาห์ในเดือน 10/20/30/40
+		doc = self.make_schedule(
+			[
+				{"wbs": "1", "amount": 1000, "start_date": "2026-11-02", "end_date": "2026-11-11"},
+				{
+					"wbs": "2",
+					"amount": 1000,
+					"start_date": "2026-11-01",
+					"end_date": "2026-11-30",
+					"plan_distribution": {"unit": "mweek", "weights": [10, 20, 30, 40]},
+				},
+			]
+		)
+		self.assertEqual(plan_progress(doc, "2026-10-31"), 0)
+		# 50 x 5/10 + 50 x (10% x 6/7)
+		self.assertAlmostEqual(plan_progress(doc, "2026-11-06"), 25 + 50 * 0.1 * 6 / 7)
+		self.assertAlmostEqual(plan_progress(doc, "2026-11-14"), 50 + 50 * 0.3)
+		# ช่วงสุดท้าย 22-30 พ.ย. (9 วัน) ทำไป 4 วัน
+		self.assertAlmostEqual(plan_progress(doc, "2026-11-25"), 50 + 50 * (0.6 + 0.4 * 4 / 9))
+		self.assertAlmostEqual(plan_progress(doc, "2026-12-01"), 100)
+
+		# นับวันทำงาน: วันหยุดไม่มี % แผน
+		doc.tasks[1].plan_distribution = None
+		doc.use_working_days = 1
+		doc.get_holidays = lambda: {getdate("2026-11-03")}
+		self.assertAlmostEqual(plan_progress(doc, "2026-11-03"), 50 / 9 + 50 * 2 / 29)
+
+	def test_target_progress(self):
+		doc = self.make_schedule(
+			[{"wbs": "1", "amount": 1000, "start_date": "2026-11-02", "end_date": "2026-11-11"}]
+		)
+		# ยังไม่ตั้ง Baseline: เทียบกับแผนปัจจุบัน
+		value, basis = target_progress(doc, "2026-11-06")
+		self.assertAlmostEqual(value, 50)
+		self.assertEqual(basis, "Current Plan")
+
+		# Baseline 2-6 พ.ย. ส่วนแผนปัจจุบันขยายถึง 11 พ.ย.
+		row = doc.tasks[0]
+		row.baseline_start_date, row.baseline_end_date, row.baseline_weight = "2026-11-02", "2026-11-06", 100
+		value, basis = target_progress(doc, "2026-11-04")
+		self.assertAlmostEqual(value, 60)
+		self.assertEqual(basis, "Baseline")
+		self.assertAlmostEqual(plan_progress(doc, "2026-11-04"), 30)
 
 	def make_linked(self, tasks, holidays=None):
 		"""แผนที่แถวมีชื่อ (ใช้อ้างเป็นงานก่อนหน้า) predecessors ใส่เป็น list และ holidays แทนปฏิทินวันหยุด
@@ -444,14 +491,45 @@ class IntegrationTestConstructionProgress(IntegrationTestCase):
 		with self.assertRaises(frappe.ValidationError):
 			self.save([{"task": self.qty_task.name, "date": "2026-11-03", "qty": 11}])
 
-	def test_baseline(self):
-		from consbiz.consbiz.doctype.construction_management.construction_management import set_baseline
+	def save_baseline(self, title, activate=1):
+		from consbiz.consbiz.doctype.construction_management.construction_management import save_baseline
 
-		set_baseline(self.doc.name, str(self.doc.modified))
 		self.doc.reload()
+		data = save_baseline(self.doc.name, str(self.doc.modified), title, activate=activate)
+		self.doc.reload()
+		return data["baselines"][-1]["name"]
+
+	def test_baseline(self):
+		from consbiz.consbiz.doctype.construction_management.construction_management import (
+			activate_baseline,
+			delete_baseline,
+			target_progress,
+		)
+
+		first = self.save_baseline("แผนตามสัญญา")
+		self.assertEqual(self.doc.active_baseline, first)
 		self.assertEqual(self.doc.tasks[1].baseline_start_date, self.doc.tasks[1].start_date)
 		self.assertEqual(self.doc.tasks[0].baseline_end_date, self.doc.tasks[0].end_date)
 		self.assertTrue(self.doc.baseline_date)
+
+		# เลื่อนงาน 1.1 ไป 10 พ.ย. แล้วบันทึกชุดที่ 2 โดยยังไม่ใช้เทียบ: ช่อง baseline_* ยังเป็นชุดแรก
+		self.save([], tasks=[{"name": self.qty_task.name, "start_date": "2026-11-10", "end_date": "2026-11-10"}])
+		second = self.save_baseline("ขยายเวลา EOT-1", activate=0)
+		self.assertEqual(self.doc.active_baseline, first)
+		self.assertEqual(str(self.doc.tasks[1].baseline_start_date), "2026-11-02")
+		# 5 พ.ย. ชุดแรกครบ 100% ชุดที่ 2 มีแค่งาน 1.2 (น้ำหนัก 25%)
+		self.assertAlmostEqual(target_progress(self.doc, "2026-11-05")[0], 100)
+
+		activate_baseline(self.doc.name, str(self.doc.modified), second)
+		self.doc.reload()
+		self.assertEqual(self.doc.active_baseline, second)
+		self.assertEqual(str(self.doc.tasks[1].baseline_start_date), "2026-11-10")
+		self.assertAlmostEqual(target_progress(self.doc, "2026-11-05")[0], 25)
+
+		# ชุดที่ใช้เทียบอยู่ลบไม่ได้ ชุดอื่นลบได้
+		with self.assertRaises(frappe.ValidationError):
+			delete_baseline(self.doc.name, second)
+		self.assertEqual([b.name for b in delete_baseline(self.doc.name, first)], [second])
 
 	def make_report(self, items, date="2026-11-05"):
 		report = frappe.new_doc("Daily Report")
@@ -487,6 +565,34 @@ class IntegrationTestConstructionProgress(IntegrationTestCase):
 		self.doc.reload()
 		self.assertEqual(self.doc.tasks[1].actual_qty, 0)
 		self.assertFalse(frappe.db.exists("Construction Progress Entry", {"reference_name": report.name}))
+
+	def test_daily_report_progress(self):
+		# ทุกงานอยู่วันที่ 2 พ.ย. แผนสะสม ณ 5 พ.ย. = 100% ยังไม่ตั้ง Baseline จึงเทียบแผนปัจจุบัน
+		# 1.1 ทำ 3/10 = 30% x น้ำหนัก 75% = 22.5%
+		report = self.make_report([{"wbs": "1.1", "qty": 3}])
+		self.assertAlmostEqual(report.today_progress, 22.5)
+		self.assertAlmostEqual(report.cumulative_progress, 22.5)
+		self.assertAlmostEqual(report.baseline_progress, 100)
+		self.assertEqual(report.plan_basis, "Current Plan")
+		self.assertAlmostEqual(report.progress_variance, -77.5)
+
+		self.save_baseline("แผนตามสัญญา")
+		report.save()
+		self.assertEqual(report.plan_basis, "Baseline")
+		report.submit()
+		html = frappe.get_print("Daily Report", report.name, "Daily Report", doc=report)
+		self.assertIn("ช้ากว่าแผน 77.500%", html)
+		self.assertIn("แผนสะสม (Baseline)", html)
+
+		# รายการหลังวันที่รายงานไม่นับในยอดสะสม 1.2 ทำ 50% x 25% = 12.5%
+		self.save([{"task": self.lump_task.name, "date": "2026-11-10", "percent": 20}])
+		later = self.make_report([{"wbs": "1.2", "percent": 50}], date="2026-11-06")
+		self.assertAlmostEqual(later.today_progress, 12.5)
+		self.assertAlmostEqual(later.cumulative_progress, 35)
+		# Submit แล้วรายการของรายงานนี้ไม่ถูกนับซ้ำ
+		later.submit()
+		later.set_progress()
+		self.assertAlmostEqual(later.cumulative_progress, 35)
 
 	def test_plan_distribution(self):
 		self.save(

@@ -18,7 +18,10 @@ from frappe.model.document import Document
 from frappe.model.mapper import get_mapped_doc
 from frappe.utils import flt, getdate, now_datetime
 
-from consbiz.consbiz.doctype.construction_management.construction_management import TOLERANCE
+from consbiz.consbiz.doctype.construction_management.construction_management import (
+	TOLERANCE,
+	target_progress,
+)
 from consbiz.consbiz.doctype.daily_report.daily_report import (
 	fit_to_remaining,
 	get_leaf_tasks,
@@ -53,11 +56,19 @@ class DailyRequest(Document):
 			frappe.db.get_value("Construction Management", self.construction_management, "actual_progress")
 		)
 		self.expected_progress = min(flt(self.current_progress) + flt(self.planned_progress), 100)
+		self.set_plan_comparison()
 
 		# แก้ไขฉบับที่ไม่อนุมัติแล้วบันทึกใหม่ = ส่งขออนุมัติอีกครั้ง
 		if self.docstatus == 0:
 			self.status = "Pending"
 			self.approved_by = self.approved_on = self.rejection_reason = None
+
+	def set_plan_comparison(self):
+		"""% แผนสะสม ณ สิ้นวันปฏิบัติงาน (Baseline ถ้าตั้งไว้) และ % คาดการณ์เร็ว-ช้ากว่าแผนเท่าไร"""
+		self.baseline_progress, self.plan_basis = target_progress(
+			frappe.get_doc("Construction Management", self.construction_management), self.date
+		)
+		self.progress_variance = flt(self.expected_progress) - self.baseline_progress
 
 	def validate_approver(self):
 		if self.approver and not frappe.has_permission(self.doctype, "submit", user=self.approver):
@@ -248,3 +259,4 @@ def get_last_approver(construction_management):
 		limit=1,
 	)
 	return last[0].approver if last else None
+

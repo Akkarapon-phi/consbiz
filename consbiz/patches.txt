@@ -11,3 +11,5 @@ consbiz.patches.set_contract_amounts
 consbiz.patches.seed_more_bar_shapes
 consbiz.patches.seed_more_rebar_types
 consbiz.patches.remove_moved_client_scripts
+consbiz.patches.set_daily_progress_comparison
+consbiz.patches.migrate_baselines

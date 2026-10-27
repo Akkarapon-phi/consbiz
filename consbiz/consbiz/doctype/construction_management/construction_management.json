@@ -27,6 +27,7 @@
   "contract_progress",
   "column_break_progress",
   "baseline_date",
+  "active_baseline",
   "section_break_total",
   "total_amount",
   "column_break_total",
@@ -175,7 +176,7 @@
    "fieldtype": "Column Break"
   },
   {
-   "description": "วันที่บันทึก Baseline ล่าสุด (กดปุ่มในหน้า Gantt)",
+   "description": "วันที่บันทึก Baseline ที่ใช้เทียบ",
    "fieldname": "baseline_date",
    "fieldtype": "Date",
    "label": "Baseline Date",
@@ -183,16 +184,25 @@
    "read_only": 1
   },
   {
+   "description": "ชุด Baseline ที่ใช้เทียบกับความคืบหน้าจริง (เลือกในหน้า Gantt)",
+   "fieldname": "active_baseline",
+   "fieldtype": "Link",
+   "label": "Active Baseline",
+   "no_copy": 1,
+   "options": "Construction Baseline",
+   "read_only": 1
+  },
+  {
    "fieldname": "section_break_total",
    "fieldtype": "Section Break"
   },
   {
+   "description": "มูลค่าตามสัญญาเดิม (ไม่รวมงานเพิ่ม-ลด)",
    "fieldname": "total_amount",
    "fieldtype": "Currency",
    "label": "Total Amount",
    "options": "Company:company:default_currency",
-   "read_only": 1,
-   "description": "มูลค่าตามสัญญาเดิม (ไม่รวมงานเพิ่ม-ลด)"
+   "read_only": 1
   },
   {
    "fieldname": "settings_tab",
@@ -240,18 +250,18 @@
    "fieldname": "variation_amount",
    "fieldtype": "Currency",
    "label": "Variation Amount",
+   "no_copy": 1,
    "options": "Company:company:default_currency",
-   "read_only": 1,
-   "no_copy": 1
+   "read_only": 1
   },
   {
    "description": "มูลค่าตามสัญญาเดิม + งานเพิ่ม-ลดที่อนุมัติแล้ว ใช้คิดน้ำหนักและ % ความคืบหน้า",
    "fieldname": "revised_amount",
    "fieldtype": "Currency",
    "label": "Revised Contract Amount",
+   "no_copy": 1,
    "options": "Company:company:default_currency",
-   "read_only": 1,
-   "no_copy": 1
+   "read_only": 1
   },
   {
    "description": "% ตามสัญญาเดิม: ถ่วงด้วยมูลค่าตามสัญญาของงานเดิม ไม่รวมงานเพิ่ม (ไว้อ้างอิง)",
@@ -267,9 +277,13 @@
   {
    "link_doctype": "Variation Order",
    "link_fieldname": "construction_management"
+  },
+  {
+   "link_doctype": "Construction Baseline",
+   "link_fieldname": "construction_management"
   }
  ],
- "modified": "2026-10-27 10:00:00.000000",
+ "modified": "2026-10-27 17:01:49.000000",
  "modified_by": "Administrator",
  "module": "ConsBiz",
  "name": "Construction Management",

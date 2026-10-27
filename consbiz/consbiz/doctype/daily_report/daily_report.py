@@ -15,6 +15,8 @@ from frappe.utils import cint, flt, getdate
 from consbiz.consbiz.doctype.construction_management.construction_management import (
 	PROGRESS_ENTRY,
 	TOLERANCE,
+	actual_progress_at,
+	target_progress,
 	update_actual_progress,
 	validate_task_progress,
 )
@@ -52,11 +54,21 @@ class DailyReport(Document):
 			seen.add(task.name)
 			self.set_row(row, task, previous.get(task.name, (0, 0)), tasks)
 		self.total_amount = sum(flt(row.amount) for row in self.items)
+		self.set_progress()
 
 	def before_insert(self):
 		# Amend: daily_request เป็น no_copy (Duplicate ไม่ติดไป) แต่ฉบับแก้ไขต้องอ้างคำขอเดิม
 		if self.amended_from and not self.daily_request:
 			self.daily_request = frappe.db.get_value("Daily Report", self.amended_from, "daily_request")
+
+	def set_progress(self):
+		"""% ความคืบหน้าโครงการจากรายงานนี้ % สะสม ณ สิ้นวันที่รายงาน และเร็ว-ช้ากว่าแผน (Baseline)"""
+		cm = frappe.get_doc("Construction Management", self.construction_management)
+		self.today_progress, self.cumulative_progress = actual_progress_at(
+			cm, self.date, self.items, exclude_report=self.name
+		)
+		self.baseline_progress, self.plan_basis = target_progress(cm, self.date)
+		self.progress_variance = self.cumulative_progress - self.baseline_progress
 
 	def validate_daily_request(self):
 		"""คำขออนุมัติที่อ้างถึงต้องอนุมัติแล้ว เป็นแผนงานเดียวกัน และยังไม่มีรายงานฉบับอื่น (ที่ไม่ได้ยกเลิก)"""

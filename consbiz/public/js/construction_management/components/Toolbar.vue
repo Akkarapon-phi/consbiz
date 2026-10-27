@@ -1,8 +1,9 @@
 <script setup>
 // แถบเครื่องมือ 2 แถว
 // 1. แถบคำสั่ง: Undo/Redo + สวิตช์บันทึกอัตโนมัติ | มาตราส่วนเวลา | ซูม | วันที่เลือกดู + วันนี้
-//    ขวา: เมนู WBS / แสดงผล / ตารางสรุป / คอลัมน์
-// 2. ตัวเลข ณ วันที่เลือกดู: % Baseline / แผน / จริง, เร็ว-ช้ากว่าแผน
+//    ขวา: เมนู Baseline / WBS / แสดงผล / ตารางสรุป / คอลัมน์
+//    Baseline: เลือกชุดที่เปิดดูได้ทีละชุด คำสั่งบันทึก/ใช้เทียบ/ลบ แยกไว้ใต้รายการ (ทำงานกับชุดที่เปิดดูอยู่)
+// 2. ตัวเลข ณ วันที่เลือกดู: % Baseline / แผน / จริง, เร็ว-ช้ากว่า Baseline (ไม่มี Baseline ใช้แผน)
 //    ขวา: วันเริ่ม-สิ้นสุดสัญญา, ระยะเวลาสัญญา, วันที่แผนเสร็จ, มูลค่าสัญญา
 // settings เป็น reactive ของ App แก้ตรงได้ (App บันทึกลง User Settings เอง)
 // สวิตช์ใช้ class switch-control ของ Frappe, เมนูเป็น dropdown ของ Bootstrap (คลิกในเมนูไม่ปิดเมนู)
@@ -26,6 +27,10 @@ const props = defineProps({
 	canWrite: Boolean,
 	canUndo: Boolean,
 	canRedo: Boolean,
+	baselines: Array,
+	viewedBaseline: String,
+	activeBaseline: String,
+	canDeleteBaseline: Boolean,
 });
 defineEmits([
 	"choose-columns",
@@ -35,6 +40,10 @@ defineEmits([
 	"undo",
 	"redo",
 	"update:statusDate",
+	"view-baseline",
+	"save-baseline",
+	"activate-baseline",
+	"delete-baseline",
 ]);
 
 // สิ่งที่แสดงบนแถบงาน (key ใน settings)
@@ -86,21 +95,26 @@ const levels = computed(() =>
 	}))
 );
 
-// เทียบ % จริงกับแผน ณ วันที่เลือก (ต่างกันไม่ถึง 0.005% ถือว่าตามแผน) ใช้ indicator มาตรฐานของ Frappe
+// เทียบ % จริงกับ Baseline ณ วันที่เลือก ยังไม่ตั้ง Baseline เทียบกับแผนปัจจุบัน (ตรงกับ target_progress ฝั่ง Python)
+// ต่างกันไม่ถึง 0.005% ถือว่าตามแผน ใช้ indicator มาตรฐานของ Frappe
 const variance = computed(() => {
-	const { plan, actual } = props.readout;
-	if (plan === null || actual === null) return null;
-	const diff = actual - plan;
-	if (Math.abs(diff) < 0.005) return { text: __("ตามแผน"), color: "gray" };
+	const { baseline, plan, actual } = props.readout;
+	const target = baseline ?? plan;
+	if (target === null || actual === null) return null;
+	const diff = actual - target;
+	const label = baseline !== null ? "Baseline" : __("แผน");
+	if (Math.abs(diff) < 0.005) return { text: __("ตาม{0}", [label]), color: "gray" };
 	return diff > 0
-		? { text: __("เร็วกว่าแผน {0}", [percent(diff)]), color: "green" }
-		: { text: __("ช้ากว่าแผน {0}", [percent(-diff)]), color: "red" };
+		? { text: __("เร็วกว่า{0} {1}", [label, percent(diff)]), color: "green" }
+		: { text: __("ช้ากว่า{0} {1}", [label, percent(-diff)]), color: "red" };
 });
 
 // แผนงานเสร็จหลังวันสิ้นสุดสัญญา
 const late = computed(
 	() => props.finishDate && props.contractFinish && props.finishDate > props.contractFinish
 );
+
+const viewed = computed(() => props.baselines.find((b) => b.name === props.viewedBaseline) || null);
 
 const revised = computed(() => props.contractAmount !== props.totalAmount);
 
@@ -193,6 +207,72 @@ const date = (value) => frappe.datetime.str_to_user(value);
 			</div>
 
 			<div class="cs-bar-end">
+				<div class="dropdown">
+					<button
+						type="button"
+						class="btn btn-default btn-sm cs-btn dropdown-toggle"
+						data-toggle="dropdown"
+						aria-haspopup="true"
+						aria-expanded="false"
+						:title="__('เลือก Baseline ที่จะดู และจัดการ Baseline')"
+					>
+						<span v-html="icon('flag')" />
+						<span class="cs-baseline-label">
+							{{ viewed ? __("Baseline: {0}", [viewed.title]) : __("Baseline") }}
+						</span>
+					</button>
+					<div class="dropdown-menu dropdown-menu-right cs-menu">
+						<div class="cs-menu-title">{{ __("เปิดดู") }}</div>
+						<a
+							v-for="baseline in baselines"
+							:key="baseline.name"
+							class="dropdown-item cs-baseline-item"
+							href="#"
+							:title="baseline.reason || ''"
+							@click.prevent="$emit('view-baseline', baseline.name)"
+						>
+							<span
+								class="cs-check"
+								:style="{ visibility: baseline.name === viewedBaseline ? 'visible' : 'hidden' }"
+								v-html="icon('check')"
+							/>
+							<span class="cs-baseline-name">
+								{{ baseline.title }}
+								<span class="text-muted">{{ date(baseline.baseline_date) }}</span>
+							</span>
+							<span v-if="baseline.name === activeBaseline" class="indicator-pill blue">
+								{{ __("ใช้เทียบ") }}
+							</span>
+						</a>
+						<div v-if="!baselines.length" class="dropdown-item disabled">
+							{{ __("ยังไม่มี Baseline") }}
+						</div>
+						<template v-if="canWrite">
+							<div class="dropdown-divider" />
+							<a class="dropdown-item" href="#" @click.prevent="$emit('save-baseline')">
+								{{ __("บันทึก Baseline ใหม่...") }}
+							</a>
+							<a
+								class="dropdown-item"
+								:class="{ disabled: !viewed || viewed.name === activeBaseline }"
+								href="#"
+								@click.prevent="$emit('activate-baseline')"
+							>
+								{{ __("ใช้ชุดที่เปิดดูเทียบกับความคืบหน้าจริง") }}
+							</a>
+							<a
+								v-if="canDeleteBaseline"
+								class="dropdown-item text-danger"
+								:class="{ disabled: !viewed || viewed.name === activeBaseline }"
+								:title="__('ชุดที่ใช้เทียบอยู่ลบไม่ได้ ให้เลือกชุดอื่นเป็นตัวเทียบก่อน')"
+								href="#"
+								@click.prevent="$emit('delete-baseline')"
+							>
+								{{ __("ลบชุดที่เปิดดู") }}
+							</a>
+						</template>
+					</div>
+				</div>
 
 				<div class="dropdown">
 					<button
@@ -476,6 +556,23 @@ const date = (value) => frappe.datetime.str_to_user(value);
 	min-width: 230px;
 	border-radius: var(--radius-md);
 	padding: var(--padding-xs) 0;
+}
+/* เมนู Baseline: เครื่องหมายถูก = ชุดที่เปิดดู ป้าย "ใช้เทียบ" = ชุดที่ใช้กับรายงาน */
+.cs-baseline-label {
+	display: inline-block;
+	max-width: 180px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	vertical-align: bottom;
+}
+.cs-baseline-item {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+}
+.cs-baseline-name {
+	flex: 1;
 }
 .cs-menu-title {
 	display: flex;

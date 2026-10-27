@@ -358,7 +358,7 @@ const summary_cells = computed(() => {
 				.map((row) =>
 					row.money
 						? `${row.label}: ${format_money(values[row.key], false)}`
-						: `${row.label}: ${format_percent(values[row.key], 2)}%`
+						: `${row.label}: ${format_percent(values[row.key])}%`
 				)
 				.join("\n"),
 		};

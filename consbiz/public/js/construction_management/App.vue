@@ -91,9 +91,7 @@ const SUMMARY_ROWS = [
 	const { color, print_color } = CURVES.find((c) => c.key === row.curve);
 	return { ...row, color, print_color };
 });
-const DEFAULT_SUMMARY_KEYS = SUMMARY_ROWS.map((row) => row.key).filter(
-	(key) => key !== "baseline_period"
-);
+const DEFAULT_SUMMARY_KEYS = SUMMARY_ROWS.map((row) => row.key);
 
 const data = ref(null);
 const tasks = ref([]);
@@ -204,6 +202,36 @@ const finish_date = computed(() => {
 // ---------- S-Curve และค่า % ----------
 
 const has_baseline = computed(() => tasks.value.some((t) => t.baseline_start_date));
+
+// ---------- Baseline หลายชุด ----------
+// ชุดที่เปิดดู (viewed_baseline) แยกจากชุดที่ใช้เทียบกับความคืบหน้าจริงในรายงาน (data.active_baseline)
+// เปิดดูชุดไหน คัดลอกวันที่/% แผน/น้ำหนักของชุดนั้นลงช่อง baseline_* ของงานในหน้านี้ (ไม่บันทึก)
+// แถบ Baseline, เส้น S-Curve, ตารางสรุป และงานพิมพ์จึงเป็นของชุดที่เปิดดู
+const viewed_baseline = ref(null);
+const baselines = computed(() => data.value?.baselines || []);
+const viewed_baseline_doc = computed(
+	() => baselines.value.find((b) => b.name === viewed_baseline.value) || null
+);
+const can_delete_baseline = frappe.model.can_delete("Construction Baseline");
+const active_baseline_doc = computed(
+	() => baselines.value.find((b) => b.name === data.value?.active_baseline) || null
+);
+
+function show_baseline(name) {
+	const baseline = baselines.value.find((b) => b.name === name);
+	viewed_baseline.value = baseline?.name || null;
+	if (!baseline) return;
+	const rows = (typeof baseline.tasks === "string" ? JSON.parse(baseline.tasks) : baseline.tasks) || {};
+	for (const task of tasks.value) {
+		const [start, end, distribution, weight] = rows[task.name] || [null, null, null, 0];
+		Object.assign(task, {
+			baseline_start_date: start,
+			baseline_end_date: end,
+			baseline_distribution: distribution,
+			baseline_weight: weight,
+		});
+	}
+}
 
 // มูลค่าสัญญาปรับปรุง (สัญญาเดิม + งานเพิ่ม-ลดที่ผู้ว่าจ้างอนุมัติแล้ว) ใช้กับ Cash Plan และหัวเครื่องมือ
 const revised_amount = computed(() => data.value?.revised_amount || data.value?.total_amount || 0);
@@ -422,6 +450,12 @@ function set_data(message, { keep_history = false } = {}) {
 		predecessors: t.predecessors ? JSON.stringify(parse_predecessors(t.predecessors)) : null,
 	}));
 	entries.value = message.progress_entries.map((e) => ({ ...e }));
+	// เปิดดูชุดเดิมต่อถ้ายังอยู่ ไม่งั้นดูชุดที่ใช้เทียบ
+	show_baseline(
+		message.baselines.some((b) => b.name === viewed_baseline.value)
+			? viewed_baseline.value
+			: message.active_baseline
+	);
 	saved_state.value = snapshot();
 	save_error.value = false;
 	remote_changed.value = false;
@@ -513,26 +547,94 @@ function on_visibility_change() {
 	if (!document.hidden) check_remote();
 }
 
-function set_baseline() {
-	if (dirty.value) {
-		frappe.msgprint(__("กรุณาบันทึกการแก้ไขก่อนตั้ง Baseline"));
-		return;
-	}
-	const message = data.value.baseline_date
-		? __("แทนที่ Baseline เดิม (ตั้งเมื่อ {0}) ด้วยวันที่ของแผนปัจจุบัน?", [
-				frappe.datetime.str_to_user(data.value.baseline_date),
-		  ])
-		: __("เก็บวันเริ่ม/วันจบของแผนปัจจุบันเป็น Baseline?");
-	frappe.confirm(message, async () => {
-		const { message } = await frappe.call({
-			method: `${API}.set_baseline`,
-			args: { name: props.schedule, modified: data.value.modified },
-			freeze: true,
-		});
-		set_data(message);
-		setup_page();
-		frappe.show_alert({ message: __("บันทึก Baseline แล้ว"), indicator: "green" });
+// เปลี่ยน Baseline ต้องบันทึกแผนงานด้วย จึงให้บันทึกการแก้ไขที่ค้างอยู่ก่อน
+function check_saved() {
+	if (!dirty.value) return true;
+	frappe.msgprint(__("กรุณาบันทึกการแก้ไขก่อนเปลี่ยน Baseline"));
+	return false;
+}
+
+function save_baseline() {
+	if (!check_saved()) return;
+	const dialog = new frappe.ui.Dialog({
+		title: __("บันทึก Baseline ใหม่"),
+		fields: [
+			{
+				fieldname: "title",
+				fieldtype: "Data",
+				label: __("ชื่อ"),
+				reqd: 1,
+				default: __("Baseline {0}", [baselines.value.length + 1]),
+			},
+			{
+				fieldname: "reason",
+				fieldtype: "Small Text",
+				label: __("เหตุผลที่ปรับแผน"),
+				description: __("เช่น แผนตามสัญญา, ได้รับอนุมัติขยายเวลา (EOT), งานเพิ่ม-ลด"),
+			},
+			{
+				fieldname: "activate",
+				fieldtype: "Check",
+				label: __("ใช้ชุดนี้เทียบกับความคืบหน้าจริง (Daily Report / Daily Request)"),
+				default: 1,
+			},
+		],
+		primary_action_label: __("บันทึก"),
+		primary_action: async (values) => {
+			const { message } = await frappe.call({
+				method: `${API}.save_baseline`,
+				args: { name: props.schedule, modified: data.value.modified, ...values },
+				freeze: true,
+			});
+			dialog.hide();
+			viewed_baseline.value = message.baselines.at(-1).name;
+			set_data(message);
+			setup_page();
+			frappe.show_alert({ message: __("บันทึก Baseline แล้ว"), indicator: "green" });
+		},
 	});
+	dialog.show();
+}
+
+function activate_baseline() {
+	const baseline = viewed_baseline_doc.value;
+	if (!baseline || !check_saved()) return;
+	frappe.confirm(
+		__(
+			"ใช้ {0} เทียบกับความคืบหน้าจริง? Daily Report / Daily Request ที่บันทึกต่อจากนี้จะเทียบกับชุดนี้ (ฉบับที่บันทึกแล้วไม่เปลี่ยน)",
+			[frappe.utils.escape_html(baseline.title)]
+		),
+		async () => {
+			const { message } = await frappe.call({
+				method: `${API}.activate_baseline`,
+				args: { name: props.schedule, modified: data.value.modified, baseline: baseline.name },
+				freeze: true,
+			});
+			set_data(message);
+			setup_page();
+			frappe.show_alert({ message: __("เปลี่ยน Baseline ที่ใช้เทียบแล้ว"), indicator: "green" });
+		}
+	);
+}
+
+function delete_baseline() {
+	const baseline = viewed_baseline_doc.value;
+	if (!baseline || baseline.name === data.value.active_baseline) return;
+	frappe.confirm(
+		__("ลบ Baseline {0}? ลบแล้วเรียกคืนไม่ได้", [frappe.utils.escape_html(baseline.title)]),
+		async () => {
+			const { message } = await frappe.call({
+				method: `${API}.delete_baseline`,
+				args: { name: props.schedule, baseline: baseline.name },
+				freeze: true,
+			});
+			// ลบไม่เปลี่ยนแผนงาน: อัปเดตแค่รายการแล้วกลับไปดูชุดที่ใช้เทียบ (การแก้ที่ค้างอยู่ยังอยู่)
+			data.value.baselines = message;
+			show_baseline(data.value.active_baseline);
+			update_indicator();
+			frappe.show_alert({ message: __("ลบ Baseline แล้ว"), indicator: "green" });
+		}
+	);
 }
 
 function reload() {
@@ -551,10 +653,6 @@ function setup_page() {
 	page.clear_icons();
 	if (can_write.value) {
 		page.set_primary_action(__("บันทึก"), save, "save");
-		page.set_secondary_action(
-			data.value.baseline_date ? __("ตั้ง Baseline ใหม่") : __("ตั้ง Baseline"),
-			set_baseline
-		);
 	}
 	page.add_action_icon("refresh-cw", reload, "", __("โหลดใหม่"));
 	page.add_action_icon("printer", print, "", __("พิมพ์"));
@@ -585,14 +683,16 @@ function update_indicator() {
 	else if (remote_changed.value)
 		props.page.set_indicator(__("มีการแก้จากที่อื่น บันทึกหรือโหลดใหม่"), "red");
 	else if (dirty.value) props.page.set_indicator(__("ยังไม่บันทึก"), "orange");
-	else if (data.value?.baseline_date)
+	else if (viewed_baseline_doc.value && viewed_baseline_doc.value !== active_baseline_doc.value)
 		props.page.set_indicator(
-			__("Baseline {0}", [frappe.datetime.str_to_user(data.value.baseline_date)]),
-			"gray"
+			__("กำลังดู Baseline: {0}", [frappe.utils.escape_html(viewed_baseline_doc.value.title)]),
+			"blue"
 		);
+	else if (active_baseline_doc.value)
+		props.page.set_indicator(__("Baseline: {0}", [frappe.utils.escape_html(active_baseline_doc.value.title)]), "gray");
 	else props.page.clear_indicator();
 }
-watch([dirty, saving, save_error, remote_changed], update_indicator);
+watch([dirty, saving, save_error, remote_changed, viewed_baseline], update_indicator);
 
 // ---------- แก้ค่าจากตารางและการลากแถบ ----------
 
@@ -1037,11 +1137,22 @@ function print_model() {
 		contractor: data.value.contractor,
 		supervisor: data.value.supervisor,
 		contract_text: contract_text(),
-		status_text: __("ณ วันที่ {0}: แผน {1}% · จริง {2}%", [
-			frappe.datetime.str_to_user(status_date.value),
-			percent(readout.value.plan),
-			percent(readout.value.actual),
-		]),
+		status_text:
+			readout.value.baseline !== null
+				? __("ณ วันที่ {0}: {1} {2}% · แผน {3}% · จริง {4}%", [
+						frappe.datetime.str_to_user(status_date.value),
+						viewed_baseline_doc.value
+							? `Baseline (${viewed_baseline_doc.value.title})`
+							: "Baseline",
+						percent(readout.value.baseline),
+						percent(readout.value.plan),
+						percent(readout.value.actual),
+				  ])
+				: __("ณ วันที่ {0}: แผน {1}% · จริง {2}%", [
+						frappe.datetime.str_to_user(status_date.value),
+						percent(readout.value.plan),
+						percent(readout.value.actual),
+				  ]),
 		columns: columns.value,
 		rows: visible_tasks.value,
 		metrics: metrics.value,
@@ -1185,6 +1296,14 @@ onBeforeUnmount(() => {
 				:contract-finish="data.finish_date"
 				:contract-start="data.start_date"
 				:contract-duration="data.duration"
+				:baselines="baselines"
+				:viewed-baseline="viewed_baseline"
+				:active-baseline="data.active_baseline"
+				:can-delete-baseline="can_delete_baseline"
+				@view-baseline="show_baseline"
+				@save-baseline="save_baseline"
+				@activate-baseline="activate_baseline"
+				@delete-baseline="delete_baseline"
 				@choose-columns="choose_columns"
 				@wbs-level="set_wbs_level"
 				@today="go_today"

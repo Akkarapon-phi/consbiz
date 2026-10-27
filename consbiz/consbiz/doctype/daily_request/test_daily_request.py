@@ -63,6 +63,10 @@ class IntegrationTestDailyRequest(IntegrationTestCase):
 		self.assertAlmostEqual(lump_row.project_percent, 12.5)
 		self.assertAlmostEqual(request.planned_progress, 35)
 		self.assertAlmostEqual(request.expected_progress, 35)
+		# แผนสะสม ณ 2 พ.ย. = 100% (ยังไม่ตั้ง Baseline ใช้แผนปัจจุบัน)
+		self.assertAlmostEqual(request.baseline_progress, 100)
+		self.assertEqual(request.plan_basis, "Current Plan")
+		self.assertAlmostEqual(request.progress_variance, -65)
 		self.assertEqual(qty_row.in_plan, 1)
 		self.assertEqual(request.status, "Pending")
 
@@ -222,3 +226,13 @@ class IntegrationTestDailyRequest(IntegrationTestCase):
 		report.insert()
 		self.assertEqual(report.items[0].qty, 10)
 		report.submit()
+
+	def test_print_format(self):
+		request = self.make_request([{"wbs": "1.1", "qty": 3}], date="2026-11-03")
+		html = frappe.get_print("Daily Request", request.name, "Daily Request", doc=request)
+		# ลงนามทั้งสองฝั่งวันก่อนวันปฏิบัติงาน, แผนสะสม ณ 3 พ.ย. = 100% (ทุกงานจบ 2 พ.ย.)
+		self.assertEqual(html.count("วันที่ 2 พฤศจิกายน 2569"), 2)
+		self.assertIn("ช้ากว่าแผน", html)
+		self.assertIn("(แผน 100.00%)", html)
+		self.assertIn("การอนุมัติ", html)
+		self.assertNotIn("มาตรการความปลอดภัย", html)

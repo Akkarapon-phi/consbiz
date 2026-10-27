@@ -179,6 +179,7 @@ jinja = {
 	"methods": [
 		"consbiz.utils.thai_date",
 		"consbiz.consbiz.doctype.bar_cut_plan.bar_cut_plan.shape_svg",
+		"consbiz.utils.name_with_title",
 	]
 }
 # jinja = {

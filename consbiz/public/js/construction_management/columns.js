@@ -73,7 +73,8 @@ export function cell_text(task, key, metrics) {
 const locale = frappe.boot.lang === "th" ? "th-TH" : frappe.boot.lang || "en";
 const compact = new Intl.NumberFormat(locale, { notation: "compact", maximumFractionDigits: 1 });
 
-export function format_percent(value, decimals = 1) {
+// % ในตารางสรุป (หน้าจอและงานพิมพ์) แสดง 3 ตำแหน่ง
+export function format_percent(value, decimals = 3) {
 	return value === null || value === undefined ? "" : format_number(value, null, decimals);
 }
 

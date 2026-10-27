@@ -2,11 +2,17 @@
 	ขออนุมัติปฏิบัติงานประจำวัน (Daily Request)
 	- โครงหน้าเหมือน Print Format "Daily Report": หัว/ท้ายกระดาษอยู่ใน <thead>/<tfoot> ของ .pf-page
 	- ไม่มีมูลค่าเงิน แสดง % ความคืบหน้าโครงการที่จะเพิ่มขึ้นแทน
-	- ช่องลงนาม: ผู้ขออนุมัติ และผู้อนุมัติที่ระบุ (วันที่อนุมัติขึ้นเมื่อ Submit แล้ว)
+	- สรุปเทียบ % คาดการณ์กับ % แผนสะสม ณ วันปฏิบัติงาน ว่าช้า/เร็วกว่าแผน
+	  (ค่าที่บันทึกในเอกสาร: Baseline ถ้าแผนงานตั้งไว้แล้ว ไม่งั้นแผนปัจจุบัน ดู plan_basis)
+	- ส่วนการอนุมัติ: บรรทัดเขียนข้อคิดเห็น + ช่องลงนาม ชื่อมีคำนำหน้าจาก Employee
+	  วันที่ลงนามทั้งสองฝั่ง = 1 วันก่อนวันปฏิบัติงาน
 -#}
 {%- set project_name = frappe.db.get_value("Project", doc.project, "project_name") if doc.project else "" -%}
-{%- set requested_by = doc.requested_by or frappe.db.get_value("User", doc.owner, "full_name") or doc.owner -%}
-{%- set approver = doc.approver_name or doc.approver or "" -%}
+{%- set requested_by = name_with_title(doc.requested_by or frappe.db.get_value("User", doc.owner, "full_name") or doc.owner, doc.owner) -%}
+{%- set approver = name_with_title(doc.approver_name or doc.approver or "", doc.approver) -%}
+{%- set sign_date = thai_date(frappe.utils.add_days(doc.date, -1)) if doc.date else "......../......../........" -%}
+{%- set variance = doc.progress_variance or 0 -%}
+{%- set plan_label = "Baseline" if doc.plan_basis == "Baseline" else "แผน" -%}
 {%- set pct = "{:,.2f}" -%}
 
 {% include "consbiz/templates/print/print_style.html" %}
@@ -52,12 +58,6 @@
 								<td class="pf-v">{{ thai_date(doc.date) }}</td>
 							</tr>
 							<tr>
-								<td class="pf-k">ผู้ขออนุมัติ</td>
-								<td class="pf-v">{{ requested_by }}</td>
-								<td class="pf-k">ผู้อนุมัติ</td>
-								<td class="pf-v">{{ approver or "-" }}</td>
-							</tr>
-							<tr>
 								<td class="pf-k">แผนงาน</td>
 								<td class="pf-v">{{ doc.construction_management }}</td>
 								<td class="pf-k">เวลาทำงาน</td>
@@ -77,12 +77,12 @@
 						<thead>
 							<tr>
 								<th class="text-center" style="width: 6%">ลำดับ</th>
-								<th style="width: 34%">กิจกรรม</th>
-								<th class="text-right" style="width: 11%">ปริมาณตามแผน</th>
+								<th style="width: 40%">กิจกรรม</th>
+								<th class="text-right" style="width: 9%">ปริมาณ</th>
 								<th class="text-center" style="width: 7%">หน่วย</th>
-								<th class="text-right" style="width: 11%">% โครงการ</th>
 								<th style="width: 16%">ตำแหน่ง / พื้นที่</th>
-								<th style="width: 15%">หมายเหตุ</th>
+								<th style="width: 12%">หมายเหตุ</th>
+								<th class="text-right" style="width: 10%">% โครงการ</th>
 							</tr>
 						</thead>
 						<tbody>
@@ -98,9 +98,9 @@
 									{%- else %}{{ pct.format(row.percent or 0) }}%{% endif -%}
 								</td>
 								<td class="text-center">{{ row.uom or "" }}</td>
-								<td class="text-right">{{ "{:,.4f}".format(row.project_percent or 0) }}%</td>
 								<td>{{ row.location or "" }}</td>
 								<td>{{ row.remarks or "" }}</td>
+								<td class="text-right">{{ "{:,.4f}".format(row.project_percent or 0) }}%</td>
 							</tr>
 							{%- else %}
 							<tr><td colspan="7" class="empty">ไม่มีรายการ</td></tr>
@@ -108,8 +108,17 @@
 						</tbody>
 					</table>
 					<div class="pf-total">
-						<span>ความคืบหน้าปัจจุบัน {{ pct.format(doc.current_progress or 0) }}% + ตามแผนนี้ {{ "{:,.4f}".format(doc.planned_progress or 0) }}%</span>
-						<span class="text-right">คาดว่า {{ pct.format(doc.expected_progress or 0) }}%</span>
+						<span>
+							ความคืบหน้าปัจจุบัน {{ pct.format(doc.current_progress or 0) }}%
+							+ ตามแผนนี้ {{ "{:,.4f}".format(doc.planned_progress or 0) }}%
+							&nbsp; คาดการณ์ {{ pct.format(doc.expected_progress or 0) }}%
+						</span>
+						<span class="text-right">
+							{%- if variance | round(2) > 0 %}เร็วกว่าแผน {{ pct.format(variance) }}%
+							{%- elif variance | round(2) < 0 %}ช้ากว่าแผน {{ pct.format(-variance) }}%
+							{%- else %}ตรงตามแผน{% endif %}
+							<span class="muted">({{ plan_label }} {{ pct.format(doc.baseline_progress or 0) }}%)</span>
+						</span>
 					</div>
 
 					{#- 3 ทรัพยากรที่ใช้ -#}
@@ -128,7 +137,7 @@
 											<tr>
 												<th class="text-center" style="width: 12%">ลำดับ</th>
 												<th>ตำแหน่ง / ประเภท</th>
-												<th class="text-right" style="width: 18%">จำนวน (คน)</th>
+												<th class="text-right" style="width: 18%">จำนวน</th>
 												<th style="width: 30%">หมายเหตุ</th>
 											</tr>
 										</thead>
@@ -186,38 +195,43 @@
 						</tbody>
 					</table>
 					<div class="pf-note">
-						<b>วัสดุที่ต้องใช้</b><br />{{ (doc.materials or "-") | e | replace("\n", "<br />") }}
+						<b>วัสดุ/อุปกรณ์ที่ต้องใช้</b><br />{{ (doc.materials or "-") | e | replace("\n", "<br />") }}
 					</div>
 					<div class="pf-note">
-						<b>มาตรการความปลอดภัย</b><br />{{ (doc.safety_measures or "-") | e | replace("\n", "<br />") }}
+						<b>หมายเหตุ</b><br />{{ (doc.remarks or "-") | e | replace("\n", "<br />") }}
 					</div>
 					</div>
-					{%- if doc.remarks %}
-					<div class="pf-note">
-						<b>หมายเหตุ</b><br />{{ doc.remarks | e | replace("\n", "<br />") }}
-					</div>
-					{%- endif %}
 
-					<table class="pf-sign pf-keep">
+					{#- 4 การอนุมัติ -#}
+					<div class="pf-keep">
+					<div class="pf-section">
+						<span><span class="no">4</span><span class="name">การอนุมัติ</span></span>
+						<span class="rule"></span>
+					</div>
+					<div class="pf-subtitle">ข้อคิดเห็น</div>
+					<div class="pf-lines">
+						{%- for i in range(5) %}<div></div>{% endfor %}
+					</div>
+
+					<table class="pf-sign">
 						<tbody>
 							<tr>
 								<td>
 									<div class="line">ลงชื่อ ........................................................</div>
 									<div>({{ requested_by }})</div>
 									<div>ผู้ขออนุมัติ</div>
-									<div class="muted">วันที่ {{ thai_date(doc.creation) }}</div>
+									<div class="muted">วันที่ {{ sign_date }}</div>
 								</td>
 								<td>
 									<div class="line">ลงชื่อ ........................................................</div>
 									<div>({{ approver or "........................................................" }})</div>
 									<div>ผู้อนุมัติ</div>
-									<div class="muted">
-										วันที่ {{ thai_date(doc.approved_on) if doc.docstatus == 1 else "......../......../........" }}
-									</div>
+									<div class="muted">วันที่ {{ sign_date }}</div>
 								</td>
 							</tr>
 						</tbody>
 					</table>
+					</div>
 				</td>
 			</tr>
 		</tbody>

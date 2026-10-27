@@ -4,11 +4,16 @@
 	  เบราว์เซอร์และ Chrome PDF พิมพ์ซ้ำให้ทุกหน้าเอง ไม่ต้องพึ่ง #header-html (wkhtmltopdf แบบไม่ patch ใช้ไม่ได้)
 	- เลขหน้าใช้ @page margin box (Chrome 131 ขึ้นไป)
 	- thai_date มาจาก consbiz.utils (ลงทะเบียน jinja ใน hooks.py)
+	- ความคืบหน้าโครงการใช้ค่าที่บันทึกในเอกสาร: % วันนี้ / % สะสม ณ วันที่รายงาน เทียบ % แผน
+	  (Baseline ถ้าแผนงานตั้งไว้แล้ว ไม่งั้นแผนปัจจุบัน ดู plan_basis)
 -#}
 {%- set cm = frappe.get_doc("Construction Management", doc.construction_management) -%}
 {%- set project_name = frappe.db.get_value("Project", doc.project, "project_name") if doc.project else "" -%}
 {%- set prepared_by = doc.supervisor_name or frappe.db.get_value("User", doc.owner, "full_name") or doc.owner -%}
 {%- set money = "{:,.2f}" -%}
+{%- set pct = "{:,.3f}" -%}
+{%- set variance = (doc.progress_variance or 0) | round(3) -%}
+{%- set plan_label = "Baseline" if doc.plan_basis == "Baseline" else "แผนปัจจุบัน" -%}
 
 {% include "consbiz/templates/print/print_style.html" %}
 
@@ -105,10 +110,38 @@
 						<span class="text-right">{{ money.format(doc.total_amount or 0) }} บาท</span>
 					</div>
 
-					{#- 3 บันทึกประกอบ (หัวข้อ ตาราง และปัญหา/อุปสรรคอยู่หน้าเดียวกัน) -#}
+					{#- 3 ความคืบหน้าโครงการ -#}
 					<div class="pf-keep">
 					<div class="pf-section">
-						<span><span class="no">3</span><span class="name">บันทึกประกอบ</span></span>
+						<span><span class="no">3</span><span class="name">ความคืบหน้าโครงการ</span></span>
+						<span class="rule"></span>
+					</div>
+					<table class="pf-grid pf-info">
+						<tbody>
+							<tr>
+								<td class="pf-k">ผลงานวันนี้</td>
+								<td class="pf-v">{{ "{:,.4f}".format(doc.today_progress or 0) }}%</td>
+								<td class="pf-k">ผลงานสะสม</td>
+								<td class="pf-v">{{ pct.format(doc.cumulative_progress or 0) }}%</td>
+							</tr>
+							<tr>
+								<td class="pf-k">แผนสะสม ({{ plan_label }})</td>
+								<td class="pf-v">{{ pct.format(doc.baseline_progress or 0) }}%</td>
+								<td class="pf-k">เทียบกับแผน</td>
+								<td class="pf-v">
+									{%- if variance > 0 %}<span class="pf-pill green">เร็วกว่าแผน {{ pct.format(variance) }}%</span>
+									{%- elif variance < 0 %}<span class="pf-pill red">ช้ากว่าแผน {{ pct.format(-variance) }}%</span>
+									{%- else %}<span class="pf-pill gray">ตรงตามแผน</span>{% endif -%}
+								</td>
+							</tr>
+						</tbody>
+					</table>
+					</div>
+
+					{#- 4 บันทึกประกอบ (หัวข้อ ตาราง และปัญหา/อุปสรรคอยู่หน้าเดียวกัน) -#}
+					<div class="pf-keep">
+					<div class="pf-section">
+						<span><span class="no">4</span><span class="name">บันทึกประกอบ</span></span>
 						<span class="rule"></span>
 					</div>
 					<table class="pf-columns">
@@ -121,7 +154,7 @@
 											<tr>
 												<th class="text-center" style="width: 12%">ลำดับ</th>
 												<th>ตำแหน่ง / ประเภท</th>
-												<th class="text-right" style="width: 18%">จำนวน (คน)</th>
+												<th class="text-right" style="width: 18%">จำนวน</th>
 												<th style="width: 30%">หมายเหตุ</th>
 											</tr>
 										</thead>

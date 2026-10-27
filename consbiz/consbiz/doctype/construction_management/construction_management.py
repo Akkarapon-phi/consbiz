@@ -12,6 +12,7 @@
 # - งานลด-งานเพิ่มมาจาก Variation Order ที่ Submit แล้ว (apply_variations):
 #   Submit แล้วงานลดลดปริมาณงานเดิม (DR ลงเกินไม่ได้) และงานเพิ่มเป็นแถวใต้กลุ่ม VO ท้ายตาราง (DR ลงได้)
 #   แต่นับในมูลค่าสัญญาและ % ความคืบหน้าเมื่อผู้ว่าจ้างอนุมัติแล้วเท่านั้น (นับตั้งแต่วันที่อนุมัติ counted_from)
+# - Baseline เก็บได้หลายชุด (Construction Baseline) ชุดที่ใช้เทียบ (active_baseline) ถูกคัดลอกลงช่อง baseline_* ของแถวงาน
 # - % ความคืบหน้า (actual_progress) = มูลค่างานที่ทำแล้ว / มูลค่าสัญญาปรับปรุง (Earned Value)
 #   contract_progress = % ตามสัญญาเดิม (ถ่วงด้วยมูลค่าตามสัญญาของงานเดิม ไม่รวมงานเพิ่ม) ไว้อ้างอิง
 # หน้า Gantt อยู่ที่ consbiz/consbiz/page/construction_gantt
@@ -22,9 +23,10 @@ import json
 import frappe
 from frappe import _
 from frappe.model.document import Document
-from frappe.utils import cint, flt, getdate, nowdate
+from frappe.utils import add_months, cint, flt, getdate, nowdate
 
 PROGRESS_ENTRY = "Construction Progress Entry"
+BASELINE = "Construction Baseline"
 VARIATION_ORDER = "Variation Order"
 # WBS ของกลุ่มงานเพิ่มท้ายตาราง งานเพิ่มแต่ละแถวเป็น VO.1, VO.2, ...
 VARIATION_GROUP_WBS = "VO"
@@ -77,6 +79,7 @@ class ConstructionManagement(Document):
 
 	def on_trash(self):
 		frappe.db.delete(PROGRESS_ENTRY, {"construction_management": self.name})
+		frappe.db.delete(BASELINE, {"construction_management": self.name})
 
 	def validate_single_active(self):
 		if self.status != "Active":
@@ -458,6 +461,107 @@ def get_variation_items(name):
 	)
 
 
+# ---------- % แผน (ตรงกับ curve_of / task_daily / segments ใน schedule.js) ----------
+
+
+def plan_progress(doc, date, baseline=False):
+	"""% แผนสะสมของทั้งโครงการ ณ สิ้นวัน date (เส้น plan หรือ baseline ของ S-Curve ในหน้า Gantt)
+	baseline ใช้น้ำหนักที่เก็บไว้ตอนตั้ง baseline (baseline ที่ตั้งก่อนมีการเก็บน้ำหนักใช้น้ำหนักปัจจุบัน)"""
+	if baseline:
+		weight_key = "baseline_weight" if any(flt(r.baseline_weight) for r in doc.tasks) else "weight"
+		keys = ("baseline_start_date", "baseline_end_date", "baseline_distribution", weight_key)
+	else:
+		keys = ("start_date", "end_date", "plan_distribution", "weight")
+	start_key, end_key, distribution_key, weight_key = keys
+	day = getdate(date)
+	holidays = doc.get_holidays() if doc.use_working_days else set()
+	total = 0
+	for row in doc.tasks:
+		if row.is_group or not row.get(start_key) or not row.get(end_key) or not flt(row.get(weight_key)):
+			continue
+		distribution = frappe.parse_json(row.get(distribution_key)) if row.get(distribution_key) else None
+		done = sum(
+			fraction
+			for d, fraction in task_daily(
+				getdate(row.get(start_key)), getdate(row.get(end_key)), distribution, holidays
+			)
+			if d <= day
+		)
+		total += flt(row.get(weight_key)) * done
+	return total
+
+
+def target_progress(doc, date):
+	"""% แผนที่ใช้เทียบกับ % จริง ณ สิ้นวัน date: Baseline ถ้าตั้งไว้แล้ว ไม่งั้นแผนปัจจุบัน
+	คืน (% แผน, "Baseline" หรือ "Current Plan") ตรงกับตัวเลขเร็ว-ช้ากว่าแผนในหน้า Gantt"""
+	if any(row.baseline_start_date for row in doc.tasks):
+		return plan_progress(doc, date, baseline=True), "Baseline"
+	return plan_progress(doc, date), "Current Plan"
+
+
+def task_daily(start, end, distribution, holidays):
+	"""สัดส่วนงานรายวัน [(วัน, สัดส่วน)] รวมกันได้ 1 ไม่ได้กำหนดเอง (หรือจำนวนช่วงไม่ตรง) = เท่ากันทุกวันทำงาน"""
+	parts = segments(start, end, distribution.get("unit")) if distribution else None
+	weights = (distribution or {}).get("weights") or []
+	if not parts or len(parts) != len(weights):
+		days = working_days_of(start, end, holidays)
+		return [(d, 1 / len(days)) for d in days]
+	result = []
+	for (part_start, part_end), weight in zip(parts, weights, strict=True):
+		days = working_days_of(part_start, part_end, holidays)
+		result.extend((d, flt(weight) / 100 / len(days)) for d in days)
+	return result
+
+
+def working_days_of(start, end, holidays):
+	"""วันทำงานของช่วง ถ้าทั้งช่วงเป็นวันหยุดให้นับวันปฏิทินแทน"""
+	all_days = [start + datetime.timedelta(days=n) for n in range((end - start).days + 1)]
+	return [d for d in all_days if d not in holidays] or all_days
+
+
+def segments(start, end, unit):
+	"""ตัดช่วงงานตามขอบของ unit เช่นงาน 5-20 แบ่งสัปดาห์ได้ [5-7], [8-14], [15-20]"""
+	result = []
+	day = start
+	while day <= end:
+		to = min(next_period(floor_period(day, unit), unit) - datetime.timedelta(days=1), end)
+		result.append((day, to))
+		day = to + datetime.timedelta(days=1)
+	return result
+
+
+def floor_period(day, unit):
+	if unit == "week":
+		return day - datetime.timedelta(days=day.weekday())
+	if unit == "mweek":
+		return day.replace(day=min((day.day - 1) // 7, 3) * 7 + 1)
+	if unit == "month":
+		return day.replace(day=1)
+	if unit == "quarter":
+		return day.replace(month=day.month - (day.month - 1) % 3, day=1)
+	if unit == "year":
+		return day.replace(month=1, day=1)
+	return day
+
+
+def next_period(day, unit):
+	"""วันแรกของช่วงถัดไป (day ต้องเป็นวันแรกของช่วงจาก floor_period)"""
+	if unit == "week":
+		return day + datetime.timedelta(days=7)
+	if unit == "mweek":
+		# ช่วงสุดท้ายของเดือน (เริ่มวันที่ 22) ยาวถึงสิ้นเดือน
+		if day.day >= 22:
+			return getdate(add_months(day.replace(day=1), 1))
+		return day + datetime.timedelta(days=7)
+	if unit == "month":
+		return getdate(add_months(day, 1))
+	if unit == "quarter":
+		return getdate(add_months(day, 3))
+	if unit == "year":
+		return day.replace(year=day.year + 1)
+	return day + datetime.timedelta(days=1)
+
+
 # ---------- ความคืบหน้าจริง ----------
 
 
@@ -499,6 +603,39 @@ def apply_actual_totals(doc, entries):
 		if contract
 		else 0
 	)
+
+
+def actual_progress_at(doc, date, rows=(), exclude_report=None):
+	"""% จริงของทั้งโครงการ ณ สิ้นวัน date (ตรงกับ actual_curve ใน schedule.js)
+	rows: รายการ [{task, percent}] ของวันที่ date ที่ยังไม่ได้เป็น Progress Entry (เช่น Daily Report ที่ยังไม่ Submit)
+	exclude_report: ไม่นับ Progress Entry ของเอกสารนี้ (ใช้ rows แทน)
+	คืน (% ของ rows, % สะสมรวม rows) ตัวหาร = มูลค่าสัญญาเดิม + งานเพิ่ม-ลดที่อนุมัติแล้ว ณ วันนั้น
+	งานเพิ่มนับตั้งแต่วันที่ผู้ว่าจ้างอนุมัติ (counted_from)"""
+	day = getdate(date)
+	leaves = {
+		row.name: row
+		for row in doc.tasks
+		if not row.is_group and is_counted(row) and (not row.counted_from or getdate(row.counted_from) <= day)
+	}
+	entries = frappe.get_all(
+		PROGRESS_ENTRY,
+		filters={"construction_management": doc.name, "date": ("<=", day)},
+		fields=["task", "percent", "reference_name"],
+	)
+
+	def earned(items):
+		return sum(
+			flt(leaves[item.task].amount) * flt(item.percent) / 100 for item in items if item.task in leaves
+		)
+
+	contract = flt(doc.total_amount) + sum(
+		flt(step.amount) for step in get_variation_steps(doc.name) if step.date and getdate(step.date) <= day
+	)
+	if not contract:
+		return 0, 0
+	previous = earned([e for e in entries if not exclude_report or e.reference_name != exclude_report])
+	today = earned(rows)
+	return today / contract * 100, (previous + today) / contract * 100
 
 
 def is_counted(row):
@@ -649,6 +786,8 @@ def get_schedule_data(name):
 		"contract_progress": doc.contract_progress,
 		"variation_steps": get_variation_steps(doc.name),
 		"baseline_date": doc.baseline_date,
+		"active_baseline": doc.active_baseline,
+		"baselines": get_baselines(doc.name),
 		"use_working_days": doc.use_working_days,
 		"holiday_list": doc.holiday_list,
 		"week_by_month": doc.week_by_month,
@@ -758,15 +897,82 @@ def save_manual_progress(name, row, date, qty, percent):
 	entry.save()
 
 
-@frappe.whitelist(methods=["POST"])
-def set_baseline(name, modified):
-	"""เก็บวันเริ่ม/วันจบปัจจุบันของทุกงานเป็น Baseline (ทับของเดิม)"""
-	doc = get_doc_for_update(name, modified)
+def get_baselines(name):
+	"""Baseline ทุกชุดของแผนงาน เรียงจากเก่าไปใหม่ (tasks: ดู baseline_snapshot)"""
+	return frappe.get_all(
+		BASELINE,
+		filters={"construction_management": name},
+		fields=["name", "title", "baseline_date", "reason", "tasks"],
+		order_by="creation asc",
+	)
+
+
+def baseline_snapshot(doc):
+	"""แผนปัจจุบันของทุกแถว {ชื่อแถว: [วันเริ่ม, วันจบ, % แผนที่กำหนดเอง, น้ำหนัก]}"""
+	return {
+		row.name: [
+			str(row.start_date) if row.start_date else None,
+			str(row.end_date) if row.end_date else None,
+			row.plan_distribution or None,
+			flt(row.weight),
+		]
+		for row in doc.tasks
+	}
+
+
+def apply_baseline(doc, baseline):
+	"""ใช้ Baseline ชุดนี้เทียบกับความคืบหน้าจริง: คัดลอกลงช่อง baseline_* ของแถวงาน (ในหน่วยความจำ)
+	งานที่ไม่มีในชุดนี้ (เช่นงานเพิ่มที่มาทีหลัง) ไม่มี Baseline"""
+	rows = frappe.parse_json(baseline.tasks) or {}
 	for row in doc.tasks:
-		row.baseline_start_date = row.start_date
-		row.baseline_end_date = row.end_date
-		row.baseline_distribution = row.plan_distribution
-		row.baseline_weight = row.weight
-	doc.baseline_date = nowdate()
+		start, end, distribution, weight = rows.get(row.name) or (None, None, None, 0)
+		row.baseline_start_date = start
+		row.baseline_end_date = end
+		row.baseline_distribution = distribution
+		row.baseline_weight = weight
+	doc.active_baseline = baseline.name
+	doc.baseline_date = baseline.baseline_date
+
+
+def get_baseline(name, baseline):
+	doc = frappe.get_doc(BASELINE, baseline)
+	if doc.construction_management != name:
+		frappe.throw(_("Baseline {0} ไม่ใช่ของแผนงาน {1}").format(doc.title, name))
+	return doc
+
+
+@frappe.whitelist(methods=["POST"])
+def save_baseline(name, modified, title, reason=None, activate=1):
+	"""บันทึกแผนปัจจุบันเป็น Baseline ชุดใหม่ activate = ใช้ชุดนี้เทียบกับความคืบหน้าจริงด้วย"""
+	doc = get_doc_for_update(name, modified)
+	baseline = frappe.get_doc(
+		{
+			"doctype": BASELINE,
+			"construction_management": name,
+			"title": title,
+			"reason": reason,
+			"baseline_date": nowdate(),
+			"tasks": frappe.as_json(baseline_snapshot(doc), indent=None),
+		}
+	).insert()
+	if cint(activate):
+		apply_baseline(doc, baseline)
+		doc.save()
+	return get_schedule_data(name)
+
+
+@frappe.whitelist(methods=["POST"])
+def activate_baseline(name, modified, baseline):
+	"""ใช้ Baseline ชุดนี้เทียบกับความคืบหน้าจริง (Daily Report / Daily Request ที่บันทึกแล้วไม่เปลี่ยน)"""
+	doc = get_doc_for_update(name, modified)
+	apply_baseline(doc, get_baseline(name, baseline))
 	doc.save()
 	return get_schedule_data(name)
+
+
+@frappe.whitelist(methods=["POST"])
+def delete_baseline(name, baseline):
+	"""ลบ Baseline ชุดที่ไม่ได้ใช้เทียบ คืนรายการ Baseline ที่เหลือ"""
+	frappe.get_doc("Construction Management", name).check_permission("write")
+	get_baseline(name, baseline).delete()
+	return get_baselines(name)
