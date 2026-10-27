@@ -134,6 +134,94 @@ class IntegrationTestBOQ(IntegrationTestCase):
 		self.assertEqual(rows[0].item_code, rows[1].item_code)  # ชื่อซ้ำสร้างครั้งเดียว
 		self.assertEqual(frappe.db.get_value("BOQ Item", rows[0].item_code, "material_rate"), 30)
 
+	def test_combined_rate(self):
+		doc = frappe.new_doc("BOQ")
+		doc.append(
+			"boq_details", {"quantity": 2, "material_rate": 100, "labour_rate": 30, "combined_rate": 1}
+		)
+		doc.append("boq_details", {"quantity": 1, "material_rate": 10, "labour_rate": 5})
+		doc.run_method("validate")
+		# แถวราคารวม: ค่าแรงย้ายไปรวมที่ค่าวัสดุ ยอดรวมเท่าเดิม
+		row = doc.boq_details[0]
+		self.assertEqual((row.material_rate, row.labour_rate, row.total_amount), (130, 0, 260))
+		self.assertEqual(doc.boq_details[1].labour_rate, 5)
+
+		# ราคารวมทั้งใบ: ติ๊กให้ทุกแถว
+		doc.combined_rate = 1
+		doc.run_method("validate")
+		self.assertEqual([r.combined_rate for r in doc.boq_details], [1, 1])
+		self.assertEqual((doc.total_material_cost, doc.total_labour_cost, doc.grand_total), (275, 0, 275))
+
+	def test_import_combined_rate(self):
+		item = self.make_item(item_name="ทดสอบราคารวม BOQ", material_rate=40, labour_rate=10)
+		result = parse_boq_rows(
+			[
+				["ลำดับ", "รายการ", "จำนวน", "ราคาต่อหน่วย", "จำนวนเงิน"],
+				["1", "งานรื้อถอน", 2, 150, 300],
+				["2", "งานเหมาไม่มีจำนวน", None, None, 5000],
+				["3", "งานเหมามีจำนวน", 4, None, 1000],
+				["4", "ทดสอบราคารวม BOQ", 3, None, None],
+			]
+		)
+		self.assertEqual(len(result["warnings"]), 1)
+		rows = apply_boq_matches(result["items"])
+		rates = [(r.combined_rate, r.quantity, r.material_rate, r.labour_rate, r.total_amount) for r in rows]
+		self.assertEqual(rates[0], (1, 2, 150, 0, 300))
+		self.assertEqual(rates[1], (1, 1, 5000, 0, 5000))  # ไม่มีจำนวน ถือเป็น 1 หน่วย
+		self.assertEqual(rates[2], (1, 4, 250, 0, 1000))
+		# ไม่มีราคาในไฟล์ จับคู่ได้ BOQ Item: ไม่ติ๊กราคารวม ใช้ราคามาตรฐานแยกตามเดิม
+		self.assertEqual(rows[3].item_code, item.name)
+		self.assertEqual(rates[3], (0, 3, 40, 10, 150))
+
+	def test_combined_rate_with_item(self):
+		item = self.make_item(item_name="ทดสอบราคารวมจับคู่", material_rate=40, labour_rate=10)
+		base = {"item_code": item.name, "missing": ["material_rate", "labour_rate"]}
+		# ติ๊กราคารวมในไฟล์แต่ไม่มีราคา: ใช้ราคามาตรฐานรวมกัน
+		row = apply_boq_matches([{**base, "row": {"quantity": 2, "combined_rate": 1}}])[0]
+		self.assertEqual((row.material_rate, row.labour_rate, row.total_amount), (50, 0, 100))
+		# มีราคารวมในไฟล์: ไม่เติมค่าแรงมาตรฐาน
+		entry = {
+			**base,
+			"missing": ["labour_rate"],
+			"row": {"quantity": 2, "material_rate": 70, "combined_rate": 1},
+		}
+		row = apply_boq_matches([entry])[0]
+		self.assertEqual((row.material_rate, row.labour_rate), (70, 0))
+
+		# สร้าง BOQ Item จากแถวราคารวม: ไม่ใส่ราคามาตรฐาน
+		entry = {
+			"row": {"item_name": "รายการราคารวมใหม่", "material_rate": 90, "combined_rate": 1},
+			"create": 1,
+		}
+		row = apply_boq_matches([entry])[0]
+		self.assertEqual(row.material_rate, 90)
+		self.assertEqual(
+			frappe.db.get_value("BOQ Item", row.item_code, ["material_rate", "labour_rate"]), (0, 0)
+		)
+
+	def test_import_uom(self):
+		for name in ("ตร.ม.", "Square Meter"):
+			if not frappe.db.exists("UOM", name):
+				frappe.get_doc({"doctype": "UOM", "uom_name": name}).insert()
+		result = parse_boq_rows(
+			[
+				["รายการ", "จำนวน", "หน่วย"],
+				["งานผนัง", 1, "ตรม"],  # ต่างแค่จุด
+				["งานพื้น", 1, "sq.m"],  # ชื่อเรียกอื่น ใช้หน่วยไทยก่อน
+				["งานฝ้า", 1, "square  meter"],  # ตรงกันไม่นับตัวพิมพ์/ช่องว่าง
+				["งานติดตั้ง", 1, "จุดทดสอบนำเข้า"],
+				["งานติดตั้งซ้ำ", 1, "จุดทดสอบนำเข้า"],
+			]
+		)
+		uoms = [i["row"]["uom"] for i in result["items"]]
+		self.assertEqual(uoms, ["ตร.ม.", "ตร.ม.", "Square Meter", "จุดทดสอบนำเข้า", "จุดทดสอบนำเข้า"])
+		self.assertEqual(len(result["warnings"]), 2)  # ใช้หน่วยในระบบแทน + สร้างใหม่
+		# สร้างหน่วยตอนยืนยันนำเข้า ไม่ใช่ตอนอ่านไฟล์
+		self.assertFalse(frappe.db.exists("UOM", "จุดทดสอบนำเข้า"))
+		rows = apply_boq_matches(result["items"])
+		self.assertEqual(rows[3].uom, "จุดทดสอบนำเข้า")
+		self.assertTrue(frappe.db.exists("UOM", "จุดทดสอบนำเข้า"))
+
 	def test_parse_rows_errors(self):
 		with self.assertRaises(frappe.ValidationError):
 			parse_boq_rows([["WBS", "Quantity"], ["1", 2]])
@@ -159,6 +247,10 @@ class IntegrationTestBOQ(IntegrationTestCase):
 			"boq_details",
 			{"wbs": "1.1", "item_name": "เทคอนกรีต", "quantity": 3, "material_rate": 100, "labour_rate": 20},
 		)
+		doc.append(
+			"boq_details",
+			{"wbs": "1.2", "item_name": "งานเหมา", "quantity": 1, "material_rate": 500, "combined_rate": 1},
+		)
 		doc.run_method("validate")
 
 		result = parse_boq_rows(read_xlsx_file_from_attached_file(fcontent=build_workbook(doc)))
@@ -167,8 +259,10 @@ class IntegrationTestBOQ(IntegrationTestCase):
 			expected["company"] = doc.company
 		self.assertEqual(result["info"], expected)
 		rows = apply_boq_matches(result["items"])
-		self.assertEqual([r.item_name for r in rows], ["งานโครงสร้าง", "เทคอนกรีต"])
+		self.assertEqual([r.item_name for r in rows], ["งานโครงสร้าง", "เทคอนกรีต", "งานเหมา"])
 		self.assertEqual(rows[1].total_amount, 360)
+		self.assertEqual([r.combined_rate for r in rows], [0, 0, 1])
+		self.assertEqual((rows[2].material_rate, rows[2].labour_rate), (500, 0))
 
 		# แม่แบบเปล่ามีแถวเตรียมกรอกพร้อมสูตร แต่อ่านกลับมาต้องไม่มีรายการ
 		blank = parse_boq_rows(read_xlsx_file_from_attached_file(fcontent=build_workbook()))

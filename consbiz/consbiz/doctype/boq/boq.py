@@ -13,6 +13,8 @@ class BOQ(Document):
 	def calculate_totals(self):
 		self.total_material_cost = self.total_labour_cost = self.grand_total = 0
 		for row in self.boq_details:
+			if self.combined_rate:
+				row.combined_rate = 1
 			calculate_row(row)
 			self.total_material_cost += row.material_amount
 			self.total_labour_cost += row.labour_amount
@@ -35,6 +37,10 @@ def assign_wbs(rows):
 
 
 def calculate_row(row):
+	"""ราคารวม (combined_rate): ราคาทั้งหมดอยู่ที่ค่าวัสดุ ค่าแรงที่กรอกไว้ย้ายมารวม (ต้องตรงกับ merge_combined_rate() ใน boq.js)"""
+	if row.combined_rate and flt(row.labour_rate):
+		row.material_rate = flt(row.material_rate) + flt(row.labour_rate)
+		row.labour_rate = 0
 	row.material_amount = flt(row.quantity) * flt(row.material_rate)
 	row.labour_amount = flt(row.quantity) * flt(row.labour_rate)
 	row.total_amount = row.material_amount + row.labour_amount

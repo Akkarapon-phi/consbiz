@@ -36,7 +36,12 @@ def get_price_history(item_code: str) -> dict:
 			detail.material_rate,
 			detail.labour_rate,
 		)
-		.where((detail.parenttype == "BOQ") & (detail.item_code == item_code) & (boq.docstatus < 2))
+		.where(
+			(detail.parenttype == "BOQ")
+			& (detail.item_code == item_code)
+			& (detail.combined_rate == 0)  # ราคารวม แยกค่าวัสดุ/ค่าแรงไม่ได้ ไม่นำมาเทียบ
+			& (boq.docstatus < 2)
+		)
 		.orderby(boq_date, order=frappe.qb.desc)
 		.orderby(boq.name, order=frappe.qb.desc)
 		.limit(HISTORY_LIMIT)

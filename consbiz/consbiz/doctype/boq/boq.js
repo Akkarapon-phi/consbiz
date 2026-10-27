@@ -57,8 +57,13 @@ frappe.ui.form.on("BOQ Item Detail", {
 		refresh_wbs(frm);
 	},
 
-	boq_details_add(frm) {
+	boq_details_add(frm, cdt, cdn) {
+		if (frm.doc.combined_rate) locals[cdt][cdn].combined_rate = 1;
 		refresh_wbs(frm);
+	},
+
+	combined_rate(frm, cdt, cdn) {
+		calculate_row_totals(frm, cdt, cdn);
 	},
 
 	boq_details_move(frm) {
@@ -70,6 +75,32 @@ frappe.ui.form.on("BOQ Item Detail", {
 		update_select_banner(frm);
 	},
 });
+
+// ราคารวมทั้งใบ: ติ๊ก/เอาออกให้ทุกแถว (ราคาที่ย้ายไปรวมในค่าวัสดุแล้วไม่แยกกลับ)
+frappe.ui.form.on("BOQ", {
+	combined_rate(frm) {
+		(frm.doc.boq_details || []).forEach((row) => {
+			row.combined_rate = frm.doc.combined_rate ? 1 : 0;
+			merge_combined_rate(row);
+			calculate_row_amounts(row);
+		});
+		frm.refresh_field("boq_details");
+		calculate_grand_totals(frm);
+	},
+});
+
+// ราคารวม: ค่าแรงที่กรอกไว้ย้ายไปรวมที่ค่าวัสดุ (ต้องตรงกับ calculate_row() ใน boq.py)
+function merge_combined_rate(row) {
+	if (!row.combined_rate || !flt(row.labour_rate)) return;
+	row.material_rate = flt(row.material_rate) + flt(row.labour_rate);
+	row.labour_rate = 0;
+}
+
+function calculate_row_amounts(row) {
+	row.material_amount = flt(row.quantity) * flt(row.material_rate);
+	row.labour_amount = flt(row.quantity) * flt(row.labour_rate);
+	row.total_amount = row.material_amount + row.labour_amount;
+}
 
 function add_excel_buttons(frm) {
 	const group = __("Excel");
@@ -303,7 +334,12 @@ function apply_boq_import(frm, { info, warnings }, items, mode) {
 				if (mode === "replace" || !frm.doc[fieldname]) frm.set_value(fieldname, value);
 			});
 			if (mode === "replace") frm.clear_table("boq_details");
-			rows.forEach((row) => frm.add_child("boq_details", row));
+			rows.forEach((row) => {
+				if (frm.doc.combined_rate) row.combined_rate = 1;
+				merge_combined_rate(row);
+				calculate_row_amounts(row);
+				frm.add_child("boq_details", row);
+			});
 			renumber_wbs(frm);
 			set_boq_totals(frm);
 			frm.refresh_field("boq_details");
@@ -553,9 +589,16 @@ frappe.ui.form.on('BOQ Item Detail', {
             frappe.db.get_value('BOQ Item', row.item_code, ['material_rate', 'labour_rate'])
                 .then(r => {
                     if (r.message) {
+                        // แถวราคารวม: ใช้ราคามาตรฐานค่าวัสดุ + ค่าแรงรวมกันที่ค่าวัสดุ
+                        let mat_rate = flt(r.message.material_rate);
+                        let lab_rate = flt(r.message.labour_rate);
+                        if (row.combined_rate) {
+                            mat_rate += lab_rate;
+                            lab_rate = 0;
+                        }
                         Promise.all([
-                            frappe.model.set_value(cdt, cdn, 'material_rate', flt(r.message.material_rate)),
-                            frappe.model.set_value(cdt, cdn, 'labour_rate', flt(r.message.labour_rate))
+                            frappe.model.set_value(cdt, cdn, 'material_rate', mat_rate),
+                            frappe.model.set_value(cdt, cdn, 'labour_rate', lab_rate)
                         ]).then(() => {
                             calculate_row_totals(frm, cdt, cdn);
                         });
@@ -586,6 +629,10 @@ frappe.ui.form.on('BOQ Item Detail', {
 // ฟังก์ชันคำนวณแต่ละแถว (Child Table)
 function calculate_row_totals(frm, cdt, cdn) {
     let row = locals[cdt][cdn];
+    if (row.combined_rate && flt(row.labour_rate)) {
+        merge_combined_rate(row);
+        frm.refresh_field('boq_details');
+    }
 
     let qty = flt(row.quantity);
     let mat_rate = flt(row.material_rate);
@@ -673,7 +720,8 @@ frappe.ui.form.on('BOQ Item Detail', {
                 filters: [
                     ['docstatus', '=', 0],
                     ['name', '!=', frm.doc.name],
-                    ['BOQ Item Detail', 'item_code', '=', row.item_code]
+                    ['BOQ Item Detail', 'item_code', '=', row.item_code],
+                    ['BOQ Item Detail', 'combined_rate', '=', 0] // ราคารวม แยกค่าวัสดุ/ค่าแรงไม่ได้
                 ],
                 fields: [
                     'name',
