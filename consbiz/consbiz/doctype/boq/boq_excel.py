@@ -90,6 +90,12 @@ def import_boq_items(filename: str, content: str) -> dict:
 	อ่านในหน่วยความจำอย่างเดียว ไม่สร้าง File และไม่เขียนลงดิสก์ (ไฟล์มีราคาทุน)
 	"""
 	frappe.has_permission("BOQ", "write", throw=True)
+	return parse_boq_rows(read_spreadsheet(filename, content))
+
+
+def read_spreadsheet(filename: str, content: str) -> list[list]:
+	"""แถวของชีตแรก (ชีตที่ active) จากไฟล์ .xlsx/.csv ที่ส่งมาเป็น base64 อ่านในหน่วยความจำ
+	ใช้ร่วมกับการนำเข้าแผนงาน (schedule_excel.py)"""
 	try:
 		data = base64.b64decode(content, validate=True)
 	except binascii.Error, ValueError:
@@ -102,17 +108,14 @@ def import_boq_items(filename: str, content: str) -> dict:
 		from frappe.utils.xlsxutils import read_xlsx_file_from_attached_file
 
 		try:
-			rows = read_xlsx_file_from_attached_file(fcontent=data)
+			return read_xlsx_file_from_attached_file(fcontent=data)
 		except zipfile.BadZipFile, KeyError, ValueError:
 			frappe.throw(_("ไฟล์ {0} ไม่ใช่ Excel (.xlsx) หรือไฟล์เสียหาย").format(filename))
 	elif extension == "csv":
 		from frappe.utils.csvutils import read_csv_content
 
-		rows = read_csv_content(data)
-	else:
-		frappe.throw(_("รองรับเฉพาะไฟล์ .xlsx หรือ .csv"))
-
-	return parse_boq_rows(rows)
+		return read_csv_content(data)
+	frappe.throw(_("รองรับเฉพาะไฟล์ .xlsx หรือ .csv"))
 
 
 def parse_boq_rows(rows: list[list]) -> dict:

@@ -95,6 +95,8 @@
     --consbiz-gantt-critical: var(--red-500);
     --consbiz-gantt-holiday: var(--subtle-fg);
     --consbiz-gantt-row-hover: var(--highlight-color);
+    --consbiz-gantt-link: var(--gray-500);
+    --consbiz-gantt-link-active: var(--text-color);
 }
 
 /* 8. แผนตัดเหล็ก (Bar Cut Plan): รูปทรงการดัด และแผนภาพการตัด */

@@ -41,6 +41,11 @@ defineEmits([
 const bar_toggles = [
 	{ key: "show_baseline_bars", label: __("แถบ Baseline") },
 	{ key: "show_split", label: __("% แผนที่แบ่ง"), title: __("แสดง % แผนที่กำหนดเองบนแถบงาน") },
+	{
+		key: "show_links",
+		label: __("เส้นงานก่อนหน้า"),
+		title: __("แสดงลูกศรจากงานก่อนหน้าไปงานที่ตามมา (FS / SS / FF / SF)"),
+	},
 	{ key: "show_labels", label: __("ชื่องาน"), title: __("แสดง WBS และชื่องานท้ายแถบ") },
 	{
 		key: "show_progress",

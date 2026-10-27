@@ -1,11 +1,12 @@
 <script setup>
-// timeline ฝั่งขวา: หัว 2 แถว, แถบงาน (ลากย้าย/ยืดหดได้), แถบ baseline, แรเงาวันหยุด,
+// timeline ฝั่งขวา: หัว 2 แถว, แถบงาน (ลากย้าย/ยืดหดได้), แถบ baseline, ลูกศรงานก่อนหน้า, แรเงาวันหยุด,
 // เส้นวันนี้, เส้นวันที่เลือกดู, S-Curve หลายเส้น และตารางสรุปติดด้านล่าง
 // แกน x: 1 วัน = ppd พิกเซล นับจาก range.start (เลขวันจาก schedule.js)
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import SCurve from "./SCurve.vue";
 import {
 	parse_distribution,
+	parse_predecessors,
 	period_shares,
 	periods,
 	sample_curve,
@@ -33,6 +34,7 @@ const props = defineProps({
 	allCurves: Object, // { baseline, plan, actual } ใช้กับตารางสรุป
 	showBaselineBars: Boolean,
 	showSplit: Boolean,
+	showLinks: Boolean,
 	showLabels: Boolean,
 	showProgress: Boolean,
 	showStatus: Boolean,
@@ -179,6 +181,7 @@ const bars = computed(() =>
 					: "",
 				`${__("น้ำหนัก")}: ${format_number(task.weight || 0, null, 2)}%`,
 				`${__("% จริง")}: ${format_number(actual, null, 2)}%`,
+				metrics?.predecessors ? `${__("งานก่อนหน้า")}: ${metrics.predecessors}` : "",
 				custom
 					? `${__("% แผนกำหนดเอง")}: ${distribution.weights
 							.map((w) => format_number(w, null, 2))
@@ -213,6 +216,55 @@ function end_label(task, metrics, x0) {
 // แถบงานสูงเต็มแถวถ้าไม่แสดง baseline ไม่งั้นแบ่งที่ให้แถบ baseline ด้านล่าง
 const bar_y = computed(() => (props.showBaselineBars ? 6 : 8));
 const bar_h = computed(() => (props.showBaselineBars ? 13 : props.rowHeight - 16));
+
+// ---------- ลูกศรงานก่อนหน้า ----------
+// ออกจากปลาย (FS, FF) หรือต้น (SS, SF) ของแถบงานก่อนหน้า เข้าต้น (FS, SS) หรือปลาย (FF, SF) ของงานที่ตามมา
+// เส้นหักตั้งฉาก ถ้าเลี้ยวลงตรงๆ แล้วต้องย้อนทับแถบ ให้อ้อมผ่านเส้นแบ่งแถวของงานที่ตามมา
+// งานที่ซ่อนอยู่ในกลุ่มที่ย่อไว้ไม่วาด เส้นไม่รับเมาส์ (ไม่บังที่จับปลายแถบ) ชี้แถวงานแล้วเส้นของงานนั้นเข้มขึ้น
+const LINK_GAP = 8;
+
+const links = computed(() => {
+	if (!props.showLinks) return [];
+	const placed = new Map(
+		bars.value
+			.filter((bar) => bar.width && !bar.task.is_group)
+			.map((bar) => [bar.task.name, bar])
+	);
+	const mid = (bar) => bar.y + bar_y.value + bar_h.value / 2;
+	const result = [];
+	for (const to of placed.values()) {
+		for (const link of parse_predecessors(to.task.predecessors)) {
+			const from = placed.get(link.task);
+			if (!from) continue;
+			const type = link.type || "FS";
+			const out = type[0] === "F" ? 1 : -1; // ออกขวา (ปลาย) / ซ้าย (ต้น)
+			const into = type[1] === "S" ? -1 : 1; // เข้าจากซ้าย (ต้น) / ขวา (ปลาย)
+			const x1 = out > 0 ? from.x + from.width : from.x;
+			const x2 = into < 0 ? to.x : to.x + to.width;
+			const y1 = mid(from);
+			const y2 = mid(to);
+			const a = x1 + out * LINK_GAP;
+			const b = x2 + into * LINK_GAP;
+			// แนวเส้นตั้งที่ทั้งออกและเข้าได้โดยไม่ย้อนทิศ
+			const low = Math.max(out > 0 ? a : -Infinity, into > 0 ? b : -Infinity);
+			const high = Math.min(out < 0 ? a : Infinity, into < 0 ? b : Infinity);
+			let path;
+			if (low <= high) {
+				const c = out > 0 ? low : high;
+				path = `M${x1},${y1} H${c} V${y2} H${x2}`;
+			} else {
+				const ym = y2 > y1 ? to.y : to.y + props.rowHeight;
+				path = `M${x1},${y1} H${a} V${ym} H${b} V${y2} H${x2}`;
+			}
+			result.push({
+				key: `${link.task}>${to.task.name}`,
+				path,
+				active: props.hovered === from.task.name || props.hovered === to.task.name,
+			});
+		}
+	}
+	return result;
+});
 
 function start_drag(bar, mode, event) {
 	if (!props.canWrite || bar.task.is_group || event.button !== 0) return;
@@ -401,6 +453,21 @@ defineExpose({ body, scroll_to_day, viewport_width });
 				</svg>
 
 				<svg class="cs-chart" :width="width" :height="chart_height">
+					<defs>
+						<marker
+							v-for="id in ['cs-link-arrow', 'cs-link-arrow-active']"
+							:id="id"
+							:key="id"
+							viewBox="0 0 6 6"
+							refX="6"
+							refY="3"
+							markerWidth="6"
+							markerHeight="6"
+							orient="auto"
+						>
+							<path d="M0,0 L6,3 L0,6 z" :class="id" />
+						</marker>
+					</defs>
 					<rect
 						v-for="hx in holiday_rects"
 						:key="'h' + hx"
@@ -587,6 +654,18 @@ defineExpose({ body, scroll_to_day, viewport_width });
 								</g>
 							</template>
 						</template>
+					</g>
+
+					<g class="cs-links">
+						<path
+							v-for="link in links"
+							:key="link.key"
+							:d="link.path"
+							:class="{ 'cs-link-active': link.active }"
+							:marker-end="`url(#${
+								link.active ? 'cs-link-arrow-active' : 'cs-link-arrow'
+							})`"
+						/>
 					</g>
 
 					<line
@@ -794,6 +873,22 @@ defineExpose({ body, scroll_to_day, viewport_width });
 .cs-handle {
 	fill: transparent;
 	cursor: ew-resize;
+}
+.cs-links path {
+	fill: none;
+	stroke: var(--consbiz-gantt-link);
+	stroke-width: 1;
+	pointer-events: none;
+}
+.cs-links path.cs-link-active {
+	stroke: var(--consbiz-gantt-link-active);
+	stroke-width: 1.5;
+}
+.cs-link-arrow {
+	fill: var(--consbiz-gantt-link);
+}
+.cs-link-arrow-active {
+	fill: var(--consbiz-gantt-link-active);
 }
 .cs-baseline-bar {
 	fill: var(--consbiz-gantt-baseline);

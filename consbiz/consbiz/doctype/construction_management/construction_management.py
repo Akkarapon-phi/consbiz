@@ -5,6 +5,8 @@
 # - indent มาจากจำนวนจุดใน WBS ("2" = 0, "2.1" = 1) แถวที่มีแถวลึกกว่าตามหลังคือกลุ่ม
 # - น้ำหนัก (%) = มูลค่าที่นับ (counted_amount) / มูลค่าสัญญาปรับปรุง กลุ่มรวมค่าจากงานย่อย
 # - วันที่ของกลุ่ม = วันเริ่มแรกสุดและวันจบหลังสุดของงานย่อย
+# - งานก่อนหน้า (predecessors): FS/SS/FF/SF + lag (วันทำงาน) งานที่มีงานก่อนหน้าเริ่มเร็วสุดที่ความสัมพันธ์ยอมเสมอ (ASAP)
+#   คงจำนวนวันเดิมของงาน อยากให้เริ่มช้ากว่านั้นใช้ lag (หน้า Gantt แปลงการลาก/แก้วันเริ่มเป็น lag ให้) ผูกได้เฉพาะงานย่อย (คำนวณเหมือนกันใน schedule.js: apply_dependencies)
 # - %แผนกระจายเท่าๆ กันทุกวันทำงาน หรือตาม plan_distribution ที่กำหนดเองรายช่วง (คำนวณในหน้า Gantt: schedule.js)
 # - ความคืบหน้าจริงเก็บเป็นรายวันใน Construction Progress Entry ส่วน actual_qty/progress ในตารางเป็นยอดรวม
 # - งานลด-งานเพิ่มมาจาก Variation Order ที่ Submit แล้ว (apply_variations):
@@ -27,6 +29,7 @@ VARIATION_ORDER = "Variation Order"
 # WBS ของกลุ่มงานเพิ่มท้ายตาราง งานเพิ่มแต่ละแถวเป็น VO.1, VO.2, ...
 VARIATION_GROUP_WBS = "VO"
 DISTRIBUTION_UNITS = ("day", "week", "mweek", "month", "quarter")
+DEPENDENCY_TYPES = ("FS", "SS", "FF", "SF")
 # เผื่อเศษทศนิยมตอนรวม % จากหลายวัน
 TOLERANCE = 0.0001
 
@@ -41,6 +44,7 @@ class ConstructionManagement(Document):
 		holidays = self.get_holidays() if self.use_working_days else set()
 		self.set_structure()
 		self.set_task_dates(holidays)
+		self.apply_dependencies(holidays)
 		self.roll_up_groups(holidays)
 		self.set_weights()
 		self.validate_distributions()
@@ -217,6 +221,29 @@ class ConstructionManagement(Document):
 				frappe.throw(_("แถว {0} ({1}): วันจบต้องไม่ก่อนวันเริ่ม").format(row.idx, row.wbs))
 			row.duration = count_working_days(row.start_date, row.end_date, holidays)
 
+	def apply_dependencies(self, holidays):
+		"""งานที่มีงานก่อนหน้าเริ่มวันเร็วสุดที่ความสัมพันธ์ยอม (คงจำนวนวันเดิม) เรียงตามลำดับความสัมพันธ์"""
+		rows = {row.name: row for row in self.tasks if row.name}
+		links = {}
+		for row in self.tasks:
+			if row.is_group:
+				row.predecessors = None
+				continue
+			# แถวใหม่ที่ยังไม่ได้บันทึกยังไม่มีชื่อ จึงยังไม่มีงานไหนอ้างถึงได้
+			if not row.name:
+				continue
+			links[row.name] = normalize_predecessors(row, rows)
+			row.predecessors = json.dumps(links[row.name]) if links[row.name] else None
+
+		for row in dependency_order(self.tasks, links):
+			required = earliest_start(row, links.get(row.name), rows, holidays)
+			if required is None or (row.start_date and getdate(row.start_date) == required):
+				continue
+			duration = max(cint(row.duration), 1)
+			row.start_date = required
+			row.end_date = add_working_days(required, duration, holidays)
+			row.duration = count_working_days(row.start_date, row.end_date, holidays)
+
 	def roll_up_groups(self, holidays):
 		for i, row in enumerate(self.tasks):
 			if not row.is_group:
@@ -277,6 +304,91 @@ def normalize_distribution(value, row):
 			)
 		)
 	return json.dumps({"unit": data["unit"], "weights": weights})
+
+
+def normalize_predecessors(row, rows):
+	"""งานก่อนหน้าของแถว [{task, type, lag}] ตัดลิงก์ที่ชี้ไปงานที่ไม่มีแล้ว (เช่น ยกเลิก Variation Order) หรือชี้ตัวเอง
+	ลิงก์ซ้ำงานเดียวกันใช้อันหลัง"""
+	value = frappe.parse_json(row.predecessors) if isinstance(row.predecessors, str) else row.predecessors
+	result = {}
+	for link in value or []:
+		predecessor = rows.get(link.get("task"))
+		if not predecessor or predecessor.name == row.name:
+			continue
+		if predecessor.is_group:
+			frappe.throw(
+				_("แถว {0} ({1}): งานก่อนหน้า {2} เป็นหัวข้อกลุ่ม ให้ผูกกับงานย่อยแทน").format(
+					row.idx, row.wbs, predecessor.wbs
+				)
+			)
+		link_type = (link.get("type") or "FS").upper()
+		if link_type not in DEPENDENCY_TYPES:
+			frappe.throw(_("แถว {0} ({1}): ชนิดความสัมพันธ์ {2} ไม่ถูกต้อง").format(row.idx, row.wbs, link_type))
+		result[predecessor.name] = {"task": predecessor.name, "type": link_type, "lag": cint(link.get("lag"))}
+	return list(result.values())
+
+
+def dependency_order(tasks, links):
+	"""งานย่อยเรียงให้งานก่อนหน้ามาก่อนเสมอ ผูกกันเป็นวง = error
+	(ลำดับของงานที่ไม่ขึ้นต่อกันไม่มีผลกับวันที่ จึงไม่ต้องตรงกับ dependency_order ใน schedule.js)"""
+	rows = {row.name: row for row in tasks if row.name in links}
+	waiting = {name: len(task_links) for name, task_links in links.items()}
+	successors = {}
+	for name, task_links in links.items():
+		for link in task_links:
+			successors.setdefault(link["task"], []).append(name)
+
+	ordered = [row for name, row in rows.items() if not waiting[name]]
+	for row in ordered:  # ต่อท้ายระหว่างวน: งานที่งานก่อนหน้าครบแล้ว
+		for name in successors.get(row.name, []):
+			waiting[name] -= 1
+			if not waiting[name]:
+				ordered.append(rows[name])
+
+	if len(ordered) < len(links):
+		stuck = [row.wbs or "" for row in tasks if waiting.get(row.name)]
+		frappe.throw(
+			_("งานก่อนหน้าผูกกันเป็นวง ตรวจงาน: {0}").format(", ".join(stuck)),
+			title=_("ความสัมพันธ์ของงานไม่ถูกต้อง"),
+		)
+	return ordered
+
+
+def earliest_start(row, links, rows, holidays):
+	"""วันเริ่มเร็วสุดของงานตามงานก่อนหน้าทุกงาน (None = ไม่มีความสัมพันธ์ที่ใช้ได้)"""
+	days = [link_start(row, link, rows, holidays) for link in links or []]
+	days = [day for day in days if day]
+	return max(days) if days else None
+
+
+def link_start(row, link, rows, holidays):
+	"""วันเริ่มเร็วสุดของงานตามลิงก์เดียว (None = งานก่อนหน้ายังไม่มีวันที่)
+	FS: เริ่มวันทำงานถัดจากวันจบ, SS: เริ่มวันเดียวกัน, FF: จบวันเดียวกัน, SF: จบวันทำงานก่อนวันเริ่ม
+	แล้วเลื่อนอีก lag วันทำงาน (ติดลบ = ซ้อนกันได้)"""
+	predecessor = rows[link["task"]]
+	if not predecessor.start_date or not predecessor.end_date:
+		return None
+	start, end, lag = getdate(predecessor.start_date), getdate(predecessor.end_date), link["lag"]
+	if link["type"] == "FS":
+		return shift_working_days(end, lag + 1, holidays)
+	if link["type"] == "SS":
+		return shift_working_days(start, lag, holidays)
+	if link["type"] == "FF":
+		finish = shift_working_days(end, lag, holidays)
+	else:
+		finish = shift_working_days(start, lag - 1, holidays)
+	return shift_working_days(finish, 1 - max(cint(row.duration), 1), holidays)
+
+
+def shift_working_days(day, days, holidays):
+	"""เลื่อนวันไป days วันทำงาน (ติดลบ = ย้อนหลัง) ข้ามวันใน holidays 0 = วันเดิม"""
+	day = getdate(day)
+	step = datetime.timedelta(days=1 if days > 0 else -1)
+	for _i in range(abs(days)):
+		day += step
+		while day in holidays:
+			day += step
+	return day
 
 
 def get_holiday_dates(holiday_list):
@@ -512,6 +624,7 @@ def get_schedule_data(name):
 		"actual_qty",
 		"progress",
 		"plan_distribution",
+		"predecessors",
 		"baseline_distribution",
 		"baseline_weight",
 		"is_variation",
@@ -600,6 +713,8 @@ def save_tasks(name, tasks, modified, progress=None):
 		row.end_date = task.get("end_date") or None
 		if "plan_distribution" in task:
 			row.plan_distribution = task.get("plan_distribution") or None
+		if "predecessors" in task:
+			row.predecessors = task.get("predecessors") or None
 	doc.save()
 
 	touched = set()

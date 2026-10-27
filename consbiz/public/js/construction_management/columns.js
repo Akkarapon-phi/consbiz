@@ -1,6 +1,6 @@
 // คอลัมน์ของตาราง WBS ใช้ร่วมกันระหว่างหน้าจอ (TaskGrid) และงานพิมพ์ (print.js)
 // editor = fieldtype ของ Frappe control ที่ใช้แก้ค่าในช่อง (ไม่มี = แก้ไม่ได้)
-// plan_pct / actual_pct / actual_qty เป็นค่า ณ วันที่ที่เลือกดู (metrics จาก App)
+// plan_pct / actual_pct / actual_qty เป็นค่า ณ วันที่ที่เลือกดู, predecessors เป็นข้อความ WBS (metrics จาก App)
 
 export const COLUMNS = [
 	{ key: "wbs", label: __("WBS"), width: 64 },
@@ -12,6 +12,7 @@ export const COLUMNS = [
 	{ key: "start_date", label: __("วันเริ่ม"), width: 100, editor: "Date" },
 	{ key: "end_date", label: __("วันจบ"), width: 100, editor: "Date" },
 	{ key: "duration", label: __("จำนวนวัน"), width: 72, align: "right", editor: "Int" },
+	{ key: "predecessors", label: __("งานก่อนหน้า"), width: 110, editor: "Data" },
 	{ key: "baseline_start_date", label: __("เริ่ม (Baseline)"), width: 100 },
 	{ key: "baseline_end_date", label: __("จบ (Baseline)"), width: 100 },
 	{ key: "plan_pct", label: __("% แผน"), width: 72, align: "right" },
@@ -30,7 +31,7 @@ export const DEFAULT_COLUMNS = [
 	"actual_pct",
 ];
 
-const METRIC_KEYS = ["plan_pct", "actual_pct", "actual_qty"];
+const METRIC_KEYS = ["plan_pct", "actual_pct", "actual_qty", "predecessors"];
 
 export function cell_value(task, key, metrics) {
 	if (METRIC_KEYS.includes(key)) return metrics.get(task.name)?.[key] ?? null;
