@@ -297,3 +297,186 @@ frappe.ui.form.on('Purchase Invoice', {
         }
     }
 });
+
+// ---- ย้ายจาก Client Script "Print Purchase Invoice" ----
+
+// 1. โหลด Library สำหรับจัดการ PDF (pdf-lib)
+if (!window.PDFLib) {
+    $.getScript('https://unpkg.com/pdf-lib/dist/pdf-lib.min.js');
+}
+
+frappe.ui.form.on('Purchase Invoice', {
+    refresh: function(frm) {
+        frm.add_custom_button(__('Payment Voucher'), function() {
+            open_print_multi_dialog(frm, 'Payment Voucher');
+        }, __("Print"));
+
+        frm.add_custom_button(__('Substitute Receipt'), function() {
+            open_print_multi_dialog(frm, 'Substitute Receipt');
+        }, __("Print"));
+    }
+});
+
+function open_print_multi_dialog(frm, base_format) {
+    let d = new frappe.ui.Dialog({
+        title: `${base_format}`,
+        fields: [
+            {
+                fieldtype: 'HTML',
+                options: `
+                    <style>
+                        .modal-footer { display: flex !important; justify-content: flex-end !important; }
+                        .modal-footer .btn { margin-left: 12px !important; }
+                        .stepper-row { display: flex; align-items: center; justify-content: space-between; padding: 18px 0; border-bottom: 1px solid #f0f0f0; }
+                        .stepper-control { display: flex; align-items: center; gap: 15px; }
+                        .qty-input { width: 45px; text-align: center; border: none; background: transparent; font-weight: bold; font-size: 18px; color: #333; }
+                        .btn-stepper { width: 35px; height: 35px; border-radius: 8px; display: flex; align-items: center; justify-content: center; }
+                    </style>
+                    <div style="padding: 10px 0;">
+                        <div class="stepper-row">
+                            <div style="font-weight: bold; font-size: 1.1em;">ต้นฉบับ</div>
+                            <div class="stepper-control">
+                                <button class="btn btn-default btn-xs btn-stepper" onclick="update_qty_val('orig', -1)">-</button>
+                                <input type="number" id="qty_orig" value="1" readonly class="qty-input">
+                                <button class="btn btn-default btn-xs btn-stepper" onclick="update_qty_val('orig', 1)">+</button>
+                            </div>
+                        </div>
+                        <div class="stepper-row" style="border-bottom: none;">
+                            <div style="font-weight: bold; font-size: 1.1em;">สำเนา</div>
+                            <div class="stepper-control">
+                                <button class="btn btn-default btn-xs btn-stepper" onclick="update_qty_val('copy', -1)">-</button>
+                                <input type="number" id="qty_copy" value="1" readonly class="qty-input">
+                                <button class="btn btn-default btn-xs btn-stepper" onclick="update_qty_val('copy', 1)">+</button>
+                            </div>
+                        </div>
+                    </div>
+                `
+            }
+        ]
+    });
+
+    d.set_primary_action(__('Preview'), async () => {
+        const blobUrl = await merge_process(frm, base_format);
+        if (blobUrl) show_final_view(frm, blobUrl, 'preview');
+        d.hide();
+    });
+
+    d.add_custom_action(__('Print'), async () => {
+        const blobUrl = await merge_process(frm, base_format);
+        if (blobUrl) show_final_view(frm, blobUrl, 'print');
+        d.hide();
+    });
+
+    d.add_custom_action(__('Download'), async () => {
+        const blobUrl = await merge_process(frm, base_format);
+        if (blobUrl) show_final_view(frm, blobUrl, 'download');
+        d.hide();
+    });
+
+    window.update_qty_val = function(id, delta) {
+        let input = $(`#qty_${id}`);
+        let next = parseInt(input.val()) + delta;
+        if (next >= 0) input.val(next);
+    };
+
+    d.show();
+}
+
+async function merge_process(frm, base_format) {
+    if (!window.PDFLib) { 
+        frappe.msgprint("กำลังเตรียมระบบ PDF..."); 
+        return null; 
+    }
+    frappe.show_alert({message: __('กำลังรวมไฟล์...'), indicator: 'blue'});
+
+    try {
+        const { PDFDocument } = PDFLib;
+        const combinedPdf = await PDFDocument.create();
+        const tasks = [
+            { name: base_format, qty: parseInt($('#qty_orig').val()) },
+            { name: `${base_format} (Copy)`, qty: parseInt($('#qty_copy').val()) }
+        ];
+
+        let has_content = false;
+        for (const t of tasks) {
+            if (t.qty > 0) {
+                let url = `/api/method/frappe.utils.print_format.download_pdf?doctype=${encodeURIComponent(frm.doc.doctype)}&name=${encodeURIComponent(frm.doc.name)}&format=${encodeURIComponent(t.name)}&no_letterhead=0&_lang=th`;
+                const resp = await fetch(url);
+                if (!resp.ok) continue;
+                const donorPdf = await PDFDocument.load(await resp.arrayBuffer());
+                for (let i = 0; i < t.qty; i++) {
+                    const pages = await combinedPdf.copyPages(donorPdf, donorPdf.getPageIndices());
+                    pages.forEach(p => combinedPdf.addPage(p));
+                    has_content = true;
+                }
+            }
+        }
+        if (!has_content) return null;
+        const bytes = await combinedPdf.save();
+        return URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }));
+    } catch (e) {
+        console.error(e);
+        return null;
+    }
+}
+
+function show_final_view(frm, blobUrl, mode) {
+    const is_mobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
+    if (is_mobile) {
+        // มือถือ: ใช้เทคนิคสร้างลิงก์หลอกเพื่อเลี่ยง Pop-up Blocker
+        const a = document.createElement('a');
+        a.href = blobUrl;
+        a.target = '_blank';
+        // ถ้าเป็น iOS บางเวอร์ชันต้องการให้ต่อเข้ากับ DOM ก่อนคลิก
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        return;
+    }
+
+    // Desktop
+    if (mode === 'download') {
+        const a = document.createElement('a');
+        a.href = blobUrl;
+        a.download = `${frm.doc.name}.pdf`;
+        a.click();
+    } else if (mode === 'print') {
+        const f = document.createElement('iframe');
+        f.style.display = 'none';
+        f.src = blobUrl;
+        document.body.appendChild(f);
+        f.onload = () => { f.contentWindow.focus(); f.contentWindow.print(); };
+    } else {
+        let d = new frappe.ui.Dialog({ title: __('PDF Preview'), size: 'large' });
+        $(d.body).html(`<div style="height: 75vh;"><iframe src="${blobUrl}#view=FitH" width="100%" height="100%" style="border: none;"></iframe></div>`);
+        d.add_custom_action(__('Download'), () => { 
+            const a = document.createElement('a'); a.href = blobUrl; a.download = `${frm.doc.name}.pdf`; a.click(); 
+        });
+        d.set_primary_action(__('Print'), () => { 
+            d.$body.find('iframe')[0].contentWindow.print(); 
+        });
+        d.show();
+    }
+}
+
+// ---- ย้ายจาก Client Script "Purchase Invoice Is Cash" ----
+
+frappe.ui.form.on('Purchase Invoice', {
+    custom_is_cash: function(frm) {
+        // ดึงค่าปัจจุบันของ custom_is_cash (จะเป็น 1 หรือ 0)
+        let is_cash = frm.doc.custom_is_cash;
+        
+        // เซ็ตค่าให้ is_paid และ update_stock ตามค่า custom_is_cash
+        frm.set_value('is_paid', is_cash);
+        frm.set_value('update_stock', is_cash);
+        
+        // (ตัวเลือกเสริม) แจ้งเตือนผู้ใช้เล็กน้อย
+        if (is_cash == 1) {
+            frappe.show_alert({
+                message: __('เปลี่ยนเป็นบิลเงินสดเรียบร้อย'),
+                indicator: 'green'
+            });
+        }
+    }
+});

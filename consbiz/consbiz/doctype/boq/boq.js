@@ -42,7 +42,7 @@ frappe.ui.form.on("BOQ", {
 });
 
 // ดึงชื่อ หน่วย กลุ่ม จาก BOQ Item ครั้งเดียวตอนเลือกรหัส (ไม่ใช้ fetch_from เพราะ fetch_from
-// ดึงทับทุกครั้งที่บันทึก ค่าที่แก้หรือนำเข้าจาก Excel จะหาย) ราคาดึงใน Client Script "BOQ Calulation"
+// ดึงทับทุกครั้งที่บันทึก ค่าที่แก้หรือนำเข้าจาก Excel จะหาย) ราคาดึงในส่วน "BOQ Calulation" ท้ายไฟล์
 frappe.ui.form.on("BOQ Item Detail", {
 	item_code(frm, cdt, cdn) {
 		const row = locals[cdt][cdn];
@@ -540,3 +540,282 @@ function move_selected(frm) {
 		clear_selection(frm);
 	});
 }
+
+// ---- ย้ายจาก Client Script "BOQ Calulation" ----
+
+// 1. Event ภายใน Child Table (BOQ Item Detail)
+frappe.ui.form.on('BOQ Item Detail', {
+    // ดึงราคา material_rate และ labour_rate ครั้งเดียวเมื่อเลือก item_code
+    item_code: function(frm, cdt, cdn) {
+        let row = locals[cdt][cdn];
+
+        if (row.item_code) {
+            frappe.db.get_value('BOQ Item', row.item_code, ['material_rate', 'labour_rate'])
+                .then(r => {
+                    if (r.message) {
+                        Promise.all([
+                            frappe.model.set_value(cdt, cdn, 'material_rate', flt(r.message.material_rate)),
+                            frappe.model.set_value(cdt, cdn, 'labour_rate', flt(r.message.labour_rate))
+                        ]).then(() => {
+                            calculate_row_totals(frm, cdt, cdn);
+                        });
+                    }
+                });
+        }
+    },
+
+    quantity: function(frm, cdt, cdn) {
+        calculate_row_totals(frm, cdt, cdn);
+    },
+    material_rate: function(frm, cdt, cdn) {
+        calculate_row_totals(frm, cdt, cdn);
+    },
+    labour_rate: function(frm, cdt, cdn) {
+        calculate_row_totals(frm, cdt, cdn);
+    }
+});
+
+// 2. Event เมื่อมีการลบแถวออกจาก Child Table
+// หมายเหตุ: แทนที่ 'boq_details' ด้วย Fieldname ของตาราง Child Table ในตัวแม่
+frappe.ui.form.on('BOQ Item Detail', {
+    boq_details_remove: function(frm) {
+        calculate_grand_totals(frm);
+    }
+});
+
+// ฟังก์ชันคำนวณแต่ละแถว (Child Table)
+function calculate_row_totals(frm, cdt, cdn) {
+    let row = locals[cdt][cdn];
+
+    let qty = flt(row.quantity);
+    let mat_rate = flt(row.material_rate);
+    let lab_rate = flt(row.labour_rate);
+
+    let mat_amount = qty * mat_rate;
+    let lab_amount = qty * lab_rate;
+    let tot_amount = mat_amount + lab_amount;
+
+    frappe.model.set_value(cdt, cdn, 'material_amount', mat_amount);
+    frappe.model.set_value(cdt, cdn, 'labour_amount', lab_amount);
+    frappe.model.set_value(cdt, cdn, 'total_amount', tot_amount);
+
+    // คำนวณยอดรวมส่งเข้า Parent ต่อทันที
+    calculate_grand_totals(frm);
+}
+
+// ฟังก์ชันรวมยอดสรุปเข้า Parent DocType
+function calculate_grand_totals(frm) {
+    let total_material = 0;
+    let total_labour = 0;
+    let grand_total = 0;
+
+    // หาตาราง Child Table ในฟอร์มให้อัตโนมัติ (รองรับ boq_details หรือชื่ออื่น)
+    let child_rows = frm.doc.boq_details || frm.doc.items || [];
+    
+    // หากชื่อตารางไม่ตรง ให้ลองค้นหา Child Table ที่ใช้ DocType 'BOQ Item Detail'
+    if (!child_rows.length && frm.meta.fields) {
+        let table_field = frm.meta.fields.find(f => f.fieldtype === 'Table' && f.options === 'BOQ Item Detail');
+        if (table_field && frm.doc[table_field.fieldname]) {
+            child_rows = frm.doc[table_field.fieldname];
+        }
+    }
+
+    // วนลูปบวกยอดจากทุกแถว
+    (child_rows || []).forEach(row => {
+        total_material += flt(row.material_amount);
+        total_labour += flt(row.labour_amount);
+        grand_total += flt(row.total_amount);
+    });
+
+    // อัปเดต 3 ฟิลด์สรุปเข้า Parent
+    // มี if (frm.fields_dict[...]) ดักไว้ เพื่อไม่ให้ขึ้น Error สีแดงหากใน DocType ยังไม่ได้สร้างฟิลด์
+    if (frm.fields_dict['total_material_cost']) {
+        frm.set_value('total_material_cost', total_material);
+    }
+    if (frm.fields_dict['total_labour_cost']) {
+        frm.set_value('total_labour_cost', total_labour);
+    }
+    if (frm.fields_dict['grand_total']) {
+        frm.set_value('grand_total', grand_total);
+    }
+
+    frm.refresh_fields();
+}
+
+// ---- ย้ายจาก Client Script "Get Price History" ----
+
+// เปลี่ยน 'BOQ Item Detail' เป็นชื่อ Child DocType ของคุณ
+frappe.ui.form.on('BOQ Item Detail', {
+    
+    get_price_history: function(frm, cdt, cdn) {
+        let row = locals[cdt][cdn];
+
+        if (!row.item_code) {
+            frappe.msgprint(__('กรุณาเลือกรหัสวัสดุ (Item Code) ก่อนดูประวัติราคา'));
+            return;
+        }
+
+        let d = new frappe.ui.Dialog({
+            title: 'ประวัติราคา: ' + row.item_code,
+            fields: [{ fieldname: 'history_html', fieldtype: 'HTML' }],
+            size: 'large', // ขยายหน้าต่างให้กว้างขึ้นเพื่อดูกราฟได้ชัดเจน
+            primary_action_label: 'ปิดหน้าต่าง',
+            primary_action: function() { d.hide(); }
+        });
+
+        d.fields_dict.history_html.$wrapper.html('<p class="text-muted">กำลังโหลดข้อมูลและสร้างกราฟ...</p>');
+        d.show();
+
+        frappe.call({
+            method: 'frappe.client.get_list',
+            args: {
+                doctype: 'BOQ',
+                filters: [
+                    ['docstatus', '=', 0],
+                    ['name', '!=', frm.doc.name],
+                    ['BOQ Item Detail', 'item_code', '=', row.item_code]
+                ],
+                fields: [
+                    'name',
+                    'creation',
+                    '`tabBOQ Item Detail`.material_rate as material_rate',
+                    '`tabBOQ Item Detail`.labour_rate as labour_rate'
+                ],
+                limit_page_length: 1000, // ดึงข้อมูลเยอะหน่อยเพื่อหาค่า สูงสุด-ต่ำสุด ที่เคยมีมา
+                order_by: 'creation desc'
+            },
+            callback: function(r) {
+                if (r.message && r.message.length > 0) {
+                    let all_data = r.message;
+
+                    // 1. หาค่าสูงสุด-ต่ำสุด จากประวัติทั้งหมด (All time)
+                    let max_mat = Math.max(...all_data.map(i => i.material_rate || 0));
+                    let min_mat = Math.min(...all_data.map(i => i.material_rate || 0));
+                    let max_lab = Math.max(...all_data.map(i => i.labour_rate || 0));
+                    let min_lab = Math.min(...all_data.map(i => i.labour_rate || 0));
+
+                    // 2. ตัดเอาเฉพาะ 20 รายการล่าสุด
+                    let last_20 = all_data.slice(0, 20);
+
+                    // 3. ฟังก์ชันแปลงวันที่ให้อยู่ในฟอร์แมต dd/mm/yyyy
+                    const formatDate = (dateStr) => {
+                        let dateObj = frappe.datetime.str_to_obj(dateStr);
+                        let dd = String(dateObj.getDate()).padStart(2, '0');
+                        let mm = String(dateObj.getMonth() + 1).padStart(2, '0');
+                        let yyyy = dateObj.getFullYear();
+                        return `${dd}/${mm}/${yyyy}`;
+                    };
+
+                    // 4. เตรียมข้อมูลสำหรับพล็อตกราฟ (ต้อง Reverse ให้ข้อมูลเก่าอยู่ซ้าย ใหม่สุดอยู่ขวา)
+                    let chart_data = [...last_20].reverse();
+                    let chart_labels = chart_data.map(i => formatDate(i.creation));
+                    let chart_mat_series = chart_data.map(i => i.material_rate);
+                    let chart_lab_series = chart_data.map(i => i.labour_rate);
+
+// ฟังก์ชันช่วยจัดฟอร์แมตตัวเลข (ป้องกันการขึ้นบรรทัดใหม่จาก Currency ของ Frappe)
+                    const formatNumber = (num) => Number(num || 0).toLocaleString('en', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+
+                    // 5. สร้างโครงสร้าง HTML (กราฟ -> สรุป -> ตาราง)
+                    let html = `
+                        <!-- พื้นที่สำหรับแสดงกราฟ -->
+                        <div id="price-chart-container" style="margin-bottom: 20px;"></div>
+                        
+                        <!-- พื้นที่สรุปราคาสูงสุด-ต่ำสุด -->
+                        <div style="display: flex; gap: 15px; margin-bottom: 20px;">
+                            <!-- กล่อง Material Rate -->
+                            <div style="flex: 1; background-color: #f4f5f6; padding: 15px; border-radius: 8px; border: 1px solid #d1d8dd;">
+                                <div class="text-center text-muted text-uppercase text-small" style="margin-bottom: 10px; font-weight: 600;">
+                                    Material Rate (ทั้งหมด)
+                                </div>
+                                <div style="display: flex; justify-content: space-around; font-size: 14px;">
+                                    <span style="color: #e74c3c; font-weight: bold;">
+                                        <i class="fa fa-arrow-down"></i> ต่ำสุด: ${formatNumber(min_mat)}
+                                    </span>
+                                    <span style="color: #27ae60; font-weight: bold;">
+                                        <i class="fa fa-arrow-up"></i> สูงสุด: ${formatNumber(max_mat)}
+                                    </span>
+                                </div>
+                            </div>
+
+                            <!-- กล่อง Labour Rate -->
+                            <div style="flex: 1; background-color: #f4f5f6; padding: 15px; border-radius: 8px; border: 1px solid #d1d8dd;">
+                                <div class="text-center text-muted text-uppercase text-small" style="margin-bottom: 10px; font-weight: 600;">
+                                    Labour Rate (ทั้งหมด)
+                                </div>
+                                <div style="display: flex; justify-content: space-around; font-size: 14px;">
+                                    <span style="color: #e74c3c; font-weight: bold;">
+                                        <i class="fa fa-arrow-down"></i> ต่ำสุด: ${formatNumber(min_lab)}
+                                    </span>
+                                    <span style="color: #2980b9; font-weight: bold;">
+                                        <i class="fa fa-arrow-up"></i> สูงสุด: ${formatNumber(max_lab)}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- พื้นที่ตาราง -->
+                        <table class="table table-bordered table-striped" style="font-size: 13px;">
+                            <thead>
+                                <tr>
+                                    <th width="20%">วันที่</th>
+                                    <th width="40%">เลขที่เอกสาร</th>
+                                    <th class="text-right" width="20%">Material Rate</th>
+                                    <th class="text-right" width="20%">Labour Rate</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                    `;
+
+                    // วนลูปสร้างบรรทัดในตาราง (20 รายการ)
+                    last_20.forEach(item => {
+                        html += `
+                            <tr>
+                                <td>${formatDate(item.creation)}</td>
+                                <td><strong>${item.name}</strong></td>
+                                <td class="text-right">${frappe.format(item.material_rate, {fieldtype: 'Currency'})}</td>
+                                <td class="text-right">${frappe.format(item.labour_rate, {fieldtype: 'Currency'})}</td>
+                            </tr>
+                        `;
+                    });
+
+                    html += `</tbody></table>`;
+                    
+                    // นำ HTML ใส่ลงใน Dialog
+                    d.fields_dict.history_html.$wrapper.html(html);
+
+                    // 6. เรียกใช้ Frappe Charts วาดกราฟ (ตั้งหน่วงเวลาเล็กน้อยเพื่อให้ HTML เรนเดอร์เสร็จก่อน)
+                    setTimeout(() => {
+                        new frappe.Chart(d.fields_dict.history_html.$wrapper.find("#price-chart-container")[0], {
+                            title: `แนวโน้มราคา 20 ครั้งล่าสุด`,
+                            data: {
+                                labels: chart_labels,
+                                datasets: [
+                                    {
+                                        name: "Material Rate",
+                                        type: "line",
+                                        values: chart_mat_series
+                                    },
+                                    {
+                                        name: "Labour Rate",
+                                        type: "line",
+                                        values: chart_lab_series
+                                    }
+                                ]
+                            },
+                            type: 'axis-mixed', // กราฟเส้นแกนผสม
+                            height: 250,
+                            colors: ['#27ae60', '#2980b9'], // สีเขียว และ สีฟ้า
+                            tooltipOptions: {
+                                formatTooltipX: d => (d + '').toUpperCase(),
+                                formatTooltipY: d => frappe.format(d, {fieldtype: 'Currency'})
+                            }
+                        });
+                    }, 300);
+
+                } else {
+                    d.fields_dict.history_html.$wrapper.html('<p class="text-muted">ไม่พบประวัติราคาที่อนุมัติแล้วสำหรับวัสดุนี้</p>');
+                }
+            }
+        });
+    }
+});
