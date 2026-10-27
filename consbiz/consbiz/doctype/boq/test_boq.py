@@ -152,6 +152,43 @@ class IntegrationTestBOQ(IntegrationTestCase):
 		self.assertEqual([r.combined_rate for r in doc.boq_details], [1, 1])
 		self.assertEqual((doc.total_material_cost, doc.total_labour_cost, doc.grand_total), (275, 0, 275))
 
+	def test_round_down_total(self):
+		doc = frappe.new_doc("BOQ")
+		doc.round_down_total = 1
+		doc.append("boq_details", {"quantity": 3, "material_rate": 100.33, "labour_rate": 0.5})
+		doc.append("boq_details", {"quantity": 100, "material_rate": 0.29})  # float ได้ 28.999...
+		doc.run_method("validate")
+		# ตัดสตางค์เฉพาะช่องรวม ค่าวัสดุ/ค่าแรงไม่ปัด
+		row = doc.boq_details[0]
+		self.assertAlmostEqual(row.material_amount, 300.99)
+		self.assertEqual((row.labour_amount, row.total_amount), (1.5, 302))
+		self.assertEqual(doc.boq_details[1].total_amount, 29)
+		self.assertEqual(doc.grand_total, 331)
+
+		# ส่งออกแล้วนำเข้า: สูตรใช้ ROUNDDOWN และตรวจพบว่าไฟล์ตัดสตางค์
+		result = parse_boq_rows(read_xlsx_file_from_attached_file(fcontent=build_workbook(doc)))
+		self.assertEqual(result["info"].get("round_down_total"), 1)
+
+	def test_import_detect_round_down(self):
+		result = parse_boq_rows(
+			[
+				["รายการ", "จำนวน", "ค่าวัสดุ/หน่วย", "ค่าแรง/หน่วย", "รวมค่าวัสดุและค่าแรง"],
+				["งานผนัง", 3, 100.33, 0.5, 302],  # 302.49 ตัดสตางค์
+				["งานพื้น", 2, 50, 0, 100],  # ลงตัว ไม่ชี้ขาด
+				["งานฝ้า", 1, 10.5, 0, 999],  # ไม่ตรงทั้งสองแบบ
+			]
+		)
+		self.assertEqual(result["info"].get("round_down_total"), 1)
+		self.assertEqual(len(result["warnings"]), 2)
+		self.assertIn("4", result["warnings"][1])
+
+		# ไม่ปัด: ไม่ติ๊กให้ และไม่เตือน
+		result = parse_boq_rows(
+			[["รายการ", "จำนวน", "ค่าวัสดุ/หน่วย", "จำนวนเงิน"], ["งานผนัง", 3, 100.33, 300.99]]
+		)
+		self.assertNotIn("round_down_total", result["info"])
+		self.assertEqual(result["warnings"], [])
+
 	def test_import_combined_rate(self):
 		item = self.make_item(item_name="ทดสอบราคารวม BOQ", material_rate=40, labour_rate=10)
 		result = parse_boq_rows(

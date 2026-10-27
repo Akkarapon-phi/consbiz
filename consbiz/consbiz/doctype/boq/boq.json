@@ -16,6 +16,7 @@
   "date",
   "company",
   "combined_rate",
+  "round_down_total",
   "amended_from",
   "section_break_dgbe",
   "boq_details",
@@ -75,6 +76,13 @@
    "label": "Combined Rate (All Items)"
   },
   {
+   "default": "0",
+   "description": "ตัดเศษสตางค์ของรวมค่าวัสดุและค่าแรงแต่ละแถว (เหมือน ROUNDDOWN ใน Excel)",
+   "fieldname": "round_down_total",
+   "fieldtype": "Check",
+   "label": "Round Down Total"
+  },
+  {
    "fieldname": "amended_from",
    "fieldtype": "Link",
    "label": "Amended From",
@@ -129,7 +137,7 @@
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-10-27 10:00:00.000000",
+ "modified": "2026-10-27 14:00:00.000000",
  "modified_by": "Administrator",
  "module": "ConsBiz",
  "name": "BOQ",

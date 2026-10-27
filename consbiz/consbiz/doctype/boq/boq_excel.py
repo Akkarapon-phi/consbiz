@@ -19,7 +19,7 @@ import frappe
 from frappe import _
 from frappe.utils import cstr, flt, getdate, strip_html
 
-from consbiz.consbiz.doctype.boq.boq import calculate_row
+from consbiz.consbiz.doctype.boq.boq import calculate_row, round_down_amount
 
 # (fieldname, หัวคอลัมน์, ความกว้าง, ชนิด) ตามลำดับในไฟล์
 # หัวคอลัมน์แบบ tuple คือ (หัวชั้นบน, หัวชั้นล่าง) คอลัมน์ติดกันที่หัวชั้นบนเหมือนกันจะรวมเซลล์
@@ -127,6 +127,7 @@ def parse_boq_rows(rows: list[list]) -> dict:
 
 	items = []
 	combined_rows = 0
+	amount_checks = []  # (แถว, จำนวน x ราคา, จำนวนเงินในไฟล์)
 	for row_no, cells in enumerate(rows[data_start:], start=data_start + 1):
 		if any(is_label(cell, (TOTAL_LABEL, "Grand Total")) for cell in cells):
 			break
@@ -145,11 +146,17 @@ def parse_boq_rows(rows: list[list]) -> dict:
 			else:  # ไม่มีสิทธิ์สร้าง UOM
 				warnings.append(_("แถว {0}: ไม่พบหน่วย {1} จึงเว้นว่างไว้").format(row_no, values.pop("uom")))
 
-		if combine_rates(values):
+		amount = flt(values.get("line_amount"))
+		source = combine_rates(values)
+		if source:
 			combined_rows += 1
 		missing = [fieldname for fieldname in ITEM_DEFAULTS if fieldname not in values]
 		for fieldname in NUMBER_FIELDS:
 			values[fieldname] = flt(values.get(fieldname))
+		# ราคาที่คิดจากจำนวนเงินตรงกับไฟล์อยู่แล้ว / ไม่มีราคา (รอเติมจาก BOQ Item) เทียบไม่ได้
+		if amount and source != "amount" and any(values[f] for f in RATE_FIELDS):
+			raw = values["quantity"] * (values["material_rate"] + values["labour_rate"])
+			amount_checks.append((row_no, raw, amount))
 		items.append({"row_no": row_no, "row": values, "missing": missing, **matcher.match(values)})
 
 	if combined_rows:
@@ -159,27 +166,56 @@ def parse_boq_rows(rows: list[list]) -> dict:
 			)
 		)
 	warnings.extend(uoms.warnings())
+
+	round_down, mismatched = check_amounts(amount_checks)
+	if round_down:
+		info["round_down_total"] = 1
+		warnings.append(_('ไฟล์ตัดเศษสตางค์ของยอดรวมแต่ละแถว ระบบติ๊ก "ปัดเศษสตางค์ยอดรวมลง" ให้'))
+	if mismatched:
+		rows_text = ", ".join(str(row_no) for row_no in mismatched[:10]) + (
+			" ..." if len(mismatched) > 10 else ""
+		)
+		warnings.append(
+			_("แถว {0}: จำนวนเงินในไฟล์ไม่ตรงกับ จำนวน x ราคาต่อหน่วย ระบบใช้ยอดที่คำนวณใหม่").format(rows_text)
+		)
 	return {"info": info, "items": items, "warnings": warnings}
 
 
-def combine_rates(values: dict) -> bool:
+def check_amounts(checks: list[tuple]) -> tuple[bool, list[int]]:
+	"""เทียบจำนวนเงินในไฟล์กับ จำนวน x ราคา: ไฟล์ตัดสตางค์ยอดรวม (ROUNDDOWN) หรือไม่ และแถวที่ไม่ตรง
+	ถือว่าตัดสตางค์เมื่อแบบตัดสตางค์ตรงมากกว่าแบบไม่ปัด (แถวที่ยอดลงตัวเป็นบาทตรงทั้งสองแบบ ไม่ชี้ขาด)
+	"""
+
+	def same(a, b):
+		return abs(a - b) < 0.005
+
+	exact = [same(raw, amount) for _row, raw, amount in checks]
+	floored = [same(round_down_amount(raw), amount) for _row, raw, amount in checks]
+	round_down = sum(floored) > sum(exact)
+	matched = floored if round_down else exact
+	return round_down, [row_no for (row_no, _raw, _amount), ok in zip(checks, matched, strict=True) if not ok]
+
+
+def combine_rates(values: dict) -> str | None:
 	"""แถวที่ไม่มีค่าวัสดุ/ค่าแรง แต่มีราคาต่อหน่วยหรือจำนวนเงินรวม = ราคารวม: ใส่ราคาที่ค่าวัสดุและติ๊ก combined_rate
 	มีแต่จำนวนเงิน (เช่น งานเหมา) ราคาต่อหน่วย = จำนวนเงิน ÷ จำนวน ถ้าไม่มีจำนวนถือเป็น 1 หน่วย
-	คืน True เมื่อแปลงจากราคารวม (ไม่นับแถวที่ติ๊กมาในไฟล์แล้ว)
+	คืนที่มาของราคาเมื่อแปลงจากราคารวม: "rate" (ราคาต่อหน่วย) หรือ "amount" (จำนวนเงิน)
+	ไม่ได้แปลง (มีค่าวัสดุ/ค่าแรงแยก หรือแถวที่ติ๊กมาในไฟล์แล้ว) คืน None
 	"""
 	unit_rate = flt(values.pop("unit_rate", None))
 	amount = flt(values.pop("line_amount", None))
 	values["combined_rate"] = int(is_checked(values.get("combined_rate")))
 	if any(flt(values.get(f)) for f in RATE_FIELDS) or not (unit_rate or amount):
-		return False
+		return None
 
+	source = "rate" if unit_rate else "amount"
 	if not unit_rate:
 		if not flt(values.get("quantity")):
 			values["quantity"] = 1
 		unit_rate = amount / flt(values["quantity"])
 	values["material_rate"] = unit_rate
 	values["combined_rate"] = 1
-	return True
+	return source
 
 
 def is_checked(value) -> bool:
@@ -554,13 +590,14 @@ def build_workbook(doc=None) -> bytes:
 	write_table_header(ws, fmt, header_row)
 
 	rows = doc.boq_details if doc else []
+	round_down = bool(doc and doc.round_down_total)
 	first_row = header_row + 2
 	write_item_sheet(wb, fmt)
 	for i, row in enumerate(rows):
-		write_item_row(ws, fmt, first_row + i, row)
+		write_item_row(ws, fmt, first_row + i, row, round_down)
 	blank_rows = BLANK_ROWS["export" if doc else "template"]
 	for i in range(blank_rows):
-		write_item_row(ws, fmt, first_row + len(rows) + i)
+		write_item_row(ws, fmt, first_row + len(rows) + i, round_down=round_down)
 	last_row = first_row + len(rows) + blank_rows - 1
 
 	total_row = last_row + 1
@@ -633,11 +670,15 @@ def write_table_header(ws, fmt, row):
 			col += 1
 
 
-def write_item_row(ws, fmt, r, row=None):
-	"""row=None คือแถวว่างเตรียมกรอก (มีแต่สูตรยอดเงิน) ชื่อรายการพิมพ์อิสระ ระบบจับคู่กับ BOQ Item ตอนนำเข้า"""
+def write_item_row(ws, fmt, r, row=None, round_down=False):
+	"""row=None คือแถวว่างเตรียมกรอก (มีแต่สูตรยอดเงิน) ชื่อรายการพิมพ์อิสระ ระบบจับคู่กับ BOQ Item ตอนนำเข้า
+	round_down: ช่องรวมค่าวัสดุและค่าแรงใช้ ROUNDDOWN ตัดสตางค์ (ตาม round_down_total ของ BOQ)"""
 	excel_row = r + 1
 	ref = lambda name: f"${col_letter(column_index(name))}{excel_row}"  # noqa: E731
 	# ช่องที่ยังคำนวณไม่ได้ (ไม่มีจำนวนหรือราคา) คืน "" ไม่ให้ขึ้น #VALUE!
+	total = f"N({ref('material_amount')})+N({ref('labour_amount')})"
+	if round_down:
+		total = f"ROUNDDOWN({total},0)"
 	amount_formula = {
 		"material_amount": (
 			f"=IF(AND(ISNUMBER({ref('quantity')}),ISNUMBER({ref('material_rate')})),"
@@ -647,10 +688,7 @@ def write_item_row(ws, fmt, r, row=None):
 			f"=IF(AND(ISNUMBER({ref('quantity')}),ISNUMBER({ref('labour_rate')})),"
 			f'{ref("quantity")}*{ref("labour_rate")},"")'
 		),
-		"total_amount": (
-			f'=IF(AND({ref("material_amount")}="",{ref("labour_amount")}=""),"",'
-			f"N({ref('material_amount')})+N({ref('labour_amount')}))"
-		),
+		"total_amount": (f'=IF(AND({ref("material_amount")}="",{ref("labour_amount")}=""),"",{total})'),
 	}
 	# แถวหัวข้องาน (ไม่มีจำนวนและราคา) ใช้ตัวหนาและเว้นช่องตัวเลข
 	is_heading = row and not (flt(row.quantity) or flt(row.material_rate) or flt(row.labour_rate))

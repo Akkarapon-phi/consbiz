@@ -82,12 +82,24 @@ frappe.ui.form.on("BOQ", {
 		(frm.doc.boq_details || []).forEach((row) => {
 			row.combined_rate = frm.doc.combined_rate ? 1 : 0;
 			merge_combined_rate(row);
-			calculate_row_amounts(row);
+			calculate_row_amounts(frm, row);
 		});
 		frm.refresh_field("boq_details");
 		calculate_grand_totals(frm);
 	},
+
+	round_down_total(frm) {
+		(frm.doc.boq_details || []).forEach((row) => calculate_row_amounts(frm, row));
+		frm.refresh_field("boq_details");
+		calculate_grand_totals(frm);
+	},
 });
+
+// ปัดเศษสตางค์ยอดรวมลง: ตัดสตางค์เฉพาะช่องรวม (ต้องตรงกับ round_down_amount() ใน boq.py)
+function round_boq_total(frm, amount) {
+	if (!frm.doc.round_down_total) return amount;
+	return Math.trunc(flt(amount, 6));
+}
 
 // ราคารวม: ค่าแรงที่กรอกไว้ย้ายไปรวมที่ค่าวัสดุ (ต้องตรงกับ calculate_row() ใน boq.py)
 function merge_combined_rate(row) {
@@ -96,10 +108,10 @@ function merge_combined_rate(row) {
 	row.labour_rate = 0;
 }
 
-function calculate_row_amounts(row) {
+function calculate_row_amounts(frm, row) {
 	row.material_amount = flt(row.quantity) * flt(row.material_rate);
 	row.labour_amount = flt(row.quantity) * flt(row.labour_rate);
-	row.total_amount = row.material_amount + row.labour_amount;
+	row.total_amount = round_boq_total(frm, row.material_amount + row.labour_amount);
 }
 
 function add_excel_buttons(frm) {
@@ -331,13 +343,16 @@ function apply_boq_import(frm, { info, warnings }, items, mode) {
 		.then(({ message: rows }) => {
 			// หัวเอกสาร: แบบแทนที่ใช้ค่าจากไฟล์ทั้งหมด แบบต่อท้ายเติมเฉพาะช่องที่ยังว่าง
 			Object.entries(info).forEach(([fieldname, value]) => {
+				// ต่อท้าย BOQ ที่มีรายการแล้ว ไม่เปลี่ยนการปัดเศษ (จะเปลี่ยนยอดของรายการเดิมด้วย)
+				const has_rows = (frm.doc.boq_details || []).length;
+				if (fieldname === "round_down_total" && mode !== "replace" && has_rows) return;
 				if (mode === "replace" || !frm.doc[fieldname]) frm.set_value(fieldname, value);
 			});
 			if (mode === "replace") frm.clear_table("boq_details");
 			rows.forEach((row) => {
 				if (frm.doc.combined_rate) row.combined_rate = 1;
 				merge_combined_rate(row);
-				calculate_row_amounts(row);
+				calculate_row_amounts(frm, row);
 				frm.add_child("boq_details", row);
 			});
 			renumber_wbs(frm);
@@ -640,7 +655,7 @@ function calculate_row_totals(frm, cdt, cdn) {
 
     let mat_amount = qty * mat_rate;
     let lab_amount = qty * lab_rate;
-    let tot_amount = mat_amount + lab_amount;
+    let tot_amount = round_boq_total(frm, mat_amount + lab_amount);
 
     frappe.model.set_value(cdt, cdn, 'material_amount', mat_amount);
     frappe.model.set_value(cdt, cdn, 'labour_amount', lab_amount);
