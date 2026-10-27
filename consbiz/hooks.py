@@ -44,7 +44,9 @@ doctype_js = {
     "Sales Invoice": "public/js/sales_invoice_cal.js",
     "Purchase Order": "public/js/purchase_order.js",
     "Purchase Invoice": "public/js/purchase_invoice.js",
-    "Payment Entry": "public/js/payment_entry_deduction.js"
+    "Payment Entry": "public/js/payment_entry_deduction.js",
+    "Material Request": "public/js/material_request.js",
+    "Employee": "public/js/employee.js"
 }
 
 # ----------------------------------------
@@ -177,6 +179,7 @@ jinja = {
 	"methods": [
 		"consbiz.utils.thai_date",
 		"consbiz.consbiz.doctype.bar_cut_plan.bar_cut_plan.shape_svg",
+		"consbiz.utils.name_with_title",
 	]
 }
 # jinja = {

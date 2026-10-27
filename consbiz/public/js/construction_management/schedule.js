@@ -55,6 +55,142 @@ export function roll_up(tasks, holidays) {
 	});
 }
 
+// ---------- งานก่อนหน้า (ตรงกับ apply_dependencies ใน construction_management.py) ----------
+// predecessors ของงานเก็บเป็น JSON [{ task, type, lag }] task = name ของแถวงานก่อนหน้า, type = FS/SS/FF/SF
+// lag = วันทำงาน (ติดลบ = ซ้อนกันได้) งานที่มีงานก่อนหน้าเริ่มวันเร็วสุดที่ความสัมพันธ์ยอมเสมอ (ASAP)
+// อยากให้เริ่มช้ากว่านั้นใช้ lag: ลาก/แก้วันเริ่มของงานที่มีงานก่อนหน้าแปลงเป็น lag ด้วย hold_start
+
+export function parse_predecessors(value) {
+	if (!value) return [];
+	try {
+		const parsed = typeof value === "string" ? JSON.parse(value) : value;
+		return Array.isArray(parsed) ? parsed : [];
+	} catch {
+		return [];
+	}
+}
+
+// เลื่อนวันไป days วันทำงาน (ติดลบ = ย้อนหลัง) ข้ามวันใน holidays 0 = วันเดิม
+export function shift_days(day, days, holidays) {
+	const step = days > 0 ? 1 : -1;
+	for (let i = 0; i < Math.abs(days); i++) {
+		day += step;
+		while (holidays.has(day)) day += step;
+	}
+	return day;
+}
+
+// งานย่อยเรียงให้งานก่อนหน้ามาก่อนเสมอ คืน null ถ้าผูกกันเป็นวง
+export function dependency_order(tasks) {
+	const leaves = tasks.filter((t) => !t.is_group);
+	const names = new Set(leaves.map((t) => t.name));
+	const waiting = new Map();
+	const successors = new Map();
+	for (const task of leaves) {
+		const links = parse_predecessors(task.predecessors).filter((link) => names.has(link.task));
+		waiting.set(task.name, links.length);
+		for (const link of links) {
+			if (!successors.has(link.task)) successors.set(link.task, []);
+			successors.get(link.task).push(task);
+		}
+	}
+	const ordered = leaves.filter((t) => !waiting.get(t.name));
+	// ต่อท้ายระหว่างวน: งานที่งานก่อนหน้าครบแล้ว
+	for (let i = 0; i < ordered.length; i++) {
+		for (const next of successors.get(ordered[i].name) || []) {
+			waiting.set(next.name, waiting.get(next.name) - 1);
+			if (!waiting.get(next.name)) ordered.push(next);
+		}
+	}
+	return ordered.length === leaves.length ? ordered : null;
+}
+
+// วันเริ่มเร็วสุดของงานตามลิงก์เดียว (null = งานก่อนหน้ายังไม่มีวันที่)
+// FS: เริ่มวันทำงานถัดจากวันจบ, SS: เริ่มวันเดียวกัน, FF: จบวันเดียวกัน, SF: จบวันทำงานก่อนวันเริ่ม แล้วเลื่อนอีก lag
+export function link_start(task, link, by_name, holidays) {
+	const predecessor = by_name.get(link.task);
+	const start = to_day(predecessor?.start_date);
+	const end = to_day(predecessor?.end_date);
+	if (start === null || end === null) return null;
+	const lag = link.lag || 0;
+	if (link.type === "SS") return shift_days(start, lag, holidays);
+	if (link.type === "FF" || link.type === "SF") {
+		const finish =
+			link.type === "FF"
+				? shift_days(end, lag, holidays)
+				: shift_days(start, lag - 1, holidays);
+		return shift_days(finish, 1 - Math.max(task.duration || 0, 1), holidays);
+	}
+	return shift_days(end, lag + 1, holidays);
+}
+
+// วันเริ่มเร็วสุดของงานตามงานก่อนหน้าทุกงาน (null = ไม่มีความสัมพันธ์ที่ใช้ได้)
+export function earliest_start(task, by_name, holidays) {
+	const days = parse_predecessors(task.predecessors)
+		.map((link) => link_start(task, link, by_name, holidays))
+		.filter((day) => day !== null);
+	return days.length ? Math.max(...days) : null;
+}
+
+// ปรับ lag ให้งานเริ่มวันเริ่มปัจจุบันพอดี (ผู้ใช้ลากหรือแก้วันที่ของงานที่มีงานก่อนหน้า)
+// ลิงก์ที่บังคับให้เริ่มช้ากว่าวันนั้นลด lag ลงมา ถ้าทุกลิงก์ยอมให้เริ่มเร็วกว่า เพิ่ม lag ของลิงก์ที่กำหนดวันเริ่มอยู่
+// คืน true ถ้า lag เปลี่ยน
+export function hold_start(task, by_name, holidays) {
+	const start = to_day(task.start_date);
+	if (start === null) return false;
+	const links = parse_predecessors(task.predecessors);
+	const days = links.map((link) => link_start(task, link, by_name, holidays));
+	const placed = days.filter((day) => day !== null);
+	if (!placed.length) return false;
+	const latest = Math.max(...placed);
+	let changed = false;
+	links.forEach((link, i) => {
+		const day = days[i];
+		if (day === null || !(day > start || (latest < start && day === latest))) return;
+		// จำนวนวันทำงานจาก day ถึง start (ติดลบถ้า start มาก่อน)
+		link.lag =
+			(link.lag || 0) +
+			(start > day
+				? count_days(day + 1, start, holidays)
+				: -count_days(start, day - 1, holidays));
+		changed = true;
+	});
+	if (changed) task.predecessors = JSON.stringify(links);
+	return changed;
+}
+
+// งานที่มีงานก่อนหน้าเริ่มวันเร็วสุดที่ความสัมพันธ์ยอม (คงจำนวนวันเดิม) คืนงานที่ถูกเลื่อน หรือ null ถ้าผูกกันเป็นวง
+export function apply_dependencies(tasks, holidays) {
+	const order = dependency_order(tasks);
+	if (!order) return null;
+	const by_name = new Map(tasks.map((t) => [t.name, t]));
+	const moved = [];
+	for (const task of order) {
+		const required = earliest_start(task, by_name, holidays);
+		const start = to_day(task.start_date);
+		if (required === null || start === required) continue;
+		const end = end_of(required, Math.max(task.duration || 0, 1), holidays);
+		task.start_date = from_day(required);
+		task.end_date = from_day(end);
+		task.duration = count_days(required, end, holidays);
+		moved.push(task);
+	}
+	return moved;
+}
+
+// ข้อความงานก่อนหน้า เช่น "1.2, 1.3SS+2, 2.1FF-1" (FS ที่ไม่มี lag แสดงแค่ WBS)
+export function format_predecessors(value, by_name) {
+	return parse_predecessors(value)
+		.map((link) => {
+			const wbs = by_name.get(link.task)?.wbs;
+			if (!wbs) return null;
+			const lag = link.lag > 0 ? `+${link.lag}` : link.lag < 0 ? `${link.lag}` : "";
+			return `${wbs}${link.type !== "FS" || lag ? link.type : ""}${lag}`;
+		})
+		.filter(Boolean)
+		.join(", ");
+}
+
 // S-Curve จากวันที่ของงาน (แผนปัจจุบันหรือ baseline) แล้วสะสม
 // งานปกติกระจายน้ำหนักเท่าๆ กันทุกวันทำงาน งานที่กำหนด % เองกระจายตาม % ของแต่ละช่วง (task_daily)
 // น้ำหนัก = มูลค่าที่นับ / มูลค่าสัญญาปรับปรุง (baseline ใช้น้ำหนักที่เก็บไว้ตอนตั้ง baseline)

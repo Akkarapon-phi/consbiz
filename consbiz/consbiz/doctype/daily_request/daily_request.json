@@ -28,6 +28,12 @@
   "planned_progress",
   "column_break_expected",
   "expected_progress",
+  "section_break_compare",
+  "baseline_progress",
+  "column_break_compare",
+  "plan_basis",
+  "column_break_variance",
+  "progress_variance",
   "section_break_resources",
   "labour",
   "column_break_resources",
@@ -132,6 +138,7 @@
   },
   {
    "default": "Pending",
+   "description": "Completed = Submit Daily Report ของคำขอนี้แล้ว",
    "fieldname": "status",
    "fieldtype": "Select",
    "in_list_view": 1,
@@ -140,8 +147,7 @@
    "no_copy": 1,
    "options": "Pending\nApproved\nCompleted\nRejected\nCancelled",
    "print_hide": 1,
-   "read_only": 1,
-   "description": "Completed = Submit Daily Report ของคำขอนี้แล้ว"
+   "read_only": 1
   },
   {
    "default": "1",
@@ -200,6 +206,43 @@
    "fieldname": "expected_progress",
    "fieldtype": "Percent",
    "label": "Expected Progress",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_compare",
+   "fieldtype": "Section Break",
+   "hide_border": 1
+  },
+  {
+   "description": "% แผนสะสม ณ สิ้นวันปฏิบัติงาน",
+   "fieldname": "baseline_progress",
+   "fieldtype": "Percent",
+   "label": "Planned Progress",
+   "precision": "3",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_compare",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "เทียบกับ Baseline ถ้าแผนงานตั้ง Baseline ไว้แล้ว ไม่งั้นเทียบกับแผนปัจจุบัน",
+   "fieldname": "plan_basis",
+   "fieldtype": "Select",
+   "label": "Compared With",
+   "options": "Baseline\nCurrent Plan",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_variance",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "% คาดการณ์ - % แผน (บวก = เร็วกว่าแผน, ลบ = ช้ากว่าแผน)",
+   "fieldname": "progress_variance",
+   "fieldtype": "Percent",
+   "label": "Ahead (+) / Behind (-) Plan",
+   "precision": "3",
    "read_only": 1
   },
   {
@@ -297,7 +340,7 @@
    "link_fieldname": "daily_request"
   }
  ],
- "modified": "2026-10-26 22:38:35.000000",
+ "modified": "2026-10-27 16:42:57.000000",
  "modified_by": "Administrator",
  "module": "ConsBiz",
  "name": "Daily Request",

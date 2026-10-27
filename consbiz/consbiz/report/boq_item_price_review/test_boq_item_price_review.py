@@ -37,6 +37,8 @@ class IntegrationTestBOQItemPriceReview(IntegrationTestCase):
 		self.make_boq("2026-03-01", [{"item_code": code, "material_rate": 120, "labour_rate": 20}])
 		self.make_boq("2026-04-01", [{"item_code": code, "material_rate": 999, "labour_rate": 20}])
 		self.make_boq("2026-05-01", [{"item_code": code, "material_rate": 5000}], submit=False)
+		# ราคารวม แยกค่าวัสดุ/ค่าแรงไม่ได้ ไม่นับ
+		self.make_boq("2026-06-01", [{"item_code": code, "material_rate": 7000, "combined_rate": 1}])
 
 		rows = {row["rate_field"]: row for row in self.report() if row["item_code"] == code}
 		material, labour = rows["material_rate"], rows["labour_rate"]

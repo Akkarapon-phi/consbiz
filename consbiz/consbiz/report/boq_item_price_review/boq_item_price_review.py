@@ -6,6 +6,7 @@
 หนึ่งแถวต่อรายการต่อประเภทราคา (ค่าวัสดุ/ค่าแรง) เทียบราคามาตรฐานกับค่ามัธยฐานของ BOQ
 - ใช้ค่ามัธยฐาน ไม่ใช่ค่าเฉลี่ย เพื่อไม่ให้ BOQ ราคาพิเศษใบเดียวดึงค่าไป
 - นับ 1 ค่าต่อ BOQ (รายการซ้ำในใบเดียวกันใช้ค่าเฉลี่ยของใบนั้น) และไม่นับราคา 0 (ไม่มีค่าวัสดุ/ค่าแรงในใบนั้น)
+- ไม่นับแถวราคารวม (combined_rate) เพราะแยกค่าวัสดุ/ค่าแรงไม่ได้
 - ค่าเริ่มต้นนับเฉพาะ BOQ ที่ Submit แล้ว
 """
 
@@ -149,6 +150,7 @@ def get_boq_rates(filters, item_codes: list[str]) -> dict:
 		.where(
 			(detail.parenttype == "BOQ")
 			& detail.item_code.isin(item_codes)
+			& (detail.combined_rate == 0)
 			& docstatus
 			& (boq_date >= from_date)
 			& (boq_date < add_days(to_date, 1))

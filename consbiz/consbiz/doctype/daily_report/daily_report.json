@@ -20,6 +20,14 @@
   "section_break_items",
   "items",
   "total_amount",
+  "section_break_progress",
+  "today_progress",
+  "cumulative_progress",
+  "column_break_progress",
+  "baseline_progress",
+  "plan_basis",
+  "column_break_variance",
+  "progress_variance",
   "section_break_resources",
   "labour",
   "column_break_resources",
@@ -145,6 +153,59 @@
    "read_only": 1
   },
   {
+   "fieldname": "section_break_progress",
+   "fieldtype": "Section Break",
+   "label": "Project Progress"
+  },
+  {
+   "description": "\u0e04\u0e27\u0e32\u0e21\u0e04\u0e37\u0e1a\u0e2b\u0e19\u0e49\u0e32\u0e02\u0e2d\u0e07\u0e17\u0e31\u0e49\u0e07\u0e42\u0e04\u0e23\u0e07\u0e01\u0e32\u0e23\u0e08\u0e32\u0e01\u0e07\u0e32\u0e19\u0e43\u0e19\u0e23\u0e32\u0e22\u0e07\u0e32\u0e19\u0e19\u0e35\u0e49",
+   "fieldname": "today_progress",
+   "fieldtype": "Percent",
+   "label": "Progress Today",
+   "precision": "4",
+   "read_only": 1
+  },
+  {
+   "description": "\u0e04\u0e27\u0e32\u0e21\u0e04\u0e37\u0e1a\u0e2b\u0e19\u0e49\u0e32\u0e08\u0e23\u0e34\u0e07\u0e2a\u0e30\u0e2a\u0e21\u0e02\u0e2d\u0e07\u0e17\u0e31\u0e49\u0e07\u0e42\u0e04\u0e23\u0e07\u0e01\u0e32\u0e23 \u0e13 \u0e2a\u0e34\u0e49\u0e19\u0e27\u0e31\u0e19\u0e17\u0e35\u0e48\u0e23\u0e32\u0e22\u0e07\u0e32\u0e19 (\u0e23\u0e27\u0e21\u0e23\u0e32\u0e22\u0e07\u0e32\u0e19\u0e19\u0e35\u0e49)",
+   "fieldname": "cumulative_progress",
+   "fieldtype": "Percent",
+   "label": "Cumulative Progress",
+   "precision": "3",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_progress",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "% \u0e41\u0e1c\u0e19\u0e2a\u0e30\u0e2a\u0e21 \u0e13 \u0e2a\u0e34\u0e49\u0e19\u0e27\u0e31\u0e19\u0e17\u0e35\u0e48\u0e23\u0e32\u0e22\u0e07\u0e32\u0e19",
+   "fieldname": "baseline_progress",
+   "fieldtype": "Percent",
+   "label": "Planned Progress",
+   "precision": "3",
+   "read_only": 1
+  },
+  {
+   "description": "\u0e40\u0e17\u0e35\u0e22\u0e1a\u0e01\u0e31\u0e1a Baseline \u0e16\u0e49\u0e32\u0e41\u0e1c\u0e19\u0e07\u0e32\u0e19\u0e15\u0e31\u0e49\u0e07 Baseline \u0e44\u0e27\u0e49\u0e41\u0e25\u0e49\u0e27 \u0e44\u0e21\u0e48\u0e07\u0e31\u0e49\u0e19\u0e40\u0e17\u0e35\u0e22\u0e1a\u0e01\u0e31\u0e1a\u0e41\u0e1c\u0e19\u0e1b\u0e31\u0e08\u0e08\u0e38\u0e1a\u0e31\u0e19",
+   "fieldname": "plan_basis",
+   "fieldtype": "Select",
+   "label": "Compared With",
+   "options": "Baseline\nCurrent Plan",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_variance",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "% \u0e2a\u0e30\u0e2a\u0e21 - % \u0e41\u0e1c\u0e19 (\u0e1a\u0e27\u0e01 = \u0e40\u0e23\u0e47\u0e27\u0e01\u0e27\u0e48\u0e32\u0e41\u0e1c\u0e19, \u0e25\u0e1a = \u0e0a\u0e49\u0e32\u0e01\u0e27\u0e48\u0e32\u0e41\u0e1c\u0e19)",
+   "fieldname": "progress_variance",
+   "fieldtype": "Percent",
+   "label": "Ahead (+) / Behind (-) Plan",
+   "precision": "3",
+   "read_only": 1
+  },
+  {
    "fieldname": "section_break_resources",
    "fieldtype": "Section Break",
    "label": "Resources"
@@ -187,7 +248,7 @@
  "grid_page_length": 50,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-10-26 22:05:10.000000",
+ "modified": "2026-10-27 16:42:57.000000",
  "modified_by": "Administrator",
  "module": "ConsBiz",
  "name": "Daily Report",

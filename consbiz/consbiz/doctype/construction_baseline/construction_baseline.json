@@ -1,0 +1,110 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "autoname": "hash",
+ "creation": "2026-10-27 17:01:49.000000",
+ "description": "สำเนาแผนงาน (วันเริ่ม/วันจบ/% แผน/น้ำหนักของทุกงาน) ณ วันที่บันทึก สร้าง เลือกใช้ และลบจากหน้า Gantt",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "construction_management",
+  "title",
+  "column_break_main",
+  "baseline_date",
+  "section_break_reason",
+  "reason",
+  "tasks"
+ ],
+ "fields": [
+  {
+   "fieldname": "construction_management",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Construction Management",
+   "options": "Construction Management",
+   "read_only": 1,
+   "reqd": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "title",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Title",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_main",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "baseline_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Baseline Date",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_reason",
+   "fieldtype": "Section Break"
+  },
+  {
+   "description": "เหตุผลที่ปรับแผน เช่น ได้รับอนุมัติขยายเวลา (EOT) หรืองานเพิ่ม-ลด",
+   "fieldname": "reason",
+   "fieldtype": "Small Text",
+   "label": "Reason"
+  },
+  {
+   "description": "{ชื่อแถวงาน: [วันเริ่ม, วันจบ, % แผนที่กำหนดเอง, น้ำหนัก]}",
+   "fieldname": "tasks",
+   "fieldtype": "JSON",
+   "hidden": 1,
+   "label": "Tasks",
+   "read_only": 1
+  }
+ ],
+ "grid_page_length": 50,
+ "in_create": 1,
+ "index_web_pages_for_search": 0,
+ "links": [],
+ "modified": "2026-10-27 17:01:49.000000",
+ "modified_by": "Administrator",
+ "module": "ConsBiz",
+ "name": "Construction Baseline",
+ "naming_rule": "Random",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "export": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "export": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Projects Manager",
+   "write": 1
+  },
+  {
+   "create": 1,
+   "export": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Projects User",
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "title"
+}

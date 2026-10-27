@@ -499,7 +499,8 @@ class Layout {
 							COLOR.line
 						}" stroke-width="0.5"/>`
 					);
-					if (value && w >= 18) {
+					// ช่องที่แคบกว่าตัวเลขไม่แสดง ไม่ให้ตัวเลขล้นทับช่องข้างๆ (เหมือนหน้าจอ)
+					if (value && text_width(value, `7px ${PRINT_FONT}`) <= w - 2) {
 						out.push(
 							text(x(period.start) + w / 2, y + SUMMARY_ROW - 5, value, {
 								size: 7,

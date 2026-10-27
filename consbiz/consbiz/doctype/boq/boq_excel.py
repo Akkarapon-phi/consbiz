@@ -19,7 +19,7 @@ import frappe
 from frappe import _
 from frappe.utils import cstr, flt, getdate, strip_html
 
-from consbiz.consbiz.doctype.boq.boq import calculate_row
+from consbiz.consbiz.doctype.boq.boq import calculate_row, round_down_amount
 
 # (fieldname, หัวคอลัมน์, ความกว้าง, ชนิด) ตามลำดับในไฟล์
 # หัวคอลัมน์แบบ tuple คือ (หัวชั้นบน, หัวชั้นล่าง) คอลัมน์ติดกันที่หัวชั้นบนเหมือนกันจะรวมเซลล์
@@ -38,6 +38,7 @@ COLUMNS = (
 	("description", "หมายเหตุ", 30, "text"),
 	("item_code", "รหัสรายการ", 12, "text"),
 	("item_group", "กลุ่มงาน", 16, "text"),
+	("combined_rate", "ไม่แยกค่าวัสดุ/ค่าแรง", 12, "check"),
 )
 PRINT_COLUMNS = 9  # พิมพ์เฉพาะคอลัมน์ A-I ตามแบบฟอร์ม
 IMPORT_FIELDS = tuple(fieldname for fieldname, _label, _width, kind in COLUMNS if kind != "amount")
@@ -48,7 +49,13 @@ COLUMN_ALIASES = {
 	"material_rate": ("ค่าวัสดุ/หน่วย",),
 	"labour_rate": ("ค่าแรง/หน่วย",),
 }
+# คอลัมน์ที่อ่านตอนนำเข้าอย่างเดียว สำหรับไฟล์ที่ไม่แยกค่าวัสดุ/ค่าแรง (ดู combine_rates)
+COMBINED_COLUMNS = {
+	"unit_rate": ("ราคาต่อหน่วย", "ราคา/หน่วย", "หน่วยละ", "ราคารวมต่อหน่วย", "Unit Rate", "Rate"),
+	"line_amount": ("รวมค่าวัสดุและค่าแรง", "จำนวนเงิน", "รวมเป็นเงิน", "ราคารวม", "Amount", "Total Amount"),
+}
 NUMBER_FIELDS = ("quantity", "material_rate", "labour_rate")
+RATE_FIELDS = ("material_rate", "labour_rate")
 # ค่าที่ดึงจาก BOQ Item เมื่อช่องในไฟล์ว่าง
 ITEM_DEFAULTS = ("item_name", "uom", "item_group", "material_rate", "labour_rate")
 # หัวเอกสาร: fieldname ของ BOQ -> ป้ายในไฟล์
@@ -83,9 +90,15 @@ def import_boq_items(filename: str, content: str) -> dict:
 	อ่านในหน่วยความจำอย่างเดียว ไม่สร้าง File และไม่เขียนลงดิสก์ (ไฟล์มีราคาทุน)
 	"""
 	frappe.has_permission("BOQ", "write", throw=True)
+	return parse_boq_rows(read_spreadsheet(filename, content))
+
+
+def read_spreadsheet(filename: str, content: str) -> list[list]:
+	"""แถวของชีตแรก (ชีตที่ active) จากไฟล์ .xlsx/.csv ที่ส่งมาเป็น base64 อ่านในหน่วยความจำ
+	ใช้ร่วมกับการนำเข้าแผนงาน (schedule_excel.py)"""
 	try:
 		data = base64.b64decode(content, validate=True)
-	except (binascii.Error, ValueError):
+	except binascii.Error, ValueError:
 		frappe.throw(_("อ่านไฟล์ไม่ได้"))
 	if len(data) > MAX_FILE_SIZE:
 		frappe.throw(_("ไฟล์ใหญ่เกิน {0} MB").format(MAX_FILE_SIZE // (1024 * 1024)))
@@ -95,17 +108,14 @@ def import_boq_items(filename: str, content: str) -> dict:
 		from frappe.utils.xlsxutils import read_xlsx_file_from_attached_file
 
 		try:
-			rows = read_xlsx_file_from_attached_file(fcontent=data)
-		except (zipfile.BadZipFile, KeyError, ValueError):
+			return read_xlsx_file_from_attached_file(fcontent=data)
+		except zipfile.BadZipFile, KeyError, ValueError:
 			frappe.throw(_("ไฟล์ {0} ไม่ใช่ Excel (.xlsx) หรือไฟล์เสียหาย").format(filename))
 	elif extension == "csv":
 		from frappe.utils.csvutils import read_csv_content
 
-		rows = read_csv_content(data)
-	else:
-		frappe.throw(_("รองรับเฉพาะไฟล์ .xlsx หรือ .csv"))
-
-	return parse_boq_rows(rows)
+		return read_csv_content(data)
+	frappe.throw(_("รองรับเฉพาะไฟล์ .xlsx หรือ .csv"))
 
 
 def parse_boq_rows(rows: list[list]) -> dict:
@@ -116,8 +126,11 @@ def parse_boq_rows(rows: list[list]) -> dict:
 	header_index, columns, data_start = find_header(rows)
 	info, warnings = parse_info(rows[:header_index])
 	matcher = ItemMatcher()
+	uoms = UomMatcher()
 
 	items = []
+	combined_rows = 0
+	amount_checks = []  # (แถว, จำนวน x ราคา, จำนวนเงินในไฟล์)
 	for row_no, cells in enumerate(rows[data_start:], start=data_start + 1):
 		if any(is_label(cell, (TOTAL_LABEL, "Grand Total")) for cell in cells):
 			break
@@ -130,16 +143,88 @@ def parse_boq_rows(rows: list[list]) -> dict:
 		if not values:
 			continue
 
-		if values.get("uom") and not frappe.db.exists("UOM", values["uom"]):
-			uom = values.pop("uom")
-			warnings.append(_("แถว {0}: ไม่พบหน่วย {1} จึงเว้นว่างไว้").format(row_no, uom))
+		if values.get("uom"):
+			if uom := uoms.match(values["uom"]):
+				values["uom"] = uom
+			else:  # ไม่มีสิทธิ์สร้าง UOM
+				warnings.append(_("แถว {0}: ไม่พบหน่วย {1} จึงเว้นว่างไว้").format(row_no, values.pop("uom")))
 
+		amount = flt(values.get("line_amount"))
+		source = combine_rates(values)
+		if source:
+			combined_rows += 1
 		missing = [fieldname for fieldname in ITEM_DEFAULTS if fieldname not in values]
 		for fieldname in NUMBER_FIELDS:
 			values[fieldname] = flt(values.get(fieldname))
+		# ราคาที่คิดจากจำนวนเงินตรงกับไฟล์อยู่แล้ว / ไม่มีราคา (รอเติมจาก BOQ Item) เทียบไม่ได้
+		if amount and source != "amount" and any(values[f] for f in RATE_FIELDS):
+			raw = values["quantity"] * (values["material_rate"] + values["labour_rate"])
+			amount_checks.append((row_no, raw, amount))
 		items.append({"row_no": row_no, "row": values, "missing": missing, **matcher.match(values)})
 
+	if combined_rows:
+		warnings.append(
+			_('{0} แถวไม่แยกค่าวัสดุและค่าแรง ระบบใส่ราคารวมที่ค่าวัสดุและติ๊ก "ราคารวมวัสดุและค่าแรง" ไว้').format(
+				combined_rows
+			)
+		)
+	warnings.extend(uoms.warnings())
+
+	round_down, mismatched = check_amounts(amount_checks)
+	if round_down:
+		info["round_down_total"] = 1
+		warnings.append(_('ไฟล์ตัดเศษสตางค์ของยอดรวมแต่ละแถว ระบบติ๊ก "ปัดเศษสตางค์ยอดรวมลง" ให้'))
+	if mismatched:
+		rows_text = ", ".join(str(row_no) for row_no in mismatched[:10]) + (
+			" ..." if len(mismatched) > 10 else ""
+		)
+		warnings.append(
+			_("แถว {0}: จำนวนเงินในไฟล์ไม่ตรงกับ จำนวน x ราคาต่อหน่วย ระบบใช้ยอดที่คำนวณใหม่").format(rows_text)
+		)
 	return {"info": info, "items": items, "warnings": warnings}
+
+
+def check_amounts(checks: list[tuple]) -> tuple[bool, list[int]]:
+	"""เทียบจำนวนเงินในไฟล์กับ จำนวน x ราคา: ไฟล์ตัดสตางค์ยอดรวม (ROUNDDOWN) หรือไม่ และแถวที่ไม่ตรง
+	ถือว่าตัดสตางค์เมื่อแบบตัดสตางค์ตรงมากกว่าแบบไม่ปัด (แถวที่ยอดลงตัวเป็นบาทตรงทั้งสองแบบ ไม่ชี้ขาด)
+	"""
+
+	def same(a, b):
+		return abs(a - b) < 0.005
+
+	exact = [same(raw, amount) for _row, raw, amount in checks]
+	floored = [same(round_down_amount(raw), amount) for _row, raw, amount in checks]
+	round_down = sum(floored) > sum(exact)
+	matched = floored if round_down else exact
+	return round_down, [row_no for (row_no, _raw, _amount), ok in zip(checks, matched, strict=True) if not ok]
+
+
+def combine_rates(values: dict) -> str | None:
+	"""แถวที่ไม่มีค่าวัสดุ/ค่าแรง แต่มีราคาต่อหน่วยหรือจำนวนเงินรวม = ราคารวม: ใส่ราคาที่ค่าวัสดุและติ๊ก combined_rate
+	มีแต่จำนวนเงิน (เช่น งานเหมา) ราคาต่อหน่วย = จำนวนเงิน ÷ จำนวน ถ้าไม่มีจำนวนถือเป็น 1 หน่วย
+	คืนที่มาของราคาเมื่อแปลงจากราคารวม: "rate" (ราคาต่อหน่วย) หรือ "amount" (จำนวนเงิน)
+	ไม่ได้แปลง (มีค่าวัสดุ/ค่าแรงแยก หรือแถวที่ติ๊กมาในไฟล์แล้ว) คืน None
+	"""
+	unit_rate = flt(values.pop("unit_rate", None))
+	amount = flt(values.pop("line_amount", None))
+	values["combined_rate"] = int(is_checked(values.get("combined_rate")))
+	if any(flt(values.get(f)) for f in RATE_FIELDS) or not (unit_rate or amount):
+		return None
+
+	source = "rate" if unit_rate else "amount"
+	if not unit_rate:
+		if not flt(values.get("quantity")):
+			values["quantity"] = 1
+		unit_rate = amount / flt(values["quantity"])
+	values["material_rate"] = unit_rate
+	values["combined_rate"] = 1
+	return source
+
+
+def is_checked(value) -> bool:
+	if isinstance(value, int | float):
+		return bool(value)
+	return cstr(value).strip().lower() not in ("", "0", "no", "false", "ไม่")
 
 
 @frappe.whitelist()
@@ -153,6 +238,8 @@ def apply_boq_matches(items: list[dict] | str) -> list[dict]:
 	rows = []
 	for entry in frappe.parse_json(items):
 		row = frappe._dict({k: v for k, v in (entry.get("row") or {}).items() if k in IMPORT_FIELDS})
+		if row.uom:
+			row.uom = ensure_uom(row.uom)
 		code = entry.get("item_code")
 		if entry.get("create") and row.item_name:
 			key = name_key(row.item_name)
@@ -163,8 +250,13 @@ def apply_boq_matches(items: list[dict] | str) -> list[dict]:
 			item = frappe.db.get_value("BOQ Item", code, ITEM_DEFAULTS, as_dict=True)
 			if not item:
 				frappe.throw(_("ไม่พบ BOQ Item {0}").format(code))
-			for fieldname in entry.get("missing") or ():
-				row[fieldname] = item[fieldname]
+			missing = entry.get("missing") or ()
+			for fieldname in missing:
+				# ราคารวม: ไม่เติมค่าวัสดุ/ค่าแรงแยก ถ้าไฟล์ไม่มีราคาเลยใช้ราคามาตรฐานรวมกัน
+				if not (row.combined_rate and fieldname in RATE_FIELDS):
+					row[fieldname] = item[fieldname]
+			if row.combined_rate and set(RATE_FIELDS) <= set(missing):
+				row.material_rate = flt(item.material_rate) + flt(item.labour_rate)
 
 		row.item_code = code or None
 		for fieldname in NUMBER_FIELDS:
@@ -175,18 +267,91 @@ def apply_boq_matches(items: list[dict] | str) -> list[dict]:
 
 
 def create_boq_item(row) -> str:
+	"""ราคาในไฟล์เป็นราคามาตรฐาน ยกเว้นแถวราคารวม (แยกค่าวัสดุ/ค่าแรงไม่ได้) สร้างโดยไม่ใส่ราคา"""
+	rates = {} if row.combined_rate else {f: flt(row.get(f)) for f in RATE_FIELDS}
 	item = frappe.get_doc(
 		{
 			"doctype": "BOQ Item",
 			"item_name": row.item_name,
 			"uom": row.uom,
 			"item_group": row.item_group if frappe.db.exists("BOQ Item Group", row.item_group) else None,
-			"material_rate": flt(row.material_rate),
-			"labour_rate": flt(row.labour_rate),
+			**rates,
 		}
 	)
 	item.insert()  # ตรวจสิทธิ์สร้าง BOQ Item ของผู้ใช้
 	return item.name
+
+
+# ---------------------------------------------------------------- หน่วย
+
+# ชื่อเรียกหน่วยเดียวกัน เทียบด้วย uom_key ตัวแรกที่มีในระบบเป็นหน่วยที่ใช้ (ไทยก่อน)
+UOM_ALIASES = (
+	("ตร.ม.", "ตารางเมตร", "ม2", "ม.2", "m2", "sq.m", "sqm", "Square Meter"),
+	("ลบ.ม.", "ลูกบาศก์เมตร", "ม3", "ม.3", "m3", "cu.m", "cum", "Cubic Meter"),
+	("เมตร", "ม.", "m", "Meter", "Metre"),
+	("กก.", "กิโลกรัม", "kg", "kgs", "Kilogram"),
+	("ตัน", "ton", "tons", "Tonne"),
+	("ลิตร", "ล.", "l", "lt", "Litre", "Liter"),
+	("เหมา", "ls", "l.s.", "lump sum", "Lot"),
+	("ชุด", "set", "sets"),
+	("ชิ้น", "pc", "pcs", "piece", "pieces"),
+)
+
+
+def uom_key(name) -> str:
+	"""ไม่สนตัวพิมพ์ ช่องว่าง จุด และขีด ("ตร.ม." = "ตรม" = "ตร. ม")"""
+	return re.sub(r"[\s.\-_]", "", cstr(name).lower())
+
+
+class UomMatcher:
+	"""หาหน่วยในระบบที่ตรงกับหน่วยในไฟล์: ชื่อตรงกัน (ไม่นับตัวพิมพ์/จุด/ช่องว่าง) หรือเป็นชื่อเรียกอื่นใน UOM_ALIASES
+	ไม่พบ: คืนชื่อเดิมไว้สร้างหน่วยใหม่ตอนนำเข้า (ensure_uom) ถ้าผู้ใช้ไม่มีสิทธิ์สร้าง UOM คืน None
+	ไม่ใช้ความใกล้เคียงของชื่อ เพราะชื่อหน่วยสั้น "ม." กับ "มม." ต่างกันตัวเดียวแต่คนละหน่วย
+	"""
+
+	def __init__(self):
+		self.by_key = {}
+		for uom in frappe.get_all("UOM", fields=["name", "enabled"], order_by="enabled desc, name asc"):
+			self.by_key.setdefault(uom_key(uom.name), uom.name)
+		self.can_create = frappe.has_permission("UOM", "create")
+		self.mapped = {}  # ชื่อในไฟล์ -> หน่วยในระบบที่ใช้แทน
+		self.new = []
+
+	def match(self, name) -> str | None:
+		name = " ".join(cstr(name).split())
+		key = uom_key(name)
+		if found := self.by_key.get(key):
+			if found != name:
+				self.mapped.setdefault(name, found)
+			return found
+		for aliases in UOM_ALIASES:
+			if key in {uom_key(alias) for alias in aliases}:
+				found = next((self.by_key[uom_key(a)] for a in aliases if uom_key(a) in self.by_key), None)
+				if found:
+					self.mapped.setdefault(name, found)
+					return found
+		if not self.can_create:
+			return None
+		if name not in self.new:
+			self.new.append(name)
+		return name
+
+	def warnings(self) -> list[str]:
+		messages = []
+		if self.mapped:
+			pairs = ", ".join(f"{src} → {uom}" for src, uom in self.mapped.items())
+			messages.append(_("ใช้หน่วยที่มีในระบบแทน: {0}").format(pairs))
+		if self.new:
+			messages.append(_("หน่วยที่ยังไม่มีในระบบ จะสร้างใหม่ตอนนำเข้า: {0}").format(", ".join(self.new)))
+		return messages
+
+
+def ensure_uom(name) -> str:
+	"""สร้าง UOM ที่ยังไม่มี (ชื่อตามที่ UomMatcher คืนไว้) insert ตรวจสิทธิ์สร้าง UOM ของผู้ใช้"""
+	name = " ".join(cstr(name).split())
+	if existing := frappe.db.exists("UOM", name):
+		return existing
+	return frappe.get_doc({"doctype": "UOM", "uom_name": name}).insert().name
 
 
 # ---------------------------------------------------------------- จับคู่รายการ
@@ -335,6 +500,10 @@ def get_column_names() -> dict[str, str]:
 		aliases = COLUMN_ALIASES.get(fieldname, ())
 		for name in (fieldname, meta_label, _(meta_label), label, _(label), *aliases):
 			names[normalize(name)] = fieldname
+	for fieldname, aliases in COMBINED_COLUMNS.items():
+		for name in aliases:
+			names.setdefault(normalize(name), fieldname)
+			names.setdefault(normalize(_(name)), fieldname)
 	return names
 
 
@@ -424,13 +593,14 @@ def build_workbook(doc=None) -> bytes:
 	write_table_header(ws, fmt, header_row)
 
 	rows = doc.boq_details if doc else []
+	round_down = bool(doc and doc.round_down_total)
 	first_row = header_row + 2
 	write_item_sheet(wb, fmt)
 	for i, row in enumerate(rows):
-		write_item_row(ws, fmt, first_row + i, row)
+		write_item_row(ws, fmt, first_row + i, row, round_down)
 	blank_rows = BLANK_ROWS["export" if doc else "template"]
 	for i in range(blank_rows):
-		write_item_row(ws, fmt, first_row + len(rows) + i)
+		write_item_row(ws, fmt, first_row + len(rows) + i, round_down=round_down)
 	last_row = first_row + len(rows) + blank_rows - 1
 
 	total_row = last_row + 1
@@ -503,11 +673,15 @@ def write_table_header(ws, fmt, row):
 			col += 1
 
 
-def write_item_row(ws, fmt, r, row=None):
-	"""row=None คือแถวว่างเตรียมกรอก (มีแต่สูตรยอดเงิน) ชื่อรายการพิมพ์อิสระ ระบบจับคู่กับ BOQ Item ตอนนำเข้า"""
+def write_item_row(ws, fmt, r, row=None, round_down=False):
+	"""row=None คือแถวว่างเตรียมกรอก (มีแต่สูตรยอดเงิน) ชื่อรายการพิมพ์อิสระ ระบบจับคู่กับ BOQ Item ตอนนำเข้า
+	round_down: ช่องรวมค่าวัสดุและค่าแรงใช้ ROUNDDOWN ตัดสตางค์ (ตาม round_down_total ของ BOQ)"""
 	excel_row = r + 1
 	ref = lambda name: f"${col_letter(column_index(name))}{excel_row}"  # noqa: E731
 	# ช่องที่ยังคำนวณไม่ได้ (ไม่มีจำนวนหรือราคา) คืน "" ไม่ให้ขึ้น #VALUE!
+	total = f"N({ref('material_amount')})+N({ref('labour_amount')})"
+	if round_down:
+		total = f"ROUNDDOWN({total},0)"
 	amount_formula = {
 		"material_amount": (
 			f"=IF(AND(ISNUMBER({ref('quantity')}),ISNUMBER({ref('material_rate')})),"
@@ -517,10 +691,7 @@ def write_item_row(ws, fmt, r, row=None):
 			f"=IF(AND(ISNUMBER({ref('quantity')}),ISNUMBER({ref('labour_rate')})),"
 			f'{ref("quantity")}*{ref("labour_rate")},"")'
 		),
-		"total_amount": (
-			f'=IF(AND({ref("material_amount")}="",{ref("labour_amount")}=""),"",'
-			f"N({ref('material_amount')})+N({ref('labour_amount')}))"
-		),
+		"total_amount": (f'=IF(AND({ref("material_amount")}="",{ref("labour_amount")}=""),"",{total})'),
 	}
 	# แถวหัวข้องาน (ไม่มีจำนวนและราคา) ใช้ตัวหนาและเว้นช่องตัวเลข
 	is_heading = row and not (flt(row.quantity) or flt(row.material_rate) or flt(row.labour_rate))
@@ -528,7 +699,7 @@ def write_item_row(ws, fmt, r, row=None):
 	for col, (fieldname, _label, _width, kind) in enumerate(COLUMNS):
 		if fieldname in ("item_name", "description"):
 			cell_fmt = fmt["text_wrap_bold" if is_heading else "text_wrap"]
-		elif fieldname in ("wbs", "uom", "item_code"):
+		elif fieldname in ("wbs", "uom", "item_code", "combined_rate"):
 			cell_fmt = fmt["center_bold" if is_heading else "center"]
 		else:
 			cell_fmt = fmt[kind]
@@ -542,6 +713,8 @@ def write_item_row(ws, fmt, r, row=None):
 				value = strip_html(cstr(value)).strip()
 			if kind in ("qty", "money"):
 				value = None if is_heading else flt(value)
+			elif kind == "check":
+				value = 1 if value else None
 			ws.write(r, col, value if value not in (None, "") else None, cell_fmt)
 		else:
 			ws.write_blank(r, col, None, cell_fmt)

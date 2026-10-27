@@ -93,6 +93,12 @@ pre-commit run --all-files                               # ruff + prettier (ต�
   ซึ่งระบบสร้างเองจากการ Submit `Daily Report` หรือการกรอกในหน้า Gantt ห้ามให้ผู้ใช้กรอกตรง
   `Daily Request` (ขออนุมัติปฏิบัติงานล่วงหน้า) ไม่สร้าง Progress Entry Submit = อนุมัติ แล้วสร้าง Daily Report ต่อได้ 1 ฉบับ
   การคำนวณ %แผน/S-Curve ใน `public/js/construction_management/schedule.js` ต้องตรงกับฝั่ง Python เสมอ
+  งานก่อนหน้า (`predecessors` FS/SS/FF/SF + lag) เป็นแบบ ASAP: `apply_dependencies` มีทั้ง Python และ `schedule.js` ต้องตรงกัน
+  Baseline เก็บได้หลายชุดใน `Construction Baseline` (สำเนาวันที่/% แผน/น้ำหนักของทุกแถว) เลือกดูในหน้า Gantt ได้ทีละชุด
+  ชุดที่ใช้เทียบในรายงาน (`active_baseline`) ถูกคัดลอกลงช่อง `baseline_*` ของแถวงาน และลบไม่ได้
+  Daily Report/Request เทียบ % จริงกับ Baseline (ไม่มี Baseline ใช้แผนปัจจุบัน: `target_progress`) แล้วเก็บค่าไว้ในเอกสาร
+  ลาก/แก้วันเริ่มของงานที่มีงานก่อนหน้าในหน้า Gantt = ปรับ lag (`hold_start`) ส่วน Excel อยู่ใน `schedule_excel.py`
+  (นำเข้าแค่อ่านไฟล์ หน้า Gantt เป็นคนใส่ค่าและ Undo ได้)
 - งานลด-งานเพิ่ม: `Variation Order` Submit แล้วมีผลกับแผน (`apply_variations` ใน CM) งานลดลดปริมาณงานเดิม
   งานเพิ่มเป็นแถว `VO.n` ใต้กลุ่ม `VO` ท้ายตาราง แต่นับในมูลค่าสัญญาและ % เมื่อ `employer_status = Approved` เท่านั้น
   % ความคืบหน้า = มูลค่างานที่ทำแล้ว ÷ มูลค่าสัญญาปรับปรุง (`revised_amount`) S-Curve จริงใช้ตัวหาร ณ วันที่อนุมัติแต่ละ VO

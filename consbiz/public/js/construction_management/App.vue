@@ -2,25 +2,33 @@
 // หน้า Gantt ของ Construction Management: ตาราง WBS ซ้าย, timeline + S-Curve ขวา, ตารางสรุปด้านล่าง
 // ฝั่ง server: consbiz/consbiz/doctype/construction_management/construction_management.py
 // ความคืบหน้าจริงเก็บเป็นรายการรายวัน (Construction Progress Entry) กรอกในหน้านี้ได้ ณ "วันที่เลือกดู"
-// การแก้ไข: Undo/Redo (Ctrl+Z / Ctrl+Y) ย้อนได้ทั้งวันที่ % แผนที่กำหนดเอง และ % จริงที่กรอก
+// การแก้ไข: Undo/Redo (Ctrl+Z / Ctrl+Y) ย้อนได้ทั้งวันที่ % แผนที่กำหนดเอง งานก่อนหน้า และ % จริงที่กรอก
+// งานก่อนหน้า (FS/SS/FF/SF + lag): งานที่ตามมาเลื่อนตามทันทีที่แก้ (ASAP, apply_dependencies ใน schedule.js)
+// ลาก/แก้วันที่ของงานที่มีงานก่อนหน้า = ปรับ lag ให้งานอยู่ตรงที่วาง (hold_start)
 // บันทึกอัตโนมัติหลังหยุดแก้ AUTO_SAVE_DELAY และโหลดใหม่เองเมื่อมีการแก้จากที่อื่น (ตรวจทุก REFRESH_INTERVAL)
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 import Toolbar from "./components/Toolbar.vue";
 import TaskGrid from "./components/TaskGrid.vue";
 import Timeline from "./components/Timeline.vue";
 import { COLUMNS, DEFAULT_COLUMNS } from "./columns";
+import { open_import_dialog } from "./import_dialog";
 import { open_plan_dialog } from "./plan_dialog";
 import { open_print_dialog } from "./print";
 import {
 	actual_curve,
+	apply_dependencies,
 	count_days,
 	curve_of,
+	dependency_order,
 	distribution_fits,
 	end_of,
 	floor_to,
+	format_predecessors,
 	from_day,
+	hold_start,
 	next_of,
 	parse_distribution,
+	parse_predecessors,
 	plan_percent,
 	roll_up,
 	to_day,
@@ -31,6 +39,7 @@ import {
 const props = defineProps({ page: Object, schedule: String });
 
 const API = "consbiz.consbiz.doctype.construction_management.construction_management";
+const EXCEL_API = "consbiz.consbiz.doctype.construction_management.schedule_excel";
 const DOCTYPE = "Construction Management";
 const AUTO_SAVE_DELAY = 1500;
 const REFRESH_INTERVAL = 30000;
@@ -82,9 +91,7 @@ const SUMMARY_ROWS = [
 	const { color, print_color } = CURVES.find((c) => c.key === row.curve);
 	return { ...row, color, print_color };
 });
-const DEFAULT_SUMMARY_KEYS = SUMMARY_ROWS.map((row) => row.key).filter(
-	(key) => key !== "baseline_period"
-);
+const DEFAULT_SUMMARY_KEYS = SUMMARY_ROWS.map((row) => row.key);
 
 const data = ref(null);
 const tasks = ref([]);
@@ -111,12 +118,15 @@ const settings = reactive({
 	show_summary: true,
 	summary_keys: [...DEFAULT_SUMMARY_KEYS],
 	show_split: true,
+	show_links: true,
 	show_labels: false,
 	show_progress: false,
 	show_status: true,
 	auto_save: true,
 	grid_width: 560,
 	print: {},
+	// แบบไฟล์ Excel ที่ส่งออก (schedule_excel.EDITABLE): duration = กำหนดจำนวนวัน, dates = กำหนดวันเริ่ม-จบ
+	excel_mode: "duration",
 });
 
 const panes = ref(null);
@@ -129,6 +139,7 @@ const counting_holidays = computed(() =>
 	data.value?.use_working_days ? holidays.value : new Set()
 );
 const can_write = computed(() => Boolean(data.value?.can_write));
+const task_by_name = computed(() => new Map(tasks.value.map((t) => [t.name, t])));
 const status_day = computed(() => to_day(status_date.value) ?? today());
 
 const columns = computed(() =>
@@ -192,6 +203,36 @@ const finish_date = computed(() => {
 
 const has_baseline = computed(() => tasks.value.some((t) => t.baseline_start_date));
 
+// ---------- Baseline หลายชุด ----------
+// ชุดที่เปิดดู (viewed_baseline) แยกจากชุดที่ใช้เทียบกับความคืบหน้าจริงในรายงาน (data.active_baseline)
+// เปิดดูชุดไหน คัดลอกวันที่/% แผน/น้ำหนักของชุดนั้นลงช่อง baseline_* ของงานในหน้านี้ (ไม่บันทึก)
+// แถบ Baseline, เส้น S-Curve, ตารางสรุป และงานพิมพ์จึงเป็นของชุดที่เปิดดู
+const viewed_baseline = ref(null);
+const baselines = computed(() => data.value?.baselines || []);
+const viewed_baseline_doc = computed(
+	() => baselines.value.find((b) => b.name === viewed_baseline.value) || null
+);
+const can_delete_baseline = frappe.model.can_delete("Construction Baseline");
+const active_baseline_doc = computed(
+	() => baselines.value.find((b) => b.name === data.value?.active_baseline) || null
+);
+
+function show_baseline(name) {
+	const baseline = baselines.value.find((b) => b.name === name);
+	viewed_baseline.value = baseline?.name || null;
+	if (!baseline) return;
+	const rows = (typeof baseline.tasks === "string" ? JSON.parse(baseline.tasks) : baseline.tasks) || {};
+	for (const task of tasks.value) {
+		const [start, end, distribution, weight] = rows[task.name] || [null, null, null, 0];
+		Object.assign(task, {
+			baseline_start_date: start,
+			baseline_end_date: end,
+			baseline_distribution: distribution,
+			baseline_weight: weight,
+		});
+	}
+}
+
 // มูลค่าสัญญาปรับปรุง (สัญญาเดิม + งานเพิ่ม-ลดที่ผู้ว่าจ้างอนุมัติแล้ว) ใช้กับ Cash Plan และหัวเครื่องมือ
 const revised_amount = computed(() => data.value?.revised_amount || data.value?.total_amount || 0);
 
@@ -238,6 +279,7 @@ const readout = computed(() => ({
 }));
 
 // % แผน / % จริง / ปริมาณจริงสะสมของแต่ละงาน ณ วันที่เลือกดู (กลุ่มถ่วงน้ำหนักจากงานย่อย)
+// และข้อความงานก่อนหน้า (WBS) ของงานย่อย
 const metrics = computed(() => {
 	const day = status_day.value;
 	const sums = new Map();
@@ -263,6 +305,7 @@ const metrics = computed(() => {
 			),
 			actual_pct: Math.min(Math.max(sum.percent, 0), 100),
 			actual_qty: sum.qty,
+			predecessors: format_predecessors(task.predecessors, task_by_name.value),
 		});
 	}
 	tasks.value.forEach((task, i) => {
@@ -296,7 +339,7 @@ const metrics = computed(() => {
 
 // ---------- สถานะที่แก้ได้ (Undo/Redo, เทียบกับที่บันทึกแล้ว) ----------
 
-// ค่าที่ผู้ใช้แก้ได้ในหน้านี้: วันที่และ % แผนที่กำหนดเองของงานย่อย และรายการ % จริงที่กรอกเอง (Manual)
+// ค่าที่ผู้ใช้แก้ได้ในหน้านี้: วันที่ % แผนที่กำหนดเอง และงานก่อนหน้าของงานย่อย และรายการ % จริงที่กรอกเอง (Manual)
 function snapshot() {
 	return JSON.stringify({
 		tasks: tasks.value
@@ -307,6 +350,7 @@ function snapshot() {
 				t.end_date || null,
 				t.duration || 0,
 				t.plan_distribution || null,
+				t.predecessors || null,
 			]),
 		entries: entries.value
 			.filter((e) => e.source === "Manual")
@@ -321,9 +365,16 @@ const dirty = computed(() => saved_state.value !== null && current_state.value !
 function restore(state) {
 	const { tasks: rows, entries: manual } = JSON.parse(state);
 	const by_name = new Map(tasks.value.map((t) => [t.name, t]));
-	for (const [name, start_date, end_date, duration, plan_distribution] of rows) {
+	for (const [name, start_date, end_date, duration, plan_distribution, predecessors] of rows) {
 		const task = by_name.get(name);
-		if (task) Object.assign(task, { start_date, end_date, duration, plan_distribution });
+		if (task)
+			Object.assign(task, {
+				start_date,
+				end_date,
+				duration,
+				plan_distribution,
+				predecessors,
+			});
 	}
 	roll_up(tasks.value, counting_holidays.value);
 	entries.value = [
@@ -393,8 +444,18 @@ function progress_changes(saved) {
 // keep_history: ข้อมูลจากการบันทึกของหน้านี้เอง (Undo ต่อได้) ไม่งั้นเป็นข้อมูลใหม่จากฐานข้อมูล ล้างประวัติ
 function set_data(message, { keep_history = false } = {}) {
 	data.value = message;
-	tasks.value = message.tasks.map((t) => ({ ...t }));
+	// งานก่อนหน้าเขียนเป็น JSON รูปแบบเดียวกับที่หน้านี้สร้าง ไม่ให้ Undo กลับมาแล้วดูเหมือนยังไม่บันทึก
+	tasks.value = message.tasks.map((t) => ({
+		...t,
+		predecessors: t.predecessors ? JSON.stringify(parse_predecessors(t.predecessors)) : null,
+	}));
 	entries.value = message.progress_entries.map((e) => ({ ...e }));
+	// เปิดดูชุดเดิมต่อถ้ายังอยู่ ไม่งั้นดูชุดที่ใช้เทียบ
+	show_baseline(
+		message.baselines.some((b) => b.name === viewed_baseline.value)
+			? viewed_baseline.value
+			: message.active_baseline
+	);
 	saved_state.value = snapshot();
 	save_error.value = false;
 	remote_changed.value = false;
@@ -422,11 +483,12 @@ async function save({ auto = false } = {}) {
 				modified: data.value.modified,
 				tasks: tasks.value
 					.filter((t) => !t.is_group)
-					.map(({ name, start_date, end_date, plan_distribution }) => ({
+					.map(({ name, start_date, end_date, plan_distribution, predecessors }) => ({
 						name,
 						start_date,
 						end_date,
 						plan_distribution,
+						predecessors,
 					})),
 				progress: progress_changes(saved_state.value),
 			},
@@ -485,26 +547,94 @@ function on_visibility_change() {
 	if (!document.hidden) check_remote();
 }
 
-function set_baseline() {
-	if (dirty.value) {
-		frappe.msgprint(__("กรุณาบันทึกการแก้ไขก่อนตั้ง Baseline"));
-		return;
-	}
-	const message = data.value.baseline_date
-		? __("แทนที่ Baseline เดิม (ตั้งเมื่อ {0}) ด้วยวันที่ของแผนปัจจุบัน?", [
-				frappe.datetime.str_to_user(data.value.baseline_date),
-		  ])
-		: __("เก็บวันเริ่ม/วันจบของแผนปัจจุบันเป็น Baseline?");
-	frappe.confirm(message, async () => {
-		const { message } = await frappe.call({
-			method: `${API}.set_baseline`,
-			args: { name: props.schedule, modified: data.value.modified },
-			freeze: true,
-		});
-		set_data(message);
-		setup_page();
-		frappe.show_alert({ message: __("บันทึก Baseline แล้ว"), indicator: "green" });
+// เปลี่ยน Baseline ต้องบันทึกแผนงานด้วย จึงให้บันทึกการแก้ไขที่ค้างอยู่ก่อน
+function check_saved() {
+	if (!dirty.value) return true;
+	frappe.msgprint(__("กรุณาบันทึกการแก้ไขก่อนเปลี่ยน Baseline"));
+	return false;
+}
+
+function save_baseline() {
+	if (!check_saved()) return;
+	const dialog = new frappe.ui.Dialog({
+		title: __("บันทึก Baseline ใหม่"),
+		fields: [
+			{
+				fieldname: "title",
+				fieldtype: "Data",
+				label: __("ชื่อ"),
+				reqd: 1,
+				default: __("Baseline {0}", [baselines.value.length + 1]),
+			},
+			{
+				fieldname: "reason",
+				fieldtype: "Small Text",
+				label: __("เหตุผลที่ปรับแผน"),
+				description: __("เช่น แผนตามสัญญา, ได้รับอนุมัติขยายเวลา (EOT), งานเพิ่ม-ลด"),
+			},
+			{
+				fieldname: "activate",
+				fieldtype: "Check",
+				label: __("ใช้ชุดนี้เทียบกับความคืบหน้าจริง (Daily Report / Daily Request)"),
+				default: 1,
+			},
+		],
+		primary_action_label: __("บันทึก"),
+		primary_action: async (values) => {
+			const { message } = await frappe.call({
+				method: `${API}.save_baseline`,
+				args: { name: props.schedule, modified: data.value.modified, ...values },
+				freeze: true,
+			});
+			dialog.hide();
+			viewed_baseline.value = message.baselines.at(-1).name;
+			set_data(message);
+			setup_page();
+			frappe.show_alert({ message: __("บันทึก Baseline แล้ว"), indicator: "green" });
+		},
 	});
+	dialog.show();
+}
+
+function activate_baseline() {
+	const baseline = viewed_baseline_doc.value;
+	if (!baseline || !check_saved()) return;
+	frappe.confirm(
+		__(
+			"ใช้ {0} เทียบกับความคืบหน้าจริง? Daily Report / Daily Request ที่บันทึกต่อจากนี้จะเทียบกับชุดนี้ (ฉบับที่บันทึกแล้วไม่เปลี่ยน)",
+			[frappe.utils.escape_html(baseline.title)]
+		),
+		async () => {
+			const { message } = await frappe.call({
+				method: `${API}.activate_baseline`,
+				args: { name: props.schedule, modified: data.value.modified, baseline: baseline.name },
+				freeze: true,
+			});
+			set_data(message);
+			setup_page();
+			frappe.show_alert({ message: __("เปลี่ยน Baseline ที่ใช้เทียบแล้ว"), indicator: "green" });
+		}
+	);
+}
+
+function delete_baseline() {
+	const baseline = viewed_baseline_doc.value;
+	if (!baseline || baseline.name === data.value.active_baseline) return;
+	frappe.confirm(
+		__("ลบ Baseline {0}? ลบแล้วเรียกคืนไม่ได้", [frappe.utils.escape_html(baseline.title)]),
+		async () => {
+			const { message } = await frappe.call({
+				method: `${API}.delete_baseline`,
+				args: { name: props.schedule, baseline: baseline.name },
+				freeze: true,
+			});
+			// ลบไม่เปลี่ยนแผนงาน: อัปเดตแค่รายการแล้วกลับไปดูชุดที่ใช้เทียบ (การแก้ที่ค้างอยู่ยังอยู่)
+			data.value.baselines = message;
+			show_baseline(data.value.active_baseline);
+			update_indicator();
+			frappe.show_alert({ message: __("ลบ Baseline แล้ว"), indicator: "green" });
+		}
+	);
 }
 
 function reload() {
@@ -523,10 +653,6 @@ function setup_page() {
 	page.clear_icons();
 	if (can_write.value) {
 		page.set_primary_action(__("บันทึก"), save, "save");
-		page.set_secondary_action(
-			data.value.baseline_date ? __("ตั้ง Baseline ใหม่") : __("ตั้ง Baseline"),
-			set_baseline
-		);
 	}
 	page.add_action_icon("refresh-cw", reload, "", __("โหลดใหม่"));
 	page.add_action_icon("printer", print, "", __("พิมพ์"));
@@ -540,6 +666,8 @@ function setup_page() {
 			date: status_date.value,
 		})
 	);
+	page.add_menu_item(__("ส่งออก Excel"), export_excel);
+	if (can_write.value) page.add_menu_item(__("นำเข้าจาก Excel"), import_excel);
 	page.add_menu_item(__("รายการความคืบหน้า"), () =>
 		frappe.set_route("List", "Construction Progress Entry", {
 			construction_management: data.value.name,
@@ -555,20 +683,23 @@ function update_indicator() {
 	else if (remote_changed.value)
 		props.page.set_indicator(__("มีการแก้จากที่อื่น บันทึกหรือโหลดใหม่"), "red");
 	else if (dirty.value) props.page.set_indicator(__("ยังไม่บันทึก"), "orange");
-	else if (data.value?.baseline_date)
+	else if (viewed_baseline_doc.value && viewed_baseline_doc.value !== active_baseline_doc.value)
 		props.page.set_indicator(
-			__("Baseline {0}", [frappe.datetime.str_to_user(data.value.baseline_date)]),
-			"gray"
+			__("กำลังดู Baseline: {0}", [frappe.utils.escape_html(viewed_baseline_doc.value.title)]),
+			"blue"
 		);
+	else if (active_baseline_doc.value)
+		props.page.set_indicator(__("Baseline: {0}", [frappe.utils.escape_html(active_baseline_doc.value.title)]), "gray");
 	else props.page.clear_indicator();
 }
-watch([dirty, saving, save_error, remote_changed], update_indicator);
+watch([dirty, saving, save_error, remote_changed, viewed_baseline], update_indicator);
 
 // ---------- แก้ค่าจากตารางและการลากแถบ ----------
 
 function update_task(task, field, value) {
 	if (field === "actual_pct") return update_actual(task, value || 0);
 	if (field === "actual_qty") return update_actual(task, ((value || 0) / task.quantity) * 100);
+	if (field === "predecessors") return update_predecessors(task, value);
 
 	const hol = counting_holidays.value;
 	let start = to_day(task.start_date);
@@ -593,23 +724,252 @@ function update_task(task, field, value) {
 	set_dates(task, start, end);
 }
 
+// ตั้งวันที่ของงาน ถ้างานมีงานก่อนหน้าปรับ lag ให้งานอยู่ตรงนั้น แล้วเลื่อนงานที่ตามมา
 function set_dates(task, start, end) {
 	const hol = counting_holidays.value;
+	task.start_date = start === null ? null : from_day(start);
+	task.end_date = end === null ? null : from_day(end);
+	task.duration = start === null ? 0 : count_days(start, end, hol);
+	if (hold_start(task, task_by_name.value, hol)) {
+		frappe.show_alert({
+			message: __("งาน {0}: งานก่อนหน้าเปลี่ยนเป็น {1}", [
+				task.wbs,
+				format_predecessors(task.predecessors, task_by_name.value),
+			]),
+			indicator: "blue",
+		});
+	}
+	reschedule([task]);
+}
+
+// เลื่อนงานตามงานก่อนหน้า แล้วคิดวันที่ของกลุ่มใหม่ (edited = งานที่ผู้ใช้เพิ่งแก้)
+function reschedule(edited) {
+	const hol = counting_holidays.value;
+	const moved = apply_dependencies(tasks.value, hol) || [];
+
 	// % แผนที่กำหนดเองใช้ต่อได้ถ้าจำนวนช่วงเท่าเดิม ไม่งั้นกลับไปคิดตามจำนวนวัน
-	const distribution = parse_distribution(task.plan_distribution);
-	if (distribution && (start === null || !distribution_fits(start, end, distribution))) {
-		task.plan_distribution = null;
+	const cleared = [...new Set([...edited, ...moved])].filter((t) => {
+		const distribution = parse_distribution(t.plan_distribution);
+		const s = to_day(t.start_date);
+		if (
+			!distribution ||
+			(s !== null && distribution_fits(s, to_day(t.end_date), distribution))
+		)
+			return false;
+		t.plan_distribution = null;
+		return true;
+	});
+	if (cleared.length) {
 		frappe.show_alert({
 			message: __("งาน {0}: จำนวนช่วงเปลี่ยน % แผนที่กำหนดเองถูกล้าง กลับไปคิดตามจำนวนวัน", [
-				task.wbs,
+				wbs_list(cleared),
 			]),
 			indicator: "orange",
 		});
 	}
-	task.start_date = start === null ? null : from_day(start);
-	task.end_date = end === null ? null : from_day(end);
-	task.duration = start === null ? 0 : count_days(start, end, hol);
+	const [task] = edited;
+	if (edited.length === 1 && moved.includes(task)) {
+		frappe.show_alert({
+			message: __("งาน {0} เลื่อนไปเริ่ม {1} ตามงานก่อนหน้า", [
+				task.wbs,
+				frappe.datetime.str_to_user(task.start_date),
+			]),
+			indicator: "blue",
+		});
+	}
+	const followers = moved.filter((t) => !edited.includes(t));
+	if (followers.length) {
+		frappe.show_alert({
+			message: __("เลื่อนงานที่ตามมา {0} งาน: {1}", [followers.length, wbs_list(followers)]),
+			indicator: "blue",
+		});
+	}
 	roll_up(tasks.value, hol);
+}
+
+// WBS ของงานสำหรับข้อความแจ้งเตือน (ยาวเกินตัดท้าย)
+function wbs_list(rows, limit = 10) {
+	const text = rows
+		.slice(0, limit)
+		.map((t) => t.wbs)
+		.join(", ");
+	return rows.length > limit ? `${text} ...` : text;
+}
+
+// กรอกงานก่อนหน้าเป็น WBS คั่นด้วยจุลภาค เช่น "1.2, 1.3SS+2, 2.1FF-1" (ไม่ระบุชนิด = FS, lag เป็นวัน)
+const LINK_PATTERN = /^(.+?)\s*(FS|SS|FF|SF)?\s*(?:([+-])\s*(\d+))?$/i;
+
+// แปลงข้อความงานก่อนหน้าของ task เป็น JSON ที่เก็บใน predecessors คืน { value } หรือ { error }
+function parse_link_text(task, text) {
+	const by_wbs = new Map(tasks.value.map((t) => [String(t.wbs || "").trim(), t]));
+	const links = new Map();
+	for (const token of String(text || "")
+		.split(/[,;]/)
+		.map((s) => s.trim())
+		.filter(Boolean)) {
+		const match = token.match(LINK_PATTERN);
+		const predecessor = match && by_wbs.get(match[1].trim());
+		if (!predecessor) return { error: __("ไม่พบงาน WBS {0}", [match ? match[1] : token]) };
+		if (predecessor.is_group)
+			return { error: __("{0} เป็นหัวข้อกลุ่ม ให้ผูกกับงานย่อยแทน", [predecessor.wbs]) };
+		if (predecessor === task) return { error: __("งานผูกกับตัวเองไม่ได้") };
+		const lag = match[4] ? Number(match[4]) * (match[3] === "-" ? -1 : 1) : 0;
+		links.set(predecessor.name, {
+			task: predecessor.name,
+			type: (match[2] || "FS").toUpperCase(),
+			lag,
+		});
+	}
+	return { value: links.size ? JSON.stringify([...links.values()]) : null };
+}
+
+function update_predecessors(task, text) {
+	const { value, error } = parse_link_text(task, text);
+	if (error) {
+		frappe.show_alert({ message: error, indicator: "red" });
+		return;
+	}
+	const before = task.predecessors;
+	task.predecessors = value;
+	if (!dependency_order(tasks.value)) {
+		task.predecessors = before;
+		frappe.show_alert({ message: __("งานก่อนหน้าผูกกันเป็นวง"), indicator: "red" });
+		return;
+	}
+	reschedule([task]);
+}
+
+// ---------- Excel (schedule_excel.py) ----------
+
+function export_excel() {
+	if (dirty.value) {
+		frappe.msgprint(__("กรุณาบันทึกการแก้ไขก่อนส่งออก"));
+		return;
+	}
+	const dialog = new frappe.ui.Dialog({
+		title: __("ส่งออก Excel"),
+		fields: [
+			{
+				fieldname: "mode",
+				fieldtype: "Select",
+				label: __("แก้ในไฟล์โดย"),
+				options: [
+					{ value: "duration", label: __("กำหนดวันเริ่ม + จำนวนวัน (วันจบคำนวณให้)") },
+					{ value: "dates", label: __("กำหนดวันเริ่ม-วันจบ (จำนวนวันนับให้)") },
+				],
+				default: settings.excel_mode,
+			},
+			{
+				fieldtype: "HTML",
+				options: `<p class="text-muted small">${__(
+					"นำเข้ากลับได้ทั้งสองแบบ ระบบใช้วันเริ่ม-วันจบในไฟล์เสมอ (จำนวนวันใช้เมื่อวันจบว่าง)"
+				)}</p>`,
+			},
+		],
+		primary_action_label: __("ส่งออก"),
+		primary_action({ mode }) {
+			settings.excel_mode = mode;
+			dialog.hide();
+			open_url_post(`/api/method/${EXCEL_API}.export_schedule`, {
+				name: props.schedule,
+				mode,
+			});
+		},
+	});
+	dialog.show();
+}
+
+function import_excel() {
+	open_import_dialog(`${EXCEL_API}.import_schedule`, props.schedule, (result) =>
+		record(() => apply_import(result))
+	);
+}
+
+// ใส่ค่าจากไฟล์ทีละงาน (แก้ในหน้านี้ ยังไม่บันทึก Undo ได้ทั้งชุด) ช่องที่ไม่มีในแถว = ไม่เปลี่ยน
+// วันที่: ใช้วันเริ่ม-วันจบเสมอ จำนวนวันใช้เฉพาะแถวที่วันจบว่าง (ไม่ตรงกับวันที่ = แจ้งเตือน)
+// งานที่วันเริ่มเปลี่ยนแต่งานก่อนหน้าไม่เปลี่ยน ปรับ lag ให้อยู่ตามวันในไฟล์เหมือนลากในหน้า
+// ถ้างานก่อนหน้าเปลี่ยนด้วย หรือแก้แค่วันจบ/จำนวนวัน วันเริ่มเป็นไปตามงานก่อนหน้า
+// (วันที่ในไฟล์ไม่เลื่อนตามงานก่อนหน้าที่แก้ในไฟล์เดียวกัน จึงตรึงไม่ได้)
+function apply_import({ rows, warnings }) {
+	const hol = counting_holidays.value;
+	const before = current_state.value;
+	const by_wbs = new Map(tasks.value.map((t) => [String(t.wbs || "").trim(), t]));
+	const messages = [...warnings];
+	const edited = [];
+	const held = [];
+	for (const row of rows) {
+		const task = by_wbs.get(row.wbs);
+		if (!task) {
+			messages.push(__("แถว {0}: ไม่พบงาน WBS {1} ในแผนนี้", [row.row_no, row.wbs]));
+			continue;
+		}
+		if (task.is_group) continue;
+
+		let links_changed = false;
+		if ("predecessors" in row) {
+			const { value, error } = parse_link_text(task, row.predecessors);
+			if (error) messages.push(__("แถว {0}: {1}", [row.row_no, error]));
+			else if (value !== (task.predecessors || null)) {
+				task.predecessors = value;
+				links_changed = true;
+			}
+		}
+
+		const start = row.start_date ? to_day(row.start_date) : to_day(task.start_date);
+		let end = to_day(task.end_date);
+		if (row.end_date) {
+			end = to_day(row.end_date);
+			const days = start === null || end < start ? null : count_days(start, end, hol);
+			if (row.duration && days !== null && row.duration !== days)
+				messages.push(
+					__(
+						"แถว {0}: จำนวนวันในไฟล์ ({1}) ไม่ตรงกับวันเริ่ม-วันจบ ใช้วันที่ ({2} วัน)",
+						[row.row_no, row.duration, days]
+					)
+				);
+		} else if (row.duration && start !== null) end = end_of(start, row.duration, hol);
+		else if (row.start_date) end = end_of(start, task.duration || 1, hol);
+		let dates_changed = false;
+		if (start === null && end !== null) {
+			messages.push(
+				__("แถว {0}: ใส่วันจบแล้วต้องใส่วันเริ่มด้วย ข้ามวันที่ของงานนี้", [row.row_no])
+			);
+		} else if (start !== null && end < start) {
+			messages.push(
+				__("แถว {0}: วันจบต้องไม่ก่อนวันเริ่ม ข้ามวันที่ของงานนี้", [row.row_no])
+			);
+		} else if (start !== to_day(task.start_date) || end !== to_day(task.end_date)) {
+			if (!links_changed && start !== to_day(task.start_date)) held.push(task);
+			task.start_date = from_day(start);
+			task.end_date = from_day(end);
+			task.duration = count_days(start, end, hol);
+			dates_changed = true;
+		}
+		if (links_changed || dates_changed) edited.push(task);
+	}
+
+	if (!dependency_order(tasks.value)) {
+		restore(before);
+		frappe.msgprint(__("งานก่อนหน้าในไฟล์ผูกกันเป็นวง ยกเลิกการนำเข้า"));
+		return;
+	}
+	for (const task of held) hold_start(task, task_by_name.value, hol);
+	reschedule(edited);
+
+	const summary = edited.length
+		? __("แก้แผน {0} งานแล้ว ตรวจดูแล้วกดบันทึก (ย้อนกลับได้ด้วย Undo)", [edited.length])
+		: __("ไม่มีงานที่เปลี่ยน");
+	if (messages.length) {
+		frappe.msgprint({
+			title: __("นำเข้าจาก Excel"),
+			message: `<p>${summary}</p><ul>${messages
+				.map((m) => `<li>${frappe.utils.escape_html(m)}</li>`)
+				.join("")}</ul>`,
+			indicator: "orange",
+		});
+	} else {
+		frappe.show_alert({ message: summary, indicator: "green" });
+	}
 }
 
 // คลิกแถบงาน: กำหนด % แผนรายวัน/สัปดาห์/เดือนของงานนั้น
@@ -777,11 +1137,22 @@ function print_model() {
 		contractor: data.value.contractor,
 		supervisor: data.value.supervisor,
 		contract_text: contract_text(),
-		status_text: __("ณ วันที่ {0}: แผน {1}% · จริง {2}%", [
-			frappe.datetime.str_to_user(status_date.value),
-			percent(readout.value.plan),
-			percent(readout.value.actual),
-		]),
+		status_text:
+			readout.value.baseline !== null
+				? __("ณ วันที่ {0}: {1} {2}% · แผน {3}% · จริง {4}%", [
+						frappe.datetime.str_to_user(status_date.value),
+						viewed_baseline_doc.value
+							? `Baseline (${viewed_baseline_doc.value.title})`
+							: "Baseline",
+						percent(readout.value.baseline),
+						percent(readout.value.plan),
+						percent(readout.value.actual),
+				  ])
+				: __("ณ วันที่ {0}: แผน {1}% · จริง {2}%", [
+						frappe.datetime.str_to_user(status_date.value),
+						percent(readout.value.plan),
+						percent(readout.value.actual),
+				  ]),
 		columns: columns.value,
 		rows: visible_tasks.value,
 		metrics: metrics.value,
@@ -925,6 +1296,14 @@ onBeforeUnmount(() => {
 				:contract-finish="data.finish_date"
 				:contract-start="data.start_date"
 				:contract-duration="data.duration"
+				:baselines="baselines"
+				:viewed-baseline="viewed_baseline"
+				:active-baseline="data.active_baseline"
+				:can-delete-baseline="can_delete_baseline"
+				@view-baseline="show_baseline"
+				@save-baseline="save_baseline"
+				@activate-baseline="activate_baseline"
+				@delete-baseline="delete_baseline"
 				@choose-columns="choose_columns"
 				@wbs-level="set_wbs_level"
 				@today="go_today"
@@ -966,6 +1345,7 @@ onBeforeUnmount(() => {
 					:all-curves="curves"
 					:show-baseline-bars="settings.show_baseline_bars"
 					:show-split="settings.show_split"
+					:show-links="settings.show_links"
 					:show-labels="settings.show_labels"
 					:show-progress="settings.show_progress"
 					:counting-holidays="counting_holidays"

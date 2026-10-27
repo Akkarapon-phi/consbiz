@@ -19,7 +19,9 @@ onMounted(() => {
 		df: {
 			fieldname: "value",
 			...props.df,
-			change() {
+			change(event) {
+				// Data ส่ง change ทุกครั้งที่หยุดพิมพ์ (event input) ช่องจะปิดกลางคัน รอ Enter หรือออกจากช่องแทน
+				if (event?.type === "input") return;
 				const value = control.get_value();
 				if (value !== props.modelValue) emit("update:modelValue", value);
 			},
