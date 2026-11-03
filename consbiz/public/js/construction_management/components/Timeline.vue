@@ -1,6 +1,7 @@
 <script setup>
 // timeline ฝั่งขวา: หัว 2 แถว, แถบงาน (ลากย้าย/ยืดหดได้), แถบ baseline, ลูกศรงานก่อนหน้า, แรเงาวันหยุด,
-// เส้นวันนี้, เส้นวันที่เลือกดู, S-Curve หลายเส้น และตารางสรุปติดด้านล่าง
+// เส้นเตรียมล่วงหน้า (เส้นประจากวันต้องสั่งวัสดุ/จองคน-เครื่องจักรรายการแรก ถึงวันเริ่มงาน),
+// เส้นวันนี้, เส้นวันที่เลือกดู, เส้นสิ้นสุดสัญญา (เดิมและปรับปรุงจาก EOT), S-Curve หลายเส้น และตารางสรุปติดด้านล่าง
 // แกน x: 1 วัน = ppd พิกเซล นับจาก range.start (เลขวันจาก schedule.js)
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import SCurve from "./SCurve.vue";
@@ -20,6 +21,7 @@ import {
 	format_percent,
 	format_share,
 	period_label,
+	prep_tone,
 	progress_status,
 	text_width,
 } from "../columns";
@@ -38,16 +40,22 @@ const props = defineProps({
 	showLabels: Boolean,
 	showProgress: Boolean,
 	showStatus: Boolean,
+	showCritical: Boolean,
 	countingHolidays: Set,
 	summaryRows: Array,
 	summaryRowHeight: Number,
 	totalAmount: Number,
 	statusDay: Number,
+	contractFinish: String,
+	originalFinish: String,
 	metrics: Map,
 	canWrite: Boolean,
 	rowHeight: Number,
 	headerHeight: Number,
 	hovered: String,
+	dimCurves: Boolean,
+	showPrep: Boolean,
+	prep: Map, // งาน → สิ่งที่ต้องเตรียม (prep_items ใน schedule.js)
 });
 const emit = defineEmits(["scroll", "hover", "set-dates", "edit-plan", "body-height"]);
 
@@ -99,6 +107,15 @@ const day_x = (day) => (day >= props.range.start && day < props.range.end ? x(da
 const today_x = computed(() => day_x(today()));
 const today_line_x = computed(() => day_x(today() + 1));
 const status_x = computed(() => day_x(props.statusDay + 1));
+// สิ้นวันสิ้นสุดสัญญา เส้นเดิมแสดงเมื่อมี EOT เท่านั้น
+const finish_x = computed(() =>
+	props.contractFinish ? day_x(to_day(props.contractFinish) + 1) : null
+);
+const original_finish_x = computed(() =>
+	props.originalFinish && props.originalFinish !== props.contractFinish
+		? day_x(to_day(props.originalFinish) + 1)
+		: null
+);
 
 // ---------- แถบงาน ----------
 
@@ -137,8 +154,11 @@ const bars = computed(() =>
 			status && ["green", "orange", "red"].includes(status.color)
 				? `cs-status-${status.color}`
 				: "";
+		const critical = props.showCritical && !task.is_group && metrics?.critical;
 		return {
 			...bar,
+			lead: task.is_group ? null : lead_of(task, start),
+			critical,
 			start,
 			end,
 			x: x(start),
@@ -182,6 +202,11 @@ const bars = computed(() =>
 				`${__("น้ำหนัก")}: ${format_number(task.weight || 0, null, 2)}%`,
 				`${__("% จริง")}: ${format_number(actual, null, 2)}%`,
 				metrics?.predecessors ? `${__("งานก่อนหน้า")}: ${metrics.predecessors}` : "",
+				metrics && metrics.total_float !== null && !task.is_group
+					? `${__("Float")}: ${__("{0} วัน", [metrics.total_float])}${
+							metrics.critical ? ` (${__("งานวิกฤต")})` : ""
+					  }`
+					: "",
 				custom
 					? `${__("% แผนกำหนดเอง")}: ${distribution.weights
 							.map((w) => format_number(w, null, 2))
@@ -194,6 +219,35 @@ const bars = computed(() =>
 		};
 	})
 );
+
+// ---------- เส้นเตรียมล่วงหน้า ----------
+// จากวันต้องเตรียมรายการแรกถึงวันเริ่มงาน ระยะคิดจากวันเริ่มที่บันทึกไว้ ระหว่างลากแถบจึงเลื่อนตามแถบ
+// สีตามรายการที่ยังต้องทำและครบกำหนดก่อนสุด (ทำครบแล้ว = เขียว)
+function lead_of(task, start) {
+	const items = props.showPrep ? props.prep?.get(task.name) : null;
+	const dated = (items || []).filter((item) => item.target !== null);
+	if (!dated.length) return null;
+	const first = Math.min(...dated.map((item) => item.target));
+	const offset = to_day(task.start_date) - first;
+	if (offset <= 0) return null;
+	const pending = dated.filter((item) => item.pending).map((item) => item.target);
+	const fmt = (day) => frappe.datetime.str_to_user(new Date(day * 86400000).toISOString().slice(0, 10));
+	const lines = [...dated]
+		.sort((a, b) => a.target - b.target)
+		.map((item) => {
+			const material = item.kind === "material";
+			const label = material ? item.row.item_label || item.row.item_code : item.row.resource;
+			const done = item.pending ? "" : ` (${material ? __("ขอครบแล้ว") : __("เริ่มงานแล้ว")})`;
+			return `${material ? __("สั่ง") : __("จอง")} ${label}: ${fmt(item.target)}${done}`;
+		});
+	return {
+		x: x(start - offset) + props.ppd / 2,
+		tone: prep_tone(pending.length ? Math.min(...pending) : null, pending.length > 0, today()),
+		title: [`${task.wbs || ""} ${task.item_name || ""}`.trim(), __("เตรียมล่วงหน้า"), ...lines].join("\n"),
+	};
+}
+
+const diamond = (cx, cy, r) => `M${cx},${cy - r} L${cx + r},${cy} L${cx},${cy + r} L${cx - r},${cy} z`;
 
 // ท้ายแถบ: ชื่องาน (ข้อความ) แล้วตามด้วยกรอบ 2 ช่อง % แผน (ฟ้า) | % จริง (เขียว)
 let font_family;
@@ -260,6 +314,7 @@ const links = computed(() => {
 				key: `${link.task}>${to.task.name}`,
 				path,
 				active: props.hovered === from.task.name || props.hovered === to.task.name,
+				critical: from.critical && to.critical,
 			});
 		}
 	}
@@ -514,7 +569,7 @@ defineExpose({ body, scroll_to_day, viewport_width });
 							:y="bar.y + rowHeight - 9"
 							:width="bar.baseline.width"
 							height="4"
-							rx="1"
+							rx="2"
 							class="cs-baseline-bar"
 						/>
 						<template v-if="bar.width">
@@ -526,26 +581,56 @@ defineExpose({ body, scroll_to_day, viewport_width });
 								<title>{{ bar.title }}</title>
 								<rect
 									:x="bar.x"
-									:y="bar.y + bar_y + 2"
+									:y="bar.y + bar_y + 3"
 									:width="bar.width"
-									height="7"
+									height="5"
+									rx="2.5"
 								/>
-								<rect :x="bar.x" :y="bar.y + bar_y + 2" width="4" height="12" />
+								<rect :x="bar.x" :y="bar.y + bar_y + 3" width="3" height="10" rx="1.5" />
 								<rect
-									:x="bar.x + bar.width - 4"
-									:y="bar.y + bar_y + 2"
-									width="4"
-									height="12"
+									:x="bar.x + bar.width - 3"
+									:y="bar.y + bar_y + 3"
+									width="3"
+									height="10"
+									rx="1.5"
 								/>
 							</g>
-							<g v-else :class="[{ 'cs-draggable': canWrite }, bar.status_class]">
+							<g
+								v-if="bar.lead"
+								class="cs-lead"
+								:class="'cs-lead-' + bar.lead.tone"
+							>
+								<title>{{ bar.lead.title }}</title>
+								<line
+									:x1="bar.lead.x"
+									:x2="bar.x"
+									:y1="bar.y + bar_y + bar_h / 2"
+									:y2="bar.y + bar_y + bar_h / 2"
+									class="cs-lead-hit"
+								/>
+								<line
+									:x1="bar.lead.x"
+									:x2="bar.x"
+									:y1="bar.y + bar_y + bar_h / 2"
+									:y2="bar.y + bar_y + bar_h / 2"
+									class="cs-lead-line"
+								/>
+								<path :d="diamond(bar.lead.x, bar.y + bar_y + bar_h / 2, 4.5)" class="cs-lead-mark" />
+							</g>
+							<g
+								v-if="!bar.task.is_group"
+								:class="[
+									{ 'cs-draggable': canWrite, 'cs-critical': bar.critical },
+									bar.status_class,
+								]"
+							>
 								<title>{{ bar.title }}</title>
 								<rect
 									:x="bar.x"
 									:y="bar.y + bar_y"
 									:width="bar.width"
 									:height="bar_h"
-									rx="3"
+									:rx="bar_h / 2"
 									class="cs-bar"
 									@pointerdown="start_drag(bar, 'move', $event)"
 								/>
@@ -564,7 +649,7 @@ defineExpose({ body, scroll_to_day, viewport_width });
 									:y="bar.y + bar_y"
 									:width="bar.progress_width"
 									:height="bar_h"
-									rx="3"
+									:rx="bar_h / 2"
 									class="cs-bar-progress"
 								/>
 								<template v-if="canWrite">
@@ -661,13 +746,35 @@ defineExpose({ body, scroll_to_day, viewport_width });
 							v-for="link in links"
 							:key="link.key"
 							:d="link.path"
-							:class="{ 'cs-link-active': link.active }"
+							:class="{ 'cs-link-active': link.active, 'cs-link-critical': link.critical }"
 							:marker-end="`url(#${
 								link.active ? 'cs-link-arrow-active' : 'cs-link-arrow'
 							})`"
 						/>
 					</g>
 
+					<line
+						v-if="original_finish_x !== null"
+						:x1="original_finish_x"
+						:x2="original_finish_x"
+						y1="0"
+						:y2="chart_height"
+						class="cs-finish cs-finish-original"
+					>
+						<title>{{ __("สิ้นสุดสัญญาเดิม") }}</title>
+					</line>
+					<line
+						v-if="finish_x !== null"
+						:x1="finish_x"
+						:x2="finish_x"
+						y1="0"
+						:y2="chart_height"
+						class="cs-finish"
+					>
+						<title>
+							{{ original_finish_x !== null ? __("สิ้นสุดสัญญาปรับปรุง") : __("สิ้นสุดสัญญา") }}
+						</title>
+					</line>
 					<line
 						v-if="today_line_x !== null"
 						:x1="today_line_x"
@@ -690,7 +797,12 @@ defineExpose({ body, scroll_to_day, viewport_width });
 					</line>
 
 					<!-- S-Curve สูงเท่าพื้นที่ที่มองเห็นและอยู่กับที่เมื่อเลื่อนแนวตั้ง (งานหลายร้อยแถวก็ยังเห็นทั้งเส้น) -->
-					<g v-if="curve_lines.length" :transform="`translate(0, ${scroll_top})`">
+					<g
+						v-if="curve_lines.length"
+						class="cs-curves"
+						:class="{ 'cs-curves-dim': dimCurves && hovered }"
+						:transform="`translate(0, ${scroll_top})`"
+					>
 						<SCurve grid :height="curve_height" />
 						<SCurve
 							v-for="line in curve_lines"
@@ -789,15 +901,16 @@ defineExpose({ body, scroll_to_day, viewport_width });
 	top: 0;
 	z-index: 2;
 	display: block;
-	background: var(--subtle-fg);
+	background: var(--card-bg);
 }
 .cs-header-cell {
-	fill: var(--subtle-fg);
-	stroke: var(--border-color);
+	fill: var(--card-bg);
+	stroke: color-mix(in srgb, var(--border-color) 60%, transparent);
 }
 .cs-header-text {
 	fill: var(--text-muted);
 	font-size: 11px;
+	font-weight: 500;
 }
 .cs-chart {
 	display: block;
@@ -806,8 +919,7 @@ defineExpose({ body, scroll_to_day, viewport_width });
 	fill: var(--consbiz-gantt-holiday);
 }
 .cs-grid-line {
-	stroke: var(--border-color);
-	stroke-dasharray: 2 3;
+	stroke: color-mix(in srgb, var(--border-color) 55%, transparent);
 }
 .cs-row-bg {
 	fill: transparent;
@@ -817,7 +929,13 @@ defineExpose({ body, scroll_to_day, viewport_width });
 	opacity: 0.6;
 }
 .cs-row-line {
-	stroke: var(--border-color);
+	stroke: color-mix(in srgb, var(--border-color) 45%, transparent);
+}
+.cs-curves {
+	transition: opacity 0.15s ease;
+}
+.cs-curves-dim {
+	opacity: 0.15;
 }
 .cs-bar {
 	fill: var(--consbiz-gantt-bar);
@@ -895,6 +1013,7 @@ defineExpose({ body, scroll_to_day, viewport_width });
 }
 .cs-group-bar rect {
 	fill: var(--consbiz-gantt-group);
+	opacity: 0.75;
 }
 .cs-status-green .cs-bar,
 .cs-status-green .cs-bar-progress,
@@ -911,12 +1030,54 @@ defineExpose({ body, scroll_to_day, viewport_width });
 .cs-group-bar.cs-status-red rect {
 	fill: var(--consbiz-gantt-critical);
 }
+.cs-lead-hit {
+	stroke: transparent;
+	stroke-width: 9;
+}
+.cs-lead-line {
+	stroke: var(--cs-lead);
+	stroke-width: 1.5;
+	stroke-dasharray: 3 3;
+	pointer-events: none;
+}
+.cs-lead-mark {
+	fill: var(--cs-lead);
+	stroke: var(--card-bg);
+	stroke-width: 1;
+}
+.cs-lead-gray {
+	--cs-lead: var(--gray-500);
+}
+.cs-lead-green {
+	--cs-lead: var(--consbiz-gantt-done);
+}
+.cs-lead-orange {
+	--cs-lead: var(--consbiz-gantt-late);
+}
+.cs-lead-red {
+	--cs-lead: var(--consbiz-gantt-critical);
+}
 .cs-today {
 	stroke: var(--consbiz-gantt-today);
 	stroke-width: 1.5;
 }
 .cs-today-mark {
 	fill: var(--consbiz-gantt-today);
+}
+.cs-critical .cs-bar {
+	stroke: var(--consbiz-gantt-critical-path);
+	stroke-width: 2;
+}
+.cs-links path.cs-link-critical {
+	stroke: var(--consbiz-gantt-critical-path);
+}
+.cs-finish {
+	stroke: var(--consbiz-gantt-finish);
+	stroke-width: 1.5;
+}
+.cs-finish-original {
+	stroke-dasharray: 4 3;
+	opacity: 0.6;
 }
 .cs-status {
 	stroke: var(--consbiz-gantt-status-date);

@@ -1,0 +1,129 @@
+{
+ "actions": [],
+ "creation": "2026-10-31 15:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "wbs",
+  "item_name",
+  "item_code",
+  "qty",
+  "uom",
+  "lead_time_days",
+  "column_break_dates",
+  "required_by",
+  "order_by",
+  "material_request",
+  "remarks",
+  "task"
+ ],
+ "fields": [
+  {
+   "columns": 1,
+   "fieldname": "wbs",
+   "fieldtype": "Autocomplete",
+   "in_list_view": 1,
+   "label": "WBS",
+   "reqd": 1
+  },
+  {
+   "columns": 2,
+   "fieldname": "item_name",
+   "fieldtype": "Data",
+   "label": "Task",
+   "read_only": 1
+  },
+  {
+   "columns": 2,
+   "fieldname": "item_code",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Item",
+   "options": "Item",
+   "reqd": 1
+  },
+  {
+   "columns": 1,
+   "fieldname": "qty",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Qty",
+   "reqd": 1
+  },
+  {
+   "columns": 1,
+   "fetch_from": "item_code.stock_uom",
+   "fetch_if_empty": 1,
+   "fieldname": "uom",
+   "fieldtype": "Link",
+   "label": "UOM",
+   "options": "UOM"
+  },
+  {
+   "columns": 1,
+   "description": "จำนวนวันตั้งแต่สั่งจนของถึงหน้างาน ตั้งต้นจาก Lead Time ของ Item",
+   "fetch_from": "item_code.lead_time_days",
+   "fetch_if_empty": 1,
+   "fieldname": "lead_time_days",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "Lead Time (Days)"
+  },
+  {
+   "fieldname": "column_break_dates",
+   "fieldtype": "Column Break"
+  },
+  {
+   "columns": 1,
+   "description": "วันเริ่มงานตามแผน - วันที่ต้องให้ของถึงก่อน",
+   "fieldname": "required_by",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Required By",
+   "read_only": 1
+  },
+  {
+   "columns": 1,
+   "description": "ต้องการภายใน - Lead Time",
+   "fieldname": "order_by",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Order By Date",
+   "read_only": 1
+  },
+  {
+   "fieldname": "material_request",
+   "fieldtype": "Link",
+   "label": "Material Request",
+   "no_copy": 1,
+   "options": "Material Request",
+   "read_only": 1
+  },
+  {
+   "fieldname": "remarks",
+   "fieldtype": "Data",
+   "label": "Remarks"
+  },
+  {
+   "fieldname": "task",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "label": "Task Row",
+   "read_only": 1
+  }
+ ],
+ "grid_page_length": 50,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-10-31 15:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "ConsBiz",
+ "name": "Construction Material Plan Item",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

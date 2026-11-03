@@ -77,6 +77,11 @@ doc_events = {
         "before_cancel": "consbiz.api.cancel_transmittal_entry"
     },
 
+    # โครงการที่หัวเอกสาร (custom_project) ลงทุกรายการ ให้ PO / PR ที่สร้างต่อได้โครงการไปด้วย (แผนวัสดุนับยอดตามโครงการ)
+    "Material Request": {
+        "validate": "consbiz.consbiz.doctype.construction_material_plan.construction_material_plan.set_item_project"
+    },
+
     "Sales Invoice": {
         "on_submit": [
             "consbiz.api.create_retention_receivable",

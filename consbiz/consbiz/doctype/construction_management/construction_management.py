@@ -12,6 +12,8 @@
 # - งานลด-งานเพิ่มมาจาก Variation Order ที่ Submit แล้ว (apply_variations):
 #   Submit แล้วงานลดลดปริมาณงานเดิม (DR ลงเกินไม่ได้) และงานเพิ่มเป็นแถวใต้กลุ่ม VO ท้ายตาราง (DR ลงได้)
 #   แต่นับในมูลค่าสัญญาและ % ความคืบหน้าเมื่อผู้ว่าจ้างอนุมัติแล้วเท่านั้น (นับตั้งแต่วันที่อนุมัติ counted_from)
+# - ขยายเวลา (Extension of Time) ที่ผู้ว่าจ้างอนุมัติแล้วเลื่อนวันสิ้นสุดสัญญา (revised_finish_date, วันปฏิทิน)
+#   finish_date คงเป็นวันตามสัญญาเดิม และไม่เลื่อนวันของงานในแผน (apply_extensions)
 # - Baseline เก็บได้หลายชุด (Construction Baseline) ชุดที่ใช้เทียบ (active_baseline) ถูกคัดลอกลงช่อง baseline_* ของแถวงาน
 # - % ความคืบหน้า (actual_progress) = มูลค่างานที่ทำแล้ว / มูลค่าสัญญาปรับปรุง (Earned Value)
 #   contract_progress = % ตามสัญญาเดิม (ถ่วงด้วยมูลค่าตามสัญญาของงานเดิม ไม่รวมงานเพิ่ม) ไว้อ้างอิง
@@ -23,11 +25,19 @@ import json
 import frappe
 from frappe import _
 from frappe.model.document import Document
-from frappe.utils import add_months, cint, flt, getdate, nowdate
+from frappe.utils import add_days, add_months, cint, flt, getdate, nowdate
+
+from consbiz.consbiz.doctype.construction_management.resources import (
+	check_plans,
+	get_plans,
+	plan_versions,
+	save_plans,
+)
 
 PROGRESS_ENTRY = "Construction Progress Entry"
 BASELINE = "Construction Baseline"
 VARIATION_ORDER = "Variation Order"
+EXTENSION_OF_TIME = "Extension of Time"
 # WBS ของกลุ่มงานเพิ่มท้ายตาราง งานเพิ่มแต่ละแถวเป็น VO.1, VO.2, ...
 VARIATION_GROUP_WBS = "VO"
 DISTRIBUTION_UNITS = ("day", "week", "mweek", "month", "quarter")
@@ -43,6 +53,7 @@ class ConstructionManagement(Document):
 		self.validate_single_active()
 		self.apply_variations()
 		self.set_duration()
+		self.apply_extensions()
 		holidays = self.get_holidays() if self.use_working_days else set()
 		self.set_structure()
 		self.set_task_dates(holidays)
@@ -62,6 +73,9 @@ class ConstructionManagement(Document):
 		self.set("tasks", [{**task, "start_date": self.start_date} for task in plan["tasks"]])
 
 	def on_update(self):
+		from consbiz.consbiz.doctype.construction_material_plan.construction_material_plan import refresh_dates
+
+		refresh_dates(self.name)
 		# ปริมาณเปลี่ยน (งานลด/แก้ปริมาณงานเพิ่ม) % ของรายการความคืบหน้าเดิมต้องคิดใหม่จาก qty
 		before = self.get_doc_before_save()
 		if not before:
@@ -191,6 +205,14 @@ class ConstructionManagement(Document):
 			self.duration = (getdate(self.finish_date) - getdate(self.start_date)).days + 1
 		else:
 			self.duration = 0
+
+	def apply_extensions(self):
+		"""วันสิ้นสุดสัญญาปรับปรุง = วันสิ้นสุดเดิม + วันที่อนุมัติของ EOT ทุกฉบับ (วันปฏิทิน)"""
+		self.extension_days = 0 if self.is_new() else get_extension_days(self.name)
+		self.revised_finish_date = (
+			add_days(self.finish_date, self.extension_days) if self.finish_date else None
+		)
+		self.revised_duration = cint(self.duration) + self.extension_days if self.duration else 0
 
 	def get_holidays(self):
 		return {getdate(d) for d in get_holiday_dates(self.holiday_list)}
@@ -383,6 +405,56 @@ def link_start(row, link, rows, holidays):
 	return shift_working_days(finish, 1 - max(cint(row.duration), 1), holidays)
 
 
+def total_float(tasks, holidays):
+	"""Float (วันทำงาน) ของงานย่อยที่มีวันที่ {name: float} 0 = งานวิกฤต (ตรงกับ total_float ใน schedule.js)
+	backward pass จากวันจบหลังสุดของงานย่อยทั้งหมด: วันจบช้าสุดที่ไม่ทำให้งานที่ตามมาหรือโครงการเลื่อน"""
+	rows = {row.name: row for row in tasks if not row.is_group and row.name}
+	links = {
+		name: [
+			{"task": link.get("task"), "type": (link.get("type") or "FS").upper(), "lag": cint(link.get("lag"))}
+			for link in frappe.parse_json(row.predecessors or "[]") or []
+			if link.get("task") in rows
+		]
+		for name, row in rows.items()
+	}
+	dated = [row for row in dependency_order(tasks, links) if row.start_date and row.end_date]
+	if not dated:
+		return {}
+	finish = max(getdate(row.end_date) for row in dated)
+	late = {row.name: finish for row in dated}
+	# ย้อนลำดับ: งานที่ตามมาได้วันจบช้าสุดครบก่อนส่งต่อให้งานก่อนหน้า
+	for row in reversed(dated):
+		late_finish = late[row.name]
+		late_start = shift_working_days(late_finish, 1 - max(cint(row.duration), 1), holidays)
+		for link in links[row.name]:
+			if link["task"] not in late:
+				continue
+			limit = latest_finish(rows[link["task"]], link, late_start, late_finish, holidays)
+			late[link["task"]] = min(late[link["task"]], limit)
+
+	result = {}
+	for row in dated:
+		end, late_finish = getdate(row.end_date), late[row.name]
+		result[row.name] = (
+			count_working_days(add_days(end, 1), late_finish, holidays)
+			if late_finish >= end
+			else -count_working_days(add_days(late_finish, 1), end, holidays)
+		)
+	return result
+
+
+def latest_finish(predecessor, link, late_start, late_finish, holidays):
+	"""วันจบช้าสุดของงานก่อนหน้าตามลิงก์เดียว (กลับด้านของ link_start)"""
+	lag, duration = link["lag"], max(cint(predecessor.duration), 1)
+	if link["type"] == "SS":
+		return add_working_days(shift_working_days(late_start, -lag, holidays), duration, holidays)
+	if link["type"] == "SF":
+		return add_working_days(shift_working_days(late_finish, 1 - lag, holidays), duration, holidays)
+	if link["type"] == "FF":
+		return shift_working_days(late_finish, -lag, holidays)
+	return shift_working_days(late_start, -(lag + 1), holidays)
+
+
 def shift_working_days(day, days, holidays):
 	"""เลื่อนวันไป days วันทำงาน (ติดลบ = ย้อนหลัง) ข้ามวันใน holidays 0 = วันเดิม"""
 	day = getdate(day)
@@ -424,6 +496,24 @@ def add_working_days(start_date, duration, holidays):
 			if remaining <= 0:
 				return day
 		day += datetime.timedelta(days=1)
+
+
+def get_extension_days(name, exclude=None):
+	"""จำนวนวันที่ผู้ว่าจ้างอนุมัติให้ขยายรวมทุกฉบับ (ไม่นับฉบับ exclude)"""
+	filters = {"construction_management": name, "docstatus": 1, "employer_status": "Approved"}
+	if exclude:
+		filters["name"] = ("!=", exclude)
+	return sum(cint(days) for days in frappe.get_all(EXTENSION_OF_TIME, filters=filters, pluck="approved_days"))
+
+
+def get_extensions(name):
+	"""EOT ที่อนุมัติแล้ว เรียงตามวันที่อนุมัติ สำหรับหน้า Gantt"""
+	return frappe.get_all(
+		EXTENSION_OF_TIME,
+		filters={"construction_management": name, "docstatus": 1, "employer_status": "Approved"},
+		fields=["name", "title", "approved_days", "employer_approved_on"],
+		order_by="employer_approved_on asc",
+	)
 
 
 def get_variation_items(name):
@@ -701,6 +791,18 @@ def create_from_boq(boq):
 
 
 @frappe.whitelist()
+def get_task_options(construction_management):
+	"""ตัวเลือก WBS ของงานย่อย (Autocomplete) สำหรับฟอร์มที่อ้างงานในแผน"""
+	from consbiz.consbiz.doctype.daily_report.daily_report import get_leaf_tasks
+
+	frappe.get_doc("Construction Management", construction_management).check_permission("read")
+	return [
+		{"value": task.wbs, "label": f"{task.wbs} {task.item_name}", "description": task.group_path}
+		for task in get_leaf_tasks(construction_management).values()
+	]
+
+
+@frappe.whitelist()
 def get_boq_plan(boq):
 	"""ค่าตั้งต้นของแผนจาก BOQ: โครงการ วันเริ่ม ปฏิทินวันหยุด และงาน 1 แถวต่อ 1 แถว BOQ (ยังไม่มีวันเริ่มงาน)"""
 	boq_doc = frappe.get_doc("BOQ", boq)
@@ -740,6 +842,8 @@ def find_project(value):
 
 @frappe.whitelist()
 def get_schedule_data(name):
+	from consbiz.consbiz.doctype.construction_management.delay import forecast_finish
+
 	doc = frappe.get_doc("Construction Management", name)
 	doc.check_permission("read")
 	fields = (
@@ -776,6 +880,13 @@ def get_schedule_data(name):
 		"start_date": doc.start_date,
 		"finish_date": doc.finish_date,
 		"duration": doc.duration,
+		"revised_finish_date": doc.revised_finish_date,
+		"revised_duration": doc.revised_duration,
+		"extension_days": doc.extension_days,
+		"extensions": get_extensions(doc.name),
+		# วันเสร็จที่คาดการณ์จากความคืบหน้าที่บันทึกแล้ว ณ วันนี้ (delay.py)
+		"forecast_finish": forecast_finish(doc),
+		"handover_date": doc.handover_date,
 		"employer": doc.employer,
 		"contractor": doc.contractor,
 		"supervisor": doc.supervisor,
@@ -798,6 +909,8 @@ def get_schedule_data(name):
 		"progress_entries": get_progress_entries(doc.name),
 		# ส่งวันหยุดเสมอเพื่อแรเงาใน timeline แม้จะนับวันแบบปฏิทิน
 		"holidays": get_holiday_dates(doc.holiday_list),
+		# แผนคน/เครื่องจักรและวัสดุ (แผงด้านขวาของงานในหน้า Gantt) resources.py
+		**get_plans(doc.name),
 	}
 
 
@@ -825,7 +938,7 @@ def schedule_version(name):
 		.select(frappe.query_builder.functions.Count("*"), frappe.query_builder.functions.Max(entry.modified))
 		.where(entry.construction_management == name)
 	).run()[0]
-	return f"{frappe.db.get_value('Construction Management', name, 'modified')}|{count}|{last}"
+	return f"{frappe.db.get_value('Construction Management', name, 'modified')}|{count}|{last}|{plan_versions(name)}"
 
 
 def get_doc_for_update(name, modified):
@@ -837,11 +950,15 @@ def get_doc_for_update(name, modified):
 
 
 @frappe.whitelist(methods=["POST"])
-def save_tasks(name, tasks, modified, progress=None):
+def save_tasks(name, tasks, modified, progress=None, resources=None, materials=None):
 	"""บันทึกจากหน้า Gantt
 	tasks: วันเริ่ม/วันจบ/% แผนที่กำหนดเองของงานย่อย (แถวกลุ่มคำนวณใหม่ใน validate)
-	progress: ยอดที่กรอกเอง [{task, date, qty, percent}] 1 รายการต่องานต่อวัน ค่า 0 = ลบรายการนั้น"""
+	progress: ยอดที่กรอกเอง [{task, date, qty, percent}] 1 รายการต่องานต่อวัน ค่า 0 = ลบรายการนั้น
+	resources / materials: รายการทั้งชุดของแผนคน-เครื่องจักร / แผนวัสดุ {modified, items} (resources.save_plans)"""
 	doc = get_doc_for_update(name, modified)
+	resources = frappe.parse_json(resources) if resources else None
+	materials = frappe.parse_json(materials) if materials else None
+	check_plans(name, resources, materials)
 
 	rows = {row.name: row for row in doc.tasks}
 	for task in frappe.parse_json(tasks):
@@ -867,6 +984,7 @@ def save_tasks(name, tasks, modified, progress=None):
 		validate_task_progress(doc.name, touched)
 		update_actual_progress(doc.name)
 
+	save_plans(doc.name, resources, materials)
 	return get_schedule_data(name)
 
 

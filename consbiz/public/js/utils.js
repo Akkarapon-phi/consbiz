@@ -177,3 +177,37 @@ consbiz.fill_default_resources = function (frm) {
             }
         });
 };
+
+// Daily Report / Daily Request สร้างได้หลายฉบับต่อวัน (แบ่งกันลงหลายคน): แถบบนฟอร์มบอกว่าวันนั้นมีใครสร้างอะไรไปแล้ว
+// เรียกใน refresh / construction_management / date ของทั้งสองฟอร์ม (ข้อมูลจาก daily_report.get_same_day_documents)
+consbiz.show_same_day = async function (frm) {
+	frm.dashboard.clear_comment();
+	const { construction_management, date } = frm.doc;
+	if (!construction_management || !date || frm.doc.docstatus === 2) return;
+	const key = `${construction_management}|${date}|${frm.doc.name}`;
+	frm._same_day_key = key;
+	const { message } = await frappe.call({
+		method: "consbiz.consbiz.doctype.daily_report.daily_report.get_same_day_documents",
+		args: { construction_management, date, exclude: frm.is_new() ? null : frm.doc.name },
+	});
+	if (frm._same_day_key !== key) return;
+	const parts = Object.entries(message || {})
+		.filter(([, rows]) => rows.length)
+		.map(
+			([doctype, rows]) =>
+				`${__(doctype)}: ` +
+				rows
+					.map(
+						(row) =>
+							`<a href="/app/${frappe.router.slug(doctype)}/${encodeURIComponent(row.name)}">${frappe.utils.escape_html(row.name)}</a>` +
+							` (${frappe.utils.escape_html(row.owner_name)}${row.docstatus === 0 ? `, ${__("ร่าง")}` : ""})`
+					)
+					.join(", ")
+		);
+	if (!parts.length) return;
+	frm.dashboard.add_comment(
+		`${__("วันที่ {0} มีเอกสารแล้ว", [frappe.datetime.str_to_user(date)])} · ${parts.join(" · ")}`,
+		"blue",
+		true
+	);
+};

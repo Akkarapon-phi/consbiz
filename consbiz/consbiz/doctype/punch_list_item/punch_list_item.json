@@ -1,0 +1,102 @@
+{
+ "actions": [],
+ "creation": "2026-10-31 16:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "location",
+  "description",
+  "wbs",
+  "responsible",
+  "due_date",
+  "column_break_status",
+  "status",
+  "closed_on",
+  "photo",
+  "photo_after"
+ ],
+ "fields": [
+  {
+   "columns": 2,
+   "fieldname": "location",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Location"
+  },
+  {
+   "columns": 3,
+   "fieldname": "description",
+   "fieldtype": "Small Text",
+   "in_list_view": 1,
+   "label": "Description",
+   "reqd": 1
+  },
+  {
+   "columns": 1,
+   "fieldname": "wbs",
+   "fieldtype": "Autocomplete",
+   "label": "WBS"
+  },
+  {
+   "columns": 1,
+   "description": "ผู้รับผิดชอบแก้ไข เช่น ผู้รับเหมาช่วง",
+   "fieldname": "responsible",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Responsible"
+  },
+  {
+   "columns": 1,
+   "fieldname": "due_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Due Date"
+  },
+  {
+   "fieldname": "column_break_status",
+   "fieldtype": "Column Break"
+  },
+  {
+   "allow_on_submit": 1,
+   "columns": 1,
+   "default": "Open",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Status",
+   "options": "Open\nClosed"
+  },
+  {
+   "allow_on_submit": 1,
+   "description": "ว่างไว้ = วันที่ปิดรายการ",
+   "fieldname": "closed_on",
+   "fieldtype": "Date",
+   "label": "Closed On"
+  },
+  {
+   "fieldname": "photo",
+   "fieldtype": "Attach Image",
+   "label": "Photo (Before)"
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "photo_after",
+   "fieldtype": "Attach Image",
+   "label": "Photo (After)"
+  }
+ ],
+ "grid_page_length": 50,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-10-31 16:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "ConsBiz",
+ "name": "Punch List Item",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

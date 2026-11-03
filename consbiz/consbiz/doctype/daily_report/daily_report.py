@@ -315,3 +315,30 @@ def get_tasks(construction_management, date=None, report=None):
 			}
 		)
 	return tasks
+
+
+@frappe.whitelist()
+def get_same_day_documents(construction_management, date, exclude=None):
+	"""Daily Report / Daily Request อื่นของแผนงานเดียวกันวันเดียวกัน (ไม่นับที่ยกเลิก)
+	สร้างได้หลายฉบับต่อวัน (แบ่งกันลงหลายคน) ฟอร์มใช้เตือนว่าวันนี้มีใครสร้างอะไรไปแล้ว"""
+	result = {}
+	if not construction_management or not date:
+		return result
+	for doctype in ("Daily Report", "Daily Request"):
+		if not frappe.has_permission(doctype, "read"):
+			continue
+		rows = frappe.get_all(
+			doctype,
+			filters={
+				"construction_management": construction_management,
+				"date": date,
+				"docstatus": ("<", 2),
+				"name": ("!=", exclude or ""),
+			},
+			fields=["name", "docstatus", "owner"],
+			order_by="creation asc",
+		)
+		for row in rows:
+			row.owner_name = frappe.utils.get_fullname(row.owner)
+		result[doctype] = rows
+	return result

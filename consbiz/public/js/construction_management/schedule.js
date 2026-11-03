@@ -178,6 +178,53 @@ export function apply_dependencies(tasks, holidays) {
 	return moved;
 }
 
+// ---------- สายงานวิกฤต (ตรงกับ total_float ใน construction_management.py) ----------
+// backward pass จากวันจบหลังสุดของงานย่อยทั้งหมด: วันจบช้าสุด (late finish) ที่ไม่ทำให้งานที่ตามมาหรือโครงการเลื่อน
+// Float = จำนวนวันทำงานจากวันจบถึงวันจบช้าสุด 0 = งานวิกฤต (Critical Path)
+// คืน Map name → float เฉพาะงานย่อยที่มีวันที่ หรือ null ถ้าผูกกันเป็นวง
+export function total_float(tasks, holidays) {
+	const order = dependency_order(tasks);
+	if (!order) return null;
+	const dated = order.filter((t) => to_day(t.start_date) !== null && to_day(t.end_date) !== null);
+	if (!dated.length) return new Map();
+	const by_name = new Map(dated.map((t) => [t.name, t]));
+	const finish = Math.max(...dated.map((t) => to_day(t.end_date)));
+	const late = new Map(dated.map((t) => [t.name, finish]));
+	// ย้อนลำดับ: งานที่ตามมาได้วันจบช้าสุดครบก่อนส่งต่อให้งานก่อนหน้า
+	for (const task of [...dated].reverse()) {
+		const late_finish = late.get(task.name);
+		const late_start = shift_days(late_finish, 1 - Math.max(task.duration || 0, 1), holidays);
+		for (const link of parse_predecessors(task.predecessors)) {
+			const predecessor = by_name.get(link.task);
+			if (!predecessor) continue;
+			const limit = latest_finish(predecessor, link, late_start, late_finish, holidays);
+			if (limit < late.get(link.task)) late.set(link.task, limit);
+		}
+	}
+	return new Map(
+		dated.map((t) => {
+			const end = to_day(t.end_date);
+			const late_finish = late.get(t.name);
+			const float =
+				late_finish >= end
+					? count_days(end + 1, late_finish, holidays)
+					: -count_days(late_finish + 1, end, holidays);
+			return [t.name, float];
+		})
+	);
+}
+
+// วันจบช้าสุดของงานก่อนหน้าตามลิงก์เดียว (กลับด้านของ link_start)
+function latest_finish(predecessor, link, late_start, late_finish, holidays) {
+	const lag = link.lag || 0;
+	const duration = Math.max(predecessor.duration || 0, 1);
+	if (link.type === "SS") return end_of(shift_days(late_start, -lag, holidays), duration, holidays);
+	if (link.type === "SF")
+		return end_of(shift_days(late_finish, 1 - lag, holidays), duration, holidays);
+	if (link.type === "FF") return shift_days(late_finish, -lag, holidays);
+	return shift_days(late_start, -(lag + 1), holidays);
+}
+
 // ข้อความงานก่อนหน้า เช่น "1.2, 1.3SS+2, 2.1FF-1" (FS ที่ไม่มี lag แสดงแค่ WBS)
 export function format_predecessors(value, by_name) {
 	return parse_predecessors(value)
@@ -459,8 +506,8 @@ export function plan_percent(start_date, end_date, day, holidays, distribution =
 	return done * 100;
 }
 
-// วันทำงานของช่วง ถ้าทั้งช่วงเป็นวันหยุดให้นับวันปฏิทินแทน
-function working_days_of(start, end, holidays) {
+// วันทำงานของช่วง ถ้าทั้งช่วงเป็นวันหยุดให้นับวันปฏิทินแทน (ตรงกับ working_days_of ฝั่ง Python)
+export function working_days_of(start, end, holidays) {
 	const all = [];
 	for (let d = start; d <= end; d++) all.push(d);
 	const working = all.filter((d) => !holidays.has(d));
@@ -537,4 +584,121 @@ export function next_of(day, unit) {
 
 export function today() {
 	return to_day(frappe.datetime.get_today());
+}
+
+// ---------- สิ่งที่ต้องเตรียมก่อนเริ่มงาน (ตรงกับ construction_management/resources.py) ----------
+// นับวันปฏิทิน: วัสดุ ต้องการภายใน = วันเริ่มงาน - buffer, ต้องสั่งภายใน = ต้องการภายใน - lead time
+// คน/เครื่องจักร ต้องจองภายใน = วันเริ่มงาน - lead time (ต้องจองเฉพาะงานที่ยังไม่เริ่ม)
+
+export function material_dates(start, buffer_days, lead_time_days) {
+	if (start === null || start === undefined) return { required_by: null, order_by: null };
+	const required_by = start - (buffer_days || 0);
+	return { required_by, order_by: required_by - (lead_time_days || 0) };
+}
+
+export function book_by(start, lead_time_days) {
+	return start === null || start === undefined ? null : start - (lead_time_days || 0);
+}
+
+// ---------- ยอดวัสดุที่ขอ/สั่ง/รับแล้ว (ตรงกับ allocate ใน construction_material_plan.py) ----------
+// supply: { item_code: { total: { requested, ordered, received }, purchase, customer } } หน่วยสต็อก (จาก server)
+// ตัดยอดให้แถวที่ต้องการก่อนก่อน (วันต้องการภายในว่าง = ท้ายสุด, เท่ากัน = ตามลำดับแถว)
+// คืน Map key ของแถว (name หรือ key ของแถวใหม่) → { requested, ordered, received (หน่วยของแถว), state }
+// state: received / ordered / requested (ขอครบ) / partial (ขอแล้วบางส่วน) / none
+const MATERIAL_STAGES = ["requested", "ordered", "received"];
+const EPSILON = 1e-6;
+
+export const material_key = (row) => row.name || row.key;
+
+export function allocate_materials(tasks, materials, buffer_days, supply) {
+	const start_of = new Map(tasks.map((t) => [t.name, to_day(t.start_date)]));
+	const by_item = new Map();
+	materials.forEach((row, index) => {
+		const { required_by } = material_dates(start_of.get(row.task) ?? null, buffer_days, row.lead_time_days);
+		if (!by_item.has(row.item_code)) by_item.set(row.item_code, []);
+		by_item.get(row.item_code).push({ row, index, required_by });
+	});
+	const result = new Map();
+	for (const [item_code, rows] of by_item) {
+		rows.sort((a, b) => (a.required_by ?? Infinity) - (b.required_by ?? Infinity) || a.index - b.index);
+		const total = supply?.[item_code]?.total || {};
+		const left = Object.fromEntries(MATERIAL_STAGES.map((stage) => [stage, total[stage] || 0]));
+		for (const { row } of rows) {
+			const factor = row.factor || 1;
+			const need = (row.qty || 0) * factor;
+			const covered = {};
+			for (const stage of MATERIAL_STAGES) {
+				const value = Math.min(need, Math.max(left[stage], 0));
+				left[stage] -= value;
+				covered[stage] = value / factor;
+			}
+			const stock = (stage) => covered[stage] * factor;
+			covered.state =
+				MATERIAL_STAGES.slice()
+					.reverse()
+					.find((stage) => stock(stage) >= need - EPSILON) ||
+				(stock("requested") > EPSILON ? "partial" : "none");
+			covered.shortfall = Math.max((row.qty || 0) - covered.requested, 0);
+			result.set(material_key(row), covered);
+		}
+	}
+	return result;
+}
+
+// ขอ (MR) ครบจำนวนแล้ว ไม่ต้องสั่งเพิ่ม
+export function is_requested(coverage) {
+	return ["requested", "ordered", "received"].includes(coverage?.state);
+}
+
+// สิ่งที่ต้องเตรียมของแต่ละงาน: Map งาน → [{ kind: material | resource, row, target, pending }]
+// target = วันต้องสั่ง (วัสดุ) / วันต้องจอง (คน/เครื่องจักร) เป็นเลขวัน (ไม่มีวันเริ่มงาน = null)
+// pending = ยังต้องทำ: วัสดุที่ยังขอไม่ครบ (coverage จาก allocate_materials), คน/เครื่องจักรของงานที่ยังไม่เริ่ม (ณ day)
+export function prep_items(tasks, resources, materials, buffer_days, day, coverage) {
+	const start_of = new Map(tasks.map((t) => [t.name, to_day(t.start_date)]));
+	const result = new Map();
+	const add = (task, item) => {
+		if (!result.has(task)) result.set(task, []);
+		result.get(task).push(item);
+	};
+	for (const row of materials) {
+		const dates = material_dates(start_of.get(row.task) ?? null, buffer_days, row.lead_time_days);
+		const covered = coverage?.get(material_key(row));
+		add(row.task, {
+			kind: "material",
+			row,
+			target: dates.order_by,
+			required_by: dates.required_by,
+			coverage: covered,
+			pending: !is_requested(covered),
+		});
+	}
+	for (const row of resources) {
+		const start = start_of.get(row.task) ?? null;
+		add(row.task, { kind: "resource", row, target: book_by(start, row.lead_time_days), pending: start === null || start > day });
+	}
+	return result;
+}
+
+// ต่องาน: { days: วันที่เหลือก่อนต้องเตรียมสิ่งแรก (ติดลบ = เลยกำหนด) หรือ null, done: วัสดุสั่งครบแล้วและไม่มีสิ่งที่ต้องจอง }
+export function prep_by_task(tasks, resources, materials, buffer_days, day, coverage) {
+	const result = new Map();
+	for (const [task, items] of prep_items(tasks, resources, materials, buffer_days, day, coverage)) {
+		const pending = items.filter((item) => item.pending);
+		const days = pending.map((item) => item.target).filter((target) => target !== null).map((target) => target - day);
+		result.set(task, { days: days.length ? Math.min(...days) : null, done: !pending.length });
+	}
+	return result;
+}
+
+// จำนวนคน/เครื่องจักรต่อวันของรายการแผนทรัพยากร: Map เลขวัน → จำนวน (วันทำงานของงาน เหมือน planned_daily ใน resources.py)
+export function resource_daily(rows, task_by_name, holidays) {
+	const result = new Map();
+	for (const row of rows) {
+		const task = task_by_name.get(row.task);
+		const start = to_day(task?.start_date);
+		const end = to_day(task?.end_date);
+		if (start === null || end === null || end < start) continue;
+		for (const d of working_days_of(start, end, holidays)) result.set(d, (result.get(d) || 0) + (row.qty_per_day || 0));
+	}
+	return result;
 }

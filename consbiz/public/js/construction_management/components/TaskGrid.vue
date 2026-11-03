@@ -2,9 +2,12 @@
 // ตาราง WBS ฝั่งซ้าย: แถวสูงเท่ากับ timeline และเลื่อนแนวตั้งตาม timeline (App ตั้ง scrollTop ให้)
 // ล้อเมาส์แนวตั้งส่งต่อให้ App เลื่อน timeline แทน เพื่อให้มี scrollbar แนวตั้งอันเดียว
 // คลิกช่องที่แก้ได้จะเปิด Frappe control ในช่องนั้น, ลากหัวคอลัมน์เพื่อสลับตำแหน่ง
+// คีย์บอร์ดแบบ Excel: ลูกศรเลื่อนช่อง, Enter / F2 แก้ช่อง, ระหว่างแก้ Enter = บันทึกแล้วลงแถวถัดไป,
+// Tab / Shift+Tab = บันทึกแล้วไปช่องที่แก้ได้ถัดไป / ก่อนหน้า, Esc = ยกเลิก
+// คลิกช่องใดก็ได้ส่ง select ให้ App (คลิก WBS/ชื่องาน = เปิดแผงคน/เครื่องจักร/วัสดุของงานด้านขวา)
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from "vue";
 import FrappeControl from "./FrappeControl.vue";
-import { can_edit, cell_text, cell_value } from "../columns";
+import { can_edit, cell_text, cell_tone, cell_value } from "../columns";
 
 const props = defineProps({
 	tasks: Array,
@@ -18,6 +21,7 @@ const props = defineProps({
 	summaryRows: Array,
 	summaryRowHeight: Number,
 	hovered: String,
+	selected: String,
 });
 const emit = defineEmits([
 	"update",
@@ -26,6 +30,8 @@ const emit = defineEmits([
 	"move-column",
 	"hover",
 	"scroll-y",
+	"reveal-row",
+	"select",
 ]);
 
 const body = ref(null);
@@ -43,13 +49,39 @@ function on_wheel(event) {
 	emit("scroll-y", event.deltaY);
 }
 
+// จอสัมผัส: ปัดขึ้น-ลงบนตารางเลื่อน timeline เหมือนล้อเมาส์ (ปัดซ้าย-ขวาเลื่อนตารางตามปกติ)
+let touch = null;
+function on_touchstart(event) {
+	const t = event.touches[0];
+	touch = event.touches.length === 1 ? { x: t.clientX, y: t.clientY, axis: null } : null;
+}
+function on_touchmove(event) {
+	if (!touch) return;
+	const t = event.touches[0];
+	const dx = touch.x - t.clientX;
+	const dy = touch.y - t.clientY;
+	touch.axis ??= Math.abs(dy) > Math.abs(dx) ? "y" : "x";
+	if (touch.axis !== "y") return;
+	event.preventDefault();
+	emit("scroll-y", dy);
+	Object.assign(touch, { x: t.clientX, y: t.clientY });
+}
+function on_touchend() {
+	touch = null;
+}
+
 // ---------- แก้ค่าในช่อง ----------
 
 const editing = ref(null); // { task, column, value }
 const editor = ref(null);
 
 function start_edit(task, column) {
-	if (!props.canWrite || !can_edit(task, column)) return;
+	active.value = { name: task.name, key: column.key };
+	emit("select", task, column.key);
+	if (!props.canWrite || !can_edit(task, column)) {
+		focus_body();
+		return;
+	}
 	editing.value = { task, column, value: cell_value(task, column.key, props.metrics) };
 }
 
@@ -74,8 +106,127 @@ function on_document_mousedown(event) {
 	nextTick(() => (editing.value = null));
 }
 
+// ---------- คีย์บอร์ด ----------
+
+const active = ref(null); // ช่องที่เลือกอยู่ { name, key }
+
+function is_active(task, column) {
+	return active.value?.name === task.name && active.value.key === column.key;
+}
+
+function focus_body() {
+	nextTick(() => body.value?.focus({ preventScroll: true }));
+}
+
+function position() {
+	if (!active.value) return null;
+	const row = props.tasks.findIndex((t) => t.name === active.value.name);
+	const col = props.columns.findIndex((c) => c.key === active.value.key);
+	return row < 0 || col < 0 ? null : { row, col };
+}
+
+function set_active(row, col) {
+	const task = props.tasks[row];
+	const column = props.columns[col];
+	if (!task || !column) return false;
+	active.value = { name: task.name, key: column.key };
+	emit("reveal-row", row);
+	reveal_column(col);
+	return true;
+}
+
+// เลื่อนตารางแนวนอนให้เห็นคอลัมน์ที่เลือก
+function reveal_column(col) {
+	const el = body.value;
+	if (!el) return;
+	const left = props.columns.slice(0, col).reduce((sum, c) => sum + c.width, 0);
+	const right = left + props.columns[col].width;
+	if (left < el.scrollLeft) el.scrollLeft = left;
+	else if (right > el.scrollLeft + el.clientWidth) el.scrollLeft = right - el.clientWidth;
+}
+
+// ไปช่องที่แก้ได้ถัดไป: แนวตั้ง (Enter) คอลัมน์เดิม, แนวนอน (Tab) ไล่ต่อแถวถัดไป
+function next_editable(step, vertical) {
+	const pos = position();
+	if (!pos) return;
+	const cols = props.columns.length;
+	let { row, col } = pos;
+	for (let i = 0; i < props.tasks.length * cols; i++) {
+		if (vertical) row += step;
+		else {
+			col += step;
+			if (col >= cols) [row, col] = [row + 1, 0];
+			if (col < 0) [row, col] = [row - 1, cols - 1];
+		}
+		const task = props.tasks[row];
+		if (!task) return;
+		if (props.canWrite && can_edit(task, props.columns[col])) {
+			set_active(row, col);
+			return;
+		}
+	}
+}
+
+function edit_active() {
+	const pos = position();
+	if (pos) start_edit(props.tasks[pos.row], props.columns[pos.col]);
+}
+
+// ระหว่างแก้: ยืนยันค่าที่พิมพ์ (ให้ control ส่ง change) แล้วย้ายช่อง
+function finish_edit(move) {
+	const control = editor.value?.[0]?.get_control?.() || editor.value?.get_control?.();
+	control?.$input?.trigger("change");
+	nextTick(() => {
+		editing.value = null;
+		move?.();
+		focus_body();
+	});
+}
+
 function on_keydown(event) {
-	if (event.key === "Escape") editing.value = null;
+	const date = editing.value?.column.editor === "Date";
+	if (event.key === "Escape") {
+		event.preventDefault();
+		editing.value = null;
+		focus_body();
+	} else if (event.key === "Enter") {
+		event.preventDefault();
+		finish_edit(() => next_editable(event.shiftKey ? -1 : 1, true));
+	} else if (event.key === "Tab") {
+		event.preventDefault();
+		finish_edit(() => next_editable(event.shiftKey ? -1 : 1, false));
+	} else if (!date && (event.key === "ArrowUp" || event.key === "ArrowDown")) {
+		// ช่องวันที่ใช้ลูกศรใน date picker
+		event.preventDefault();
+		finish_edit(() => next_editable(event.key === "ArrowUp" ? -1 : 1, true));
+	}
+}
+
+// ไม่ได้แก้ช่องอยู่ (โฟกัสที่ตาราง)
+function on_grid_keydown(event) {
+	if (editing.value || event.ctrlKey || event.metaKey || event.altKey) return;
+	const pos = position();
+	if (!pos) {
+		if (event.key.startsWith("Arrow") && props.tasks.length) {
+			event.preventDefault();
+			set_active(0, 0);
+		}
+		return;
+	}
+	const moves = { ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1] };
+	if (moves[event.key]) {
+		event.preventDefault();
+		const [dr, dc] = moves[event.key];
+		set_active(pos.row + dr, pos.col + dc);
+	} else if (event.key === "Enter" || event.key === "F2") {
+		event.preventDefault();
+		edit_active();
+	} else if (event.key === "Tab") {
+		event.preventDefault();
+		next_editable(event.shiftKey ? -1 : 1, false);
+	} else if (event.key === "Escape") {
+		active.value = null;
+	}
 }
 
 onMounted(() => document.addEventListener("mousedown", on_document_mousedown, true));
@@ -109,7 +260,16 @@ function on_drop(column) {
 
 <template>
 	<div class="cs-grid">
-		<div ref="body" class="cs-grid-body" @wheel="on_wheel">
+		<div
+			ref="body"
+			class="cs-grid-body"
+			tabindex="0"
+			@wheel="on_wheel"
+			@touchstart.passive="on_touchstart"
+			@touchmove="on_touchmove"
+			@touchend="on_touchend"
+			@keydown="on_grid_keydown"
+		>
 			<div :style="{ width: total_width + 'px' }">
 				<div class="cs-grid-header" :style="{ height: headerHeight + 'px' }">
 					<div
@@ -142,7 +302,11 @@ function on_drop(column) {
 						v-for="task in tasks"
 						:key="task.name"
 						class="cs-row"
-						:class="{ 'cs-group': task.is_group, 'cs-hover': hovered === task.name }"
+						:class="{
+							'cs-group': task.is_group,
+							'cs-hover': hovered === task.name,
+							'cs-selected': selected === task.name,
+						}"
 						:style="{ height: rowHeight + 'px' }"
 						@mouseenter="emit('hover', task.name)"
 						@mouseleave="emit('hover', null)"
@@ -155,6 +319,7 @@ function on_drop(column) {
 								'text-right': column.align === 'right',
 								'cs-editable': canWrite && can_edit(task, column),
 								'cs-editing': is_editing(task, column),
+								'cs-active': is_active(task, column),
 							}"
 							:style="{ width: column.width + 'px' }"
 							@click="start_edit(task, column)"
@@ -163,7 +328,11 @@ function on_drop(column) {
 								v-if="column.key === 'item_name'"
 								class="cs-name"
 								:style="{ paddingLeft: task.indent * 16 + 'px' }"
-								:title="task.item_name"
+								:title="
+									task.is_group
+										? task.item_name
+										: `${task.item_name}\n${__('คลิกเพื่อกำหนดคน/เครื่องจักร/วัสดุ')}`
+								"
 							>
 								<button
 									v-if="task.is_group"
@@ -194,6 +363,13 @@ function on_drop(column) {
 								@update:model-value="commit"
 								@keydown="on_keydown"
 							/>
+							<span
+								v-else-if="cell_tone(task, column.key, metrics)"
+								class="indicator-pill no-indicator-dot cs-pill"
+								:class="cell_tone(task, column.key, metrics)"
+							>
+								{{ cell_text(task, column.key, metrics) }}
+							</span>
 							<template v-else>{{ cell_text(task, column.key, metrics) }}</template>
 						</div>
 					</div>
@@ -239,8 +415,8 @@ function on_drop(column) {
 	top: 0;
 	z-index: 2;
 	display: flex;
-	background: var(--subtle-fg);
-	border-bottom: 1px solid var(--border-color);
+	background: var(--card-bg);
+	border-bottom: 1px solid color-mix(in srgb, var(--border-color) 70%, transparent);
 	font-size: var(--text-sm);
 	font-weight: 600;
 	color: var(--text-muted);
@@ -271,7 +447,7 @@ function on_drop(column) {
 }
 .cs-row {
 	display: flex;
-	border-bottom: 1px solid var(--border-color);
+	border-bottom: 1px solid color-mix(in srgb, var(--border-color) 45%, transparent);
 	font-size: var(--text-sm);
 	box-sizing: border-box;
 }
@@ -282,6 +458,14 @@ function on_drop(column) {
 .cs-row.cs-hover {
 	background: var(--consbiz-gantt-row-hover);
 }
+.cs-row.cs-selected {
+	background: var(--consbiz-gantt-row-selected);
+}
+.cs-pill {
+	height: 20px;
+	padding: 0 8px;
+	font-size: var(--text-xs);
+}
 .cs-cell {
 	display: flex;
 	align-items: center;
@@ -289,8 +473,9 @@ function on_drop(column) {
 	padding: 0 8px;
 	overflow: hidden;
 	white-space: nowrap;
-	border-right: 1px solid var(--border-color);
+	border-right: 1px solid color-mix(in srgb, var(--border-color) 45%, transparent);
 	box-sizing: border-box;
+	font-variant-numeric: tabular-nums;
 }
 .cs-cell.text-right {
 	justify-content: flex-end;
@@ -300,6 +485,15 @@ function on_drop(column) {
 }
 .cs-cell.cs-editable:hover {
 	box-shadow: inset 0 0 0 1px var(--gray-400);
+}
+.cs-grid-body:focus {
+	outline: none;
+}
+/* ช่องที่เลือกด้วยคีย์บอร์ด (แสดงเฉพาะตอนตารางมีโฟกัส หรือกำลังแก้) */
+.cs-grid-body:focus .cs-cell.cs-active,
+.cs-cell.cs-active.cs-editing {
+	box-shadow: inset 0 0 0 2px var(--consbiz-gantt-plan);
+	border-radius: 4px;
 }
 .cs-cell.cs-editing {
 	padding: 0 2px;

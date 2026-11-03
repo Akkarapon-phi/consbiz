@@ -92,6 +92,7 @@ pre-commit run --all-files                               # ruff + prettier (ต�
 - แผนงาน: `Construction Management` (+ Task) ความคืบหน้าจริงเก็บใน `Construction Progress Entry`
   ซึ่งระบบสร้างเองจากการ Submit `Daily Report` หรือการกรอกในหน้า Gantt ห้ามให้ผู้ใช้กรอกตรง
   `Daily Request` (ขออนุมัติปฏิบัติงานล่วงหน้า) ไม่สร้าง Progress Entry Submit = อนุมัติ แล้วสร้าง Daily Report ต่อได้ 1 ฉบับ
+  1 วันสร้าง DR / DRQ ได้หลายฉบับ (แบ่งกันลงหลายคน) ฟอร์มแจ้งว่าวันนั้นมีฉบับไหนแล้ว (`consbiz.show_same_day` ใน `utils.js`)
   การคำนวณ %แผน/S-Curve ใน `public/js/construction_management/schedule.js` ต้องตรงกับฝั่ง Python เสมอ
   งานก่อนหน้า (`predecessors` FS/SS/FF/SF + lag) เป็นแบบ ASAP: `apply_dependencies` มีทั้ง Python และ `schedule.js` ต้องตรงกัน
   Baseline เก็บได้หลายชุดใน `Construction Baseline` (สำเนาวันที่/% แผน/น้ำหนักของทุกแถว) เลือกดูในหน้า Gantt ได้ทีละชุด
@@ -102,6 +103,32 @@ pre-commit run --all-files                               # ruff + prettier (ต�
 - งานลด-งานเพิ่ม: `Variation Order` Submit แล้วมีผลกับแผน (`apply_variations` ใน CM) งานลดลดปริมาณงานเดิม
   งานเพิ่มเป็นแถว `VO.n` ใต้กลุ่ม `VO` ท้ายตาราง แต่นับในมูลค่าสัญญาและ % เมื่อ `employer_status = Approved` เท่านั้น
   % ความคืบหน้า = มูลค่างานที่ทำแล้ว ÷ มูลค่าสัญญาปรับปรุง (`revised_amount`) S-Curve จริงใช้ตัวหาร ณ วันที่อนุมัติแต่ละ VO
+- ขยายเวลา: `Extension of Time` ที่ `employer_status = Approved` เลื่อน `revised_finish_date` ของ CM (วันปฏิทิน)
+  `finish_date` คงเป็นวันตามสัญญาเดิม และไม่เลื่อนวันของงานในแผน
+- สายงานวิกฤต: `total_float` มีทั้ง Python และ `schedule.js` ต้องตรงกัน (backward pass จากวันจบหลังสุดของงานย่อย)
+- ความล่าช้า/ค่าปรับ (`construction_management/delay.py`) และ EVM (`evm.py`, AC จาก GL Entry บัญชี Expense ที่ผูก Project)
+  ใช้ในรายงาน `Construction Delay Analysis`, `Construction Earned Value` และ Tab ภาพรวมของ CM
+- Tab "ภาพรวม" / "Gantt" / "ทรัพยากร" / "Look-ahead" / "การเงิน" / "เอกสารโครงการ" ของ CM เป็น Vue โหลดเมื่อเปิด Tab (`PROJECT_TABS` ใน `construction_management.js`)
+  Look-ahead (แผนรายวันหลายสัปดาห์ จัดกลุ่มตาม WBS ระดับบน) ข้อมูลจาก `construction_management/lookahead.py` เทียบแผนปัจจุบัน
+  แต่ละวันเป็นกล่องสีตามสถานะของวัน ณ วันที่ดู (ทำแล้ว / ไม่ได้ทำตามแผน / วันที่ดู / แผนข้างหน้า / ทำนอกแผน / เสร็จแล้ว)
+  ภาพรวม/เอกสาร: `public/js/project_dashboard` (ข้อมูลจาก `construction_management/dashboard.py`) Header ของ CM ไม่มีปุ่มเพิ่ม
+  การเงิน (`Finance.vue`, `construction_management/finance.py`): Cash Flow รายเดือน (Cash Plan ตรงกับตารางสรุปใต้ Gantt) + EVM
+  Gantt ในฟอร์มเป็นโหมด `embedded` = ดูอย่างเดียว (แถบบาง `ViewBar.vue`) ใช้ page จำลองที่ไม่ทำอะไร (`embedded_page.js`) ห้ามแตะ Header ของฟอร์ม
+  แก้แผนที่หน้าเต็มจอ `/app/construction-gantt/<CM>` ที่เดียว (ปุ่ม "แก้ไขแผนงาน" ใน `ViewBar`, แถบเครื่องมือ `Toolbar.vue`)
+  Tab โหลดใหม่เมื่อแผนเปลี่ยน (`activate` → `check_remote`) แผนเปลี่ยนแล้วฟอร์ม `reload_doc` เปิด Tab แล้วซ่อนแผงข้าง (`.consbiz-wide-form`)
+  เมนู/แผงในแถบเครื่องมือใช้ `frappe.ui.Dropdown` / `frappe.ui.Popover` (ผ่าน `EsDropdown.vue` / `EsPopover.vue`) ห้ามใช้ dropdown ของ Bootstrap
+  `budget_cost` ของ CM เป็น permlevel 1 (เฉพาะ Projects Manager) รายงาน EVM จึงให้สิทธิ์เฉพาะ Projects Manager
+- แผนทรัพยากร/จัดซื้อ: `Construction Resource Plan`, `Construction Material Plan` (1 ฉบับต่อ CM ชื่อเดียวกับ CM)
+  ชื่อทรัพยากรต้องตรงกับที่ลงใน Daily Report วันต้องสั่งวัสดุเลื่อนตามแผนผ่าน `refresh_dates` ใน `CM.on_update`
+  หน้า Gantt เต็มจอ: คลิก WBS/ชื่องาน เปิดแผงขวา `TaskPanel.vue` แก้รายการของงาน (Undo ได้ บันทึกพร้อม `save_tasks`
+  → `construction_management/resources.py` `save_plans` ตรวจ `modified` ของแผน) แก้/ลบแถววัสดุได้เสมอ
+  วันต้องสั่ง/ต้องจอง (วันปฏิทิน) มีทั้ง `resources.py` และ `prep_by_task` ใน `schedule.js` ต้องตรงกัน คอลัมน์ "เตรียมล่วงหน้า (วัน)"
+  Tab "ทรัพยากร" ของ CM (`project_dashboard/Resources.vue`, ข้อมูลจาก `resources.get_overview`) ดูอย่างเดียว
+  สถานะวัสดุไม่ผูก MR ทีละแถว: `get_supply` รวมยอด MR (รวมร่าง) / PO / รับของ (PR, PI อัปเดตสต็อก, Stock Entry Material Receipt)
+  ต่อ (โครงการ + Item) หน่วยสต็อก แยกซื้อเอง / ลูกค้าจัดหา (Customer Provided) แล้ว `allocate` ตัดให้แถวที่ต้องการก่อนก่อน
+  มีทั้ง Python (`construction_material_plan.py`) และ `allocate_materials` ใน `schedule.js` ต้องตรงกัน
+  โครงการของ MR = `custom_project` (doc_events `set_item_project` คัดลอกลงรายการให้ PO/PR ได้โครงการต่อ)
+  มุมมอง "ทรัพยากร" ของหน้า Gantt (`ResourceGantt.vue`) แถวเป็นคน/เครื่องจักร/วัสดุ ดูอย่างเดียว
 - แผนตัดเหล็ก: `Bar Cut Plan` ใช้ `Rebar Type` และ `Bar Shape` (สูตรความยาว + รูป SVG) ตัวจัดตัดอยู่ใน `bar_cut_plan/optimizer.py`
   ด้าน A-F, R (มม.), N (รอบ), T (องศา) สูตรใช้ `sqrt` และ `sin`/`cos`/`tan` (องศา) ได้
   ข้อมูลมาตรฐานสร้างด้วย patch `seed_bar_cut_masters`, `seed_more_bar_shapes`, `seed_more_rebar_types` (ข้ามที่มีอยู่แล้ว) รหัสรูปทรงไม่ใช่รหัส BS 8666
@@ -115,7 +142,7 @@ pre-commit run --all-files                               # ruff + prettier (ต�
 
 - DocType: ชื่ออังกฤษ Title Case คำเต็ม (เช่น `Daily Report`, `Retention Release`)
 - เอกสารที่ submit ได้: `autoname = naming_series:` ใช้ `.ABBR.` ถ้าต้องการตัวย่อบริษัท/โครงการ
-- prefix ที่ใช้แล้ว ห้ามใช้ซ้ำ: `BCP-` Bar Cut Plan, `CM-` Construction Management, `DR-` Daily Report, `DRQ-` Daily Request, `VO-` Variation Order, `WHTE-` WHT Employee
+- prefix ที่ใช้แล้ว ห้ามใช้ซ้ำ: `BCP-` Bar Cut Plan, `CM-` Construction Management, `DR-` Daily Report, `DRQ-` Daily Request, `EOT-` Extension of Time, `IR-` Inspection Request, `PL-` Punch List, `VO-` Variation Order, `WHTE-` WHT Employee
 - master ที่ตั้งชื่อตามค่า field ใช้ `field:<fieldname>` (เช่น Rebar Type, Bar Shape)
 - fieldname ของ Custom Field ขึ้นต้นด้วย `custom_`
 - CSS ของ Print Format ใช้ class ขึ้นต้น `pf-` สีใหม่ใน `style.css` ใช้ตัวแปร `--consbiz-*`

@@ -1,6 +1,8 @@
 # Copyright (c) 2026, Siricons and Contributors
 # See license.txt
 
+from unittest.mock import patch
+
 import frappe
 from frappe.tests import IntegrationTestCase
 from frappe.utils import getdate
@@ -10,6 +12,7 @@ from consbiz.consbiz.doctype.construction_management.construction_management imp
 	count_working_days,
 	plan_progress,
 	target_progress,
+	total_float,
 )
 
 EXTRA_TEST_RECORD_DEPENDENCIES = []
@@ -244,6 +247,49 @@ class IntegrationTestConstructionManagement(IntegrationTestCase):
 		self.assert_dates(rows["c"], "2026-11-06", "2026-11-06")
 		# ลิงก์ที่ชี้ไปงานที่ไม่มีแล้วถูกตัดทิ้ง
 		self.assertEqual(frappe.parse_json(rows["b"].predecessors), [{"task": "a", "type": "FS", "lag": 0}])
+
+	def test_total_float(self):
+		# ตัวอย่างเดียวกับที่ใช้เทียบ total_float ใน schedule.js: ทุกชนิดความสัมพันธ์ + วันหยุดเสาร์-อาทิตย์
+		weekend = ["2026-11-07", "2026-11-08", "2026-11-14", "2026-11-15", "2026-11-21", "2026-11-22"]
+		rows = self.make_linked(
+			[
+				{"name": "a", "wbs": "1", "amount": 1, "start_date": "2026-11-02", "duration": 5},
+				{"name": "b", "wbs": "2", "amount": 1, "duration": 8, "predecessors": [{"task": "a"}]},
+				{
+					"name": "c",
+					"wbs": "3",
+					"amount": 1,
+					"duration": 3,
+					"predecessors": [{"task": "a", "type": "SS", "lag": 2}],
+				},
+				{
+					"name": "d",
+					"wbs": "4",
+					"amount": 1,
+					"duration": 3,
+					"predecessors": [{"task": "c", "lag": 1}],
+				},
+				{
+					"name": "e",
+					"wbs": "5",
+					"amount": 1,
+					"duration": 2,
+					"predecessors": [{"task": "d", "type": "FF", "lag": 4}],
+				},
+				{
+					"name": "f",
+					"wbs": "6",
+					"amount": 1,
+					"duration": 3,
+					"predecessors": [{"task": "b"}, {"task": "e", "type": "SF", "lag": 3}],
+				},
+				{"name": "g", "wbs": "7", "amount": 1, "start_date": "2026-11-02", "duration": 3},
+			],
+			holidays=weekend,
+		)
+		self.assert_dates(rows["f"], "2026-11-19", "2026-11-23")
+		floats = total_float(self.linked_doc.tasks, {getdate(d) for d in weekend})
+		self.assertEqual(floats, {"a": 0, "b": 0, "c": 2, "d": 2, "e": 2, "f": 0, "g": 13})
 
 	def test_dependency_errors(self):
 		cycle = [
@@ -486,6 +532,111 @@ class IntegrationTestConstructionProgress(IntegrationTestCase):
 		# ค่า 0 ลบรายการของวันนั้น
 		self.save([{"task": self.qty_task.name, "date": "2026-11-04", "qty": 0}])
 		self.assertEqual(self.doc.tasks[1].actual_qty, 4)
+
+	def test_dashboard_and_documents(self):
+		from consbiz.consbiz.doctype.construction_management.dashboard import get_dashboard, get_documents
+
+		self.save([{"task": self.qty_task.name, "date": "2026-11-03", "qty": 5}])
+		data = get_dashboard(self.doc.name, "2026-11-30")
+		self.assertAlmostEqual(data["progress"]["actual"], 37.5)
+		self.assertEqual(data["tasks"]["total"], 2)
+		self.assertTrue(data["curve"])
+		# เส้นแผนยาวถึงวันจบของแผน (100%) เส้นจริงหยุดที่วันที่ดู
+		self.assertAlmostEqual(data["curve"][-1]["plan"], 100)
+		after = [row for row in data["curve"] if getdate(row["date"]) > getdate("2026-11-30")]
+		self.assertTrue(all(row["actual"] is None for row in after))
+		self.assertAlmostEqual(
+			next(row for row in data["curve"] if str(row["date"]) == "2026-11-30")["actual"], 37.5
+		)
+		# Administrator เห็นงบต้นทุน จึงได้ EVM
+		self.assertIsNotNone(data["evm"])
+
+		documents = get_documents(self.doc.name)
+		doctypes = {item["doctype"]: item for group in documents["groups"] for item in group["items"]}
+		self.assertIn("Variation Order", doctypes)
+		self.assertTrue(doctypes["Construction Material Plan"]["single"])
+		self.assertFalse(doctypes["Construction Baseline"]["can_create"])
+		self.assertIn("Construction Delay Analysis", [r["name"] for r in documents["reports"]])
+
+	def test_finance(self):
+		# Cash Actual = มูลค่างานที่ทำได้ (5/10 ของงาน 3000 = 1500) เดือนหลังวันที่ดูไม่มีค่าจริง แผนสะสมครบมูลค่าสัญญา
+		from consbiz.consbiz.doctype.construction_management.finance import get_finance
+
+		self.save([{"task": self.qty_task.name, "date": "2026-11-03", "qty": 5}])
+		data = get_finance(self.doc.name, "2026-11-30")
+		months = {str(row["month"]): row for row in data["months"]}
+		self.assertAlmostEqual(months["2026-11-01"]["actual_cum"], 1500)
+		self.assertAlmostEqual(data["summary"]["actual"], 1500)
+		self.assertAlmostEqual(data["months"][-1]["plan_cum"], self.doc.revised_amount or self.doc.total_amount)
+		self.assertTrue(all(row["actual"] is None for row in data["months"] if str(row["month"]) > "2026-11-30"))
+
+	def test_lookahead(self):
+		from consbiz.consbiz.doctype.construction_management.construction_management import save_tasks
+		from consbiz.consbiz.doctype.construction_management.lookahead import get_lookahead
+
+		self.doc.reload()
+		qty, lump = self.doc.tasks[1], self.doc.tasks[2]
+		save_tasks(
+			self.doc.name,
+			frappe.as_json(
+				[
+					# งานค้าง: ควรจบก่อนช่วงแต่ทำได้แค่บางส่วน
+					{"name": qty.name, "start_date": "2026-10-26", "end_date": "2026-10-28"},
+					{"name": lump.name, "start_date": "2026-11-12", "end_date": "2026-11-20"},
+				]
+			),
+			str(self.doc.modified),
+			frappe.as_json([{"task": qty.name, "date": "2026-10-27", "qty": 3}]),
+		)
+		# 4 พ.ย. 2569 เป็นวันพุธ: สัปดาห์นี้เริ่ม 2 พ.ย. ไม่รวมสัปดาห์ที่แล้ว 2 สัปดาห์ = 2-15 พ.ย.
+		data = get_lookahead(self.doc.name, "2026-11-04", weeks=2, include_last_week=0)
+		self.assertEqual((str(data["start"]), str(data["end"])), ("2026-11-02", "2026-11-15"))
+		tasks = {t["name"]: t for g in data["groups"] for t in g["tasks"]}
+		self.assertTrue(tasks[qty.name]["overdue"])
+		self.assertEqual(tasks[qty.name]["days"], [])
+		self.assertEqual([str(d) for d in tasks[lump.name]["days"]], [f"2026-11-{d}" for d in range(12, 16)])
+
+		# รวมสัปดาห์ที่แล้ว: งานแรกอยู่ในช่วง ไม่ใช่งานค้างจากก่อนช่วง และเห็นวันที่ทำจริง
+		data = get_lookahead(self.doc.name, "2026-11-04", weeks=2, include_last_week=1)
+		task = next(t for g in data["groups"] for t in g["tasks"] if t["name"] == qty.name)
+		self.assertFalse(task["overdue"])
+		self.assertEqual([str(d) for d in task["done_days"]], ["2026-10-27"])
+		self.assertAlmostEqual(task["actual_pct"], 30)
+		# ปริมาณที่ทำต่อวัน (กล่องรายวัน) และยังไม่ครบ 100% จึงไม่มีวันเสร็จ
+		self.assertEqual(task["work"]["2026-10-27"]["qty"], 3)
+		self.assertAlmostEqual(task["work"]["2026-10-27"]["percent"], 30)
+		self.assertIsNone(task["finished_on"])
+
+	def test_site_calendar(self):
+		from consbiz.consbiz.doctype.construction_management.dashboard import get_site_calendar
+
+		self.doc.reload()
+		self.doc.start_date = "2026-11-02"
+		self.doc.save()
+		report = self.make_report([{"wbs": "1.1", "qty": 2}], date="2026-11-03")
+		report.submit()
+		self.make_report([{"wbs": "1.2", "percent": 10}], date="2026-11-04")
+
+		with patch("consbiz.consbiz.doctype.construction_management.dashboard.nowdate", return_value="2026-11-05"):
+			data = get_site_calendar(self.doc.name, "2026-11-20")
+		self.assertEqual((str(data["start"]), str(data["end"])), ("2026-11-01", "2026-11-30"))
+		self.assertEqual([r.docstatus for r in data["reports"]], [1, 0])
+		# 2-5 พ.ย. ลงแล้ว (Submit) แค่ 3 พ.ย. ฉบับร่างไม่นับ
+		self.assertEqual(data["summary"]["report_days"], 1)
+		self.assertEqual(data["summary"]["missing_days"], 3)
+		self.assertAlmostEqual(data["summary"]["progress"], 15)
+
+	def test_many_reports_per_day(self):
+		# วันเดียวสร้าง DR ได้หลายฉบับ (แบ่งกันลงหลายคน) และฟอร์มเห็นว่าวันนั้นมีฉบับไหนแล้ว
+		from consbiz.consbiz.doctype.daily_report.daily_report import get_same_day_documents
+
+		first = self.make_report([{"wbs": "1.1", "qty": 2}], date="2026-11-03")
+		second = self.make_report([{"wbs": "1.2", "percent": 10}], date="2026-11-03")
+		first.submit()
+		second.submit()
+		same_day = get_same_day_documents(self.doc.name, "2026-11-03", exclude=second.name)
+		self.assertEqual([row.name for row in same_day["Daily Report"]], [first.name])
+		self.assertEqual(same_day["Daily Request"], [])
 
 	def test_progress_cannot_exceed_quantity(self):
 		with self.assertRaises(frappe.ValidationError):

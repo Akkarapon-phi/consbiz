@@ -12,6 +12,9 @@
   "start_date",
   "finish_date",
   "duration",
+  "revised_finish_date",
+  "revised_duration",
+  "extension_days",
   "column_break_main",
   "naming_series",
   "status",
@@ -30,9 +33,27 @@
   "active_baseline",
   "section_break_total",
   "total_amount",
+  "budget_cost",
   "column_break_total",
   "variation_amount",
   "revised_amount",
+  "section_break_penalty",
+  "penalty_per_day",
+  "penalty_limit_percent",
+  "column_break_penalty",
+  "handover_date",
+  "dashboard_tab",
+  "dashboard_html",
+  "gantt_tab",
+  "gantt_html",
+  "resources_tab",
+  "resources_html",
+  "lookahead_tab",
+  "lookahead_html",
+  "finance_tab",
+  "finance_html",
+  "documents_tab",
+  "documents_html",
   "settings_tab",
   "section_break_calculation",
   "use_working_days",
@@ -88,6 +109,31 @@
    "fieldname": "duration",
    "fieldtype": "Int",
    "label": "ระยะเวลาสัญญา",
+   "read_only": 1
+  },
+  {
+   "depends_on": "eval:doc.extension_days",
+   "description": "วันสิ้นสุดเดิม + จำนวนวันที่อนุมัติของ Extension of Time ทุกฉบับ (วันปฏิทิน)",
+   "fieldname": "revised_finish_date",
+   "fieldtype": "Date",
+   "label": "วันที่สิ้นสุดสัญญา (ปรับปรุง)",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "depends_on": "eval:doc.extension_days",
+   "fieldname": "revised_duration",
+   "fieldtype": "Int",
+   "label": "ระยะเวลาสัญญา (ปรับปรุง)",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "depends_on": "eval:doc.extension_days",
+   "fieldname": "extension_days",
+   "fieldtype": "Int",
+   "label": "ขยายเวลา (วัน)",
+   "no_copy": 1,
    "read_only": 1
   },
   {
@@ -205,6 +251,80 @@
    "read_only": 1
   },
   {
+   "description": "ต้นทุนที่ประมาณไว้ทั้งโครงการ ใช้เป็น BAC ใน Earned Value (CPI/EAC) ว่างไว้ = ใช้มูลค่าสัญญาปรับปรุง",
+   "fieldname": "budget_cost",
+   "fieldtype": "Currency",
+   "label": "งบประมาณต้นทุน",
+   "options": "Company:company:default_currency",
+   "permlevel": 1
+  },
+  {
+   "depends_on": "eval:!doc.__islocal",
+   "fieldname": "dashboard_tab",
+   "fieldtype": "Tab Break",
+   "label": "ภาพรวม"
+  },
+  {
+   "fieldname": "dashboard_html",
+   "fieldtype": "HTML",
+   "label": "Dashboard"
+  },
+  {
+   "depends_on": "eval:!doc.__islocal",
+   "fieldname": "gantt_tab",
+   "fieldtype": "Tab Break",
+   "label": "Gantt"
+  },
+  {
+   "fieldname": "gantt_html",
+   "fieldtype": "HTML",
+   "label": "Gantt"
+  },
+  {
+   "depends_on": "eval:!doc.__islocal",
+   "fieldname": "resources_tab",
+   "fieldtype": "Tab Break",
+   "label": "ทรัพยากร"
+  },
+  {
+   "fieldname": "resources_html",
+   "fieldtype": "HTML",
+   "label": "Resources"
+  },
+  {
+   "depends_on": "eval:!doc.__islocal",
+   "fieldname": "lookahead_tab",
+   "fieldtype": "Tab Break",
+   "label": "Look-ahead"
+  },
+  {
+   "fieldname": "lookahead_html",
+   "fieldtype": "HTML",
+   "label": "Look-ahead"
+  },
+  {
+   "depends_on": "eval:!doc.__islocal",
+   "fieldname": "finance_tab",
+   "fieldtype": "Tab Break",
+   "label": "การเงิน"
+  },
+  {
+   "fieldname": "finance_html",
+   "fieldtype": "HTML",
+   "label": "Finance"
+  },
+  {
+   "depends_on": "eval:!doc.__islocal",
+   "fieldname": "documents_tab",
+   "fieldtype": "Tab Break",
+   "label": "เอกสารโครงการ"
+  },
+  {
+   "fieldname": "documents_html",
+   "fieldtype": "HTML",
+   "label": "Documents"
+  },
+  {
    "fieldname": "settings_tab",
    "fieldtype": "Tab Break",
    "label": "Settings"
@@ -264,6 +384,36 @@
    "read_only": 1
   },
   {
+   "collapsible": 1,
+   "fieldname": "section_break_penalty",
+   "fieldtype": "Section Break",
+   "label": "ค่าปรับและการส่งมอบ"
+  },
+  {
+   "description": "ค่าปรับต่อวันที่ส่งมอบช้ากว่าวันสิ้นสุดสัญญาปรับปรุง (รวม EOT) เช่น งานราชการ 0.01-0.10% ของค่าจ้าง",
+   "fieldname": "penalty_per_day",
+   "fieldtype": "Currency",
+   "label": "ค่าปรับรายวัน",
+   "options": "Company:company:default_currency"
+  },
+  {
+   "default": "10",
+   "description": "เตือนเมื่อค่าปรับเกิน % ของมูลค่าสัญญาปรับปรุงนี้ (สัญญาภาครัฐ: เกิน 10% ต้องพิจารณาบอกเลิกสัญญา) 0 = ไม่เตือน",
+   "fieldname": "penalty_limit_percent",
+   "fieldtype": "Percent",
+   "label": "เพดานค่าปรับ (%)"
+  },
+  {
+   "fieldname": "column_break_penalty",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "ใส่เมื่อส่งมอบงานแล้ว ค่าปรับคิดถึงวันนี้แทนวันที่คาดการณ์",
+   "fieldname": "handover_date",
+   "fieldtype": "Date",
+   "label": "วันที่ส่งมอบงานจริง"
+  },
+  {
    "description": "% ตามสัญญาเดิม: ถ่วงด้วยมูลค่าตามสัญญาของงานเดิม ไม่รวมงานเพิ่ม (ไว้อ้างอิง)",
    "fieldname": "contract_progress",
    "fieldtype": "Percent",
@@ -273,17 +423,8 @@
   }
  ],
  "grid_page_length": 50,
- "links": [
-  {
-   "link_doctype": "Variation Order",
-   "link_fieldname": "construction_management"
-  },
-  {
-   "link_doctype": "Construction Baseline",
-   "link_fieldname": "construction_management"
-  }
- ],
- "modified": "2026-10-27 17:01:49.000000",
+ "links": [],
+ "modified": "2026-11-04 10:00:00.000000",
  "modified_by": "Administrator",
  "module": "ConsBiz",
  "name": "Construction Management",
@@ -323,6 +464,18 @@
    "report": 1,
    "role": "Projects User",
    "share": 1,
+   "write": 1
+  },
+  {
+   "permlevel": 1,
+   "read": 1,
+   "role": "System Manager",
+   "write": 1
+  },
+  {
+   "permlevel": 1,
+   "read": 1,
+   "role": "Projects Manager",
    "write": 1
   }
  ],
