@@ -181,8 +181,13 @@ def contract_text(doc) -> str:
 	if not doc.start_date or not doc.finish_date:
 		return ""
 	fmt = "%d/%m/%Y"
-	return _("{0} - {1} ({2} วัน)").format(
+	text = _("{0} - {1} ({2} วัน)").format(
 		getdate(doc.start_date).strftime(fmt), getdate(doc.finish_date).strftime(fmt), doc.duration
+	)
+	if not doc.extension_days:
+		return text
+	return text + " " + _("ขยายเวลา {0} วัน ถึง {1}").format(
+		doc.extension_days, getdate(doc.revised_finish_date).strftime(fmt)
 	)
 
 

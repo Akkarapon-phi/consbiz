@@ -1,0 +1,256 @@
+{
+ "actions": [],
+ "autoname": "naming_series:",
+ "creation": "2026-10-31 16:00:00.000000",
+ "description": "ขอตรวจงานจากผู้ควบคุมงาน/ที่ปรึกษา Submit = ส่งขอตรวจ ผลตรวจแก้ได้หลัง Submit ตรวจไม่ผ่านสร้างฉบับขอตรวจซ้ำได้",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "section_break_info",
+  "naming_series",
+  "construction_management",
+  "project",
+  "company",
+  "title",
+  "wbs",
+  "item_name",
+  "location",
+  "column_break_main",
+  "request_date",
+  "inspection_date",
+  "inspector",
+  "reinspection_of",
+  "amended_from",
+  "section_break_result",
+  "result",
+  "inspected_on",
+  "column_break_result",
+  "comments",
+  "section_break_remarks",
+  "remarks",
+  "task"
+ ],
+ "fields": [
+  {
+   "fieldname": "section_break_info",
+   "fieldtype": "Section Break"
+  },
+  {
+   "default": "IR-.YYYY.MM.####",
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "hidden": 1,
+   "label": "Series",
+   "options": "IR-.YYYY.MM.####",
+   "print_hide": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "construction_management",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Construction Management",
+   "options": "Construction Management",
+   "reqd": 1
+  },
+  {
+   "fetch_from": "construction_management.project",
+   "fieldname": "project",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "label": "Project",
+   "options": "Project",
+   "read_only": 1
+  },
+  {
+   "fetch_from": "construction_management.company",
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "label": "Company",
+   "options": "Company",
+   "read_only": 1
+  },
+  {
+   "description": "เช่น ตรวจเหล็กเสริมก่อนเทคอนกรีตฐานราก F1",
+   "fieldname": "title",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Subject",
+   "reqd": 1
+  },
+  {
+   "fieldname": "wbs",
+   "fieldtype": "Autocomplete",
+   "in_standard_filter": 1,
+   "label": "WBS",
+   "reqd": 1
+  },
+  {
+   "fieldname": "item_name",
+   "fieldtype": "Data",
+   "label": "Task",
+   "read_only": 1
+  },
+  {
+   "fieldname": "location",
+   "fieldtype": "Data",
+   "label": "Location"
+  },
+  {
+   "fieldname": "column_break_main",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "Today",
+   "fieldname": "request_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Request Date",
+   "reqd": 1
+  },
+  {
+   "description": "วันที่นัดตรวจ",
+   "fieldname": "inspection_date",
+   "fieldtype": "Date",
+   "label": "Inspection Date"
+  },
+  {
+   "fieldname": "inspector",
+   "fieldtype": "Data",
+   "label": "Inspector"
+  },
+  {
+   "description": "ฉบับที่ตรวจไม่ผ่านซึ่งฉบับนี้ขอตรวจซ้ำ",
+   "fieldname": "reinspection_of",
+   "fieldtype": "Link",
+   "label": "Re-inspection Of",
+   "options": "Inspection Request",
+   "read_only": 1
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "Inspection Request",
+   "print_hide": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_result",
+   "fieldtype": "Section Break",
+   "label": "Result"
+  },
+  {
+   "allow_on_submit": 1,
+   "default": "Pending",
+   "fieldname": "result",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Result",
+   "no_copy": 1,
+   "options": "Pending\nPassed\nPassed with Comments\nFailed"
+  },
+  {
+   "allow_on_submit": 1,
+   "depends_on": "eval:doc.result!='Pending'",
+   "description": "ว่างไว้ = วันที่บันทึกผล",
+   "fieldname": "inspected_on",
+   "fieldtype": "Date",
+   "label": "Inspected On",
+   "no_copy": 1
+  },
+  {
+   "fieldname": "column_break_result",
+   "fieldtype": "Column Break"
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "comments",
+   "fieldtype": "Small Text",
+   "label": "Inspector Comments",
+   "no_copy": 1
+  },
+  {
+   "fieldname": "section_break_remarks",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "remarks",
+   "fieldtype": "Small Text",
+   "label": "Remarks"
+  },
+  {
+   "fieldname": "task",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "label": "Task Row",
+   "read_only": 1
+  }
+ ],
+ "grid_page_length": 50,
+ "is_submittable": 1,
+ "links": [],
+ "modified": "2026-10-31 16:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "ConsBiz",
+ "name": "Inspection Request",
+ "naming_rule": "By \"Naming Series\" field",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "read": 1,
+   "report": 1,
+   "print": 1,
+   "export": 1,
+   "email": 1,
+   "share": 1,
+   "create": 1,
+   "write": 1,
+   "delete": 1,
+   "submit": 1,
+   "cancel": 1,
+   "amend": 1,
+   "role": "System Manager"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "print": 1,
+   "export": 1,
+   "email": 1,
+   "share": 1,
+   "create": 1,
+   "write": 1,
+   "delete": 1,
+   "submit": 1,
+   "cancel": 1,
+   "amend": 1,
+   "role": "Projects Manager"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "print": 1,
+   "export": 1,
+   "email": 1,
+   "share": 1,
+   "create": 1,
+   "write": 1,
+   "delete": 1,
+   "submit": 1,
+   "cancel": 1,
+   "amend": 1,
+   "role": "Projects User"
+  }
+ ],
+ "row_format": "Dynamic",
+ "search_fields": "title,wbs",
+ "sort_field": "request_date",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "title",
+ "track_changes": 1
+}

@@ -21,6 +21,7 @@ frappe.ui.form.on("Daily Report", {
 	refresh(frm) {
 		load_tasks(frm);
 		setup_buttons(frm);
+		consbiz.show_same_day(frm);
 	},
 
 	construction_management(frm) {
@@ -29,10 +30,12 @@ frappe.ui.form.on("Daily Report", {
 		load_tasks(frm);
 		setup_buttons(frm);
 		consbiz.fill_default_resources(frm);
+		consbiz.show_same_day(frm);
 	},
 
 	date(frm) {
 		load_tasks(frm);
+		consbiz.show_same_day(frm);
 	},
 
 	hide_completed(frm) {

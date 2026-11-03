@@ -6,10 +6,20 @@
 // งานก่อนหน้า (FS/SS/FF/SF + lag): งานที่ตามมาเลื่อนตามทันทีที่แก้ (ASAP, apply_dependencies ใน schedule.js)
 // ลาก/แก้วันที่ของงานที่มีงานก่อนหน้า = ปรับ lag ให้งานอยู่ตรงที่วาง (hold_start)
 // บันทึกอัตโนมัติหลังหยุดแก้ AUTO_SAVE_DELAY และโหลดใหม่เองเมื่อมีการแก้จากที่อื่น (ตรวจทุก REFRESH_INTERVAL)
+// ใช้ได้ 2 แบบ: หน้าเต็มจอ (page/construction_gantt) = แก้ไขแผนได้ มี Toolbar
+// หรือฝังใน Tab "Gantt" ของฟอร์ม (embedded) = ดูอย่างเดียว มีแถบบาง ViewBar + ปุ่มไปแก้ในหน้าเต็มจอ
+// คลิก WBS/ชื่องาน = เปิดแผงด้านขวา (TaskPanel) กำหนดคน/เครื่องจักร (Construction Resource Plan) และวัสดุ (Construction Material Plan)
+// ของงานนั้น แก้แล้ว Undo ได้และบันทึกพร้อมแผนงาน (save_tasks → resources.save_plans)
+// เส้นประหน้าแถบงาน = ช่วงเตรียมล่วงหน้า (วันต้องสั่งวัสดุ/จองคน-เครื่องจักรรายการแรก ถึงวันเริ่มงาน)
+// มุมมอง "ทรัพยากร" (settings.view = resources, ResourceGantt) แถวเป็นคน/เครื่องจักร/วัสดุ ดูว่าใช้อะไรเมื่อไหร่ (ดูอย่างเดียว)
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
+import ViewBar from "./components/ViewBar.vue";
+import ViewPanel from "./components/ViewPanel.vue";
 import Toolbar from "./components/Toolbar.vue";
 import TaskGrid from "./components/TaskGrid.vue";
 import Timeline from "./components/Timeline.vue";
+import TaskPanel from "./components/TaskPanel.vue";
+import ResourceGantt from "./components/ResourceGantt.vue";
 import { COLUMNS, DEFAULT_COLUMNS } from "./columns";
 import { open_import_dialog } from "./import_dialog";
 import { open_plan_dialog } from "./plan_dialog";
@@ -17,6 +27,7 @@ import { open_print_dialog } from "./print";
 import {
 	actual_curve,
 	apply_dependencies,
+	total_float,
 	count_days,
 	curve_of,
 	dependency_order,
@@ -30,13 +41,24 @@ import {
 	parse_distribution,
 	parse_predecessors,
 	plan_percent,
+	allocate_materials,
+	prep_by_task,
+	prep_items,
 	roll_up,
 	to_day,
 	today,
 	value_at,
 } from "./schedule";
 
-const props = defineProps({ page: Object, schedule: String });
+const props = defineProps({
+	page: Object,
+	schedule: String,
+	embedded: Boolean,
+	// ฝังในฟอร์ม: Tab Gantt เปิดอยู่และมองเห็นไหม (Ctrl+Z ทำงานเฉพาะตอนนั้น)
+	isActive: { type: Function, default: () => true },
+	// เอกสารแผนงานเปลี่ยนในฐานข้อมูล (บันทึกจาก Gantt หรือโหลดของใหม่) ให้ฟอร์มโหลดใหม่
+	onSaved: Function,
+});
 
 const API = "consbiz.consbiz.doctype.construction_management.construction_management";
 const EXCEL_API = "consbiz.consbiz.doctype.construction_management.schedule_excel";
@@ -48,12 +70,13 @@ const ROW_HEIGHT = 32;
 const HEADER_HEIGHT = 48;
 const SUMMARY_ROW_HEIGHT = 22;
 
+// label: ชื่อเต็ม (เมนู/tooltip), short: ชื่อบนปุ่มของแถบเครื่องมือ
 // px_per_day: ความกว้างต่อวันที่ซูม 100%, top/bottom: หน่วยของหัว timeline 2 แถว, pad: วันเผื่อหน้า-หลัง
 const SCALES = {
-	day: { label: __("วัน"), px_per_day: 32, top: "month", bottom: "day", pad: 3 },
-	week: { label: __("สัปดาห์"), px_per_day: 12, top: "month", bottom: "week", pad: 7 },
-	month: { label: __("เดือน"), px_per_day: 4, top: "year", bottom: "month", pad: 15 },
-	year: { label: __("ปี"), px_per_day: 0.8, top: "year", bottom: "quarter", pad: 60 },
+	day: { label: __("รายวัน"), short: __("วัน"), icon: "calendar-1", px_per_day: 32, top: "month", bottom: "day", pad: 3 },
+	week: { label: __("รายสัปดาห์"), short: __("สัปดาห์"), icon: "calendar-range", px_per_day: 12, top: "month", bottom: "week", pad: 7 },
+	month: { label: __("รายเดือน"), short: __("เดือน"), icon: "calendar-days", px_per_day: 4, top: "year", bottom: "month", pad: 15 },
+	year: { label: __("รายปี"), short: __("ปี"), icon: "calendar-fold", px_per_day: 0.8, top: "year", bottom: "quarter", pad: 60 },
 };
 
 // print_color ใช้ในงานพิมพ์ (ไม่ตามธีมมืด) ค่าเดียวกับสีของ Frappe ที่ตัวแปรอ้างถึง
@@ -91,11 +114,20 @@ const SUMMARY_ROWS = [
 	const { color, print_color } = CURVES.find((c) => c.key === row.curve);
 	return { ...row, color, print_color };
 });
-const DEFAULT_SUMMARY_KEYS = SUMMARY_ROWS.map((row) => row.key);
+// ตารางสรุปใต้ Gantt เริ่มต้นแค่ % สะสม (Cash Flow ดูเต็มที่ Tab การเงิน) แถวอื่นเปิดได้จากเมนู S-Curve
+const DEFAULT_SUMMARY_KEYS = ["plan", "actual"];
+// เพิ่มเลขนี้เมื่อเปลี่ยนค่าเริ่มต้นของแถวสรุป: ผู้ใช้ที่บันทึกค่าเก่าไว้จะถูกตั้งเป็นค่าเริ่มต้นใหม่ 1 ครั้ง
+const SUMMARY_VERSION = 2;
 
 const data = ref(null);
 const tasks = ref([]);
 const entries = ref([]);
+// แถวของแผนคน/เครื่องจักร และแผนวัสดุ (แถวใหม่ที่ยังไม่บันทึกไม่มี name ใช้ key แทน)
+const resources = ref([]);
+const materials = ref([]);
+// งานที่เปิดแผงด้านขวาอยู่ (ชื่อแถวงาน)
+const selected = ref(null);
+let new_row_id = 0;
 const saving = ref(false);
 // บันทึกไม่สำเร็จ (เช่น มีคนแก้แผนจากที่อื่น) หยุดบันทึกอัตโนมัติจนกว่าจะกดบันทึกเองหรือโหลดใหม่
 const save_error = ref(false);
@@ -105,6 +137,8 @@ const remote_changed = ref(false);
 const saved_state = ref(null);
 const history = reactive({ past: [], future: [] });
 const hovered = ref(null);
+// Tab ที่เลือกในแผงมุมมอง (ViewPanel ใน Popover ของ Toolbar) จำไว้ระหว่างเปิด-ปิดแผง
+const view_tab = ref("general");
 const collapsed = reactive(new Set());
 const status_date = ref(frappe.datetime.get_today());
 const body_height = ref(0);
@@ -117,11 +151,17 @@ const settings = reactive({
 	show_baseline_bars: true,
 	show_summary: true,
 	summary_keys: [...DEFAULT_SUMMARY_KEYS],
+	summary_version: SUMMARY_VERSION,
 	show_split: true,
 	show_links: true,
 	show_labels: false,
 	show_progress: false,
 	show_status: true,
+	show_critical: false,
+	show_prep: true,
+	// tasks = แผนงาน (ตาราง WBS + Timeline), resources = Gantt ทรัพยากร
+	view: "tasks",
+	dim_curves: true,
 	auto_save: true,
 	grid_width: 560,
 	print: {},
@@ -138,7 +178,9 @@ const holidays = computed(() => new Set((data.value?.holidays || []).map(to_day)
 const counting_holidays = computed(() =>
 	data.value?.use_working_days ? holidays.value : new Set()
 );
-const can_write = computed(() => Boolean(data.value?.can_write));
+// has_write = มีสิทธิ์แก้แผน, can_write = แก้ได้ในหน้านี้ (Tab ในฟอร์มดูอย่างเดียว ไปแก้ที่หน้าเต็มจอ)
+const has_write = computed(() => Boolean(data.value?.can_write));
+const can_write = computed(() => has_write.value && !props.embedded);
 const task_by_name = computed(() => new Map(tasks.value.map((t) => [t.name, t])));
 const status_day = computed(() => to_day(status_date.value) ?? today());
 
@@ -168,7 +210,29 @@ const scale = computed(() => {
 });
 const ppd = computed(() => scale.value.px_per_day * settings.zoom);
 
-// วันแรก-วันสุดท้ายของงานทั้งหมด (รวม baseline)
+// ยอดวัสดุที่ขอ/สั่ง/รับแล้วของแต่ละแถว (ตัดยอดรวมของโครงการตามวันที่ต้องการ เปลี่ยนตามการลากงาน)
+const material_coverage = computed(() =>
+	allocate_materials(
+		tasks.value,
+		materials.value,
+		data.value?.material_plan?.buffer_days,
+		data.value?.material_plan?.supply
+	)
+);
+
+// สิ่งที่ต้องเตรียมของแต่ละงาน (เส้นเตรียมล่วงหน้าบน Timeline)
+const prep = computed(() =>
+	prep_items(
+		tasks.value,
+		resources.value,
+		materials.value,
+		data.value?.material_plan?.buffer_days,
+		today(),
+		material_coverage.value
+	)
+);
+
+// วันแรก-วันสุดท้ายของงานทั้งหมด (รวม baseline และวันต้องเตรียมล่วงหน้า)
 const extent = computed(() => {
 	const days = tasks.value
 		.flatMap((t) => [
@@ -177,7 +241,8 @@ const extent = computed(() => {
 			to_day(t.baseline_start_date),
 			to_day(t.baseline_end_date),
 		])
-		.filter((d) => d !== null);
+		.concat([...prep.value.values()].flat().map((item) => item.target))
+		.filter((d) => d !== null && d !== undefined);
 	const first = days.length ? Math.min(...days) : to_day(data.value?.start_date) ?? today();
 	const last = days.length ? Math.max(...days) : first + 30;
 	return { first, last };
@@ -190,13 +255,6 @@ const range = computed(() => {
 		start: floor_to(first - pad, top),
 		end: next_of(floor_to(last + pad, top), top),
 	};
-});
-
-const finish_date = computed(() => {
-	const ends = tasks.value
-		.filter((t) => !t.is_group && t.end_date)
-		.map((t) => to_day(t.end_date));
-	return ends.length ? from_day(Math.max(...ends)) : null;
 });
 
 // ---------- S-Curve และค่า % ----------
@@ -280,6 +338,9 @@ const readout = computed(() => ({
 
 // % แผน / % จริง / ปริมาณจริงสะสมของแต่ละงาน ณ วันที่เลือกดู (กลุ่มถ่วงน้ำหนักจากงานย่อย)
 // และข้อความงานก่อนหน้า (WBS) ของงานย่อย
+// Float ของงานย่อย (คิดจากแผนปัจจุบัน ไม่ขึ้นกับวันที่เลือกดู)
+const floats = computed(() => total_float(tasks.value, counting_holidays.value) || new Map());
+
 const metrics = computed(() => {
 	const day = status_day.value;
 	const sums = new Map();
@@ -291,10 +352,19 @@ const metrics = computed(() => {
 		sums.set(entry.task, sum);
 	}
 
+	const prep = prep_by_task(
+		tasks.value,
+		resources.value,
+		materials.value,
+		data.value?.material_plan?.buffer_days,
+		today(),
+		material_coverage.value
+	);
 	const map = new Map();
 	for (const task of tasks.value) {
 		if (task.is_group) continue;
 		const sum = sums.get(task.name) || { percent: 0, qty: 0 };
+		const task_prep = prep.get(task.name);
 		map.set(task.name, {
 			plan_pct: plan_percent(
 				task.start_date,
@@ -306,6 +376,10 @@ const metrics = computed(() => {
 			actual_pct: Math.min(Math.max(sum.percent, 0), 100),
 			actual_qty: sum.qty,
 			predecessors: format_predecessors(task.predecessors, task_by_name.value),
+			total_float: floats.value.get(task.name) ?? null,
+			critical: floats.value.get(task.name) <= 0,
+			prep_days: task_prep?.days ?? null,
+			prep_done: Boolean(task_prep?.done),
 		});
 	}
 	tasks.value.forEach((task, i) => {
@@ -320,6 +394,14 @@ const metrics = computed(() => {
 		let weight = 0;
 		let plan = 0;
 		let actual = 0;
+		// Float ของกลุ่ม = น้อยสุดของงานย่อย
+		const child_floats = children
+			.map((child) => map.get(child.name).total_float)
+			.filter((value) => value !== null);
+		// เตรียมล่วงหน้าของกลุ่ม = งานย่อยที่ต้องเตรียมเร็วที่สุด
+		const child_preps = children
+			.map((child) => map.get(child.name).prep_days)
+			.filter((value) => value !== null);
 		for (const child of children) {
 			const m = map.get(child.name);
 			weight += child[key] || 0;
@@ -330,6 +412,9 @@ const metrics = computed(() => {
 			plan_pct: weight ? plan / weight : 0,
 			actual_pct: weight ? actual / weight : 0,
 			actual_qty: null,
+			total_float: child_floats.length ? Math.min(...child_floats) : null,
+			prep_days: child_preps.length ? Math.min(...child_preps) : null,
+			prep_done: false,
 		});
 	});
 	return map;
@@ -356,14 +441,41 @@ function snapshot() {
 			.filter((e) => e.source === "Manual")
 			.map(({ task, date, percent, qty }) => ({ task, date, percent, qty }))
 			.sort((a, b) => (a.task + a.date).localeCompare(b.task + b.date)),
+		resources: resources.value.map(pick_resource),
+		materials: materials.value.map(pick_material),
 	});
 }
+
+const RESOURCE_KEYS = ["name", "key", "task", "resource_type", "resource", "qty_per_day", "lead_time_days", "remarks"];
+const MATERIAL_KEYS = [
+	"name",
+	"key",
+	"task",
+	"item_code",
+	"item_label",
+	"qty",
+	"uom",
+	"lead_time_days",
+	"material_request",
+	"request_docstatus",
+	"request_status",
+	"remarks",
+	// ตัวคูณเป็นหน่วยสต็อก และ Item เป็นของลูกค้าจัดหา (ข้อมูลประกอบ ไม่ส่งกลับ)
+	"factor",
+	"stock_uom",
+	"customer_provided",
+];
+const pick = (keys) => (row) => Object.fromEntries(keys.map((k) => [k, row[k] ?? null]));
+const pick_resource = pick(RESOURCE_KEYS);
+const pick_material = pick(MATERIAL_KEYS);
 
 const current_state = computed(snapshot);
 const dirty = computed(() => saved_state.value !== null && current_state.value !== saved_state.value);
 
 function restore(state) {
-	const { tasks: rows, entries: manual } = JSON.parse(state);
+	const { tasks: rows, entries: manual, resources: resource_rows, materials: material_rows } = JSON.parse(state);
+	resources.value = resource_rows;
+	materials.value = material_rows;
 	const by_name = new Map(tasks.value.map((t) => [t.name, t]));
 	for (const [name, start_date, end_date, duration, plan_distribution, predecessors] of rows) {
 		const task = by_name.get(name);
@@ -408,7 +520,7 @@ function redo() {
 // Ctrl+Z / Ctrl+Y / Ctrl+Shift+Z ทำงานเหมือนปุ่ม Undo/Redo ทั้งหน้า รวมถึงตอนพิมพ์ในช่องของตาราง
 // (ค่าที่พิมพ์ค้างในช่องถูกยกเลิกแล้วย้อนการแก้ไขล่าสุด) ยกเว้นช่องนอกหน้า Gantt เช่นช่องค้นหาด้านบน และใน dialog
 function on_keydown(event) {
-	if (!(event.ctrlKey || event.metaKey) || event.altKey) return;
+	if (!(event.ctrlKey || event.metaKey) || event.altKey || !props.isActive()) return;
 	const key = event.key.toLowerCase();
 	const is_undo = key === "z" && !event.shiftKey;
 	const is_redo = key === "y" || (key === "z" && event.shiftKey);
@@ -439,6 +551,32 @@ function progress_changes(saved) {
 	return changes;
 }
 
+// แผนคน/เครื่องจักร และแผนวัสดุที่เปลี่ยนจากที่บันทึกไว้: ส่งรายการทั้งชุดของแผนนั้น (ไม่เปลี่ยน = ไม่ส่ง)
+function plan_changes(saved) {
+	const before = JSON.parse(saved);
+	const now = JSON.parse(current_state.value);
+	const wbs = (task) => task_by_name.value.get(task)?.wbs;
+	const changes = {};
+	if (JSON.stringify(before.resources) !== JSON.stringify(now.resources)) {
+		changes.resources = {
+			modified: data.value.resource_plan?.modified,
+			items: now.resources.map(({ key, ...row }) => ({ ...row, wbs: wbs(row.task) })),
+		};
+	}
+	if (JSON.stringify(before.materials) !== JSON.stringify(now.materials)) {
+		changes.materials = {
+			modified: data.value.material_plan?.modified,
+			items: now.materials.map(
+				({ key, item_label, request_docstatus, request_status, factor, stock_uom, customer_provided, ...row }) => ({
+					...row,
+					wbs: wbs(row.task),
+				})
+			),
+		};
+	}
+	return changes;
+}
+
 // ---------- โหลดและบันทึก ----------
 
 // keep_history: ข้อมูลจากการบันทึกของหน้านี้เอง (Undo ต่อได้) ไม่งั้นเป็นข้อมูลใหม่จากฐานข้อมูล ล้างประวัติ
@@ -450,6 +588,9 @@ function set_data(message, { keep_history = false } = {}) {
 		predecessors: t.predecessors ? JSON.stringify(parse_predecessors(t.predecessors)) : null,
 	}));
 	entries.value = message.progress_entries.map((e) => ({ ...e }));
+	resources.value = (message.resource_plan?.items || []).map(pick_resource);
+	materials.value = (message.material_plan?.items || []).map(pick_material);
+	if (selected.value && !tasks.value.some((t) => t.name === selected.value && !t.is_group)) selected.value = null;
 	// เปิดดูชุดเดิมต่อถ้ายังอยู่ ไม่งั้นดูชุดที่ใช้เทียบ
 	show_baseline(
 		message.baselines.some((b) => b.name === viewed_baseline.value)
@@ -491,6 +632,7 @@ async function save({ auto = false } = {}) {
 						predecessors,
 					})),
 				progress: progress_changes(saved_state.value),
+				...plan_changes(saved_state.value),
 			},
 			freeze: !auto,
 		});
@@ -499,6 +641,11 @@ async function save({ auto = false } = {}) {
 		} else {
 			// แก้ต่อระหว่างรอบันทึก: เก็บสิ่งที่แก้ใหม่ไว้ บันทึกรอบถัดไป
 			Object.assign(data.value, { modified: message.modified, version: message.version });
+			for (const plan of ["resource_plan", "material_plan"]) {
+				if (data.value[plan] && message[plan]) {
+					Object.assign(data.value[plan], { modified: message[plan].modified, exists: message[plan].exists });
+				}
+			}
 			saved_state.value = state;
 		}
 		save_error.value = false;
@@ -651,30 +798,50 @@ function setup_page() {
 	page.clear_actions();
 	page.clear_menu();
 	page.clear_icons();
-	if (can_write.value) {
+	// บันทึกอัตโนมัติไม่ต้องมีปุ่มบันทึก (สถานะบอกแทน) ยกเว้นบันทึกไม่สำเร็จหรือมีการแก้จากที่อื่น
+	if (can_write.value && (!settings.auto_save || save_error.value || remote_changed.value)) {
 		page.set_primary_action(__("บันทึก"), save, "save");
 	}
-	page.add_action_icon("refresh-cw", reload, "", __("โหลดใหม่"));
 	page.add_action_icon("printer", print, "", __("พิมพ์"));
-	page.add_menu_item(__("เปิดเอกสารแผนงาน"), () =>
-		frappe.set_route("Form", DOCTYPE, data.value.name)
-	);
-	page.add_menu_item(__("เปิด BOQ"), () => frappe.set_route("Form", "BOQ", data.value.boq));
-	page.add_menu_item(__("สร้าง Daily Report"), () =>
-		frappe.new_doc("Daily Report", {
-			construction_management: data.value.name,
-			date: status_date.value,
-		})
-	);
-	page.add_menu_item(__("ส่งออก Excel"), export_excel);
-	if (can_write.value) page.add_menu_item(__("นำเข้าจาก Excel"), import_excel);
-	page.add_menu_item(__("รายการความคืบหน้า"), () =>
-		frappe.set_route("List", "Construction Progress Entry", {
-			construction_management: data.value.name,
-		})
-	);
-	page.add_menu_item(__("โหลดใหม่"), reload);
+	// หน้าเต็มจอ = ย่อกลับไปที่ Tab Gantt ของฟอร์ม (ฝังในฟอร์มไปหน้าเต็มจอด้วยปุ่มใน ViewBar)
+	if (!props.embedded) {
+		page.add_action_icon("minimize-2", () => frappe.set_route("Form", DOCTYPE, data.value.name), "", __("ย่อกลับไปที่ฟอร์มแผนงาน"));
+	}
+	commands.value.forEach((command) => page.add_menu_item(command.label, command.action));
 	update_indicator();
+}
+watch(
+	() => [settings.auto_save, save_error.value, remote_changed.value],
+	() => data.value && setup_page()
+);
+
+// คำสั่งที่ใช้ไม่บ่อย (เมนูของหน้าเต็มจอ)
+const commands = computed(() =>
+	[
+		{ label: __("เปิด BOQ"), icon: "book-open", action: () => frappe.set_route("Form", "BOQ", data.value.boq) },
+		{
+			label: __("สร้าง Daily Report ณ วันที่เลือกดู"),
+			icon: "file-plus",
+			action: () =>
+				frappe.new_doc("Daily Report", {
+					construction_management: data.value.name,
+					date: status_date.value,
+				}),
+		},
+		{ label: __("ส่งออก Excel"), icon: "file-spreadsheet", action: export_excel },
+		can_write.value && { label: __("นำเข้าจาก Excel"), icon: "sheet", action: import_excel },
+		{
+			label: __("รายการความคืบหน้า"),
+			icon: "list",
+			action: () =>
+				frappe.set_route("List", "Construction Progress Entry", { construction_management: data.value.name }),
+		},
+		{ label: __("โหลดใหม่"), icon: "refresh-cw", action: reload },
+	].filter(Boolean)
+);
+
+function open_full() {
+	frappe.set_route("construction-gantt", data.value.name);
 }
 
 function update_indicator() {
@@ -682,12 +849,14 @@ function update_indicator() {
 	else if (save_error.value) props.page.set_indicator(__("บันทึกไม่สำเร็จ"), "red");
 	else if (remote_changed.value)
 		props.page.set_indicator(__("มีการแก้จากที่อื่น บันทึกหรือโหลดใหม่"), "red");
-	else if (dirty.value) props.page.set_indicator(__("ยังไม่บันทึก"), "orange");
+	else if (dirty.value)
+		props.page.set_indicator(settings.auto_save ? __("รอบันทึก...") : __("ยังไม่บันทึก"), "orange");
 	else if (viewed_baseline_doc.value && viewed_baseline_doc.value !== active_baseline_doc.value)
 		props.page.set_indicator(
 			__("กำลังดู Baseline: {0}", [frappe.utils.escape_html(viewed_baseline_doc.value.title)]),
 			"blue"
 		);
+	else if (can_write.value) props.page.set_indicator(__("บันทึกแล้ว"), "green");
 	else if (active_baseline_doc.value)
 		props.page.set_indicator(__("Baseline: {0}", [frappe.utils.escape_html(active_baseline_doc.value.title)]), "gray");
 	else props.page.clear_indicator();
@@ -1029,6 +1198,81 @@ function update_actual(task, cumulative) {
 	}
 }
 
+// ---------- คน/เครื่องจักร และวัสดุของงาน (แผงด้านขวา TaskPanel) ----------
+// แก้ได้เมื่อแก้แผนงานได้ในหน้านี้ (หน้าเต็มจอ) และมีสิทธิ์แก้แผนนั้น (ยังไม่มีแผน = สิทธิ์สร้าง)
+
+const selected_task = computed(() => (selected.value && task_by_name.value.get(selected.value)) || null);
+const can_edit_resources = computed(() => can_write.value && Boolean(data.value?.resource_plan?.can_write));
+const can_edit_materials = computed(() => can_write.value && Boolean(data.value?.material_plan?.can_write));
+const task_resources = computed(() => resources.value.filter((row) => row.task === selected.value));
+const task_materials = computed(() => materials.value.filter((row) => row.task === selected.value));
+
+// คลิกช่องในตาราง: WBS/ชื่องานเปิดแผง ถ้าแผงเปิดอยู่แล้วคลิกงานอื่นช่องไหนก็ได้ = สลับไปงานนั้น
+function select_task(task, key) {
+	if (task.is_group) return;
+	if (selected.value || key === "wbs" || key === "item_name") selected.value = task.name;
+}
+
+function add_resource(values) {
+	const task = selected.value;
+	const duplicate = resources.value.some(
+		(row) => row.task === task && row.resource_type === values.resource_type && row.resource === values.resource
+	);
+	if (duplicate) {
+		frappe.show_alert({ message: __("{0} มีในงานนี้แล้ว", [values.resource]), indicator: "red" });
+		return;
+	}
+	record(() => resources.value.push(pick_resource({ ...values, task, key: `new-${++new_row_id}` })));
+}
+
+function add_material(values) {
+	record(() => materials.value.push(pick_material({ ...values, task: selected.value, key: `new-${++new_row_id}` })));
+}
+
+function update_row(row, field, value) {
+	record(() => (row[field] = field === "lead_time_days" ? cint(value) : flt(value)));
+}
+
+function remove_row(list, row) {
+	record(() => list.value.splice(list.value.indexOf(row), 1));
+}
+
+// คลิกงานในมุมมองทรัพยากร: กลับมุมมองงาน ขยายกลุ่มที่ซ่อนงานนั้นไว้ เปิดแผงของงาน แล้วเลื่อนให้เห็น
+function open_task(name) {
+	const index = tasks.value.findIndex((t) => t.name === name);
+	if (index < 0) return;
+	const task = tasks.value[index];
+	let indent = task.indent || 0;
+	for (let i = index - 1; i >= 0 && indent > 0; i--) {
+		if ((tasks.value[i].indent || 0) < indent) {
+			collapsed.delete(tasks.value[i].name);
+			indent = tasks.value[i].indent || 0;
+		}
+	}
+	settings.view = "tasks";
+	selected.value = name;
+	nextTick(() => {
+		reveal_row(visible_tasks.value.indexOf(task));
+		const start = to_day(task.start_date);
+		if (start !== null) timeline.value?.scroll_to_day(start - 7);
+	});
+}
+
+// สลับมุมมองแล้วคงตำแหน่งเลื่อนแนวนอน (แกนเวลาเดียวกัน)
+watch(
+	() => settings.view,
+	() => {
+		const left = timeline.value?.body?.scrollLeft || 0;
+		nextTick(() => {
+			if (timeline.value?.body) timeline.value.body.scrollLeft = left;
+		});
+	}
+);
+
+function open_plan(doctype) {
+	frappe.set_route("Form", doctype, data.value.name);
+}
+
 // ---------- ย่อ/ขยาย ----------
 
 function toggle(task) {
@@ -1049,41 +1293,6 @@ const wbs_depth = computed(() => Math.max(0, ...tasks.value.map((t) => t.indent 
 
 // ---------- คอลัมน์ ซูม และการตั้งค่า (จำต่อผู้ใช้ใน User Settings ของ Construction Management) ----------
 
-function choose_columns() {
-	const dialog = new frappe.ui.Dialog({
-		title: __("เลือกคอลัมน์"),
-		fields: [
-			{
-				fieldname: "columns",
-				fieldtype: "MultiCheck",
-				columns: 2,
-				options: COLUMNS.filter((c) => c.key !== "item_name").map((c) => ({
-					label: c.label,
-					value: c.key,
-					checked: settings.columns.includes(c.key),
-				})),
-			},
-			{
-				fieldtype: "HTML",
-				options: `<p class="text-muted small">${__(
-					"สลับตำแหน่งคอลัมน์ได้โดยลากหัวคอลัมน์ในตาราง"
-				)}</p>`,
-			},
-		],
-		primary_action_label: __("ตกลง"),
-		primary_action({ columns: selected }) {
-			// คอลัมน์เดิมคงลำดับไว้ ที่เพิ่มใหม่ต่อท้าย
-			const kept = settings.columns.filter(
-				(key) => key === "item_name" || selected.includes(key)
-			);
-			const added = selected.filter((key) => !kept.includes(key));
-			settings.columns = [...kept, ...added];
-			dialog.hide();
-		},
-	});
-	dialog.show();
-}
-
 function resize_column(key, width) {
 	settings.widths[key] = Math.max(40, Math.round(width));
 }
@@ -1095,8 +1304,20 @@ function move_column(from, to) {
 		0,
 		from
 	);
-	settings.columns = keys;
+	settings.columns = pin_wbs(keys);
 }
+
+// คอลัมน์ WBS อยู่ซ้ายสุดเสมอ (ถ้าเลือกแสดง)
+function pin_wbs(keys) {
+	return keys.includes("wbs") ? ["wbs", ...keys.filter((key) => key !== "wbs")] : keys;
+}
+watch(
+	() => settings.columns,
+	(keys) => {
+		const pinned = pin_wbs(keys);
+		if (pinned.some((key, i) => key !== keys[i])) settings.columns = pinned;
+	}
+);
 
 function zoom(action) {
 	if (action === "in") settings.zoom = Math.min(settings.zoom * 1.25, 8);
@@ -1119,13 +1340,18 @@ function print() {
 	open_print_dialog(print_model, settings.print, (options) => (settings.print = options));
 }
 
-// ระยะเวลาสัญญา เช่น "01-11-2026 - 30-04-2027 (181 วัน)"
+// ระยะเวลาสัญญา เช่น "01-11-2026 - 30-04-2027 (181 วัน)" มี EOT ต่อท้ายด้วยวันสิ้นสุดใหม่
 function contract_text() {
-	const { start_date, finish_date, duration } = data.value;
+	const { start_date, finish_date, duration, extension_days, revised_finish_date } = data.value;
 	if (!start_date || !finish_date) return "";
-	return `${frappe.datetime.str_to_user(start_date)} - ${frappe.datetime.str_to_user(
+	const text = `${frappe.datetime.str_to_user(start_date)} - ${frappe.datetime.str_to_user(
 		finish_date
 	)} (${duration} ${__("วัน")})`;
+	if (!extension_days) return text;
+	return `${text} ${__("ขยายเวลา {0} วัน ถึง {1}", [
+		extension_days,
+		frappe.datetime.str_to_user(revised_finish_date),
+	])}`;
 }
 
 function print_model() {
@@ -1138,7 +1364,7 @@ function print_model() {
 		supervisor: data.value.supervisor,
 		contract_text: contract_text(),
 		status_text:
-			readout.value.baseline !== null
+			(readout.value.baseline !== null
 				? __("ณ วันที่ {0}: {1} {2}% · แผน {3}% · จริง {4}%", [
 						frappe.datetime.str_to_user(status_date.value),
 						viewed_baseline_doc.value
@@ -1152,7 +1378,7 @@ function print_model() {
 						frappe.datetime.str_to_user(status_date.value),
 						percent(readout.value.plan),
 						percent(readout.value.actual),
-				  ]),
+				  ])),
 		columns: columns.value,
 		rows: visible_tasks.value,
 		metrics: metrics.value,
@@ -1197,6 +1423,17 @@ function go_today() {
 	timeline.value?.scroll_to_day(today());
 }
 
+// คีย์บอร์ดในตารางเลื่อนไปแถวที่มองไม่เห็น: เลื่อน timeline (ซึ่งคุม scrollTop ของทั้งสองฝั่ง) ให้เห็นแถวนั้น
+function reveal_row(index) {
+	const body = timeline.value?.body;
+	if (!body) return;
+	const summary = summary_rows.value.length ? summary_rows.value.length * SUMMARY_ROW_HEIGHT + 1 : 0;
+	const view = body.clientHeight - HEADER_HEIGHT - summary;
+	const top = index * ROW_HEIGHT;
+	if (top < body.scrollTop) body.scrollTop = top;
+	else if (top + ROW_HEIGHT > body.scrollTop + view) body.scrollTop = top + ROW_HEIGHT - view;
+}
+
 function on_timeline_scroll(scroll_top) {
 	if (grid.value) grid.value.body.scrollTop = scroll_top;
 }
@@ -1205,21 +1442,40 @@ function on_grid_wheel(delta) {
 	timeline.value.body.scrollTop += delta;
 }
 
+// ลากเส้นแบ่งได้ทั้งเมาส์และนิ้ว (pointer events)
 function start_split(event) {
 	const start_x = event.clientX;
-	const start_width = settings.grid_width;
+	const start_width = grid_width.value;
 	const move = (e) => {
-		const max = panes.value.clientWidth - 120;
-		settings.grid_width = Math.min(Math.max(start_width + e.clientX - start_x, 180), max);
+		settings.grid_width = Math.min(Math.max(start_width + e.clientX - start_x, 180), max_grid_width());
 	};
 	const up = () => {
-		document.removeEventListener("mousemove", move);
-		document.removeEventListener("mouseup", up);
+		document.removeEventListener("pointermove", move);
+		document.removeEventListener("pointerup", up);
+		document.removeEventListener("pointercancel", up);
 		document.body.classList.remove("cs-resizing");
 	};
-	document.addEventListener("mousemove", move);
-	document.addEventListener("mouseup", up);
+	document.addEventListener("pointermove", move);
+	document.addEventListener("pointerup", up);
+	document.addEventListener("pointercancel", up);
 	document.body.classList.add("cs-resizing");
+}
+
+// ความกว้างของพื้นที่ Gantt (ResizeObserver) ใช้จำกัดความกว้างตาราง: จอแคบ (< 768px) เหลือ timeline อย่างน้อย 45%
+const panes_width = ref(0);
+let panes_observer = null;
+function max_grid_width() {
+	const width = panes_width.value || panes.value?.clientWidth || 0;
+	return Math.max(width - (width < 768 ? width * 0.45 : 120), 120);
+}
+const grid_width = computed(() => Math.min(settings.grid_width, max_grid_width()));
+
+// ฝั่งตารางกว้างพอดีคอลัมน์ที่เลือก (ไม่เกินครึ่งหนึ่งของพื้นที่ ให้ timeline ยังเห็นได้)
+// ดับเบิลคลิกเส้นแบ่ง หรือครั้งแรกที่ผู้ใช้ยังไม่เคยปรับความกว้างเอง
+function fit_grid_width() {
+	if (!panes.value) return;
+	const columns_width = columns.value.reduce((sum, c) => sum + c.width, 0) + 2;
+	settings.grid_width = Math.max(Math.min(columns_width, panes.value.clientWidth * 0.5), 180);
 }
 
 // ความสูงของพื้นที่ Gantt ให้เต็มจอที่เหลือ
@@ -1227,7 +1483,8 @@ const pane_height = ref(400);
 function fit_height() {
 	if (!panes.value) return;
 	const top = panes.value.getBoundingClientRect().top + window.scrollY;
-	pane_height.value = Math.max(window.innerHeight - top - 24, 300);
+	// เผื่อปุ่มพับตารางสรุปใต้ Gantt (~32px)
+	pane_height.value = Math.max(window.innerHeight - top - 56, 300);
 }
 
 function scroll_to_start() {
@@ -1243,20 +1500,32 @@ watch(
 	}
 );
 
+watch(
+	() => data.value?.modified,
+	(value, old) => old && value !== old && props.onSaved?.()
+);
+defineExpose({ fit_height, check_remote });
+
 onMounted(async () => {
 	await frappe.model.with_doctype(DOCTYPE);
 	const saved = frappe.get_user_settings(DOCTYPE).gantt || {};
 	Object.assign(settings, saved, { curves: { ...settings.curves, ...saved.curves } });
-	settings.summary_keys = (saved.summary_keys || DEFAULT_SUMMARY_KEYS).filter((key) =>
+	const keys = saved.summary_version === SUMMARY_VERSION ? saved.summary_keys : null;
+	settings.summary_version = SUMMARY_VERSION;
+	settings.summary_keys = (keys || DEFAULT_SUMMARY_KEYS).filter((key) =>
 		SUMMARY_ROWS.some((row) => row.key === key)
 	);
 	if (!SCALES[settings.scale]) settings.scale = "week";
+	if (!["tasks", "resources"].includes(settings.view)) settings.view = "tasks";
 	settings.columns = settings.columns.filter((key) => COLUMNS.some((c) => c.key === key));
 	if (!settings.columns.includes("item_name")) settings.columns.unshift("item_name");
 	await load();
 	await nextTick();
 	fit_height();
+	if (!saved.grid_width) fit_grid_width();
 	window.addEventListener("resize", fit_height);
+	panes_observer = new ResizeObserver(([entry]) => (panes_width.value = entry.contentRect.width));
+	panes_observer.observe(panes.value);
 	// capture: ให้ทำงานก่อน undo ของช่องกรอกและ handler อื่นของ Frappe
 	document.addEventListener("keydown", on_keydown, true);
 	document.addEventListener("visibilitychange", on_visibility_change);
@@ -1266,6 +1535,7 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
 	window.removeEventListener("resize", fit_height);
+	panes_observer?.disconnect();
 	document.removeEventListener("keydown", on_keydown, true);
 	document.removeEventListener("visibilitychange", on_visibility_change);
 	clearInterval(refresh_timer);
@@ -1276,10 +1546,23 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-	<div class="cs-gantt">
+	<div class="cs-gantt" :class="{ 'cs-gantt-embedded': embedded }">
 		<div v-if="!data" class="text-muted p-4">{{ __("กำลังโหลด...") }}</div>
 		<template v-else>
+			<ViewBar
+				v-if="embedded"
+				v-model:status-date="status_date"
+				:scales="SCALES"
+				:settings="settings"
+				:curves="CURVES"
+				:readout="readout"
+				:can-write="has_write"
+				@today="go_today"
+				@zoom="zoom"
+				@open-full="open_full"
+			/>
 			<Toolbar
+				v-else
 				v-model:status-date="status_date"
 				:scales="SCALES"
 				:settings="settings"
@@ -1287,34 +1570,58 @@ onBeforeUnmount(() => {
 				:wbs-depth="wbs_depth"
 				:readout="readout"
 				:summary-options="SUMMARY_ROWS"
+				:columns="COLUMNS"
+				@fit-columns="fit_grid_width"
 				:can-write="can_write"
 				:can-undo="history.past.length > 0"
 				:can-redo="history.future.length > 0"
-				:contract-amount="data.total_amount"
-				:total-amount="revised_amount"
-				:finish-date="finish_date"
-				:contract-finish="data.finish_date"
-				:contract-start="data.start_date"
-				:contract-duration="data.duration"
-				:baselines="baselines"
-				:viewed-baseline="viewed_baseline"
-				:active-baseline="data.active_baseline"
-				:can-delete-baseline="can_delete_baseline"
-				@view-baseline="show_baseline"
-				@save-baseline="save_baseline"
-				@activate-baseline="activate_baseline"
-				@delete-baseline="delete_baseline"
-				@choose-columns="choose_columns"
 				@wbs-level="set_wbs_level"
 				@today="go_today"
 				@zoom="zoom"
 				@undo="undo"
 				@redo="redo"
-			/>
+			>
+				<template #view>
+					<ViewPanel
+						v-model:tab="view_tab"
+						:baselines="baselines"
+						:viewed-baseline="viewed_baseline"
+						:active-baseline="data.active_baseline"
+						:can-delete-baseline="can_delete_baseline"
+						:settings="settings"
+						:can-write="can_write"
+						@view-baseline="show_baseline"
+						@save-baseline="save_baseline"
+						@activate-baseline="activate_baseline"
+						@delete-baseline="delete_baseline"
+					/>
+				</template>
+			</Toolbar>
 			<div ref="panes" class="cs-panes" :style="{ height: pane_height + 'px' }">
+				<ResourceGantt
+					v-if="settings.view === 'resources'"
+					ref="timeline"
+					:tasks="tasks"
+					:resources="resources"
+					:materials="materials"
+					:buffer-days="data.material_plan?.buffer_days || 0"
+					:coverage="material_coverage"
+					:supply="data.material_plan?.supply || {}"
+					:range="range"
+					:ppd="ppd"
+					:units="{ top: scale.top, bottom: scale.bottom }"
+					:holidays="holidays"
+					:counting-holidays="counting_holidays"
+					:status-day="status_day"
+					:contract-finish="data.revised_finish_date || data.finish_date"
+					:row-height="ROW_HEIGHT"
+					:header-height="HEADER_HEIGHT"
+					@open-task="open_task"
+				/>
+				<template v-else>
 				<TaskGrid
 					ref="grid"
-					:style="{ width: settings.grid_width + 'px' }"
+					:style="{ width: grid_width + 'px' }"
 					:tasks="visible_tasks"
 					:columns="columns"
 					:metrics="metrics"
@@ -1326,14 +1633,22 @@ onBeforeUnmount(() => {
 					:summary-rows="summary_rows"
 					:summary-row-height="SUMMARY_ROW_HEIGHT"
 					:hovered="hovered"
+					:selected="selected_task ? selected : null"
+					@select="select_task"
 					@update="(...args) => record(() => update_task(...args))"
 					@toggle="toggle"
 					@resize-column="resize_column"
 					@move-column="move_column"
 					@hover="hovered = $event"
 					@scroll-y="on_grid_wheel"
+					@reveal-row="reveal_row"
 				/>
-				<div class="cs-splitter" @mousedown.prevent="start_split" />
+				<div
+					class="cs-splitter"
+					:title="__('ลากเพื่อปรับความกว้าง ดับเบิลคลิกให้พอดีคอลัมน์')"
+					@pointerdown.prevent="start_split"
+					@dblclick="fit_grid_width"
+				/>
 				<Timeline
 					ref="timeline"
 					:tasks="visible_tasks"
@@ -1350,22 +1665,65 @@ onBeforeUnmount(() => {
 					:show-progress="settings.show_progress"
 					:counting-holidays="counting_holidays"
 					:show-status="settings.show_status"
+					:show-critical="settings.show_critical"
 					:summary-rows="summary_rows"
 					:summary-row-height="SUMMARY_ROW_HEIGHT"
 					:total-amount="revised_amount"
 					:status-day="status_day"
+					:contract-finish="data.revised_finish_date || data.finish_date"
+					:original-finish="data.finish_date"
 					:metrics="metrics"
 					:can-write="can_write"
 					:row-height="ROW_HEIGHT"
 					:header-height="HEADER_HEIGHT"
 					:hovered="hovered"
+					:dim-curves="settings.dim_curves"
+					:show-prep="settings.show_prep"
+					:prep="prep"
 					@scroll="on_timeline_scroll"
 					@hover="hovered = $event"
 					@set-dates="(...args) => record(() => set_dates(...args))"
 					@edit-plan="edit_plan"
 					@body-height="body_height = $event"
 				/>
+				<TaskPanel
+					v-if="selected_task"
+					:task="selected_task"
+					:resources="task_resources"
+					:materials="task_materials"
+					:coverage="material_coverage"
+					:options="data.resource_plan?.options"
+					:buffer-days="data.material_plan?.buffer_days || 0"
+					:resource-plan="data.resource_plan"
+					:material-plan="data.material_plan"
+					:can-edit-resources="can_edit_resources"
+					:can-edit-materials="can_edit_materials"
+					:day="today()"
+					@close="selected = null"
+					@add-resource="add_resource"
+					@update-resource="update_row"
+					@remove-resource="(row) => remove_row(resources, row)"
+					@add-material="add_material"
+					@update-material="update_row"
+					@remove-material="(row) => remove_row(materials, row)"
+					@open-plan="open_plan"
+				/>
+				</template>
 			</div>
+			<!-- พับ/เปิดตารางสรุปใต้ Gantt (ตั้งค่าเดียวกับสวิตช์ "แสดงตารางสรุป" ในเมนู) -->
+			<button
+				v-if="settings.view !== 'resources'"
+				type="button"
+				class="cs-summary-toggle"
+				@click="settings.show_summary = !settings.show_summary"
+			>
+				<span v-html="frappe.utils.icon(settings.show_summary ? 'chevron-down' : 'chevron-up', 'xs')" />
+				{{
+					settings.show_summary
+						? __("ซ่อนตารางสรุป")
+						: __("แสดงตารางสรุป ({0} แถว)", [settings.summary_keys.length])
+				}}
+			</button>
 		</template>
 	</div>
 </template>
@@ -1376,19 +1734,56 @@ onBeforeUnmount(() => {
 	padding: 0 var(--padding-md);
 }
 .cs-panes {
+	position: relative;
 	display: flex;
-	border: 1px solid var(--border-color);
-	border-radius: var(--radius-lg);
+	border: 1px solid color-mix(in srgb, var(--border-color) 70%, transparent);
+	border-radius: var(--radius-xl);
 	overflow: hidden;
 	background: var(--card-bg);
+	box-shadow:
+		0 1px 2px rgb(0 0 0 / 0.04),
+		0 4px 16px rgb(0 0 0 / 0.04);
 }
 .cs-splitter {
-	flex: 0 0 5px;
+	flex: 0 0 4px;
 	cursor: col-resize;
-	background: var(--border-color);
+	background: color-mix(in srgb, var(--border-color) 70%, transparent);
+}
+.cs-summary-toggle {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	margin: 8px auto 0;
+	padding: 2px 12px;
+	border: none;
+	border-radius: var(--radius);
+	background: transparent;
+	color: var(--text-muted);
+	font-size: var(--text-xs);
+}
+.cs-summary-toggle:hover {
+	background: var(--fg-hover-color);
+	color: var(--text-color);
+}
+.cs-summary-toggle :deep(svg) {
+	stroke: currentColor;
 }
 .cs-splitter:hover {
 	background: var(--gray-400);
+}
+/* จอสัมผัส: เส้นแบ่งกว้างขึ้นให้ลากด้วยนิ้วได้ และไม่ให้เบราว์เซอร์เลื่อนหน้าแทน */
+.cs-splitter {
+	touch-action: none;
+}
+@media (pointer: coarse) {
+	.cs-splitter {
+		flex-basis: 10px;
+	}
+}
+@media (max-width: 640px) {
+	.cs-gantt {
+		padding: 0 var(--padding-sm);
+	}
 }
 </style>
 

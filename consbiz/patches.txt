@@ -13,3 +13,4 @@ consbiz.patches.seed_more_rebar_types
 consbiz.patches.remove_moved_client_scripts
 consbiz.patches.set_daily_progress_comparison
 consbiz.patches.migrate_baselines
+consbiz.patches.set_revised_finish_date

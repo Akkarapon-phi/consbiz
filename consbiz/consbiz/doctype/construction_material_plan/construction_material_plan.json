@@ -1,0 +1,137 @@
+{
+ "actions": [],
+ "autoname": "field:construction_management",
+ "creation": "2026-10-31 15:00:00.000000",
+ "description": "แผนจัดซื้อวัสดุตามแผนงาน (1 ฉบับต่อแผนงาน) วันที่ต้องสั่ง = วันเริ่มงาน - วันเผื่อ - Lead Time เลื่อนตามแผนงานเอง",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "construction_management",
+  "project",
+  "company",
+  "column_break_main",
+  "buffer_days",
+  "warehouse",
+  "section_break_items",
+  "items"
+ ],
+ "fields": [
+  {
+   "fieldname": "construction_management",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Construction Management",
+   "options": "Construction Management",
+   "reqd": 1,
+   "set_only_once": 1,
+   "unique": 1
+  },
+  {
+   "fetch_from": "construction_management.project",
+   "fieldname": "project",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Project",
+   "options": "Project",
+   "read_only": 1
+  },
+  {
+   "fetch_from": "construction_management.company",
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "label": "Company",
+   "options": "Company",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_main",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "3",
+   "description": "ให้ของถึงหน้างานก่อนวันเริ่มงานกี่วัน (วันปฏิทิน)",
+   "fieldname": "buffer_days",
+   "fieldtype": "Int",
+   "label": "Buffer Days"
+  },
+  {
+   "description": "คลังที่รับของ ใส่ใน Material Request",
+   "fieldname": "warehouse",
+   "fieldtype": "Link",
+   "label": "Warehouse",
+   "options": "Warehouse"
+  },
+  {
+   "fieldname": "section_break_items",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "items",
+   "fieldtype": "Table",
+   "label": "Materials",
+   "options": "Construction Material Plan Item"
+  }
+ ],
+ "grid_page_length": 50,
+ "links": [],
+ "modified": "2026-10-31 15:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "ConsBiz",
+ "name": "Construction Material Plan",
+ "naming_rule": "By fieldname",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "read": 1,
+   "report": 1,
+   "print": 1,
+   "export": 1,
+   "email": 1,
+   "share": 1,
+   "create": 1,
+   "write": 1,
+   "delete": 1,
+   "role": "System Manager"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "print": 1,
+   "export": 1,
+   "email": 1,
+   "share": 1,
+   "create": 1,
+   "write": 1,
+   "delete": 1,
+   "role": "Projects Manager"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "print": 1,
+   "export": 1,
+   "email": 1,
+   "share": 1,
+   "create": 1,
+   "write": 1,
+   "delete": 1,
+   "role": "Projects User"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "print": 1,
+   "export": 1,
+   "email": 1,
+   "share": 1,
+   "role": "Purchase User"
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "project",
+ "track_changes": 1
+}

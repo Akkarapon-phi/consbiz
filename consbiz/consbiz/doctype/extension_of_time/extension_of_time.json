@@ -1,0 +1,306 @@
+{
+ "actions": [],
+ "autoname": "naming_series:",
+ "creation": "2026-10-31 10:00:00.000000",
+ "description": "ขยายระยะเวลาก่อสร้าง (EOT) Submit = ยื่นขอ วันสิ้นสุดสัญญาของแผนงานเลื่อนตามจำนวนวันที่ผู้ว่าจ้างอนุมัติ (วันปฏิทิน) ไม่เลื่อนแผนงาน",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "section_break_info",
+  "naming_series",
+  "construction_management",
+  "project",
+  "company",
+  "title",
+  "cause",
+  "variation_order",
+  "column_break_main",
+  "date",
+  "reference_no",
+  "event_start",
+  "event_end",
+  "notice_deadline",
+  "amended_from",
+  "section_break_days",
+  "requested_days",
+  "employer_status",
+  "employer_approved_on",
+  "approved_days",
+  "approval_reference",
+  "column_break_days",
+  "contract_finish_date",
+  "previous_extension_days",
+  "revised_finish_date",
+  "section_break_reason",
+  "reason",
+  "column_break_reason",
+  "remarks"
+ ],
+ "fields": [
+  {
+   "fieldname": "section_break_info",
+   "fieldtype": "Section Break"
+  },
+  {
+   "default": "EOT-.YYYY.MM.####",
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "hidden": 1,
+   "label": "Series",
+   "options": "EOT-.YYYY.MM.####",
+   "print_hide": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "construction_management",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Construction Management",
+   "options": "Construction Management",
+   "reqd": 1
+  },
+  {
+   "fetch_from": "construction_management.project",
+   "fieldname": "project",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Project",
+   "options": "Project",
+   "read_only": 1
+  },
+  {
+   "fetch_from": "construction_management.company",
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "label": "Company",
+   "options": "Company",
+   "read_only": 1
+  },
+  {
+   "description": "เช่น ผู้ว่าจ้างส่งมอบพื้นที่ล่าช้า",
+   "fieldname": "title",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Subject",
+   "reqd": 1
+  },
+  {
+   "fieldname": "cause",
+   "fieldtype": "Select",
+   "in_standard_filter": 1,
+   "label": "Cause",
+   "options": "Variation Order\nEmployer Delay\nForce Majeure\nOther",
+   "reqd": 1
+  },
+  {
+   "depends_on": "eval:doc.cause=='Variation Order'",
+   "description": "จำนวนวันที่ขอตั้งต้นจากช่อง Extension Requested ของ Variation Order",
+   "fieldname": "variation_order",
+   "fieldtype": "Link",
+   "label": "Variation Order",
+   "mandatory_depends_on": "eval:doc.cause=='Variation Order'",
+   "options": "Variation Order"
+  },
+  {
+   "fieldname": "column_break_main",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "Today",
+   "description": "วันที่ยื่นหนังสือขอขยายเวลา",
+   "fieldname": "date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Notice Date",
+   "reqd": 1
+  },
+  {
+   "fieldname": "reference_no",
+   "fieldtype": "Data",
+   "label": "Notice Letter No."
+  },
+  {
+   "fieldname": "event_start",
+   "fieldtype": "Date",
+   "label": "Delay Event From",
+   "reqd": 1
+  },
+  {
+   "description": "ว่างไว้ = เหตุยังไม่สิ้นสุด ต้องแจ้งภายใน 15 วันนับแต่เหตุสิ้นสุด",
+   "fieldname": "event_end",
+   "fieldtype": "Date",
+   "label": "Delay Event To"
+  },
+  {
+   "fieldname": "notice_deadline",
+   "fieldtype": "Date",
+   "label": "Notice Deadline",
+   "read_only": 1
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "Extension of Time",
+   "print_hide": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_days",
+   "fieldtype": "Section Break",
+   "label": "Days"
+  },
+  {
+   "description": "วันปฏิทิน",
+   "fieldname": "requested_days",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "Requested Days",
+   "reqd": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "default": "Pending",
+   "description": "Submit = ยื่นขอ วันสิ้นสุดสัญญาเลื่อนเมื่อเป็น Approved แก้ได้หลัง Submit",
+   "fieldname": "employer_status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Employer Approval",
+   "no_copy": 1,
+   "options": "Pending\nApproved\nRejected"
+  },
+  {
+   "allow_on_submit": 1,
+   "depends_on": "eval:doc.employer_status!='Pending'",
+   "description": "ว่างไว้ = วันที่เปลี่ยนเป็น Approved",
+   "fieldname": "employer_approved_on",
+   "fieldtype": "Date",
+   "label": "Employer Approval Date",
+   "no_copy": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "depends_on": "eval:doc.employer_status=='Approved'",
+   "description": "วันปฏิทิน ว่างไว้ = เท่าที่ขอ",
+   "fieldname": "approved_days",
+   "fieldtype": "Int",
+   "label": "Approved Days",
+   "no_copy": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "depends_on": "eval:doc.employer_status!='Pending'",
+   "fieldname": "approval_reference",
+   "fieldtype": "Data",
+   "label": "Approval Letter No.",
+   "no_copy": 1
+  },
+  {
+   "fieldname": "column_break_days",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "contract_finish_date",
+   "fieldtype": "Date",
+   "label": "Original Finish Date",
+   "read_only": 1
+  },
+  {
+   "description": "ฉบับอื่นที่ผู้ว่าจ้างอนุมัติแล้ว",
+   "fieldname": "previous_extension_days",
+   "fieldtype": "Int",
+   "label": "Previously Approved Days",
+   "read_only": 1
+  },
+  {
+   "fieldname": "revised_finish_date",
+   "fieldtype": "Date",
+   "label": "Revised Finish Date",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_reason",
+   "fieldtype": "Section Break"
+  },
+  {
+   "description": "เหตุที่ทำให้งานล่าช้าและผลกระทบต่องาน",
+   "fieldname": "reason",
+   "fieldtype": "Small Text",
+   "label": "Reason"
+  },
+  {
+   "fieldname": "column_break_reason",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "remarks",
+   "fieldtype": "Small Text",
+   "label": "Remarks"
+  }
+ ],
+ "grid_page_length": 50,
+ "is_submittable": 1,
+ "links": [],
+ "modified": "2026-10-31 10:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "ConsBiz",
+ "name": "Extension of Time",
+ "naming_rule": "By \"Naming Series\" field",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "share": 1,
+   "write": 1,
+   "amend": 1,
+   "cancel": 1,
+   "submit": 1,
+   "role": "System Manager"
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "share": 1,
+   "write": 1,
+   "amend": 1,
+   "cancel": 1,
+   "submit": 1,
+   "role": "Projects Manager"
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "share": 1,
+   "write": 1,
+   "role": "Projects User"
+  }
+ ],
+ "row_format": "Dynamic",
+ "search_fields": "title,construction_management",
+ "show_title_field_in_link": 0,
+ "sort_field": "date",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "title",
+ "track_changes": 1
+}

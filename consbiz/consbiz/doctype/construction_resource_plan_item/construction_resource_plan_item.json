@@ -1,0 +1,105 @@
+{
+ "actions": [],
+ "creation": "2026-10-31 14:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "wbs",
+  "item_name",
+  "resource_type",
+  "resource",
+  "qty_per_day",
+  "lead_time_days",
+  "column_break_detail",
+  "remarks",
+  "task"
+ ],
+ "fields": [
+  {
+   "columns": 1,
+   "fieldname": "wbs",
+   "fieldtype": "Autocomplete",
+   "in_list_view": 1,
+   "label": "WBS",
+   "reqd": 1
+  },
+  {
+   "columns": 3,
+   "fieldname": "item_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Item Name",
+   "read_only": 1
+  },
+  {
+   "columns": 1,
+   "default": "Labour",
+   "fieldname": "resource_type",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Resource Type",
+   "options": "Labour\nEquipment",
+   "reqd": 1
+  },
+  {
+   "columns": 2,
+   "description": "ชื่อเดียวกับที่หน้างานลงใน Daily Report (ตำแหน่ง / เครื่องจักร) จึงเทียบกับที่ใช้จริงได้",
+   "fieldname": "resource",
+   "fieldtype": "Autocomplete",
+   "in_list_view": 1,
+   "label": "Resource",
+   "reqd": 1
+  },
+  {
+   "columns": 1,
+   "description": "คน หรือ คัน ต่อวันทำงานของงาน",
+   "fieldname": "qty_per_day",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Qty per Day",
+   "reqd": 1
+  },
+  {
+   "columns": 1,
+   "default": "0",
+   "description": "จองคนงาน/เครื่องจักรล่วงหน้ากี่วันก่อนวันเริ่มงาน",
+   "fieldname": "lead_time_days",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "Lead Time (Days)",
+   "non_negative": 1
+  },
+  {
+   "fieldname": "column_break_detail",
+   "fieldtype": "Column Break"
+  },
+  {
+   "columns": 1,
+   "fieldname": "remarks",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Remarks"
+  },
+  {
+   "fieldname": "task",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "label": "Task Row",
+   "read_only": 1
+  }
+ ],
+ "grid_page_length": 50,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-11-02 10:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "ConsBiz",
+ "name": "Construction Resource Plan Item",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

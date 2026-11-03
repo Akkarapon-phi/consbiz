@@ -9,15 +9,18 @@ export const COLUMNS = [
 	{ key: "uom", label: __("หน่วย"), width: 64 },
 	{ key: "amount", label: __("มูลค่า"), width: 110, align: "right" },
 	{ key: "weight", label: __("น้ำหนัก %"), width: 80, align: "right" },
-	{ key: "start_date", label: __("วันเริ่ม"), width: 100, editor: "Date" },
-	{ key: "end_date", label: __("วันจบ"), width: 100, editor: "Date" },
+	{ key: "start_date", label: __("วันเริ่ม"), width: 112, editor: "Date" },
+	{ key: "end_date", label: __("วันจบ"), width: 112, editor: "Date" },
 	{ key: "duration", label: __("จำนวนวัน"), width: 72, align: "right", editor: "Int" },
 	{ key: "predecessors", label: __("งานก่อนหน้า"), width: 110, editor: "Data" },
-	{ key: "baseline_start_date", label: __("เริ่ม (Baseline)"), width: 100 },
-	{ key: "baseline_end_date", label: __("จบ (Baseline)"), width: 100 },
+	{ key: "total_float", label: __("Float (วัน)"), width: 72, align: "right" },
+	{ key: "baseline_start_date", label: __("เริ่ม (Baseline)"), width: 112 },
+	{ key: "baseline_end_date", label: __("จบ (Baseline)"), width: 112 },
 	{ key: "plan_pct", label: __("% แผน"), width: 72, align: "right" },
 	{ key: "actual_qty", label: __("ปริมาณจริง"), width: 90, align: "right", editor: "Float" },
 	{ key: "actual_pct", label: __("% จริง"), width: 72, align: "right", editor: "Float" },
+	// วันที่เหลือก่อนต้องสั่งวัสดุ / จองคน-เครื่องจักรรายการแรกของงาน (กำหนดในแผงด้านขวา คลิกชื่องาน)
+	{ key: "prep_days", label: __("เตรียมล่วงหน้า (วัน)"), width: 96, align: "right" },
 ];
 
 export const DEFAULT_COLUMNS = [
@@ -31,7 +34,29 @@ export const DEFAULT_COLUMNS = [
 	"actual_pct",
 ];
 
-const METRIC_KEYS = ["plan_pct", "actual_pct", "actual_qty", "predecessors"];
+const METRIC_KEYS = ["plan_pct", "actual_pct", "actual_qty", "predecessors", "total_float", "prep_days"];
+// ต้องเตรียมภายในกี่วันจึงเตือน (เท่ากับ DUE_DAYS ใน construction_management/resources.py)
+export const PREP_DUE_DAYS = 14;
+
+// สีของสิ่งที่ต้องเตรียม 1 รายการ (indicator ของ Frappe) ใช้ในเส้นเตรียมล่วงหน้าของ Timeline และ ResourceGantt
+// green = สั่งแล้ว/งานเริ่มแล้ว, red = เลยกำหนดหรือครบกำหนดวันนี้, orange = ภายใน PREP_DUE_DAYS วัน, gray = ยังไม่ถึง
+export function prep_tone(target, pending, day) {
+	if (!pending) return "green";
+	if (target === null || target === undefined) return "gray";
+	const days = target - day;
+	if (days <= 0) return "red";
+	return days <= PREP_DUE_DAYS ? "orange" : "gray";
+}
+
+// สีของค่าในช่อง (indicator ของ Frappe) null = ข้อความธรรมดา
+export function cell_tone(task, key, metrics) {
+	if (key !== "prep_days") return null;
+	const m = metrics.get(task.name);
+	if (!m) return null;
+	if (m.prep_days === null || m.prep_days === undefined) return m.prep_done ? "green" : null;
+	if (m.prep_days < 0) return "red";
+	return m.prep_days <= PREP_DUE_DAYS ? "orange" : null;
+}
 
 export function cell_value(task, key, metrics) {
 	if (METRIC_KEYS.includes(key)) return metrics.get(task.name)?.[key] ?? null;
@@ -65,6 +90,11 @@ export function cell_text(task, key, metrics) {
 			return format_number(value || 0, null, 2);
 		case "duration":
 			return value || "";
+		case "total_float":
+			return value ?? "";
+		case "prep_days":
+			if (value === null || value === undefined) return metrics.get(task.name)?.prep_done ? __("ครบ") : "";
+			return value < 0 ? __("เลย {0}", [-value]) : value;
 		default:
 			return value ?? "";
 	}

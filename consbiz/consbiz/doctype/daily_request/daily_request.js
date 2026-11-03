@@ -26,6 +26,7 @@ frappe.ui.form.on("Daily Request", {
 	refresh(frm) {
 		load_tasks(frm);
 		setup_buttons(frm);
+		consbiz.show_same_day(frm);
 		if (frm.doc.docstatus === 0 && frm.doc.status === "Rejected") {
 			frm.set_intro(
 				__("ไม่อนุมัติ: {0} แก้ไขแล้วบันทึกเพื่อส่งขออนุมัติใหม่", [frm.doc.rejection_reason]),
@@ -40,11 +41,13 @@ frappe.ui.form.on("Daily Request", {
 		load_tasks(frm);
 		setup_buttons(frm);
 		consbiz.fill_default_resources(frm);
+		consbiz.show_same_day(frm);
 		set_last_approver(frm);
 	},
 
 	date(frm) {
 		load_tasks(frm);
+		consbiz.show_same_day(frm);
 	},
 
 	hide_completed(frm) {
