@@ -1,7 +1,7 @@
 # ConsBiz
 
 แอป Frappe สำหรับธุรกิจก่อสร้าง (โมดูลเดียว: `ConsBiz`) ทำงานบน Frappe/ERPNext v16 ร่วมกับ `hrms`, `erpnext_thailand`, `print_designer`
-ครอบคลุม: BOQ, เงินประกันผลงาน (Retention), หนังสือเข้า-ออก/Transmittal, แผนงานก่อสร้าง + Daily Report,
+ครอบคลุม: BOQ, เงินประกันผลงาน (Retention), หนังสือเข้า-ออก/ใบนำส่งเอกสาร (Transmittal), แผนงานก่อสร้าง + Daily Report,
 แผนตัดเหล็ก (Bar Cut Plan), ภาษีหัก ณ ที่จ่ายพนักงาน (WHT Employee), สัญญาจ้างและสัญญาผู้รับเหมาช่วง
 
 ค่าเฉพาะเครื่อง (ชื่อไซต์, path, พอร์ต) อยู่ใน `CLAUDE.local.md` ซึ่งไม่ commit
@@ -73,13 +73,17 @@ pre-commit run --all-files                               # ruff + prettier (ต�
 ## โครงสร้าง
 
 - `consbiz/hooks.py`: `doc_events`, `doctype_js`, `fixtures`, `scheduler_events`, `jinja`, `naming_series_variables`
-- `consbiz/api.py`: logic ที่ผูกกับ doc_events (Retention, Transmittal)
-- `consbiz/utils.py`: ตัวแปร naming series `ABBR` และ `thai_date()` (วันที่ไทย พ.ศ. ใช้ใน Print Format)
+- `consbiz/api.py`: เลขใบกำกับภาษีจาก Payment Entry
+- `consbiz/retention.py`: เงินประกันผลงานทั้งระบบ (ดู "ระบบย่อยที่ต้องรู้")
+- `consbiz/utils.py`: ตัวแปร naming series `ABBR`, `thai_date()` (วันที่ไทย พ.ศ. ใช้ใน Print Format) และ `thai_baht_text()` (ตรงกับ JS ใน `utils.js`)
 - `consbiz/consbiz/doctype/`: DocType ของแอป แต่ละตัวมี `test_<name>.py`
 - `consbiz/consbiz/page/construction_gantt/`: หน้า Gantt (ใช้ชื่อนี้เพราะ `construction-management` ชนกับ list ของ DocType)
 - `consbiz/consbiz/print_format/<name>/`: Print Format standard แก้ HTML ที่ `<name>.html` ไม่ใช่ช่อง HTML บนเว็บ (Frappe อ่านไฟล์ก่อน)
 - `consbiz/templates/print/print_style.html`: CSS กลางของ Print Format ใช้ผ่าน `{% include %}` class ขึ้นต้น `pf-`
 - `consbiz/consbiz/sidebar/`, `consbiz/consbiz/workspace/`, `consbiz/workspace_sidebar/`, `consbiz/dock/`, `consbiz/desktop_icon/`: เมนูและหน้าแรกของแอป
+- หน้าแรก (Workspace `ConsBiz`) = Custom HTML Block `ConsBiz Home` (fixtures) ที่เรียก `consbiz.render_home` ใน `public/js/home.js`
+  รายการไอคอนแก้ที่ `HOME_GROUPS` block อยู่ใน shadow DOM: CSS ใส่ใน home.js และคัดลอก `<symbol>` ไอคอนเป็น `<svg>` เอง
+  Workspace export ใช้ `title` เป็นชื่อไฟล์ถ้า title ต่างจาก label: ห้ามเปลี่ยน title ของ ConsBiz ไม่งั้นได้ Workspace ใหม่อีกตัว
 - `consbiz/patches/` + `consbiz/patches.txt`: patch ที่รันตอน migrate
 - `consbiz/fixtures/`: ผลจาก `export-fixtures`
 - `consbiz/translations/th.csv`: คำแปลไทย
@@ -108,11 +112,15 @@ pre-commit run --all-files                               # ruff + prettier (ต�
 - สายงานวิกฤต: `total_float` มีทั้ง Python และ `schedule.js` ต้องตรงกัน (backward pass จากวันจบหลังสุดของงานย่อย)
 - ความล่าช้า/ค่าปรับ (`construction_management/delay.py`) และ EVM (`evm.py`, AC จาก GL Entry บัญชี Expense ที่ผูก Project)
   ใช้ในรายงาน `Construction Delay Analysis`, `Construction Earned Value` และ Tab ภาพรวมของ CM
-- Tab "ภาพรวม" / "Gantt" / "ทรัพยากร" / "Look-ahead" / "การเงิน" / "เอกสารโครงการ" ของ CM เป็น Vue โหลดเมื่อเปิด Tab (`PROJECT_TABS` ใน `construction_management.js`)
+- Tab "ภาพรวม" / "Gantt" / "ทรัพยากร" / "คลังวัสดุ" / "Look-ahead" / "การเงิน" / "เอกสารโครงการ" ของ CM เป็น Vue โหลดเมื่อเปิด Tab (`PROJECT_TABS` ใน `construction_management.js`)
   Look-ahead (แผนรายวันหลายสัปดาห์ จัดกลุ่มตาม WBS ระดับบน) ข้อมูลจาก `construction_management/lookahead.py` เทียบแผนปัจจุบัน
   แต่ละวันเป็นกล่องสีตามสถานะของวัน ณ วันที่ดู (ทำแล้ว / ไม่ได้ทำตามแผน / วันที่ดู / แผนข้างหน้า / ทำนอกแผน / เสร็จแล้ว)
   ภาพรวม/เอกสาร: `public/js/project_dashboard` (ข้อมูลจาก `construction_management/dashboard.py`) Header ของ CM ไม่มีปุ่มเพิ่ม
   การเงิน (`Finance.vue`, `construction_management/finance.py`): Cash Flow รายเดือน (Cash Plan ตรงกับตารางสรุปใต้ Gantt) + EVM
+  ต้นทุนตามหมวด (`construction_management/cost.py`, ไม่ต้องกรอกเพิ่มในเอกสารซื้อ): หมวด = `Cost Category` (ข้อมูล ไม่ใช่โค้ด)
+  ผูกผ่าน `custom_cost_category` บน Item Group / Account (ไม่ตั้ง = ใช้ของกลุ่มแม่) ใช้จริง = GL เดียวกับ AC ของ EVM
+  แบ่งหมวดตาม Item Group ของบรรทัดเอกสาร (PI/PR/Stock Entry) ไม่มีบรรทัดใช้หมวดของบัญชี ผูกพัน = PO ส่วนที่ยังไม่ตั้งหนี้
+  งบอยู่ในตาราง `cost_budgets` ของ CM (permlevel 1) ปุ่ม "เติมงบวัสดุจากแผน" = แผนวัสดุ x ราคาซื้อล่าสุด
   Gantt ในฟอร์มเป็นโหมด `embedded` = ดูอย่างเดียว (แถบบาง `ViewBar.vue`) ใช้ page จำลองที่ไม่ทำอะไร (`embedded_page.js`) ห้ามแตะ Header ของฟอร์ม
   แก้แผนที่หน้าเต็มจอ `/app/construction-gantt/<CM>` ที่เดียว (ปุ่ม "แก้ไขแผนงาน" ใน `ViewBar`, แถบเครื่องมือ `Toolbar.vue`)
   Tab โหลดใหม่เมื่อแผนเปลี่ยน (`activate` → `check_remote`) แผนเปลี่ยนแล้วฟอร์ม `reload_doc` เปิด Tab แล้วซ่อนแผงข้าง (`.consbiz-wide-form`)
@@ -129,11 +137,57 @@ pre-commit run --all-files                               # ruff + prettier (ต�
   มีทั้ง Python (`construction_material_plan.py`) และ `allocate_materials` ใน `schedule.js` ต้องตรงกัน
   โครงการของ MR = `custom_project` (doc_events `set_item_project` คัดลอกลงรายการให้ PO/PR ได้โครงการต่อ)
   มุมมอง "ทรัพยากร" ของหน้า Gantt (`ResourceGantt.vue`) แถวเป็นคน/เครื่องจักร/วัสดุ ดูอย่างเดียว
+- วัสดุผู้ว่าจ้างจัดหา (= Customer Provided ของ ERPNext, ใช้คำ "ผู้ว่าจ้างจัดหา" ทั้งระบบ): `consbiz/employer_supplied.py`
+  ผู้ว่าจ้างซื้อเองแล้วหักค่าวัสดุจากงวดงาน มูลค่าสต็อก 0 ไม่ลงบัญชีบริษัท ห้ามเปิด PO
+  Customer Provided ตั้งที่ Item เท่านั้น จึงมี Item คู่ที่ระบบสร้างเอง (`custom_base_item` ชี้ Item หลัก, unique) ผู้ใช้ไม่สร้างเอง
+  ชื่อ = ชื่อ Item หลัก + " (ผู้ว่าจ้างจัดหา)" กลุ่ม/หน่วย/UOM ตาม Item หลักเสมอ (doc_events ของ Item รวม merge)
+  ผู้ใช้เลือก Item หลัก: MR ประเภท Customer Provided สลับเป็น Item คู่ (เลขชุด `OPO-`, ไม่มี VAT, Print Format `Employer Material Order`)
+  แผนวัสดุ: ติ๊ก `employer_supplied` แล้วแถวเก็บ Item คู่ ยอดแยกตาม Item จึงไม่ต้องแก้ `get_supply` / `allocate`
+- สต็อกหน้างาน (`consbiz/site_stock.py`) ใช้เอกสารสต็อกของ ERPNext:
+  1 คลังต่อโครงการ: Project.after_insert สร้าง `All Warehouses / โครงการ (หรือกลุ่ม Project/Projects ที่มีอยู่) / <ชื่อคลัง>`
+  ชื่อคลังผู้ใช้ตั้งเองตอนสร้างโครงการ (`Project.custom_warehouse_name`) เพราะ ERPNext ซ่อนช่องชื่อคลังหลังบันทึกและปิด Rename
+  (`custom_project`) ฟอร์มรับของ/เบิก/MR/ใบยืมใส่คลังนี้ให้ (`consbiz.set_project_warehouse`) โครงการเดิมใช้ปุ่มในฟอร์ม Project
+  วัสดุผู้ว่าจ้างแยกด้วย Item คู่ อยู่คลังเดียวกับของบริษัทได้ คลังผู้ว่าจ้างแยก (`custom_is_owner_warehouse`) ไม่บังคับ ถ้ามีรับได้เฉพาะ Item คู่
+  เบิก (Stock Entry Material Issue) Item หลัก: บันทึกร่างแล้วแยกแถวตัด Item คู่ก่อน (คลังเดียวกัน แล้วคลังผู้ว่าจ้าง ตาม `Project.custom_issue_priority`)
+  แถวที่ผ่านแล้ว `custom_employer_checked` = 1 ไม่แยกซ้ำ แถว Item คู่ไม่อ้าง MR (ERPNext บังคับ Item ตรงกับ MR)
+  WBS ของรายการ (`custom_wbs` ใน Stock Entry Detail / Material Request Item) ตรวจกับงานย่อยของ CM ของโครงการ
+  รับของ: Stock Entry Material Receipt มีเลขที่ใบส่งของ/ผู้ส่ง/ทะเบียนรถ รายงาน `Site Delivery Summary` รวมกับ Purchase Receipt
+  Tab "คลังวัสดุ" ของ CM (`project_dashboard/Stock.vue`) และรายงาน `Project Stock Summary` ใช้ `construction_management/stock.py` ชุดเดียว
+  1 แถวต่อ Item หลัก (Item คู่รวมเข้า Item หลัก) แยกซื้อเอง/ผู้ว่าจ้าง: ยังไม่ส่ง รับเข้า เบิกออก คงเหลือ (SLE ของคลังที่ผูกโครงการ) + ใช้ตามงาน + PO ค้างส่ง
+- คอนกรีต: `Concrete Usage` 1 ใบต่อการเท 1 จุด (WBS + ตำแหน่ง) ตั๋วรถ 1 แถวต่อคัน ไม่ผ่านสต็อก
+  ติ๊ก `employer_supplied` รายตั๋ว = หักงวดผู้ว่าจ้างตามปริมาณใช้จริง เศษไปเทที่อื่นเขียนหมายเหตุ รายงาน `Concrete Usage Summary` (แสดงรายตั๋วได้)
+- ยืม-คืนอุปกรณ์: `Equipment Borrowing` สโตร์บันทึก ผู้ยืม = พนักงาน / ผรม. / คนงาน (คนงานของ ผรม. ระบุ ผรม. เป็นผู้รับผิดชอบ)
+  Submit = โอนเข้าคลังอุปกรณ์ระหว่างยืม รับคืนผ่าน `record_return` (dialog `consbiz.equipment_return_dialog` ใน utils.js)
+  ปกติ/ชำรุด โอนกลับ, สูญหาย Material Issue แถวคืนที่บันทึกแล้วแก้/ลบไม่ได้ รายงาน `Borrowed Equipment Outstanding`
+- แอปสโตร์หน้างาน `/store` (มือถือ, ติดตั้งลงหน้าจอได้) = หน้า www (`consbiz/www/store.html`) + Vue (`public/js/site_store/`) + API `consbiz/store_app.py`
+  ไม่ใช้ desk: เรียก API ด้วย fetch เอง (`api.js`), router เอง (`/store/<view>/<params>`, `website_route_rules`), CSS อยู่ `store.css` (class `ss-`)
+  CSS ต้อง `@import` ใน `<style>` ของ `App.vue` (Frappe ฝัง CSS เข้า bundle เฉพาะที่มาจาก .vue ถ้า import .css ตรงๆ ไฟล์ JS ถูกลบตอน build)
+  ห้ามส่ง reactive object ของ Vue เข้า `history.pushState/replaceState` (clone ไม่ได้ แอปค้าง) `/app/site-store` เดิมเด้งไป `/store`
+  รับของ: PO ของโครงการ → Purchase Receipt (บัญชีทำ PI ต่อจาก PR), MR ผู้ว่าจ้างจัดหา → Stock Entry Material Receipt
+  ตีกลับที่หน้างาน = ไม่รับเข้า ยอดค้างที่ PO/MR เก็บใน `custom_site_rejected_qty` / `custom_site_reject_reason` ของแถว
+  ตีกลับทั้งหมด = ไม่มีใบรับ บันทึก Comment ที่ PO/MR, รูปอัปโหลดก่อนแล้ว server ผูกกับเอกสาร (`attach_files`)
 - แผนตัดเหล็ก: `Bar Cut Plan` ใช้ `Rebar Type` และ `Bar Shape` (สูตรความยาว + รูป SVG) ตัวจัดตัดอยู่ใน `bar_cut_plan/optimizer.py`
   ด้าน A-F, R (มม.), N (รอบ), T (องศา) สูตรใช้ `sqrt` และ `sin`/`cos`/`tan` (องศา) ได้
   ข้อมูลมาตรฐานสร้างด้วย patch `seed_bar_cut_masters`, `seed_more_bar_shapes`, `seed_more_rebar_types` (ข้ามที่มีอยู่แล้ว) รหัสรูปทรงไม่ใช่รหัส BS 8666
   ไซต์ใหม่ `install-app` ข้าม patch ทั้งหมด จึงเรียก seed ซ้ำใน `consbiz/install.py` (`after_install`) seed ใหม่ต้องเพิ่มที่นั่นด้วย
   น้ำหนักต่อเมตรใช้มวลระบุจากตาราง มอก. 20/24 (`rebar_type.nominal_mass`)
+- เงินประกันผลงาน (`consbiz/retention.py`, ปุ่ม/dialog ใน `public/js/retention.js`):
+  ผู้ว่าจ้าง: Sales Invoice → `Retention Receivable` (RR) → `Retention Invoice` (RI) → JE รับคืน (Dr. เงินสด/ธนาคาร Cr. `Company.custom_retention_receivable`)
+  ผรม.: Purchase Invoice → `Retention Payable` (RP) → `Retention Release` → JE จ่ายคืน (Dr. `Company.custom_retention_payable` Cr. เงินสด/ธนาคาร)
+  RR/RP ระบบสร้างและ Submit เองตอน Submit ใบแจ้งหนี้ (ยกเลิกใบแจ้งหนี้ = ยกเลิกตาม) ไม่ลงบัญชีเอง
+  (ยอดเข้าบัญชีเงินประกันตอนรับ/จ่ายชำระใบแจ้งหนี้ ผ่าน `custom_payment_entry_deduction`)
+  RI/Release รวมหลาย RR/RP และเบิกบางส่วนได้ แถว `Retention Claim Item` อ้าง RR/RP ด้วย Dynamic Link (`retention_doctype` + `retention_reference`)
+  ยอดเบิกรวมใบร่างด้วย กันเบิกเกินยอด RR/RP ส่วน `Retention Items` เป็นแถวที่มา (ใบแจ้งหนี้) ของ RR/RP เท่านั้น
+  `billed_amount` / `paid_amount` / `outstanding_amount` / `status` ของ RR/RP คำนวณใหม่เสมอ (`update_source`) ห้ามแก้ตรง
+  RI/Release เป็น Paid เมื่อ JE ในช่อง `journal_entry` Submit (doc_events ของ Journal Entry) ยกเลิกใบเบิกต้องยกเลิก JE ก่อน
+  `due_date` ของ RR/RP = วันครบกำหนดคืนเงินประกัน แก้ได้หลัง Submit scheduler รายวัน `update_overdue` เปลี่ยนเป็น Overdue
+- ใบนำส่งเอกสาร: `Transmittal` (เดิมชื่อ `Transmittal Ext`, patch `merge_transmittals`) ใบเดียวใช้ส่งให้ลูกค้า / ผู้ขาย / สำนักงานบัญชี
+  แถว (`Transmittal List`) อ้างเอกสารในระบบด้วย `reference_doctype` + `reference_name` หรือพิมพ์เอง/นำเข้า Excel (qty = จำนวน, amount = ยอดเงิน)
+  ปุ่ม "ดึงเอกสาร" ใช้ `SOURCES` ใน `transmittal.py` (ใบกำกับภาษีขาย/ซื้อ, หนังสือรับรองหัก ณ ที่จ่าย ของ thai_tax, SI, PI, Retention Invoice)
+  ไม่แสดงเอกสารที่อยู่ในใบนำส่ง (ไม่ยกเลิก) ของผู้รับประเภทเดียวกัน/คู่ค้าเดียวกันแล้ว ส่งให้ผู้รับต่างกันได้
+  สถานะคำนวณจากวันที่เสมอ: Draft / To Send / Sent (`sent_date`) / Received (`received_date`) / Cancelled
+  ฟอร์มเอกสารต้นทางมีปุ่ม Create > ใบนำส่งเอกสาร และแถบแจ้งว่านำส่งแล้ว (`public/js/transmittal.js`, รายชื่อต้องตรงกับ `SOURCES`)
+  `Transmittal Entry` / `Transmittal Note` (บันทึกส่งใบกำกับให้สำนักงานบัญชี) เลิกใช้และลบแล้ว ตารางเดิมในฐานข้อมูลยังอยู่
 - ปุ่มเปลี่ยนบริษัท (`public/js/company_switcher.js`) มี 2 ที่ ใช้ avatar และเมนูชุดเดียวกัน
   - Dock: กล่อง `.dock-company` เหนือ `.dock-user` ห้ามใส่ใน `.dock-user` (Frappe ผูกคลิกทั้งกล่องกับเมนูผู้ใช้)
   - Sidebar: ใช้ class `.dropdown-navbar-user` ของ Frappe จึงซ่อนตอน Dock แบบ Pinned และแสดงตอน Floating
@@ -142,7 +196,7 @@ pre-commit run --all-files                               # ruff + prettier (ต�
 
 - DocType: ชื่ออังกฤษ Title Case คำเต็ม (เช่น `Daily Report`, `Retention Release`)
 - เอกสารที่ submit ได้: `autoname = naming_series:` ใช้ `.ABBR.` ถ้าต้องการตัวย่อบริษัท/โครงการ
-- prefix ที่ใช้แล้ว ห้ามใช้ซ้ำ: `BCP-` Bar Cut Plan, `CM-` Construction Management, `DR-` Daily Report, `DRQ-` Daily Request, `EOT-` Extension of Time, `IR-` Inspection Request, `PL-` Punch List, `VO-` Variation Order, `WHTE-` WHT Employee
+- prefix ที่ใช้แล้ว ห้ามใช้ซ้ำ: `BCP-` Bar Cut Plan, `CM-` Construction Management, `CU-` Concrete Usage, `DR-` Daily Report, `DRQ-` Daily Request, `EB-` Equipment Borrowing, `EOT-` Extension of Time, `IR-` Inspection Request, `OPO-` Material Request ผู้ว่าจ้างจัดหา, `PL-` Punch List, `TX-` Transmittal, `VO-` Variation Order, `WHTE-` WHT Employee
 - master ที่ตั้งชื่อตามค่า field ใช้ `field:<fieldname>` (เช่น Rebar Type, Bar Shape)
 - fieldname ของ Custom Field ขึ้นต้นด้วย `custom_`
 - CSS ของ Print Format ใช้ class ขึ้นต้น `pf-` สีใหม่ใน `style.css` ใช้ตัวแปร `--consbiz-*`

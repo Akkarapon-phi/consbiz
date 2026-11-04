@@ -1,0 +1,13 @@
+[
+ {
+  "docstatus": 0,
+  "doctype": "Custom HTML Block",
+  "html": "<div></div>",
+  "modified": "2026-11-04 22:59:06.413114",
+  "name": "ConsBiz Home",
+  "private": 0,
+  "roles": [],
+  "script": "// ตัวหน้าแรกอยู่ใน consbiz/public/js/home.js (แก้ที่นั่น)\nconsbiz.render_home(root_element);\n",
+  "style": ""
+ }
+]

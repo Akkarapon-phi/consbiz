@@ -46,3 +46,39 @@ def name_with_title(name, user=None):
 	if not salutation or name.startswith(salutation):
 		return name
 	return salutation + ("" if re.search("[\u0e00-\u0e7f]", salutation) else " ") + name
+
+
+THAI_DIGITS = ["ศูนย์", "หนึ่ง", "สอง", "สาม", "สี่", "ห้า", "หก", "เจ็ด", "แปด", "เก้า"]
+THAI_UNITS = ["", "สิบ", "ร้อย", "พัน", "หมื่น", "แสน"]
+
+
+def _thai_number(number):
+	text = ""
+	digits = str(number)
+	for i, char in enumerate(digits):
+		n = int(char)
+		pos = len(digits) - i - 1
+		unit = pos % 6
+		if n:
+			if unit == 0 and n == 1 and i > 0:
+				text += "เอ็ด"
+			elif unit == 1 and n == 2:
+				text += "ยี่"
+			elif not (unit == 1 and n == 1):
+				text += THAI_DIGITS[n]
+			text += THAI_UNITS[unit]
+		if pos and pos % 6 == 0:
+			text += "ล้าน"
+	return text
+
+
+def thai_baht_text(amount):
+	"""จำนวนเงินเป็นคำอ่านภาษาไทย ให้ผลเหมือน thai_baht_text() ใน public/js/utils.js (ติดลบขึ้นต้นด้วย "ติดลบ")"""
+	from frappe.utils import flt
+
+	amount = flt(amount, 2)
+	prefix = "ติดลบ" if amount < 0 else ""
+	baht, satang = divmod(round(abs(amount) * 100), 100)
+	text = (_thai_number(baht) or "ศูนย์") + "บาท"
+	text += _thai_number(satang) + "สตางค์" if satang else "ถ้วน"
+	return prefix + text

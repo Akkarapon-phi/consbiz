@@ -158,54 +158,6 @@ function update_thai_labels(frm, paid_amount, grand_total) {
     }
 }
 
-// Function to create Transmittal Entry manually from Sales Invoice
-function create_transmittal_entry(frm) {
-    frappe.model.with_doctype('Transmittal Entry', function() {
-        var doc = frappe.model.get_new_doc('Transmittal Entry');
-
-        // Map Fields
-        doc.type = 'รายรับ';
-        doc.document_no = frm.doc.name;
-        doc.posting_date = frm.doc.posting_date;
-        doc.company = frm.doc.company;
-        doc.customer = frm.doc.customer;
-        doc.project = frm.doc.project;
-        doc.subject = `นำส่งเอกสารวางบิล ${frm.doc.name}`;
-        
-        // Map Checkboxes
-        doc.receipt = 1;
-        doc.tax = frm.doc.total_taxes_and_charges > 0 ? 1 : 0;
-        doc.wht = frm.doc.custom_subject_to_wht ? 1 : 0;
-        doc.retention = frm.doc.custom_subject_to_retention ? 1 : 0;
-
-        frappe.set_route('Form', 'Transmittal Entry', doc.name);
-    });
-}
-
-function create_retention_receivable(frm) {
-    frappe.model.with_doctype('Retention Receivable', function () {
-        var doc = frappe.model.get_new_doc('Retention Receivable');
-
-        doc.company = frm.doc.company;
-        doc.customer = frm.doc.customer;
-        doc.posting_date = frm.doc.posting_date;
-        doc.due_date = frm.doc.due_date;
-        doc.project = frm.doc.project;
-        doc.customer_po = frm.doc.po_no;
-
-        var child = frappe.model.add_child(doc, 'Retention Items', 'retention_items');
-        child.sales_invoice_no = frm.doc.name;
-        child.posting_date = frm.doc.posting_date;
-        child.due_date = frm.doc.due_date;
-        child.description = "Retention from " + frm.doc.name;
-        child.base_amount = frm.doc.net_total;
-        child.retention_percent = frm.doc.custom_retention_percent;
-        child.amount = frm.doc.custom_retention_amount;
-
-        frappe.set_route('Form', 'Retention Receivable', doc.name);
-    });
-}
-
 // Main Trigger
 frappe.ui.form.on('Sales Invoice', {
     setup: function (frm) {
@@ -243,87 +195,17 @@ frappe.ui.form.on('Sales Invoice', {
     refresh: function (frm) {
         calculate_paid_amount(frm);
 
-        // Logic ปุ่ม Create/View Retention
-        if (frm.doc.docstatus === 1 && frm.doc.custom_subject_to_retention && frm.doc.custom_retention_amount > 0) {
-            frappe.call({
-                method: 'consbiz.api.check_retention_exists',
-                args: { invoice_name: frm.doc.name },
-                callback: function (r) {
-                    if (r.message) {
-                        frm.add_custom_button(__('View Retention'), function () {
-                            frappe.set_route('Form', 'Retention Receivable', r.message);
-                        }, __('View'));
-                    } else {
-                        frm.add_custom_button(__('Retention Receivable'), function () {
-                            create_retention_receivable(frm);
-                        }, __('Create'));
-                    }
-                }
-            });
-        }
+        // ปุ่ม View/Create Retention Receivable (public/js/retention.js)
+        consbiz.retention.invoice_buttons(frm);
 
-            // --- 2. Logic ปุ่ม Transmittal Entry (Create/View) ---
-            // สร้างปุ่มเสมอสำหรับ Sales Invoice ที่ Submit แล้ว
-            if (frm.doc.docstatus === 1) {
-            frappe.call({
-                method: 'consbiz.api.check_transmittal_exists',
-                args: { document_no: frm.doc.name },
-                callback: function (r) {
-                    if (r.message) {
-                        // ถ้ามีแล้ว -> View
-                        frm.add_custom_button(__('Transmittal Entry'), function () {
-                            frappe.set_route('Form', 'Transmittal Entry', r.message);
-                        }, __('View'));
-                    } else {
-                        // ถ้ายังไม่มี (หรือถูกลบไป) -> Create
-                        frm.add_custom_button(__('Transmittal Entry'), function () {
-                            create_transmittal_entry(frm);
-                        }, __('Create'));
-                    }
-                }
-            });
+        // หน้าซองจดหมายส่งใบแจ้งหนี้/ใบกำกับภาษี (utils.js)
+        if (frm.doc.docstatus === 1) {
+            frm.add_custom_button(__("Envelope"), () => consbiz.make_envelope(frm), __("Create"));
         }
     }
 });
 
-// ---- ย้ายจาก Client Script "FIx Retention Receivable Grand Total" ----
-
-frappe.ui.form.on('Sales Invoice', {
-    on_submit: function(frm) {
-        // รอ 1 วินาทีให้ระบบสร้าง Doc ปลายทางเสร็จก่อน
-        setTimeout(() => {
-            if (frm.doc.custom_retention_amount) {
-                // ขั้นตอนที่ 1: ไปหา "ชื่อ" ของ Retention Receivable ก่อน
-                frappe.db.get_value('Retention Receivable', 
-                    { reference_type: 'Sales Invoice', reference_name: frm.doc.name }, 
-                    'name', 
-                    (r) => {
-                        if (r && r.name) {
-                            // ขั้นตอนที่ 2: เมื่อได้ชื่อ (name) แล้ว ค่อยสั่ง set_value
-                            frappe.call({
-                                method: 'frappe.client.set_value',
-                                args: {
-                                    doctype: 'Retention Receivable',
-                                    name: r.name, // ใส่ชื่อที่หาได้ลงไปตรงนี้ (แก้ Error missing name)
-                                    fieldname: 'grand_total',
-                                    value: frm.doc.custom_retention_amount
-                                },
-                                callback: function(res) {
-                                    if(!res.exc) {
-                                        frappe.show_alert({
-                                            message: __('อัปเดตยอด Retention เรียบร้อยแล้ว'),
-                                            indicator: 'green'
-                                        });
-                                    }
-                                }
-                            });
-                        }
-                    }
-                );
-            }
-        }, 1500); // เพิ่มดีเลย์นิดหน่อยเพื่อความชัวร์
-    }
-});
+// ยอดรวมของ Retention Receivable คำนวณที่ server (consbiz/retention.py) ไม่ต้องแก้ตามหลัง Submit
 
 // ---- ย้ายจาก Client Script "Print Sales Invoice" ----
 

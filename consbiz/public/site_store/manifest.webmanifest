@@ -1,0 +1,17 @@
+{
+	"name": "สโตร์หน้างาน",
+	"short_name": "สโตร์",
+	"description": "รับของ เบิกวัสดุ คอนกรีต ยืม-คืนอุปกรณ์ และคลังวัสดุของโครงการ",
+	"start_url": "/store",
+	"scope": "/store",
+	"display": "standalone",
+	"orientation": "portrait",
+	"background_color": "#eef2f8",
+	"theme_color": "#1f6feb",
+	"lang": "th",
+	"icons": [
+		{ "src": "/assets/consbiz/site_store/icon-192.png", "sizes": "192x192", "type": "image/png" },
+		{ "src": "/assets/consbiz/site_store/icon-512.png", "sizes": "512x512", "type": "image/png" },
+		{ "src": "/assets/consbiz/site_store/icon-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+	]
+}

@@ -1,0 +1,32 @@
+{
+ "creation": "2026-11-04 22:00:00.000000",
+ "docstatus": 0,
+ "doctype": "Page",
+ "icon": "package",
+ "idx": 0,
+ "modified": "2026-11-04 22:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "ConsBiz",
+ "name": "site-store",
+ "owner": "Administrator",
+ "page_name": "site-store",
+ "roles": [
+  {
+   "role": "System Manager"
+  },
+  {
+   "role": "Stock Manager"
+  },
+  {
+   "role": "Stock User"
+  },
+  {
+   "role": "Projects Manager"
+  },
+  {
+   "role": "Projects User"
+  }
+ ],
+ "standard": "Yes",
+ "title": "Site Store"
+}

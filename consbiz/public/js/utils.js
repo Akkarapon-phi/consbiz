@@ -211,3 +211,110 @@ consbiz.show_same_day = async function (frm) {
 		true
 	);
 };
+
+//================================================================
+// WBS ของรายการสต็อก (Stock Entry, Material Request)
+//================================================================
+
+// ช่อง custom_wbs ในตาราง items เป็น Autocomplete ตัวเลือก = งานย่อยของแผนงานของโครงการ (site_stock.get_wbs_options)
+// ฝั่ง server ตรวจซ้ำและเก็บชื่องานไว้ใน custom_task_name
+consbiz.set_wbs_options = async function (frm, project) {
+	const grid = frm.fields_dict.items?.grid;
+	if (!grid || !grid.get_docfield("custom_wbs")) return;
+	const { message } = project
+		? await frappe.call("consbiz.site_stock.get_wbs_options", { project })
+		: { message: [] };
+	grid.update_docfield_property("custom_wbs", "options", message || []);
+};
+
+//================================================================
+// รับคืนอุปกรณ์ (ฟอร์ม Equipment Borrowing และหน้าสโตร์หน้างาน)
+//================================================================
+
+// แสดงรายการที่ยังค้างคืน กรอกจำนวนที่คืนและสภาพ ผู้คืนเซ็นในกล่องลายเซ็น
+// บันทึกด้วย equipment_borrowing.record_return (สร้าง Stock Entry ให้เอง) แล้วเรียก on_done
+consbiz.equipment_return_dialog = async function (name, on_done) {
+	const doc = await frappe.db.get_doc("Equipment Borrowing", name);
+	const rows = (doc.items || [])
+		.filter((row) => row.outstanding_qty > 0)
+		.map((row) => ({
+			item_code: row.item_code,
+			item_name: row.item_name,
+			outstanding_qty: row.outstanding_qty,
+			qty: row.outstanding_qty,
+			condition: "Good",
+		}));
+	const dialog = new frappe.ui.Dialog({
+		title: __("รับคืนอุปกรณ์: {0}", [doc.borrower_name || name]),
+		size: "large",
+		fields: [
+			{ fieldname: "date", fieldtype: "Date", label: __("วันที่คืน"), default: frappe.datetime.get_today(), reqd: 1 },
+			{ fieldname: "returned_by", fieldtype: "Data", label: __("ผู้คืน"), default: doc.borrower_name },
+			{
+				fieldname: "items",
+				fieldtype: "Table",
+				label: __("รายการ"),
+				cannot_add_rows: true,
+				in_place_edit: true,
+				data: rows,
+				fields: [
+					{ fieldname: "item_code", fieldtype: "Link", options: "Item", label: __("อุปกรณ์"), read_only: 1, in_list_view: 1, columns: 4 },
+					{ fieldname: "outstanding_qty", fieldtype: "Float", label: __("ค้างคืน"), read_only: 1, in_list_view: 1, columns: 2 },
+					{ fieldname: "qty", fieldtype: "Float", label: __("คืน"), in_list_view: 1, columns: 2 },
+					{
+						fieldname: "condition",
+						fieldtype: "Select",
+						label: __("สภาพ"),
+						options: [
+							{ value: "Good", label: __("ปกติ") },
+							{ value: "Damaged", label: __("ชำรุด") },
+							{ value: "Lost", label: __("สูญหาย") },
+						],
+						in_list_view: 1,
+						columns: 2,
+					},
+				],
+			},
+			{ fieldname: "signature", fieldtype: "Signature", label: __("ลายเซ็นผู้คืน") },
+			{ fieldname: "photo", fieldtype: "Attach Image", label: __("รูปถ่าย") },
+			{ fieldname: "remarks", fieldtype: "Small Text", label: __("หมายเหตุ") },
+		],
+		primary_action_label: __("บันทึกรับคืน"),
+		async primary_action(values) {
+			const items = (values.items || []).map(({ item_code, qty, condition }) => ({ item_code, qty, condition }));
+			await frappe.call({
+				method: "consbiz.consbiz.doctype.equipment_borrowing.equipment_borrowing.record_return",
+				args: { ...values, name, items: JSON.stringify(items) },
+				freeze: true,
+			});
+			dialog.hide();
+			frappe.show_alert({ message: __("บันทึกรับคืนแล้ว"), indicator: "green" });
+			on_done && on_done();
+		},
+	});
+	dialog.show();
+};
+
+//================================================================
+// คลังของโครงการ (1 คลังต่อโครงการ สร้างให้ตอนสร้าง Project: site_stock.ensure_project_warehouse)
+//================================================================
+
+// ตั้งคลังของโครงการลงช่องที่ยังว่าง เช่น consbiz.set_project_warehouse(frm, frm.doc.project, ["from_warehouse"])
+consbiz.set_project_warehouse = async function (frm, project, fields) {
+	if (!project || !frm.is_new()) return;
+	const empty = fields.filter((field) => !frm.doc[field]);
+	if (!empty.length) return;
+	const { message } = await frappe.call("consbiz.site_stock.get_project_warehouse", { project });
+	if (!message) return;
+	empty.forEach((field) => !frm.doc[field] && frm.set_value(field, message));
+};
+
+// หน้าซองจดหมายจากเอกสารต้นทาง (Transmittal / Sales Invoice: consbiz/consbiz/doctype/envelope/envelope.py)
+consbiz.make_envelope = async function (frm) {
+	const doc = await frappe.xcall("consbiz.consbiz.doctype.envelope.envelope.make_envelope", {
+		source_doctype: frm.doctype,
+		source_name: frm.doc.name,
+	});
+	frappe.model.sync(doc);
+	frappe.set_route("Form", doc.doctype, doc.name);
+};
