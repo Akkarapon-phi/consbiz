@@ -1,0 +1,160 @@
+{#-
+	ใบสั่งวัสดุ (ผู้ว่าจ้างจัดหา) = Material Request ประเภท Customer Provided ที่ส่งถึงผู้ว่าจ้าง
+	- โครงหน้าเหมือน Print Format "Daily Request": หัว/ท้ายกระดาษอยู่ใน <thead>/<tfoot> ของ .pf-page
+	- ไม่มี VAT: ผู้ว่าจ้างซื้อเองแล้วหักค่าวัสดุจากงวดงาน ราคาเป็นราคาที่ใช้หัก (ถ้ากรอก)
+	- ชื่อรายการตัดคำต่อท้าย " (ผู้ว่าจ้างจัดหา)" ของ Item คู่ออก (ทั้งเอกสารเป็นของผู้ว่าจ้างจัดหาอยู่แล้ว)
+	- ผู้ขอ/ผู้อนุมัติ = Custom Field custom_request_by / custom_approve_by (Link Signature ชื่อตามผู้ใช้)
+-#}
+{%- set suffix = " (ผู้ว่าจ้างจัดหา)" -%}
+{%- set project_name = frappe.db.get_value("Project", doc.custom_project, "project_name") if doc.custom_project else "" -%}
+{%- set customer_name = frappe.db.get_value("Customer", doc.customer, "customer_name") if doc.customer else "" -%}
+{%- set requested_by = name_with_title(frappe.db.get_value("Signature", doc.custom_request_by, "full_name") or doc.custom_request_by or "", doc.custom_request_by) if doc.custom_request_by else "" -%}
+{%- set approver = name_with_title(frappe.db.get_value("Signature", doc.custom_approve_by, "full_name") or doc.custom_approve_by or "", doc.custom_approve_by) if doc.custom_approve_by else "" -%}
+{%- set total = doc.custom_grand_total or (doc.items | map(attribute="amount") | select | sum) -%}
+{%- set money = "{:,.2f}" -%}
+
+{% include "consbiz/templates/print/print_style.html" %}
+
+<div class="pf">
+	<table class="pf-page">
+		<thead>
+			<tr>
+				<td>
+					<div class="pf-title">
+						<h1>ใบสั่งวัสดุ (ผู้ว่าจ้างจัดหา)</h1>
+						<div>{{ doc.company or "" }}</div>
+					</div>
+				</td>
+			</tr>
+		</thead>
+
+		<tfoot>
+			<tr>
+				<td>
+					<div class="pf-footer">
+						<div>พิมพ์เมื่อ {{ thai_date(frappe.utils.nowdate()) }} {{ frappe.utils.nowtime()[:5] }} น.</div>
+						<div class="text-right">{{ doc.name }}</div>
+					</div>
+				</td>
+			</tr>
+		</tfoot>
+
+		<tbody>
+			<tr>
+				<td>
+					{#- 1 ข้อมูลเอกสาร -#}
+					<div class="pf-section">
+						<span><span class="no">1</span><span class="name">ข้อมูลเอกสาร</span></span>
+						<span class="rule"></span>
+					</div>
+					<table class="pf-grid pf-info">
+						<tbody>
+							<tr>
+								<td class="pf-k">เลขที่</td>
+								<td class="pf-v">{{ doc.name }}</td>
+								<td class="pf-k">วันที่</td>
+								<td class="pf-v">{{ thai_date(doc.transaction_date) }}</td>
+							</tr>
+							<tr>
+								<td class="pf-k">ถึง (ผู้ว่าจ้าง)</td>
+								<td class="pf-v">{{ customer_name or doc.customer or "-" }}</td>
+								<td class="pf-k">ต้องการภายใน</td>
+								<td class="pf-v">{{ thai_date(doc.schedule_date) or "-" }}</td>
+							</tr>
+							<tr>
+								<td class="pf-k">โครงการ</td>
+								<td class="pf-v">{{ project_name or doc.custom_project or "-" }}</td>
+								<td class="pf-k">สถานที่ส่ง</td>
+								<td class="pf-v">{{ doc.set_warehouse or "-" }}</td>
+							</tr>
+						</tbody>
+					</table>
+
+					{#- 2 รายการวัสดุ -#}
+					<div class="pf-section">
+						<span><span class="no">2</span><span class="name">รายการวัสดุ</span></span>
+						<span class="rule"></span>
+					</div>
+					<table class="pf-grid">
+						<thead>
+							<tr>
+								<th class="text-center" style="width: 6%">ลำดับ</th>
+								<th style="width: 38%">รายการ</th>
+								<th class="text-right" style="width: 10%">จำนวน</th>
+								<th class="text-center" style="width: 8%">หน่วย</th>
+								<th class="text-center" style="width: 12%">ต้องการวันที่</th>
+								<th class="text-right" style="width: 12%">ราคา/หน่วย</th>
+								<th class="text-right" style="width: 14%">จำนวนเงิน</th>
+							</tr>
+						</thead>
+						<tbody>
+							{%- for row in doc.items %}
+							<tr>
+								<td class="text-center">{{ loop.index }}</td>
+								<td>
+									{{ (row.item_name or row.item_code) | replace(suffix, "") }}
+									{%- if row.description and row.description | striptags != row.item_name %}
+									<span class="path">{{ row.description | striptags }}</span>
+									{%- endif %}
+								</td>
+								<td class="text-right">{{ frappe.format(row.qty, {"fieldtype": "Float"}) }}</td>
+								<td class="text-center">{{ row.uom or "" }}</td>
+								<td class="text-center">{{ frappe.utils.formatdate(row.schedule_date, "dd/MM/yyyy") if row.schedule_date else "" }}</td>
+								<td class="text-right">{{ money.format(row.rate) if row.rate else "-" }}</td>
+								<td class="text-right">{{ money.format(row.amount) if row.amount else "-" }}</td>
+							</tr>
+							{%- else %}
+							<tr><td colspan="7" class="empty">ไม่มีรายการ</td></tr>
+							{%- endfor %}
+						</tbody>
+						{%- if total %}
+						<tfoot>
+							<tr>
+								<td colspan="6">รวม{% if doc.custom_in_words %} ({{ doc.custom_in_words }}){% endif %}</td>
+								<td class="text-right">{{ money.format(total) }}</td>
+							</tr>
+						</tfoot>
+						{%- endif %}
+					</table>
+					<div class="pf-note">
+						<b>หมายเหตุ</b><br />
+						วัสดุรายการนี้ผู้ว่าจ้างเป็นผู้จัดหา ค่าวัสดุหักจากงวดงานตามปริมาณที่ใช้จริง
+						{%- if doc.custom_remark %}<br />{{ doc.custom_remark | e | replace("\n", "<br />") }}{% endif %}
+					</div>
+
+					{#- 3 ลงนาม -#}
+					<div class="pf-keep">
+					<div class="pf-section">
+						<span><span class="no">3</span><span class="name">ลงนาม</span></span>
+						<span class="rule"></span>
+					</div>
+					<table class="pf-sign">
+						<tbody>
+							<tr>
+								<td style="width: 33%">
+									<div class="line">ลงชื่อ ........................................</div>
+									<div>({{ requested_by or "........................................" }})</div>
+									<div>ผู้ขอ</div>
+									<div class="muted">วันที่ ......../......../........</div>
+								</td>
+								<td style="width: 33%">
+									<div class="line">ลงชื่อ ........................................</div>
+									<div>({{ approver or "........................................" }})</div>
+									<div>ผู้อนุมัติ</div>
+									<div class="muted">วันที่ ......../......../........</div>
+								</td>
+								<td style="width: 33%">
+									<div class="line">ลงชื่อ ........................................</div>
+									<div>(........................................)</div>
+									<div>ผู้ว่าจ้าง รับทราบ</div>
+									<div class="muted">วันที่ ......../......../........</div>
+								</td>
+							</tr>
+						</tbody>
+					</table>
+					</div>
+				</td>
+			</tr>
+		</tbody>
+	</table>
+</div>

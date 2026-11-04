@@ -128,6 +128,21 @@ class IntegrationTestConstructionMaterialPlan(IntegrationTestCase):
 				(request,) = build_material_requests(doc, [line])
 		self.assertEqual((request.material_request_type, request.customer), ("Customer Provided", "_Test Customer"))
 
+	def test_employer_supplied_row_uses_employer_item(self):
+		from consbiz.tests.test_employer_supplied import make_item
+
+		base = make_item()
+		doc = self.make_plan(item_code=base.name, employer_supplied=1)
+		row = doc.items[0]
+		twin = frappe.get_doc("Item", row.item_code)
+		self.assertEqual((twin.custom_base_item, twin.is_customer_provided_item), (base.name, 1))
+
+		# เอาติ๊กออกจากแถวเดิม = กลับเป็น Item หลัก, แถวใหม่ที่เลือก Item คู่มาเลย = ติ๊กให้เอง
+		row.employer_supplied = 0
+		doc.append("items", {"wbs": "1.1", "item_code": twin.name, "qty": 1})
+		doc.save()
+		self.assertEqual([(r.item_code, r.employer_supplied) for r in doc.items], [(base.name, 0), (twin.name, 1)])
+
 	def test_item_project_from_header(self):
 		request = frappe.new_doc("Material Request")
 		request.custom_project = "PROJ-TEST"

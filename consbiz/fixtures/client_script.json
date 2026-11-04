@@ -24,17 +24,6 @@
  {
   "docstatus": 0,
   "doctype": "Client Script",
-  "dt": "Transmittal Note",
-  "enabled": 0,
-  "modified": "2026-07-01 00:45:28.891233",
-  "module": "ConsBiz",
-  "name": "Transmittal Note Check Add",
-  "script": "frappe.ui.form.on('Transmittal Item', {\n    // 1. ทำงานทันทีที่มีแถวใหม่เพิ่มเข้ามาในตาราง\n    transmittal_item_add: function(frm, cdt, cdn) {\n        let row = frappe.get_doc(cdt, cdn);\n        \n        // ใช้ setTimeout หน่วงเวลาเล็กน้อยเพื่อให้ระบบจับค่า reference ทัน\n        setTimeout(() => { \n            if (row.reference) {\n                fetch_check_fields(frm, row);\n            }\n        }, 150); \n    },\n    \n    // 2. ทำงานเมื่อมีการเลือกหรือเปลี่ยนค่าในฟิลด์ reference\n    reference: function(frm, cdt, cdn) {\n        let row = frappe.get_doc(cdt, cdn);\n        if (row.reference) {\n            fetch_check_fields(frm, row);\n        }\n    }\n});\n\n// ฟังก์ชันสำหรับวิ่งไปดึงข้อมูลจากเอกสารต้นทาง (Transmittal Entry)\nfunction fetch_check_fields(frm, row) {\n    frappe.call({\n        method: 'frappe.client.get_value',\n        args: {\n            doctype: 'Transmittal Entry',\n            filters: { name: row.reference },\n            // ดึงฟิลด์ที่มี custom_ ตามที่คุณแจ้ง\n            fieldname: ['custom_receipt_check', 'custom_tax_check', 'custom_wht_check', 'custom_retention_check']\n        },\n        callback: function(r) {\n            if (r.message) {\n                // แก้ไขจุดนี้: ดึงข้อมูลจาก r.message ด้วยชื่อฟิลด์ custom_ แล้วเอามาใส่ในฟิลด์ปลายทาง\n                frappe.model.set_value(row.doctype, row.name, 'receipt_check', r.message.custom_receipt_check);\n                frappe.model.set_value(row.doctype, row.name, 'tax_check', r.message.custom_tax_check);\n                frappe.model.set_value(row.doctype, row.name, 'wht_check', r.message.custom_wht_check);\n                frappe.model.set_value(row.doctype, row.name, 'retention_check', r.message.custom_retention_check);\n            }\n        }\n    });\n}",
-  "view": "Form"
- },
- {
-  "docstatus": 0,
-  "doctype": "Client Script",
   "dt": "Material Request",
   "enabled": 0,
   "modified": "2026-10-21 01:00:57.364261",

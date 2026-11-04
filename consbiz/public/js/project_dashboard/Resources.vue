@@ -2,7 +2,7 @@
 // Tab "ทรัพยากร" ของ Construction Management: สิ่งที่ต้องเตรียมก่อนเริ่มงาน (ดูอย่างเดียว)
 // - วัสดุที่ต้องสั่ง เรียงตามวันต้องสั่ง และปุ่มสร้าง Material Request (construction_material_plan.make_material_request)
 //   สถานะคิดจากยอดที่ขอ/สั่งซื้อ/รับแล้วรวมของโครงการ ตัดให้แถวที่ต้องการก่อนก่อน (coverage ของแถว)
-// - ยอดรวมต่อ Item: ต้องใช้ เทียบขอ/สั่งซื้อ/รับแล้ว แยกซื้อเอง / ลูกค้าจัดหา (Customer Provided)
+// - ยอดรวมต่อ Item: ต้องใช้ เทียบขอ/สั่งซื้อ/รับแล้ว แยกซื้อเอง / ผู้ว่าจ้างจัดหา (Customer Provided)
 // - คน/เครื่องจักร รวมตามชื่อ: ช่วงที่ใช้ จำนวนสูงสุดต่อวัน และวันต้องจองของงานถัดไป
 // - กราฟคน-วัน/คัน-วันรายสัปดาห์ แผนเทียบใช้จริง (Daily Report)
 // ข้อมูลจาก construction_management/resources.get_overview กำหนดรายการได้ที่แผงด้านขวาของหน้า Gantt (คลิกชื่องาน)
@@ -37,9 +37,9 @@ const UNITS = { Labour: __("คน"), Equipment: __("คัน") };
 
 // ป้ายสถานะวัสดุที่ขอครบแล้ว: ขั้นล่าสุดที่ครบจำนวน
 const STAGE_LABELS = {
-	received: { color: "green", label: __("รับแล้ว"), customer: __("ลูกค้าส่งแล้ว") },
-	ordered: { color: "green", label: __("สั่งซื้อแล้ว"), customer: __("ขอลูกค้าแล้ว") },
-	requested: { color: "blue", label: __("ขอซื้อแล้ว"), customer: __("ขอลูกค้าแล้ว") },
+	received: { color: "green", label: __("รับแล้ว"), customer: __("ผู้ว่าจ้างส่งแล้ว") },
+	ordered: { color: "green", label: __("สั่งซื้อแล้ว"), customer: __("ขอผู้ว่าจ้างแล้ว") },
+	requested: { color: "blue", label: __("ขอซื้อแล้ว"), customer: __("ขอผู้ว่าจ้างแล้ว") },
 };
 function material_pill(row) {
 	const stage = STAGE_LABELS[row.coverage?.state];
@@ -134,7 +134,7 @@ function make_request() {
 				args: { name: props.name, days },
 				freeze: true,
 			});
-			// ซื้อเอง / ลูกค้าจัดหา ได้ 1-2 ฉบับ
+			// ซื้อเอง / ผู้ว่าจ้างจัดหา ได้ 1-2 ฉบับ
 			if (message.length === 1) frappe.set_route("Form", "Material Request", message[0]);
 			else frappe.set_route("List", "Material Request", { name: ["in", message] });
 		},
@@ -216,7 +216,7 @@ function make_request() {
 								</td>
 								<td :title="row.item_code">
 									{{ row.item_label || row.item_code }}
-									<span v-if="row.customer_provided" class="text-muted small">· {{ __("ลูกค้าจัดหา") }}</span>
+									<span v-if="row.customer_provided" class="text-muted small">· {{ __("ผู้ว่าจ้างจัดหา") }}</span>
 								</td>
 								<td class="text-right">{{ qty(row.qty) }} {{ row.uom }}</td>
 								<td class="text-right">{{ __("{0} วัน", [row.lead_time_days || 0]) }}</td>
@@ -232,7 +232,7 @@ function make_request() {
 				</div>
 			</section>
 
-			<!-- ยอดรวมต่อ Item แยกซื้อเอง / ลูกค้าจัดหา -->
+			<!-- ยอดรวมต่อ Item แยกซื้อเอง / ผู้ว่าจ้างจัดหา -->
 			<section v-if="supply.length" class="pd-card">
 				<header class="pd-card-head">
 					<div>
@@ -249,7 +249,7 @@ function make_request() {
 								<th rowspan="2">{{ __("วัสดุ") }}</th>
 								<th rowspan="2" class="text-right">{{ __("ต้องใช้") }}</th>
 								<th colspan="3" class="text-center">{{ __("ซื้อเอง") }}</th>
-								<th colspan="2" class="text-center">{{ __("ลูกค้าจัดหา") }}</th>
+								<th colspan="2" class="text-center">{{ __("ผู้ว่าจ้างจัดหา") }}</th>
 								<th rowspan="2" class="text-right">{{ __("ยังขาด") }}</th>
 							</tr>
 							<tr>

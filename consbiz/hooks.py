@@ -24,15 +24,23 @@ fixtures = [
     {"doctype": "Client Script", "filters": [["module", "=", "ConsBiz"]]},
     {"doctype": "Print Format", "filters": [["module", "=", "ConsBiz"], ["standard", "=", "No"]]},
     {"doctype": "Report", "filters": [["name", "in", ["Salary Slip Report"]]]},
+    # หน้าแรก (Workspace ConsBiz) มีแค่ตัวเรียก consbiz.render_home ใน public/js/home.js
+    {"doctype": "Custom HTML Block", "filters": [["name", "in", ["ConsBiz Home"]]]},
 ]
 
 
 app_include_css = "/assets/consbiz/css/style.css"
 app_include_js = [
     "/assets/consbiz/js/utils.js",
-    "/assets/consbiz/js/company_switcher.js"
+    "/assets/consbiz/js/company_switcher.js",
+    "/assets/consbiz/js/home.js",
+    "/assets/consbiz/js/retention.js",
+    "/assets/consbiz/js/transmittal.js"
 ]
 
+
+# แอปสโตร์หน้างานบนมือถือ (www/store.html) ทุก path ใต้ /store ให้แอปจัดการเอง
+website_route_rules = [{"from_route": "/store/<path:app_path>", "to_route": "store"}]
 
 naming_series_variables = {
     "ABBR": "consbiz.utils.parse_naming_series_variable"
@@ -46,14 +54,17 @@ doctype_js = {
     "Purchase Invoice": "public/js/purchase_invoice.js",
     "Payment Entry": "public/js/payment_entry_deduction.js",
     "Material Request": "public/js/material_request.js",
-    "Employee": "public/js/employee.js"
+    "Employee": "public/js/employee.js",
+    "Item": "public/js/item.js",
+    "Stock Entry": "public/js/stock_entry.js",
+    "Project": "public/js/project.js"
 }
 
 # ----------------------------------------
 # Auto Cancel Exemption (สำคัญมาก)
 # ----------------------------------------
 # บอกระบบว่าไม่ต้อง Block ถ้ามีเอกสารเหล่านี้ Link อยู่ (เราจะจัดการ Cancel เองใน Code)
-auto_cancel_exempted_doctypes = ["Retention Receivable"]
+auto_cancel_exempted_doctypes = ["Retention Receivable", "Retention Payable"]
 
 
 doc_events = {
@@ -61,53 +72,72 @@ doc_events = {
         "on_submit": "consbiz.api.update_si_tax" 
     },
 
+    # เงินประกันผลงาน (consbiz/retention.py): JE ที่ผูกกับ Retention Invoice / Release (ช่อง journal_entry)
     "Journal Entry": {
-        "on_submit": "consbiz.api.update_retention_on_payment_submit",
-        "on_cancel": "consbiz.api.update_retention_on_payment_cancel"
-    },
-
-    "Retention Invoice": {
-        "on_submit": "consbiz.api.create_transmittal_from_retention",
-        "before_cancel": "consbiz.api.cancel_transmittal_from_retention"
+        "on_submit": "consbiz.retention.on_journal_entry_change",
+        "before_cancel": "consbiz.retention.before_journal_entry_cancel",
+        "on_cancel": "consbiz.retention.on_journal_entry_change",
+        "on_trash": "consbiz.retention.on_journal_entry_trash"
     },
 
     "Purchase Invoice": {
-        "on_submit": "consbiz.api.create_transmittal_entry_for_pi",
-        # ใช้ฟังก์ชัน cancel เดียวกันกับ SI ได้ เพราะค้นหาจาก document_no
-        "before_cancel": "consbiz.api.cancel_transmittal_entry"
+        # ตัดสต็อกในใบเดียว (update_stock): คลังวัสดุผู้ว่าจ้างรับของบริษัทไม่ได้ (consbiz/site_stock.py)
+        "validate": "consbiz.site_stock.validate_warehouses",
+        "on_submit": "consbiz.retention.create_from_invoice",
+        "before_cancel": "consbiz.retention.cancel_from_invoice"
     },
 
     # โครงการที่หัวเอกสาร (custom_project) ลงทุกรายการ ให้ PO / PR ที่สร้างต่อได้โครงการไปด้วย (แผนวัสดุนับยอดตามโครงการ)
+    # ผู้ว่าจ้างจัดหา (Customer Provided): เลขชุด OPO- และสลับรายการเป็น Item คู่ (consbiz/employer_supplied.py)
     "Material Request": {
-        "validate": "consbiz.consbiz.doctype.construction_material_plan.construction_material_plan.set_item_project"
+        "before_insert": "consbiz.employer_supplied.set_request_series",
+        "before_validate": "consbiz.employer_supplied.swap_request_items",
+        "validate": [
+            "consbiz.consbiz.doctype.construction_material_plan.construction_material_plan.set_item_project",
+            "consbiz.site_stock.validate_wbs"
+        ]
+    },
+
+    # สต็อกหน้างาน (consbiz/site_stock.py): คลังวัสดุผู้ว่าจ้างแยกจากคลังบริษัท, เบิกตัดคลังผู้ว่าจ้างก่อน, WBS ของรายการ
+    "Stock Entry": {
+        "before_validate": "consbiz.site_stock.split_employer_stock",
+        "validate": [
+            "consbiz.site_stock.validate_warehouses",
+            "consbiz.site_stock.validate_wbs"
+        ]
+    },
+
+    "Purchase Receipt": {
+        "validate": "consbiz.site_stock.validate_warehouses"
+    },
+
+    # ทุกโครงการมีคลังของตัวเอง: All Warehouses / โครงการ / <โครงการ>
+    "Project": {
+        "validate": "consbiz.site_stock.validate_project_warehouse_name",
+        "after_insert": "consbiz.site_stock.create_project_warehouse"
+    },
+
+    # Item คู่ของวัสดุผู้ว่าจ้างจัดหา ใช้ค่าจาก Item หลักเสมอ และตาม Item หลักเมื่อแก้/merge
+    "Item": {
+        "before_validate": "consbiz.employer_supplied.enforce_base_values",
+        "on_update": "consbiz.employer_supplied.sync_employer_item",
+        "before_rename": "consbiz.employer_supplied.merge_employer_items",
+        "after_rename": "consbiz.employer_supplied.sync_after_rename"
     },
 
     "Sales Invoice": {
-        "on_submit": [
-            "consbiz.api.create_retention_receivable",
-            "consbiz.api.create_transmittal_entry"
-        ],
-
-        "before_cancel": [
-            "consbiz.api.cancel_linked_retention_receivable",
-            "consbiz.api.cancel_transmittal_entry"
-        ]
+        "on_submit": "consbiz.retention.create_from_invoice",
+        "before_cancel": "consbiz.retention.cancel_from_invoice"
     }
 }
 
 scheduler_events = {
     "daily": [
-        # สั่งให้รันฟังก์ชันนี้ทุกวัน (เปลี่ยน path.to.your.app เป็น path จริงของคุณ)
-        "consbiz.doctype.retention_receivable.retention_receivable.update_overdue_status_all"
+        # เงินประกันผลงาน: Active → Overdue เมื่อเลยวันครบกำหนด
+        "consbiz.retention.update_overdue"
     ]
 }
 
-
-#doc_events = {
-#  "Sales Invoice": {
-#       "on_submit": "consbiz.api.create_retention_receivable"
-#   }
-#}
 # Apps
 # ------------------
 

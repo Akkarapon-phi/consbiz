@@ -24,6 +24,11 @@
   "column_break_eeqc",
   "grand_total",
   "in_words",
+  "billing_section",
+  "billed_amount",
+  "paid_amount",
+  "column_break_billing",
+  "outstanding_amount",
   "more_info_section",
   "status",
   "column_break_ixim"
@@ -64,7 +69,9 @@
   {
    "fieldname": "due_date",
    "fieldtype": "Date",
-   "label": "Due Date"
+   "label": "Return Due Date",
+   "allow_on_submit": 1,
+   "description": "วันครบกำหนดคืนเงินประกัน (เช่น วันสิ้นสุดระยะรับประกันผลงาน) แก้ได้หลัง Submit"
   },
   {
    "fieldname": "column_break_ypwu",
@@ -107,12 +114,14 @@
   {
    "fieldname": "grand_total",
    "fieldtype": "Currency",
-   "label": "Grand Total"
+   "label": "Retention Amount",
+   "read_only": 1
   },
   {
    "fieldname": "in_words",
    "fieldtype": "Data",
-   "label": "In Words"
+   "label": "In Words",
+   "read_only": 1
   },
   {
    "fieldname": "section_break_pwlb",
@@ -125,12 +134,15 @@
    "options": "Retention Items"
   },
   {
-   "allow_on_submit": 1,
    "default": "Draft",
    "fieldname": "status",
    "fieldtype": "Select",
    "label": "Status",
-   "options": "Draft\nActive\nOverdue\nBilled\nPaid\nCancelled"
+   "options": "Draft\nActive\nOverdue\nPartly Billed\nBilled\nPaid\nCancelled",
+   "read_only": 1,
+   "no_copy": 1,
+   "in_standard_filter": 1,
+   "allow_on_submit": 1
   },
   {
    "collapsible": 1,
@@ -141,13 +153,48 @@
   {
    "fieldname": "column_break_ixim",
    "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "billing_section",
+   "fieldtype": "Section Break",
+   "label": "Retention Billing"
+  },
+  {
+   "fieldname": "billed_amount",
+   "fieldtype": "Currency",
+   "label": "Billed Amount",
+   "read_only": 1,
+   "no_copy": 1,
+   "allow_on_submit": 1
+  },
+  {
+   "fieldname": "paid_amount",
+   "fieldtype": "Currency",
+   "label": "Paid Amount",
+   "read_only": 1,
+   "no_copy": 1,
+   "allow_on_submit": 1
+  },
+  {
+   "fieldname": "column_break_billing",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "outstanding_amount",
+   "fieldtype": "Currency",
+   "label": "Outstanding Amount",
+   "description": "ยอดที่ยังไม่ได้วางบิล/ตั้งเบิกคืน",
+   "read_only": 1,
+   "no_copy": 1,
+   "in_list_view": 1,
+   "allow_on_submit": 1
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-02-14 23:01:13.895674",
+ "modified": "2026-11-04 23:18:00.546857",
  "modified_by": "Administrator",
  "module": "ConsBiz",
  "name": "Retention Receivable",
@@ -155,18 +202,57 @@
  "owner": "admin@siricons.com",
  "permissions": [
   {
-   "create": 1,
-   "delete": 1,
-   "email": 1,
-   "export": 1,
-   "print": 1,
-   "read": 1,
-   "report": 1,
    "role": "System Manager",
-   "select": 1,
+   "read": 1,
+   "print": 1,
+   "report": 1,
+   "export": 1,
+   "email": 1,
    "share": 1,
+   "create": 1,
+   "write": 1,
    "submit": 1,
-   "write": 1
+   "cancel": 1,
+   "amend": 1,
+   "delete": 1
+  },
+  {
+   "role": "Accounts Manager",
+   "read": 1,
+   "print": 1,
+   "report": 1,
+   "export": 1,
+   "email": 1,
+   "share": 1,
+   "create": 1,
+   "write": 1,
+   "submit": 1,
+   "cancel": 1,
+   "amend": 1,
+   "delete": 1
+  },
+  {
+   "role": "Accounts User",
+   "read": 1,
+   "print": 1,
+   "report": 1,
+   "export": 1,
+   "email": 1,
+   "share": 1,
+   "create": 1,
+   "write": 1,
+   "submit": 1,
+   "cancel": 1,
+   "amend": 1
+  },
+  {
+   "role": "Projects Manager",
+   "read": 1,
+   "print": 1,
+   "report": 1,
+   "export": 1,
+   "email": 1,
+   "share": 1
   }
  ],
  "row_format": "Dynamic",
@@ -179,15 +265,19 @@
    "title": "Draft"
   },
   {
-   "color": "Green",
+   "color": "Blue",
    "title": "Active"
   },
   {
-   "color": "Orange",
+   "color": "Red",
    "title": "Overdue"
   },
   {
-   "color": "Blue",
+   "color": "Orange",
+   "title": "Partly Billed"
+  },
+  {
+   "color": "Purple",
    "title": "Billed"
   },
   {

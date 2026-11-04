@@ -1,14 +1,18 @@
 {
- "app": "consbiz",
  "charts": [],
- "content": "[{\"id\":\"baAGSErYUr\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\">Purchasing &amp; Sales</span>\",\"col\":12}},{\"id\":\"cHSOgpad9L\",\"type\":\"card\",\"data\":{\"card_name\":\"Purchase\",\"col\":4}},{\"id\":\"R_k_DA5-bp\",\"type\":\"card\",\"data\":{\"card_name\":\"Sales\",\"col\":4}},{\"id\":\"gc_m-yhuVE\",\"type\":\"card\",\"data\":{\"card_name\":\"Account\",\"col\":4}},{\"id\":\"YWJdQpG9W2\",\"type\":\"header\",\"data\":{\"text\":\"<span style=\\\"font-size: 16px;\\\">.</span>\",\"col\":12}},{\"id\":\"ZEjAc_xr-s\",\"type\":\"card\",\"data\":{\"card_name\":\"Retention\",\"col\":4}}]",
+ "content": "[{\"id\": \"consbizhome\", \"type\": \"custom_block\", \"data\": {\"custom_block_name\": \"ConsBiz Home\", \"col\": 12}}, {\"id\": \"baAGSErYUr\", \"type\": \"header\", \"data\": {\"text\": \"\\u003cspan class=\\\"h4\\\"\\u003ePurchasing &amp; Sales\\u003c/span\\u003e\", \"col\": 12}}, {\"id\": \"cHSOgpad9L\", \"type\": \"card\", \"data\": {\"card_name\": \"Purchase\", \"col\": 4}}, {\"id\": \"R_k_DA5-bp\", \"type\": \"card\", \"data\": {\"card_name\": \"Sales\", \"col\": 4}}, {\"id\": \"gc_m-yhuVE\", \"type\": \"card\", \"data\": {\"card_name\": \"Account\", \"col\": 4}}, {\"id\": \"YWJdQpG9W2\", \"type\": \"header\", \"data\": {\"text\": \"\\u003cspan style=\\\"font-size:16px\\\"\\u003e.\\u003c/span\\u003e\", \"col\": 12}}, {\"id\": \"ZEjAc_xr-s\", \"type\": \"card\", \"data\": {\"card_name\": \"Retention\", \"col\": 4}}]",
  "creation": "2026-01-27 00:26:35.667994",
- "custom_blocks": [],
+ "custom_blocks": [
+  {
+   "custom_block_name": "ConsBiz Home",
+   "label": "ConsBiz Home"
+  }
+ ],
  "docstatus": 0,
  "doctype": "Workspace",
  "hide_custom": 0,
  "icon": "building-2",
- "idx": 4,
+ "idx": 5,
  "indicator_color": "green",
  "is_hidden": 0,
  "label": "ConsBiz",
@@ -56,35 +60,6 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Purchase",
-   "link_count": 2,
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Card Break"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Purchase Order",
-   "link_count": 0,
-   "link_to": "Purchase Order",
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Purchase Invoice",
-   "link_count": 0,
-   "link_to": "Purchase Invoice",
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
    "label": "Sales",
    "link_count": 3,
    "link_type": "DocType",
@@ -125,7 +100,7 @@
    "hidden": 0,
    "is_query_report": 0,
    "label": "Account",
-   "link_count": 1,
+   "link_count": 2,
    "link_type": "DocType",
    "onboard": 0,
    "type": "Card Break"
@@ -139,9 +114,58 @@
    "link_type": "DocType",
    "onboard": 0,
    "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Withholding Tax Cert",
+   "link_count": 0,
+   "link_to": "Withholding Tax Cert",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Purchase",
+   "link_count": 3,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Material Request",
+   "link_count": 0,
+   "link_to": "Material Request",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Purchase Order",
+   "link_count": 0,
+   "link_to": "Purchase Order",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Purchase Invoice",
+   "link_count": 0,
+   "link_to": "Purchase Invoice",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
   }
  ],
- "modified": "2026-02-02 00:24:12.514440",
+ "modified": "2026-11-04 23:00:33.472713",
  "modified_by": "Administrator",
  "module": "ConsBiz",
  "name": "ConsBiz",
@@ -153,6 +177,7 @@
  "roles": [],
  "sequence_id": 0.0,
  "shortcuts": [],
+ "standard": 1,
  "title": "ConsBiz",
  "type": "Workspace"
 }

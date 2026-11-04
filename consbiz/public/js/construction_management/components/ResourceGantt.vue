@@ -25,7 +25,7 @@ const props = defineProps({
 	materials: Array,
 	bufferDays: Number,
 	coverage: Map, // วัสดุ: key ของแถว → ยอดที่ตัดได้ (allocate_materials)
-	supply: Object, // วัสดุ: item_code → ยอดของโครงการ แยกซื้อเอง/ลูกค้าจัดหา (หน่วยสต็อก)
+	supply: Object, // วัสดุ: item_code → ยอดของโครงการ แยกซื้อเอง/ผู้ว่าจ้างจัดหา (หน่วยสต็อก)
 	range: Object,
 	ppd: Number,
 	units: Object,
@@ -141,7 +141,7 @@ function usage_row(type, row) {
 	};
 }
 
-// ยอดของโครงการแยกซื้อเอง / ลูกค้าจัดหา (หน่วยสต็อก)
+// ยอดของโครงการแยกซื้อเอง / ผู้ว่าจ้างจัดหา (หน่วยสต็อก)
 function supply_text(supply, uom) {
 	const line = (label, s, ordered) =>
 		`${label}: ${__("ขอ")} ${fmt_qty(s.requested)}${s.draft ? ` (${__("ร่าง")} ${fmt_qty(s.draft)})` : ""}${
@@ -149,7 +149,7 @@ function supply_text(supply, uom) {
 		} · ${__("รับ")} ${fmt_qty(s.received)} ${uom}`;
 	return [
 		supply.purchase?.requested ? line(__("ซื้อเอง"), supply.purchase, true) : "",
-		supply.customer?.requested ? line(__("ลูกค้าจัดหา"), supply.customer, false) : "",
+		supply.customer?.requested ? line(__("ผู้ว่าจ้างจัดหา"), supply.customer, false) : "",
 	]
 		.filter(Boolean)
 		.join("\n");

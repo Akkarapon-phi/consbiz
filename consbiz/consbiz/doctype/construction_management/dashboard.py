@@ -165,7 +165,7 @@ def quality(name):
 
 
 def materials(name, day):
-	"""วัสดุที่ยังขอซื้อ/ขอลูกค้าไม่ครบ (เทียบปริมาณรวมของโครงการ): เลยวันที่ต้องสั่งแล้ว และต้องสั่งภายใน MATERIAL_DUE_DAYS วัน"""
+	"""วัสดุที่ยังขอซื้อ/ขอผู้ว่าจ้างไม่ครบ (เทียบปริมาณรวมของโครงการ): เลยวันที่ต้องสั่งแล้ว และต้องสั่งภายใน MATERIAL_DUE_DAYS วัน"""
 	from consbiz.consbiz.doctype.construction_material_plan.construction_material_plan import is_done, plan_coverage
 
 	if not frappe.db.exists("Construction Material Plan", name):
@@ -183,17 +183,18 @@ def materials(name, day):
 
 
 def retention(project):
-	"""เงินประกันผลงานที่ยังไม่ได้รับคืน (Retention Receivable สถานะ Active / Overdue) ของ Project"""
+	"""เงินประกันผลงานที่ยังไม่ได้รับคืนของ Project (consbiz/retention.py)
+	outstanding = ยอดเงินประกัน - รับคืนแล้ว, overdue = ยอดที่เลยวันครบกำหนดคืนแต่ยังไม่ได้วางบิล"""
 	if not project or not frappe.has_permission("Retention Receivable", "read"):
 		return None
 	rows = frappe.get_all(
 		"Retention Receivable",
-		filters={"project": project, "docstatus": 1, "status": ("in", ("Active", "Overdue"))},
-		fields=["grand_total", "status"],
+		filters={"project": project, "docstatus": 1, "status": ("!=", "Paid")},
+		fields=["grand_total", "paid_amount", "outstanding_amount", "status"],
 	)
 	return {
-		"outstanding": sum(flt(r.grand_total) for r in rows),
-		"overdue": sum(flt(r.grand_total) for r in rows if r.status == "Overdue"),
+		"outstanding": sum(flt(r.grand_total) - flt(r.paid_amount) for r in rows),
+		"overdue": sum(flt(r.outstanding_amount) for r in rows if r.status == "Overdue"),
 	}
 
 

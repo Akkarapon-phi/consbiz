@@ -1,69 +1,31 @@
-import frappe
-from frappe import _
+# Copyright (c) 2026, Siricons and contributors
+# For license information, please see license.txt
+
+# เงินประกันผลงานที่ถูกหักจาก Sales Invoice (ระบบสร้างเองตอน Submit Sales Invoice) logic อยู่ใน consbiz/retention.py
+
 from frappe.model.document import Document
-from frappe.utils import getdate, nowdate
+
+from consbiz import retention
+
 
 class RetentionReceivable(Document):
-    def validate(self):
-        # 1. ระบบป้องกันการสร้างซ้ำ (Hard Block)
-        self.check_duplicate_invoice()
-        
-        # 2. คำนวณสถานะ (Logic เดิม)
-        self.set_status()
+	def validate(self):
+		retention.validate_source(self)
 
-    def check_duplicate_invoice(self):
-        """
-        ตรวจสอบว่า Sales Invoice (Reference No) ในรายการนี้ เคยถูกเอาไปสร้าง Retention Receivable ใบอื่นหรือยัง
-        (ต้องเช็คทั้งแบบ Draft และ Submit แต่ไม่เช็ค Cancel)
-        """
-        for item in self.retention_items:
-            # ใช้ sales_invoice_no สำหรับฝั่งลูกหนี้
-            ref_no = item.sales_invoice_no
-            
-            if ref_no:
-                # Query หาว่ามีใบอื่น (t2) ที่ไม่ใช่ใบนี้ (self.name) ใช้อินวอยซ์เดียวกันไหม
-                duplicate = frappe.db.sql("""
-                    SELECT t2.name 
-                    FROM `tabRetention Items` t1
-                    LEFT JOIN `tabRetention Receivable` t2 ON t1.parent = t2.name
-                    WHERE t1.sales_invoice_no = %s
-                    AND t1.parenttype = 'Retention Receivable'
-                    AND t2.docstatus < 2
-                    AND t2.name != %s
-                """, (ref_no, self.name or "New Document"))
-                
-                # ถ้าเจอ -> โวยวายทันที และห้ามบันทึก
-                if duplicate:
-                    frappe.throw(_("ไม่สามารถสร้างได้: Sales Invoice {0} ถูกใช้งานแล้วในเอกสาร <a href='/app/retention-receivable/{1}'>{1}</a>").format(ref_no, duplicate[0][0]))
+	def on_submit(self):
+		self.refresh_amounts()
 
-    def set_status(self):
-        if self.docstatus == 0:
-            self.status = "Draft"
-            return
-        elif self.docstatus == 2:
-            self.status = "Cancelled"
-            return
-        
-        if self.status == "Billed":
-            return
+	def on_update_after_submit(self):
+		# แก้วันครบกำหนดคืนหลัง Submit ได้ สถานะ Overdue คิดใหม่
+		self.refresh_amounts()
 
-        if self.due_date and getdate(self.due_date) < getdate(nowdate()):
-            self.status = "Overdue"
-        else:
-            self.status = "Active"
+	def before_cancel(self):
+		retention.before_cancel_source(self)
 
-    def on_submit(self):
-        self.set_status()
-        self.db_set("status", self.status)
+	def on_cancel(self):
+		self.refresh_amounts()
 
-    def update_overdue_status(self):
-        if self.docstatus == 1 and self.status == "Active":
-            if self.due_date and getdate(self.due_date) < getdate(nowdate()):
-                self.db_set("status", "Overdue")
-
-    @staticmethod
-    def update_overdue_status_all():
-        active_docs = frappe.get_all("Retention Receivable", filters={"status": "Active", "docstatus": 1})
-        for d in active_docs:
-            doc = frappe.get_doc("Retention Receivable", d.name)
-            doc.update_overdue_status()
+	def refresh_amounts(self):
+		values = retention.update_source(self.doctype, self.name)
+		if values:
+			self.update(values)

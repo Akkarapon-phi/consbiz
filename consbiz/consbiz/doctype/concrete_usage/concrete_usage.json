@@ -1,0 +1,304 @@
+{
+ "actions": [],
+ "autoname": "naming_series:",
+ "creation": "2026-11-04 22:00:00.000000",
+ "description": "บันทึกการใช้คอนกรีต 1 ใบต่อการเท 1 จุด ตั๋วรถ 1 แถวต่อคัน ไม่ตัดสต็อก",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "naming_series",
+  "construction_management",
+  "project",
+  "company",
+  "wbs",
+  "task_name",
+  "location",
+  "column_break_main",
+  "date",
+  "concrete_item",
+  "strength",
+  "supplier",
+  "employer_supplied",
+  "planned_qty",
+  "amended_from",
+  "section_break_tickets",
+  "tickets",
+  "section_break_totals",
+  "total_qty",
+  "ticket_count",
+  "column_break_totals",
+  "employer_qty",
+  "company_qty",
+  "column_break_variance",
+  "variance",
+  "section_break_remarks",
+  "remarks"
+ ],
+ "fields": [
+  {
+   "default": "CU-.YYYY.MM.####",
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "hidden": 1,
+   "label": "Series",
+   "options": "CU-.YYYY.MM.####",
+   "print_hide": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "construction_management",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Construction Management",
+   "options": "Construction Management",
+   "reqd": 1
+  },
+  {
+   "fetch_from": "construction_management.project",
+   "fieldname": "project",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "label": "Project",
+   "options": "Project",
+   "read_only": 1
+  },
+  {
+   "fetch_from": "construction_management.company",
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "label": "Company",
+   "options": "Company",
+   "read_only": 1
+  },
+  {
+   "fieldname": "wbs",
+   "fieldtype": "Autocomplete",
+   "in_list_view": 1,
+   "label": "WBS",
+   "reqd": 1
+  },
+  {
+   "fieldname": "task_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Task",
+   "read_only": 1
+  },
+  {
+   "description": "ชั้น / Grid / ชิ้นส่วน เช่น ชั้น 2 คาน B1-B4",
+   "fieldname": "location",
+   "fieldtype": "Data",
+   "label": "Location"
+  },
+  {
+   "fieldname": "column_break_main",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "Today",
+   "fieldname": "date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Date",
+   "reqd": 1
+  },
+  {
+   "description": "เลือก Item หลัก (ไม่ต้องเลือกของผู้ว่าจ้างจัดหา ใช้ช่องติ๊กแทน)",
+   "fieldname": "concrete_item",
+   "fieldtype": "Link",
+   "label": "Concrete",
+   "options": "Item",
+   "reqd": 1
+  },
+  {
+   "description": "เช่น 240 ksc (Cube)",
+   "fieldname": "strength",
+   "fieldtype": "Data",
+   "label": "Strength"
+  },
+  {
+   "fieldname": "supplier",
+   "fieldtype": "Link",
+   "label": "Concrete Supplier",
+   "options": "Supplier"
+  },
+  {
+   "default": "0",
+   "description": "ค่าตั้งต้นของตั๋วรถที่เพิ่มใหม่ ติ๊ก/เอาออกรายใบได้",
+   "fieldname": "employer_supplied",
+   "fieldtype": "Check",
+   "label": "Employer Supplied"
+  },
+  {
+   "description": "ปริมาณตามแบบของจุดเทนี้",
+   "fieldname": "planned_qty",
+   "fieldtype": "Float",
+   "label": "Planned Qty (m³)",
+   "non_negative": 1
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "Concrete Usage",
+   "print_hide": 1,
+   "read_only": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "section_break_tickets",
+   "fieldtype": "Section Break",
+   "label": "Tickets"
+  },
+  {
+   "fieldname": "tickets",
+   "fieldtype": "Table",
+   "label": "Tickets",
+   "options": "Concrete Usage Ticket",
+   "reqd": 1
+  },
+  {
+   "fieldname": "section_break_totals",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "total_qty",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Total Qty (m³)",
+   "read_only": 1
+  },
+  {
+   "fieldname": "ticket_count",
+   "fieldtype": "Int",
+   "label": "Trucks",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_totals",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "employer_qty",
+   "fieldtype": "Float",
+   "label": "Employer Supplied Qty (m³)",
+   "read_only": 1
+  },
+  {
+   "fieldname": "company_qty",
+   "fieldtype": "Float",
+   "label": "Company Qty (m³)",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_variance",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "ใช้จริง - ตามแบบ",
+   "fieldname": "variance",
+   "fieldtype": "Float",
+   "label": "Variance (m³)",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_remarks",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "remarks",
+   "fieldtype": "Small Text",
+   "label": "Remarks"
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "is_submittable": 1,
+ "links": [],
+ "modified": "2026-11-04 22:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "ConsBiz",
+ "name": "Concrete Usage",
+ "naming_rule": "By \"Naming Series\" field",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "submit": 1,
+   "cancel": 1,
+   "amend": 1,
+   "print": 1,
+   "email": 1,
+   "export": 1,
+   "report": 1,
+   "share": 1
+  },
+  {
+   "role": "Stock Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "submit": 1,
+   "cancel": 1,
+   "amend": 1,
+   "print": 1,
+   "email": 1,
+   "export": 1,
+   "report": 1,
+   "share": 1
+  },
+  {
+   "role": "Projects Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "submit": 1,
+   "cancel": 1,
+   "amend": 1,
+   "print": 1,
+   "email": 1,
+   "export": 1,
+   "report": 1,
+   "share": 1
+  },
+  {
+   "role": "Stock User",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "submit": 1,
+   "print": 1,
+   "email": 1,
+   "export": 1,
+   "report": 1,
+   "share": 1
+  },
+  {
+   "role": "Projects User",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "submit": 1,
+   "print": 1,
+   "email": 1,
+   "export": 1,
+   "report": 1,
+   "share": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "show_title_field_in_link": 0,
+ "sort_field": "date",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "task_name",
+ "track_changes": 1
+}

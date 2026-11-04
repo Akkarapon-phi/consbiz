@@ -70,16 +70,16 @@ const resource_rows = computed(() =>
 	})
 );
 
-// ป้ายสถานะวัสดุ: ขอครบแล้วแสดงขั้นล่าสุด (ลูกค้าจัดหาใช้คำของลูกค้า) ไม่งั้นนับวันถึงวันต้องสั่ง
+// ป้ายสถานะวัสดุ: ขอครบแล้วแสดงขั้นล่าสุด (ผู้ว่าจ้างจัดหาใช้คำของผู้ว่าจ้าง) ไม่งั้นนับวันถึงวันต้องสั่ง
 function material_pill(row, cov, order_by) {
 	const customer = Boolean(row.customer_provided);
 	switch (cov?.state) {
 		case "received":
-			return { color: "green", label: customer ? __("ลูกค้าส่งแล้ว") : __("รับแล้ว") };
+			return { color: "green", label: customer ? __("ผู้ว่าจ้างส่งแล้ว") : __("รับแล้ว") };
 		case "ordered":
-			return { color: "green", label: customer ? __("ขอลูกค้าแล้ว") : __("สั่งซื้อแล้ว") };
+			return { color: "green", label: customer ? __("ขอผู้ว่าจ้างแล้ว") : __("สั่งซื้อแล้ว") };
 		case "requested":
-			return { color: "blue", label: customer ? __("ขอลูกค้าแล้ว") : __("ขอซื้อแล้ว") };
+			return { color: "blue", label: customer ? __("ขอผู้ว่าจ้างแล้ว") : __("ขอซื้อแล้ว") };
 		default:
 			return due_pill(order_by, false);
 	}
@@ -113,8 +113,8 @@ const material_rows = computed(() =>
 );
 
 function customer_word(row, stage) {
-	if (stage === "requested") return row.customer_provided ? __("ขอลูกค้า") : __("ขอซื้อ");
-	return row.customer_provided ? __("ลูกค้าส่ง") : __("รับ");
+	if (stage === "requested") return row.customer_provided ? __("ขอผู้ว่าจ้าง") : __("ขอซื้อ");
+	return row.customer_provided ? __("ผู้ว่าจ้างส่ง") : __("รับ");
 }
 
 // แก้ค่าในแถว: ค่าไม่ถูกต้องไม่ส่งต่อ และสร้างช่องใหม่ (resets) ให้กลับไปแสดงค่าเดิม
@@ -135,7 +135,24 @@ function edit(event, row, field, value) {
 // ---------- เพิ่มรายการ ----------
 
 const new_resource = reactive({ resource_type: "Labour", resource: "", qty_per_day: null, lead_time_days: 0 });
-const EMPTY_MATERIAL = { item_code: "", item_label: "", uom: "", stock_uom: "", factor: 1, customer_provided: 0, qty: null, lead_time_days: 0 };
+const EMPTY_MATERIAL = {
+	item_code: "",
+	item_label: "",
+	uom: "",
+	stock_uom: "",
+	factor: 1,
+	customer_provided: 0,
+	employer_supplied: false,
+	qty: null,
+	lead_time_days: 0,
+};
+const EMPLOYER_ITEM_API = "consbiz.employer_supplied.get_employer_item";
+// เลือกได้เฉพาะ Item หลัก (Item คู่ของผู้ว่าจ้างจัดหาระบบเลือกให้เมื่อติ๊ก)
+const ITEM_DF = {
+	fieldtype: "Link",
+	options: "Item",
+	get_query: () => ({ filters: { custom_base_item: ["is", "not set"] } }),
+};
 const new_material = reactive({ ...EMPTY_MATERIAL });
 const adding = ref(null); // "resource" | "material"
 
@@ -179,12 +196,19 @@ async function set_item(code) {
 	});
 }
 
-function add_material() {
+async function add_material() {
 	if (!new_material.item_code || !(new_material.qty > 0) || cint(new_material.lead_time_days) < 0) {
 		frappe.show_alert({ message: __("เลือก Item กรอกจำนวน (มากกว่า 0) และ Lead Time (ไม่ติดลบ)"), indicator: "red" });
 		return;
 	}
-	emit("add-material", { ...new_material });
+	const material = { ...new_material };
+	// ผู้ว่าจ้างจัดหา: ใช้ Item คู่ (สร้างให้ถ้ายังไม่มี) ยอดจึงแยกจากของที่ซื้อเอง
+	if (material.employer_supplied && !material.customer_provided) {
+		const { message: code } = await frappe.call({ method: EMPLOYER_ITEM_API, args: { item_code: material.item_code } });
+		const { message: item } = await frappe.db.get_value("Item", code, "item_name");
+		Object.assign(material, { item_code: code, item_label: item?.item_name || code, customer_provided: 1 });
+	}
+	emit("add-material", material);
 	Object.assign(new_material, EMPTY_MATERIAL);
 }
 
@@ -316,7 +340,7 @@ function open_request(name) {
 				<div class="cs-tp-item-head">
 					<span class="cs-tp-item-icon" v-html="icon('package')" />
 					<span class="cs-tp-item-name" :title="item.row.item_code">{{ item.row.item_label || item.row.item_code }}</span>
-					<span v-if="item.row.customer_provided" class="cs-tp-tag" :title="__('Customer Provided Item')">{{ __("ลูกค้าจัดหา") }}</span>
+					<span v-if="item.row.customer_provided" class="cs-tp-tag" :title="__('Customer Provided Item')">{{ __("ผู้ว่าจ้างจัดหา") }}</span>
 					<span class="indicator-pill no-indicator-dot cs-tp-pill" :class="item.pill.color">{{ item.pill.label }}</span>
 					<button
 						v-if="canEditMaterials"
@@ -375,12 +399,14 @@ function open_request(name) {
 					<div class="cs-tp-fields">
 						<label class="cs-tp-wide">
 							<span>{{ __("Item") }}</span>
-							<FrappeControl
-								:df="{ fieldtype: 'Link', options: 'Item' }"
-								:model-value="new_material.item_code"
-								@update:model-value="set_item"
-							/>
+							<FrappeControl :df="ITEM_DF" :model-value="new_material.item_code" @update:model-value="set_item" />
 						</label>
+						<div v-if="!new_material.customer_provided" class="checkbox cs-tp-wide cs-tp-check">
+							<label>
+								<input v-model="new_material.employer_supplied" type="checkbox" />
+								<span class="label-area">{{ __("ผู้ว่าจ้างจัดหา") }}</span>
+							</label>
+						</div>
 						<label>
 							<span>{{ __("จำนวน") }} {{ new_material.uom ? `(${new_material.uom})` : "" }}</span>
 							<FrappeControl :df="{ fieldtype: 'Float' }" v-model="new_material.qty" />
@@ -560,6 +586,18 @@ function open_request(name) {
 }
 .cs-tp-wide {
 	grid-column: 1 / -1;
+}
+.cs-tp-check {
+	margin: 0;
+}
+.cs-tp-fields .cs-tp-check label {
+	flex-direction: row;
+	align-items: center;
+	gap: 6px;
+}
+.cs-tp-fields .cs-tp-check label > span {
+	color: var(--text-color);
+	font-size: var(--text-sm);
 }
 .cs-tp-actions {
 	display: flex;

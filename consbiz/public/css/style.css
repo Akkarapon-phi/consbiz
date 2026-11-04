@@ -248,3 +248,5 @@
     padding-right: var(--padding-sm);
     border-right: 1px solid var(--border-color);
 }
+
+/* 10. หน้าสโตร์หน้างานย้ายไปเป็นแอป /store (CSS อยู่ที่ public/js/site_store/store.css) */

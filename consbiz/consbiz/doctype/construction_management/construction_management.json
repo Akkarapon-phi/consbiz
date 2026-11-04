@@ -48,10 +48,13 @@
   "gantt_html",
   "resources_tab",
   "resources_html",
+  "stock_tab",
+  "stock_html",
   "lookahead_tab",
   "lookahead_html",
   "finance_tab",
   "finance_html",
+  "cost_budgets",
   "documents_tab",
   "documents_html",
   "settings_tab",
@@ -293,6 +296,17 @@
   },
   {
    "depends_on": "eval:!doc.__islocal",
+   "fieldname": "stock_tab",
+   "fieldtype": "Tab Break",
+   "label": "คลังวัสดุ"
+  },
+  {
+   "fieldname": "stock_html",
+   "fieldtype": "HTML",
+   "label": "Stock"
+  },
+  {
+   "depends_on": "eval:!doc.__islocal",
    "fieldname": "lookahead_tab",
    "fieldtype": "Tab Break",
    "label": "Look-ahead"
@@ -312,6 +326,14 @@
    "fieldname": "finance_html",
    "fieldtype": "HTML",
    "label": "Finance"
+  },
+  {
+   "description": "งบต้นทุนแยกตามหมวด (Cost Control) ใช้เทียบกับต้นทุนจริงในตาราง ต้นทุนตามหมวด ด้านบน",
+   "fieldname": "cost_budgets",
+   "fieldtype": "Table",
+   "label": "งบต้นทุนตามหมวด",
+   "options": "Construction Cost Budget",
+   "permlevel": 1
   },
   {
    "depends_on": "eval:!doc.__islocal",
@@ -424,7 +446,7 @@
  ],
  "grid_page_length": 50,
  "links": [],
- "modified": "2026-11-04 10:00:00.000000",
+ "modified": "2026-11-04 21:00:00.000000",
  "modified_by": "Administrator",
  "module": "ConsBiz",
  "name": "Construction Management",

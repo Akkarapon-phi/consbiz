@@ -12,7 +12,7 @@ frappe.ui.form.on("Material Request", {
 
 		if (
 			frm.is_new() ||
-			frm.doc.material_request_type !== "Purchase" ||
+			!["Purchase", "Customer Provided"].includes(frm.doc.material_request_type) ||
 			frm.doc.docstatus === 2 ||
 			!frappe.model.can_print(frm.doctype, frm)
 		) {
@@ -29,14 +29,16 @@ frappe.ui.form.on("Material Request", {
 				show_pr_pdf(frm);
 			},
 			"",
-			__("Purchase Request") // tooltip เมื่อเอาเมาส์ชี้
+			// tooltip เมื่อเอาเมาส์ชี้
+			frm.doc.material_request_type === "Customer Provided" ? __("ใบสั่งวัสดุ (ผู้ว่าจ้างจัดหา)") : __("Purchase Request")
 		);
 	},
 });
 
 function show_pr_pdf(frm) {
-	// docstatus 0 = Draft, 1 = Submitted
-	const print_format = frm.doc.docstatus === 1 ? "Purchase Request (Sign)" : "Purchase Request";
+	// docstatus 0 = Draft, 1 = Submitted / ผู้ว่าจ้างจัดหาใช้ใบสั่งวัสดุ (Print Format standard ของ consbiz)
+	let print_format = frm.doc.docstatus === 1 ? "Purchase Request (Sign)" : "Purchase Request";
+	if (frm.doc.material_request_type === "Customer Provided") print_format = "Employer Material Order";
 
 	const params = new URLSearchParams({
 		doctype: frm.doctype,
@@ -141,7 +143,11 @@ function calculate_totals(frm, direct = false) {
 
 	let net_total, vat;
 
-	if (cint(frm.doc.custom_vat_override)) {
+	if (frm.doc.material_request_type === CUSTOMER_PROVIDED) {
+		// ผู้ว่าจ้างจัดหา: ไม่มี VAT (ช่อง VAT ซ่อนอยู่)
+		net_total = sum_vat;
+		vat = 0;
+	} else if (cint(frm.doc.custom_vat_override)) {
 		// ใช้ค่า VAT ที่ผู้ใช้กรอกเอง
 		vat = flt(frm.doc.custom_vat, 2);
 		net_total = cint(frm.doc.custom_included_vat) ? sum_vat - vat : sum_vat;
@@ -166,7 +172,7 @@ function calculate_totals(frm, direct = false) {
 		custom_grand_total: grand_total,
 		custom_in_words: thai_baht_text(grand_total),
 	};
-	if (!cint(frm.doc.custom_vat_override)) {
+	if (!cint(frm.doc.custom_vat_override) || frm.doc.material_request_type === CUSTOMER_PROVIDED) {
 		values.custom_vat = vat;
 	}
 
@@ -310,3 +316,92 @@ function render_stepper(frm) {
 
 	frm.fields_dict.custom_stepper_html.$wrapper.html(html);
 }
+
+// ---- วัสดุผู้ว่าจ้างจัดหา (Customer Provided) ----
+// ผู้ใช้เลือก Item หลัก ระบบเปลี่ยนเป็น Item คู่ (Customer Provided) ให้ ฝั่ง server ทำซ้ำตอนบันทึก
+// (consbiz/employer_supplied.py) เลขที่ใช้ชุด OPO- ไม่มี VAT และพิมพ์เป็นใบสั่งวัสดุถึงผู้ว่าจ้าง
+
+const CUSTOMER_PROVIDED = "Customer Provided";
+const EMPLOYER_ITEM_API = "consbiz.employer_supplied.get_employer_item";
+const VAT_FIELDS = ["custom_included_vat", "custom_vat", "custom_vat_override", "custom_net_total", "custom_net_total_novat"];
+
+frappe.ui.form.on("Material Request", {
+	refresh(frm) {
+		wrap_item_query(frm);
+		toggle_vat_fields(frm);
+	},
+	material_request_type(frm) {
+		toggle_vat_fields(frm);
+		set_series(frm);
+		if (is_employer_supplied(frm)) {
+			(frm.doc.items || []).forEach((row) => swap_to_employer_item(frm, row));
+		}
+		calculate_totals(frm);
+	},
+});
+
+frappe.ui.form.on("Material Request Item", {
+	item_code(frm, cdt, cdn) {
+		if (is_employer_supplied(frm)) swap_to_employer_item(frm, locals[cdt][cdn]);
+	},
+});
+
+function is_employer_supplied(frm) {
+	return frm.doc.material_request_type === CUSTOMER_PROVIDED;
+}
+
+// ช่องเลือก Item ของ ERPNext ไม่กรอง Customer Provided ให้แสดงเฉพาะ Item หลัก (ประเภทอื่นคงตามเดิม)
+function wrap_item_query(frm) {
+	const field = frm.fields_dict.items.grid.get_field("item_code");
+	const original = field.get_query;
+	if (!original || original.consbiz) return;
+	const query = (doc, cdt, cdn) => {
+		const result = original(doc, cdt, cdn) || {};
+		if (doc.material_request_type === CUSTOMER_PROVIDED) {
+			result.filters = { ...(result.filters || {}), custom_base_item: ["is", "not set"] };
+		}
+		return result;
+	};
+	query.consbiz = true;
+	field.get_query = query;
+}
+
+async function swap_to_employer_item(frm, row) {
+	const code = row.item_code;
+	if (!code) return;
+	const { message } = await frappe.call({ method: EMPLOYER_ITEM_API, args: { item_code: code } });
+	// ผู้ใช้เปลี่ยน Item ระหว่างรอ หรือเป็น Item คู่อยู่แล้ว
+	if (message && message !== code && row.item_code === code) {
+		await frappe.model.set_value(row.doctype, row.name, "item_code", message);
+	}
+}
+
+function toggle_vat_fields(frm) {
+	frm.toggle_display(VAT_FIELDS, !is_employer_supplied(frm));
+}
+
+// ผู้ว่าจ้างจัดหาใช้เลขชุด OPO- (เปลี่ยนได้เฉพาะเอกสารใหม่ ฝั่ง server ตั้งซ้ำตอนสร้าง)
+function set_series(frm) {
+	if (!frm.is_new()) return;
+	const options = (frm.get_docfield("naming_series").options || "").split("\n");
+	const employer = options.find((s) => s.startsWith("OPO-"));
+	if (!employer) return;
+	if (is_employer_supplied(frm)) {
+		frm.set_value("naming_series", employer);
+	} else if (frm.doc.naming_series === employer) {
+		frm.set_value("naming_series", options[0]);
+	}
+}
+
+// ---- WBS ของรายการ (งานย่อยของแผนงานของโครงการ custom_project) ----
+
+frappe.ui.form.on("Material Request", {
+	refresh(frm) {
+		consbiz.set_wbs_options(frm, frm.doc.custom_project);
+	},
+	custom_project(frm) {
+		consbiz.set_wbs_options(frm, frm.doc.custom_project);
+		// ของส่งเข้าคลังของโครงการ
+		consbiz.set_project_warehouse(frm, frm.doc.custom_project, ["set_warehouse"]);
+	},
+});
