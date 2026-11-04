@@ -24,6 +24,7 @@
   "totals_section",
   "mode_of_payment",
   "account",
+  "journal_entry",
   "bank_account",
   "bank_account_no",
   "column_break_fyit",
@@ -74,7 +75,7 @@
   },
   {
    "fieldname": "credit_day",
-   "fieldtype": "Data",
+   "fieldtype": "Int",
    "label": "Credit (Day)"
   },
   {
@@ -108,7 +109,11 @@
    "fieldname": "status",
    "fieldtype": "Select",
    "label": "Status",
-   "options": "Draft\nUnpaid\nOverdue\nPaid\nCancelled"
+   "options": "Draft\nUnpaid\nOverdue\nPaid\nCancelled",
+   "read_only": 1,
+   "no_copy": 1,
+   "in_standard_filter": 1,
+   "allow_on_submit": 1
   },
   {
    "fieldname": "section_break_imhl",
@@ -118,7 +123,8 @@
    "fieldname": "retention_items",
    "fieldtype": "Table",
    "label": "Retention Items",
-   "options": "Retention Items"
+   "options": "Retention Claim Item",
+   "reqd": 1
   },
   {
    "fieldname": "totals_section",
@@ -129,13 +135,19 @@
    "fieldname": "mode_of_payment",
    "fieldtype": "Link",
    "label": "Mode of Payment",
-   "options": "Mode of Payment"
+   "options": "Mode of Payment",
+   "read_only": 1,
+   "no_copy": 1,
+   "allow_on_submit": 1
   },
   {
    "fieldname": "account",
    "fieldtype": "Link",
    "label": "Account",
-   "options": "Account"
+   "options": "Account",
+   "read_only": 1,
+   "no_copy": 1,
+   "allow_on_submit": 1
   },
   {
    "fieldname": "bank_account",
@@ -156,19 +168,30 @@
    "fieldname": "grand_total",
    "fieldtype": "Currency",
    "in_list_view": 1,
-   "label": "Grand Total"
+   "label": "Grand Total",
+   "read_only": 1
   },
   {
    "fieldname": "in_words",
    "fieldtype": "Data",
-   "label": "In Words"
+   "label": "In Words",
+   "read_only": 1
+  },
+  {
+   "fieldname": "journal_entry",
+   "fieldtype": "Link",
+   "label": "Journal Entry",
+   "options": "Journal Entry",
+   "read_only": 1,
+   "no_copy": 1,
+   "allow_on_submit": 1
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-02-14 19:51:04.327254",
+ "modified": "2026-11-04 23:18:00.546857",
  "modified_by": "Administrator",
  "module": "ConsBiz",
  "name": "Retention Release",
@@ -176,17 +199,57 @@
  "owner": "Administrator",
  "permissions": [
   {
-   "create": 1,
-   "delete": 1,
-   "email": 1,
-   "export": 1,
-   "print": 1,
-   "read": 1,
-   "report": 1,
    "role": "System Manager",
+   "read": 1,
+   "print": 1,
+   "report": 1,
+   "export": 1,
+   "email": 1,
    "share": 1,
+   "create": 1,
+   "write": 1,
    "submit": 1,
-   "write": 1
+   "cancel": 1,
+   "amend": 1,
+   "delete": 1
+  },
+  {
+   "role": "Accounts Manager",
+   "read": 1,
+   "print": 1,
+   "report": 1,
+   "export": 1,
+   "email": 1,
+   "share": 1,
+   "create": 1,
+   "write": 1,
+   "submit": 1,
+   "cancel": 1,
+   "amend": 1,
+   "delete": 1
+  },
+  {
+   "role": "Accounts User",
+   "read": 1,
+   "print": 1,
+   "report": 1,
+   "export": 1,
+   "email": 1,
+   "share": 1,
+   "create": 1,
+   "write": 1,
+   "submit": 1,
+   "cancel": 1,
+   "amend": 1
+  },
+  {
+   "role": "Projects Manager",
+   "read": 1,
+   "print": 1,
+   "report": 1,
+   "export": 1,
+   "email": 1,
+   "share": 1
   }
  ],
  "row_format": "Dynamic",
@@ -195,16 +258,25 @@
  "sort_order": "DESC",
  "states": [
   {
-   "color": "Yellow",
-   "title": "Unpaid"
+   "color": "Gray",
+   "title": "Draft"
   },
   {
    "color": "Orange",
+   "title": "Unpaid"
+  },
+  {
+   "color": "Red",
    "title": "Overdue"
   },
   {
    "color": "Green",
    "title": "Paid"
+  },
+  {
+   "color": "Red",
+   "title": "Cancelled"
   }
- ]
+ ],
+ "track_changes": 1
 }

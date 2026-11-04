@@ -8,7 +8,6 @@
  "field_order": [
   "posting_date",
   "due_date",
-  "retention_no",
   "column_break_tjda",
   "sales_invoice_no",
   "purchase_invoice_no",
@@ -31,7 +30,7 @@
   {
    "fieldname": "due_date",
    "fieldtype": "Date",
-   "in_list_view": 1,
+   "in_list_view": 0,
    "label": "Due Date"
   },
   {
@@ -74,37 +73,36 @@
    "fieldname": "amount",
    "fieldtype": "Currency",
    "in_list_view": 1,
-   "label": "Amount"
+   "label": "Amount",
+   "reqd": 1
   },
   {
    "fieldname": "reference_no",
    "fieldtype": "Data",
-   "label": "Reference No"
+   "label": "Supplier Invoice No",
+   "description": "เลขที่ใบแจ้งหนี้ของผู้ขาย (Bill No)",
+   "depends_on": "eval:parent.doctype == 'Retention Payable'"
   },
   {
    "fieldname": "sales_invoice_no",
    "fieldtype": "Link",
    "label": "Sales Invoice No",
-   "options": "Sales Invoice"
+   "options": "Sales Invoice",
+   "depends_on": "eval:parent.doctype == 'Retention Receivable'"
   },
   {
    "fieldname": "purchase_invoice_no",
    "fieldtype": "Link",
    "label": "Purchase Invoice No",
-   "options": "Purchase Invoice"
-  },
-  {
-   "allow_on_submit": 1,
-   "fieldname": "retention_no",
-   "fieldtype": "Data",
-   "label": "Retention No"
+   "options": "Purchase Invoice",
+   "depends_on": "eval:parent.doctype == 'Retention Payable'"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2026-02-14 23:04:40.842432",
+ "modified": "2026-11-04 23:18:00.546857",
  "modified_by": "Administrator",
  "module": "ConsBiz",
  "name": "Retention Items",
