@@ -66,7 +66,7 @@
 			:open="picker"
 			title="เลือกโครงการ"
 			subtitle="ข้อมูลทุกหน้าเป็นของโครงการที่เลือก"
-			full
+			half
 			@close="close_picker"
 		>
 			<div class="ss-search">

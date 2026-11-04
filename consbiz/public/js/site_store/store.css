@@ -614,6 +614,12 @@ button.ss-card:active {
 	-webkit-line-clamp: 2;
 	-webkit-box-orient: vertical;
 }
+.ss-card-sub {
+	display: block !important;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
 .ss-card-sub,
 .ss-card-meta {
 	font-size: 13px;
@@ -720,8 +726,24 @@ button.ss-card:active {
 }
 .ss-chips {
 	display: flex;
-	flex-wrap: wrap;
+	flex-wrap: nowrap;
 	gap: 6px;
+	min-width: 0;
+	overflow: hidden;
+}
+.ss-chips > * {
+	flex-shrink: 1;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+.ss-chips > .ss-chip--more,
+.ss-chips > .ss-tag {
+	flex-shrink: 0;
+}
+/* เนื้อหาท้ายการ์ด (ชิป / แถบความคืบหน้า) ชิดล่างเมื่อการ์ดสูงเท่าแถว */
+.ss-card:not(.ss-card--row):not(.ss-stock):not(.ss-skeleton) > :last-child:not(:first-child) {
+	margin-top: auto;
 }
 .ss-chip {
 	display: inline-flex;
@@ -1726,6 +1748,9 @@ button.ss-card:active {
 .ss-sheet--full {
 	height: calc(92vh - var(--ss-top));
 }
+.ss-sheet--half {
+	height: 60vh;
+}
 .ss-sheet-grip {
 	display: grid;
 	place-items: center;
@@ -2501,11 +2526,10 @@ button.ss-card:active {
 }
 
 @media (min-width: 560px) {
-	.ss-stats {
-		grid-template-columns: repeat(4, minmax(0, 1fr));
-	}
+	/* จอกว้างได้คอลัมน์เพิ่ม ไม่ยืดการ์ด */
+	.ss-stats,
 	.ss-actions {
-		grid-template-columns: repeat(4, minmax(0, 1fr));
+		grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
 	}
 }
 
@@ -2516,7 +2540,6 @@ button.ss-card:active {
 
 :root {
 	--ss-side: 0px;
-	--ss-max: 1240px;
 }
 
 .ss-nav-brand,
@@ -2568,8 +2591,6 @@ button.ss-card:active {
 	}
 	.ss-stage > .ss-view {
 		width: 100%;
-		max-width: var(--ss-max);
-		margin: 0 auto;
 	}
 	.ss-app.has-nav .ss-stage > .ss-view {
 		padding-bottom: calc(40px + var(--ss-bottom));
@@ -2608,6 +2629,10 @@ button.ss-card:active {
 	}
 	.ss-nav-item.is-active {
 		background: var(--ss-brand-soft);
+	}
+	/* แถบข้างไม่เด้งไอคอน (เด้งเฉพาะแถบล่างของมือถือ) */
+	.ss-nav-item.is-active .ss-nav-icon {
+		animation: none;
 	}
 	.ss-nav-item:not(.is-active):hover {
 		background: var(--ss-surface-2);
@@ -2692,8 +2717,14 @@ button.ss-card:active {
 	.ss-list {
 		display: grid;
 		grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
-		align-items: start;
+		grid-auto-rows: 1fr;
+		align-items: stretch;
 		gap: 14px;
+	}
+	/* ฟอร์ม: การ์ดขยายได้ (เหตุผลตีกลับ) ไม่ให้แถวอื่นสูงตาม */
+	.ss-split .ss-list,
+	.ss-sheet .ss-list {
+		grid-auto-rows: auto;
 	}
 	.ss-sheet .ss-list,
 	.ss-split-side .ss-list {
@@ -2710,8 +2741,7 @@ button.ss-card:active {
 		transform: none;
 		width: auto;
 		max-width: none;
-		padding: 14px max(28px, calc((100vw - var(--ss-side) - var(--ss-max)) / 2 + 28px))
-			calc(14px + var(--ss-bottom));
+		padding: 14px 28px calc(14px + var(--ss-bottom));
 	}
 	.ss-bar-summary,
 	.ss-cart-summary {
@@ -2745,6 +2775,9 @@ button.ss-card:active {
 	.ss-sheet--full {
 		height: min(80vh, 760px);
 	}
+	.ss-sheet--half {
+		height: min(60vh, 640px);
+	}
 	.ss-sheet-grip {
 		display: none;
 	}
@@ -2775,11 +2808,10 @@ button.ss-card:active {
 	.ss-success {
 		padding-left: var(--ss-side);
 	}
-	.ss-stats {
-		grid-template-columns: repeat(4, minmax(0, 1fr));
-	}
+	/* จอกว้างได้คอลัมน์เพิ่ม ไม่ยืดการ์ด */
+	.ss-stats,
 	.ss-actions {
-		grid-template-columns: repeat(4, minmax(0, 1fr));
+		grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
 	}
 }
 
@@ -2863,9 +2895,8 @@ button.ss-card:active {
 		position: static;
 	}
 	.ss-nav-item .ss-badge {
-		top: 50%;
+		top: calc(50% - 10px);
 		right: 12px;
-		transform: translateY(-50%);
 	}
 
 	/* ฟอร์มแบ่งซ้าย-ขวา: ข้างขวาเลื่อนตาม */
