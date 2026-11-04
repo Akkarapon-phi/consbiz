@@ -6,13 +6,15 @@
 #   ต้องสั่งภายใน = ต้องการภายใน - Lead Time
 # - แผนงานเลื่อน (บันทึก Construction Management) วันที่ทั้งสองเลื่อนตาม (refresh_dates)
 # - สถานะการสั่งไม่ผูกกับเอกสารทีละแถว แต่เทียบปริมาณรวมต่อ (โครงการ + Item) ในหน่วยสต็อก (get_supply)
-#   ขอแล้ว = Material Request (ซื้อเอง: Purchase / ลูกค้าจัดหา: Customer Provided) ที่ไม่ยกเลิก รวมฉบับร่าง
+#   ขอแล้ว = Material Request (ซื้อเอง: Purchase / ผู้ว่าจ้างจัดหา: Customer Provided) ที่ไม่ยกเลิก รวมฉบับร่าง
 #   สั่งซื้อแล้ว = Purchase Order, รับแล้ว = Purchase Receipt / Purchase Invoice (อัปเดตสต็อก) / Stock Entry (Material Receipt)
 #   โครงการของเอกสาร = custom_project ของ MR หรือ project ของหัว/รายการ หรือรายการที่อ้าง MR ของโครงการนั้น
 #   แล้วตัดยอดให้แถวที่ต้องการก่อนก่อน (allocate) MR จะสร้างจากแผนหรือจากหน้า MR เอง สั่งเป็นล็อตใหญ่ก็ได้
 #   ต้องตรงกับ allocate_materials ใน public/js/construction_management/schedule.js
 # - สร้าง Material Request เฉพาะส่วนที่ยังขาดของแถวที่ถึงกำหนดสั่งภายใน N วัน รวม 1 บรรทัดต่อ Item
 #   Item ที่เป็น Customer Provided แยกเป็น MR ประเภท Customer Provided (ลูกค้า = ลูกค้าของแผนงาน)
+# - แถวที่ติ๊กผู้ว่าจ้างจัดหา (employer_supplied) เก็บ Item คู่ของ Item ที่เลือก (consbiz/employer_supplied.py)
+#   ยอดของซื้อเองกับผู้ว่าจ้างจัดหาจึงแยกกันตาม Item โดยไม่ต้องแก้ get_supply / allocate
 
 import frappe
 from frappe import _
@@ -20,6 +22,7 @@ from frappe.model.document import Document
 from frappe.utils import add_days, cint, flt, getdate, nowdate
 
 from consbiz.consbiz.doctype.daily_report.daily_report import get_leaf_tasks
+from consbiz.employer_supplied import base_item, employer_item
 
 MATERIAL_PLAN = "Construction Material Plan"
 
@@ -37,6 +40,19 @@ class ConstructionMaterialPlan(Document):
 				frappe.throw(_("แถว {0} ({1}): จำนวนต้องมากกว่า 0").format(row.idx, row.item_code))
 			row.task, row.wbs, row.item_name = task.name, task.wbs, task.item_name
 			set_dates(row, task.start_date, self.buffer_days)
+		self.set_employer_items()
+
+	def set_employer_items(self):
+		"""ติ๊กผู้ว่าจ้างจัดหา = ใช้ Item คู่, เอาติ๊กออกจากแถวเดิม = กลับเป็น Item หลัก
+		ช่องติ๊กตามประเภทของ Item เสมอ (แถวใหม่ที่เลือก Item คู่มาเลยจึงเป็นผู้ว่าจ้างจัดหา)"""
+		before = self.get_doc_before_save()
+		was_supplied = {row.name: row.employer_supplied for row in before.items} if before else {}
+		for row in self.items:
+			if row.employer_supplied:
+				row.item_code = employer_item(row.item_code)
+			elif was_supplied.get(row.name):
+				row.item_code = base_item(row.item_code)
+			row.employer_supplied = frappe.db.get_value("Item", row.item_code, "is_customer_provided_item") or 0
 
 
 def set_dates(row, start_date, buffer_days):
@@ -132,7 +148,7 @@ def get_supply(project, item_codes):
 		for row in query.run(as_dict=True):
 			result[row.item_code]["purchase"][stage] += flt(row.stock_qty)
 
-	# รับของเข้า (Material Receipt): ของลูกค้าจัดหา = อ้าง MR แบบ Customer Provided หรือ Item เป็น Customer Provided
+	# รับของเข้า (Material Receipt): ของผู้ว่าจ้างจัดหา = อ้าง MR แบบ Customer Provided หรือ Item เป็น Customer Provided
 	se = frappe.qb.DocType("Stock Entry")
 	sed = frappe.qb.DocType("Stock Entry Detail")
 	receipts = (
@@ -159,7 +175,7 @@ def get_supply(project, item_codes):
 
 
 def with_totals(supply):
-	"""ขั้นหลังนับรวมในขั้นก่อน: ขอแล้ว >= สั่งซื้อแล้ว >= รับแล้ว (ลูกค้าจัดหาไม่มีขั้นสั่งซื้อ = เท่าที่ขอ)"""
+	"""ขั้นหลังนับรวมในขั้นก่อน: ขอแล้ว >= สั่งซื้อแล้ว >= รับแล้ว (ผู้ว่าจ้างจัดหาไม่มีขั้นสั่งซื้อ = เท่าที่ขอ)"""
 	purchase, customer = supply["purchase"], supply["customer"]
 	purchase["ordered"] = max(purchase["ordered"], purchase["received"])
 	purchase["requested"] = max(purchase["requested"], purchase["ordered"])
@@ -297,13 +313,17 @@ def customer_of(plan):
 
 
 def build_material_requests(plan, lines):
-	"""MR ฉบับร่าง: ซื้อเอง (Purchase) 1 ฉบับ และลูกค้าจัดหา (Customer Provided) 1 ฉบับ ตามประเภทของ Item"""
+	"""MR ฉบับร่าง: ซื้อเอง (Purchase) 1 ฉบับ และผู้ว่าจ้างจัดหา (Customer Provided) 1 ฉบับ ตามประเภทของ Item"""
 	items = item_info([line["item_code"] for line in lines])
 	groups = {}
 	for line in lines:
 		item = items.get(line["item_code"]) or frappe._dict(stock_uom=None, is_customer_provided_item=0)
 		groups.setdefault("Customer Provided" if item.is_customer_provided_item else "Purchase", []).append((line, item))
 
+	from consbiz.site_stock import project_warehouse
+
+	# ไม่ได้ตั้งคลังในแผน ใช้คลังของโครงการ
+	warehouse = plan.warehouse or project_warehouse(plan.project)
 	requests = []
 	for request_type in ("Purchase", "Customer Provided"):
 		if request_type not in groups:
@@ -318,10 +338,10 @@ def build_material_requests(plan, lines):
 			request.customer = customer_of(plan)
 			if not request.customer:
 				frappe.throw(
-					_("วัสดุที่ลูกค้าจัดหา (Customer Provided) ต้องมีลูกค้าใน {0}").format(plan.construction_management)
+					_("วัสดุที่ผู้ว่าจ้างจัดหา (Customer Provided) ต้องมีลูกค้าใน {0}").format(plan.construction_management)
 				)
-		if plan.warehouse:
-			request.set_warehouse = plan.warehouse
+		if warehouse:
+			request.set_warehouse = warehouse
 		dates = []
 		for line, item in groups[request_type]:
 			# ของที่ต้องการก่อนวันนี้ ให้เร็วที่สุดเท่าที่ระบบยอม
@@ -335,7 +355,7 @@ def build_material_requests(plan, lines):
 					"uom": item.stock_uom,
 					"conversion_factor": 1,
 					"schedule_date": schedule_date,
-					"warehouse": plan.warehouse,
+					"warehouse": warehouse,
 					"project": plan.project,
 					"description": ", ".join(f"{row.wbs} {row.item_name}" for row in line["rows"]),
 				},

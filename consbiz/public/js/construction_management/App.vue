@@ -460,7 +460,7 @@ const MATERIAL_KEYS = [
 	"request_docstatus",
 	"request_status",
 	"remarks",
-	// ตัวคูณเป็นหน่วยสต็อก และ Item เป็นของลูกค้าจัดหา (ข้อมูลประกอบ ไม่ส่งกลับ)
+	// ตัวคูณเป็นหน่วยสต็อก และ Item เป็นของผู้ว่าจ้างจัดหา (ข้อมูลประกอบ ไม่ส่งกลับ)
 	"factor",
 	"stock_uom",
 	"customer_provided",

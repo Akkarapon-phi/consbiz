@@ -14,6 +14,8 @@ frappe.ui.form.on("Construction Material Plan", {
 	setup(frm) {
 		frm.set_query("construction_management", () => ({ filters: { status: "Active" } }));
 		frm.set_query("warehouse", () => ({ filters: { company: frm.doc.company, is_group: 0 } }));
+		// เลือก Item หลัก แล้วติ๊ก "ผู้ว่าจ้างจัดหา" ระบบเปลี่ยนเป็น Item คู่ตอนบันทึก
+		frm.set_query("item_code", "items", () => ({ filters: { custom_base_item: ["is", "not set"] } }));
 	},
 
 	refresh(frm) {
@@ -89,7 +91,7 @@ function make_request(frm) {
 	);
 }
 
-// สร้างได้ 1-2 ฉบับ (ซื้อเอง / ลูกค้าจัดหา): ฉบับเดียวเปิดเลย หลายฉบับเปิดรายการ
+// สร้างได้ 1-2 ฉบับ (ซื้อเอง / ผู้ว่าจ้างจัดหา): ฉบับเดียวเปิดเลย หลายฉบับเปิดรายการ
 function open_requests(names) {
 	if (names.length === 1) frappe.set_route("Form", "Material Request", names[0]);
 	else frappe.set_route("List", "Material Request", { name: ["in", names] });

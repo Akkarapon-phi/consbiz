@@ -5,7 +5,7 @@
 # - Cash Flow รายเดือน: Cash Plan = % แผนปัจจุบัน x มูลค่าสัญญาปรับปรุง (ตรงกับแถว Cash Plan ของตารางสรุปในหน้า Gantt)
 #   Cash Actual = มูลค่างานที่ทำได้จริง (Progress Entry x มูลค่างาน) งานเพิ่มนับตั้งแต่วันที่อนุมัติ (ตรงกับ actual_curve)
 #   เดือนหลังวันที่ดูไม่มีค่าจริง
-# - EVM (PV/EV/AC) เฉพาะผู้ที่เห็นงบต้นทุน (budget_cost permlevel 1)
+# - EVM (PV/EV/AC) และต้นทุนตามหมวด (cost.py) เฉพาะผู้ที่เห็นงบต้นทุน (budget_cost permlevel 1)
 
 import frappe
 from frappe.utils import add_days, flt, getdate, nowdate
@@ -17,6 +17,7 @@ from consbiz.consbiz.doctype.construction_management.construction_management imp
 	next_period,
 	plan_progress,
 )
+from consbiz.consbiz.doctype.construction_management.cost import cost_control
 from consbiz.consbiz.doctype.construction_management.evm import evm_series
 
 
@@ -43,6 +44,7 @@ def get_finance(name, date=None):
 		},
 		"months": months,
 		"evm": evm_values(series) if series else None,
+		"cost": cost_control(doc, day) if show_cost else None,
 	}
 
 

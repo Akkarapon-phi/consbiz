@@ -2,7 +2,7 @@
 // Tab "การเงิน" ของ Construction Management (ดูอย่างเดียว)
 // - ตัวเลขสรุป ณ วันที่ดู: มูลค่าสัญญาปรับปรุง, Cash Plan / Cash Actual สะสม และส่วนต่าง
 // - กราฟมูลค่าสะสม (แผนถึงวันจบ จริงถึงวันที่ดู) และตาราง Cash Flow รายเดือน
-// - Earned Value (PV/EV/AC) เฉพาะผู้ที่เห็นงบต้นทุน
+// - Earned Value (PV/EV/AC) และต้นทุนตามหมวด (cost.py: งบ / ผูกพัน PO / ใช้จริง GL) เฉพาะผู้ที่เห็นงบต้นทุน
 // ข้อมูลจาก construction_management/finance.get_finance (Cash Plan ตรงกับแถว Cash Plan ของตารางสรุปในหน้า Gantt)
 import { computed, onMounted, ref } from "vue";
 import FrappeControl from "../construction_management/components/FrappeControl.vue";
@@ -142,6 +142,21 @@ const evm_indices = computed(() => {
 	];
 });
 
+// ---------- ต้นทุนตามหมวด ----------
+
+const COST_NOTES = {
+	red: __("เกินงบ"),
+	orange: __("ใช้เร็วกว่างาน"),
+	green: __("ปกติ"),
+	gray: __("ยังไม่ตั้งงบ"),
+};
+// แถบ: ใช้จริง + ผูกพัน เทียบงบ (เต็มที่ 100%) เส้นตั้ง = % งานที่เสร็จ
+const bar_width = (value, budget) => `${Math.min(Math.max(budget ? (value / budget) * 100 : 0, 0), 100)}%`;
+const pct = (value) => (value === null || value === undefined ? "-" : `${format_number(value, null, 0)}%`);
+function open_cost_settings() {
+	frappe.set_route("List", "Cost Category");
+}
+
 function open_evm_report() {
 	frappe.set_route("query-report", "Construction Earned Value", {
 		construction_management: props.name,
@@ -270,6 +285,79 @@ function open_evm_report() {
 							</tr>
 						</tfoot>
 					</table>
+				</div>
+			</section>
+
+			<section v-if="data.cost" class="pd-card">
+				<header class="pd-card-head">
+					<div>
+						<h4 class="pd-card-title">{{ __("ต้นทุนตามหมวด") }}</h4>
+						<div class="pd-card-sub">
+							{{ __("ใช้จริง = บัญชีค่าใช้จ่ายที่ผูก Project · ผูกพัน = PO ที่ยังไม่ตั้งหนี้ · งานเสร็จ {0}", [pct(data.cost.progress)]) }}
+						</div>
+					</div>
+					<button type="button" class="pf-btn pf-btn-outline" @click="open_cost_settings">
+						<span v-html="icon('settings')" />{{ __("หมวดต้นทุน") }}
+					</button>
+				</header>
+				<div class="pf-table-wrap">
+					<table class="pf-table pf-cost">
+						<thead>
+							<tr>
+								<th>{{ __("หมวด") }}</th>
+								<th class="text-right">{{ __("งบ") }}</th>
+								<th class="text-right">{{ __("ใช้จริง") }}</th>
+								<th class="text-right">{{ __("ผูกพัน") }}</th>
+								<th class="text-right">{{ __("คงเหลือ") }}</th>
+								<th class="pf-cost-bar-col">{{ __("ใช้ไปเทียบงาน") }}</th>
+							</tr>
+						</thead>
+						<tbody>
+							<tr v-for="row in data.cost.rows" :key="row.category ?? '_none'" :class="{ 'pf-future': !row.budget && !row.actual && !row.committed }">
+								<td>{{ row.label }}</td>
+								<td class="text-right">{{ row.budget ? fmt(row.budget) : "-" }}</td>
+								<td class="text-right">{{ fmt(row.actual) }}</td>
+								<td class="text-right">{{ row.committed ? fmt(row.committed) : "-" }}</td>
+								<td class="text-right" :class="row.remaining !== null && row.remaining < 0 && 'pf-text-red'">
+									{{ cell(row.remaining) }}
+								</td>
+								<td>
+									<div class="pf-cost-bar-cell">
+										<div class="pf-cost-bar" :title="__('ใช้จริง {0} · รวมผูกพัน {1} · งานเสร็จ {2}', [pct(row.actual_pct), pct(row.used), pct(data.cost.progress)])">
+											<i class="pf-cost-fill pf-cost-actual" :style="{ width: bar_width(row.actual, row.budget) }" />
+											<i class="pf-cost-fill pf-cost-committed" :style="{ left: bar_width(row.actual, row.budget), width: bar_width(row.committed, row.budget) }" />
+											<i class="pf-cost-mark" :style="{ left: `${Math.min(data.cost.progress, 100)}%` }" />
+										</div>
+										<span class="pd-pill pd-pill-sm" :class="`pd-tone-${row.tone}`">
+											{{ row.budget ? pct(row.used) : COST_NOTES.gray }}
+										</span>
+									</div>
+								</td>
+							</tr>
+						</tbody>
+						<tfoot>
+							<tr>
+								<td>{{ data.cost.total.label }}</td>
+								<td class="text-right">{{ data.cost.total.budget ? fmt(data.cost.total.budget) : "-" }}</td>
+								<td class="text-right">{{ fmt(data.cost.total.actual) }}</td>
+								<td class="text-right">{{ fmt(data.cost.total.committed) }}</td>
+								<td class="text-right" :class="data.cost.total.remaining !== null && data.cost.total.remaining < 0 && 'pf-text-red'">
+									{{ cell(data.cost.total.remaining) }}
+								</td>
+								<td>
+									<span class="pd-pill pd-pill-sm" :class="`pd-tone-${data.cost.total.tone}`">
+										{{ COST_NOTES[data.cost.total.tone] }}
+									</span>
+								</td>
+							</tr>
+						</tfoot>
+					</table>
+				</div>
+				<div class="pf-cost-legend">
+					<span><i class="pf-key pf-cost-actual" />{{ __("ใช้จริง") }}</span>
+					<span><i class="pf-key pf-cost-committed" />{{ __("ผูกพัน") }}</span>
+					<span><i class="pf-key pf-key-mark" />{{ __("% งานที่เสร็จ") }}</span>
+					<span>{{ __("ตั้งงบที่ตาราง งบต้นทุนตามหมวด ด้านล่าง") }}</span>
 				</div>
 			</section>
 
@@ -454,6 +542,66 @@ function open_evm_report() {
 	border-top: 1px solid var(--pd-border);
 	border-bottom: none;
 	font-weight: 700;
+}
+
+/* ต้นทุนตามหมวด */
+.pf-cost-bar-col {
+	width: 34%;
+}
+.pf-cost-bar-cell {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+}
+.pf-cost-bar {
+	position: relative;
+	flex: 1;
+	min-width: 80px;
+	height: 8px;
+	border-radius: 4px;
+	background: var(--subtle-fg);
+}
+.pf-cost-fill {
+	position: absolute;
+	top: 0;
+	bottom: 0;
+	left: 0;
+}
+.pf-cost-actual {
+	border-radius: 4px 0 0 4px;
+	background: var(--consbiz-gantt-actual);
+}
+.pf-cost-committed {
+	background: color-mix(in srgb, var(--consbiz-gantt-actual) 35%, transparent);
+}
+.pf-cost-mark {
+	position: absolute;
+	top: -3px;
+	bottom: -3px;
+	width: 2px;
+	margin-left: -1px;
+	background: var(--consbiz-gantt-status-date);
+}
+.pf-cost-legend {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 14px;
+	margin-top: 10px;
+	color: var(--text-muted);
+	font-size: var(--text-xs);
+}
+.pf-key {
+	display: inline-block;
+	width: 10px;
+	height: 8px;
+	margin-right: 4px;
+	border-radius: 2px;
+	vertical-align: middle;
+}
+.pf-key-mark {
+	width: 2px;
+	height: 12px;
+	background: var(--consbiz-gantt-status-date);
 }
 
 /* EVM */

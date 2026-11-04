@@ -778,3 +778,82 @@ class IntegrationTestConstructionProgress(IntegrationTestCase):
 		set_baseline(self.doc.name, str(self.doc.modified))
 		self.doc.reload()
 		self.assertEqual(self.doc.tasks[1].baseline_distribution, self.doc.tasks[1].plan_distribution)
+
+
+class IntegrationTestCostControl(IntegrationTestCase):
+	"""ต้นทุนตามหมวด (cost.py) ส่วนคำนวณที่ไม่ต้องสร้างเอกสารบัญชี"""
+
+	def test_category_inherits_from_parent_group(self):
+		from consbiz.consbiz.doctype.construction_management.cost import category_resolver
+		from consbiz.patches.seed_cost_categories import execute
+
+		execute()
+		parent = frappe.get_doc(
+			{"doctype": "Item Group", "item_group_name": "_Test Cost Parent", "is_group": 1, "custom_cost_category": "วัสดุ"}
+		).insert()
+		child = frappe.get_doc(
+			{"doctype": "Item Group", "item_group_name": "_Test Cost Child", "parent_item_group": parent.name}
+		).insert()
+		own = frappe.get_doc(
+			{
+				"doctype": "Item Group",
+				"item_group_name": "_Test Cost Own",
+				"parent_item_group": parent.name,
+				"custom_cost_category": "เครื่องจักร",
+			}
+		).insert()
+		resolve = category_resolver("Item Group", "parent_item_group")
+		self.assertEqual(resolve(child.name), "วัสดุ")
+		self.assertEqual(resolve(own.name), "เครื่องจักร")
+		self.assertIsNone(resolve("All Item Groups"))
+		self.assertIsNone(resolve(None))
+
+	def test_split_actual_by_item_lines_then_account(self):
+		from consbiz.consbiz.doctype.construction_management.cost import split_actual
+
+		groups = {"เหล็ก": "วัสดุ", "บริการ": "ผู้รับเหมาช่วง"}.get
+		accounts = {"ค่าแรง - X": "ค่าแรง"}.get
+		entries = [
+			("Purchase Invoice", "PI-1", "ต้นทุน - X", 1000),
+			("Purchase Invoice", "PI-1", "ปัดเศษ - X", 1),
+			("Journal Entry", "JE-1", "ค่าแรง - X", 500),
+			("Journal Entry", "JE-2", "อื่นๆ - X", 70),
+		]
+		lines = {("PI-1", "ต้นทุน - X"): [("เหล็ก", 300), ("บริการ", 100), ("ไม่มีหมวด", 100)]}
+		result = split_actual(entries, lines, groups, accounts)
+		self.assertAlmostEqual(result["วัสดุ"], 600)
+		self.assertAlmostEqual(result["ผู้รับเหมาช่วง"], 200)
+		self.assertAlmostEqual(result["ค่าแรง"], 500)
+		# บรรทัดที่ไม่มีหมวด + บัญชีที่ไม่มีหมวด = ไม่ระบุ
+		self.assertAlmostEqual(result[None], 200 + 1 + 70)
+		self.assertAlmostEqual(sum(result.values()), 1571)
+
+	def test_row_tone(self):
+		from consbiz.consbiz.doctype.construction_management.cost import make_row
+
+		self.assertEqual(make_row("วัสดุ", 0, 0, 100, 50)["tone"], "gray")
+		self.assertEqual(make_row("วัสดุ", 1000, 200, 900, 50)["tone"], "red")
+		self.assertEqual(make_row("วัสดุ", 1000, 0, 700, 50)["tone"], "orange")
+		row = make_row("วัสดุ", 1000, 100, 500, 50)
+		self.assertEqual(row["tone"], "green")
+		self.assertEqual(row["remaining"], 400)
+		self.assertAlmostEqual(row["used"], 60)
+
+	def test_material_budget(self):
+		from consbiz.consbiz.doctype.construction_management.cost import material_budget
+
+		items = {
+			"A": frappe._dict(name="A", item_group="เหล็ก", last_purchase_rate=20, is_customer_provided_item=0),
+			"B": frappe._dict(name="B", item_group="สี", valuation_rate=5, is_customer_provided_item=0),
+			"C": frappe._dict(name="C", item_group="เหล็ก", last_purchase_rate=9, is_customer_provided_item=1),
+			"D": frappe._dict(name="D", item_group="เหล็ก", is_customer_provided_item=0),
+		}
+		rows = [
+			{"item_code": "A", "qty": 2, "uom": "ตัน"},
+			{"item_code": "B", "qty": 10, "uom": None},
+			{"item_code": "C", "qty": 100, "uom": None},
+			{"item_code": "D", "qty": 1, "uom": None},
+		]
+		budget, missing = material_budget(rows, items, {("A", "ตัน"): 1000}, {"เหล็ก": "วัสดุ"}.get)
+		self.assertEqual(budget, {"วัสดุ": 40000, None: 50})
+		self.assertEqual(missing, ["D"])

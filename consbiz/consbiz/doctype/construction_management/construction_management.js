@@ -1,8 +1,8 @@
 // Copyright (c) 2026, Siricons and contributors
 // For license information, please see license.txt
 
-// Tab "ภาพรวม", "Gantt", "ทรัพยากร", "Look-ahead" และ "เอกสารโครงการ" เป็น Vue โหลดเมื่อเปิด Tab ครั้งแรก
-// - ภาพรวม / ทรัพยากร / Look-ahead / เอกสารโครงการ: public/js/project_dashboard โหลดข้อมูลใหม่ทุกครั้งที่ฟอร์ม refresh
+// Tab "ภาพรวม", "Gantt", "ทรัพยากร", "คลังวัสดุ", "Look-ahead", "การเงิน" และ "เอกสารโครงการ" เป็น Vue โหลดเมื่อเปิด Tab ครั้งแรก
+// - ภาพรวม / ทรัพยากร / คลังวัสดุ / Look-ahead / การเงิน / เอกสารโครงการ: public/js/project_dashboard โหลดข้อมูลใหม่ทุกครั้งที่ฟอร์ม refresh
 // - Gantt: public/js/construction_management แบบฝัง (embedded) ดูอย่างเดียว แก้แผนที่หน้าเต็มจอ (ปุ่มแก้ไขแผนงาน)
 //   ซิงก์กับฐานข้อมูลเอง ฟอร์ม refresh แล้วโหลดใหม่เฉพาะเมื่อแผนเปลี่ยน (activate) ตำแหน่งที่เลื่อนไว้จึงไม่หาย
 //   เปิด Tab ที่ wide (Gantt, Look-ahead) แล้วซ่อนแผงข้างขวาของฟอร์มให้กว้างเต็มที่ (class consbiz-wide-form ใน style.css)
@@ -37,6 +37,12 @@ const PROJECT_TABS = [
 		make: (frm, wrapper) => new consbiz.ProjectResources({ wrapper, name: frm.doc.name }),
 	},
 	{
+		tab: "stock_tab",
+		field: "stock_html",
+		bundle: "project_dashboard.bundle.js",
+		make: (frm, wrapper) => new consbiz.ProjectStock({ wrapper, name: frm.doc.name }),
+	},
+	{
 		tab: "lookahead_tab",
 		field: "lookahead_html",
 		bundle: "project_dashboard.bundle.js",
@@ -63,6 +69,7 @@ frappe.ui.form.on("Construction Management", {
 			setup_project_tabs(frm);
 		}
 		frm.set_df_property("tasks", "cannot_add_rows", true);
+		setup_cost_budget_button(frm);
 	},
 
 	boq(frm) {
@@ -141,5 +148,44 @@ function mount_project_view(frm, config) {
 		}
 		view?.destroy();
 		frm._consbiz_views[config.field] = config.make(frm, frm.fields_dict[config.field].$wrapper.get(0));
+	});
+}
+
+// ปุ่ม "เติมงบวัสดุจากแผน" ใต้ตารางงบต้นทุนตามหมวด (Tab การเงิน): แผนวัสดุ x ราคาซื้อล่าสุด แยกตามหมวดของ Item Group
+// แทนค่าเฉพาะหมวดที่คำนวณได้ หมวดอื่นคงเดิม แล้วให้ผู้ใช้กดบันทึกเอง
+function setup_cost_budget_button(frm) {
+	const grid = frm.fields_dict.cost_budgets?.grid;
+	if (frm.is_new() || !grid || !frm.perm[1]?.write) return;
+	grid.add_custom_button(__("เติมงบวัสดุจากแผน"), () => {
+		frappe
+			.call({
+				method: "consbiz.consbiz.doctype.construction_management.cost.suggest_material_budget",
+				args: { name: frm.doc.name },
+				freeze: true,
+			})
+			.then(({ message: r }) => {
+				if (!r.rows.length && !r.unassigned) {
+					frappe.msgprint(__("ไม่พบแผนวัสดุที่มีราคา (ต้องมีแผนวัสดุ และ Item มีราคาซื้อล่าสุด/ราคาประเมิน)"));
+					return;
+				}
+				const fmt = (v) => format_currency(v, frappe.defaults.get_default("currency"), 0);
+				const lines = r.rows.map((row) => `<li>${frappe.utils.escape_html(row.cost_category)}: ${fmt(row.amount)}</li>`);
+				let note = "";
+				if (r.unassigned) note += `<p>${__("ไม่ระบุหมวด (Item Group ยังไม่ได้ตั้งหมวดต้นทุน): {0}", [fmt(r.unassigned)])}</p>`;
+				if (r.missing_rate.length)
+					note += `<p>${__("Item ที่ไม่มีราคา (ไม่นับ): {0}", [r.missing_rate.map(frappe.utils.escape_html).join(", ")])}</p>`;
+				frappe.confirm(
+					`<p>${__("งบวัสดุจากแผน (แทนค่าเดิมของหมวดเหล่านี้)")}</p><ul>${lines.join("")}</ul>${note}`,
+					() => {
+						for (const row of r.rows) {
+							const existing = (frm.doc.cost_budgets || []).find((b) => b.cost_category === row.cost_category);
+							const target = existing || frm.add_child("cost_budgets", { cost_category: row.cost_category });
+							frappe.model.set_value(target.doctype, target.name, "amount", row.amount);
+							frappe.model.set_value(target.doctype, target.name, "remarks", __("จากแผนวัสดุ"));
+						}
+						frm.refresh_field("cost_budgets");
+					}
+				);
+			});
 	});
 }

@@ -1,11 +1,12 @@
-// Tab "ภาพรวม", "ทรัพยากร", "Look-ahead", "การเงิน" และ "เอกสารโครงการ" ในฟอร์ม Construction Management (โหลดจาก construction_management.js ด้วย frappe.require)
-// ฝั่ง server: consbiz/consbiz/doctype/construction_management/dashboard.py (ทรัพยากร: resources.py)
+// Tab "ภาพรวม", "ทรัพยากร", "คลังวัสดุ", "Look-ahead", "การเงิน" และ "เอกสารโครงการ" ในฟอร์ม Construction Management (โหลดจาก construction_management.js ด้วย frappe.require)
+// ฝั่ง server: consbiz/consbiz/doctype/construction_management/dashboard.py (ทรัพยากร: resources.py, คลังวัสดุ: stock.py)
 import { createApp } from "vue";
 import Dashboard from "./Dashboard.vue";
 import Documents from "./Documents.vue";
 import Finance from "./Finance.vue";
 import LookAhead from "./LookAhead.vue";
 import Resources from "./Resources.vue";
+import Stock from "./Stock.vue";
 
 class ProjectView {
 	constructor({ wrapper, name }, component) {
@@ -38,6 +39,11 @@ consbiz.ProjectLookAhead = class extends ProjectView {
 consbiz.ProjectResources = class extends ProjectView {
 	constructor(options) {
 		super(options, Resources);
+	}
+};
+consbiz.ProjectStock = class extends ProjectView {
+	constructor(options) {
+		super(options, Stock);
 	}
 };
 consbiz.ProjectFinance = class extends ProjectView {

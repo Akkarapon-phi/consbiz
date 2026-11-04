@@ -8,6 +8,7 @@
   "wbs",
   "item_name",
   "item_code",
+  "employer_supplied",
   "qty",
   "uom",
   "lead_time_days",
@@ -42,6 +43,15 @@
    "label": "Item",
    "options": "Item",
    "reqd": 1
+  },
+  {
+   "columns": 1,
+   "default": "0",
+   "description": "ติ๊กแล้วระบบใช้ Item คู่ที่เป็นวัสดุผู้ว่าจ้างจัดหา (Customer Provided) ให้เอง สร้าง MR แยกเป็นประเภท Customer Provided",
+   "fieldname": "employer_supplied",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Employer Supplied"
   },
   {
    "columns": 1,
@@ -116,7 +126,7 @@
  "grid_page_length": 50,
  "istable": 1,
  "links": [],
- "modified": "2026-10-31 15:00:00.000000",
+ "modified": "2026-11-04 10:00:00.000000",
  "modified_by": "Administrator",
  "module": "ConsBiz",
  "name": "Construction Material Plan Item",
