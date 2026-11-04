@@ -14,164 +14,187 @@
 		<div class="ss-content">
 			<Skeleton v-if="!setup" :rows="3" />
 			<template v-else>
-				<div class="ss-form">
-					<Picker
-						v-if="!readonly"
-						v-model="doc.wbs"
-						label="งาน (WBS)"
-						:options="setup.wbs"
-						required
-						@select="(o) => (doc.task_name = o.label)"
-					/>
-					<div v-else class="ss-facts">
-						<div class="ss-fact">
-							<span>งาน</span><b>{{ doc.wbs }} {{ doc.task_name }}</b>
+				<div class="ss-split">
+					<div class="ss-split-main">
+						<div class="ss-form">
+							<Picker
+								v-if="!readonly"
+								v-model="doc.wbs"
+								label="งาน (WBS)"
+								:options="setup.wbs"
+								required
+								@select="(o) => (doc.task_name = o.label)"
+							/>
+							<div v-else class="ss-facts">
+								<div class="ss-fact">
+									<span>งาน</span><b>{{ doc.wbs }} {{ doc.task_name }}</b>
+								</div>
+							</div>
+							<div class="ss-form-row">
+								<label class="ss-field">
+									<span class="ss-field-label">ตำแหน่ง</span>
+									<input
+										v-model="doc.location"
+										class="ss-input"
+										placeholder="เช่น ฐานราก F3"
+										:disabled="readonly"
+									/>
+								</label>
+								<label class="ss-field">
+									<span class="ss-field-label">วันที่เท<em>*</em></span>
+									<input
+										v-model="doc.date"
+										class="ss-input"
+										type="date"
+										:disabled="readonly"
+									/>
+								</label>
+							</div>
+							<Picker
+								v-model="doc.concrete_item"
+								label="ชนิดคอนกรีต"
+								:options="setup.items"
+								remote="Item"
+								:display_value="doc.concrete_item_name"
+								required
+								:class="{ 'is-readonly': readonly }"
+								@select="(o) => (doc.concrete_item_name = o.label)"
+							/>
+							<div class="ss-form-row">
+								<label class="ss-field">
+									<span class="ss-field-label">กำลังอัด</span>
+									<input
+										v-model="doc.strength"
+										class="ss-input"
+										placeholder="240 ksc"
+										:disabled="readonly"
+									/>
+								</label>
+								<label class="ss-field">
+									<span class="ss-field-label">ตามแผน (คิว)</span>
+									<input
+										v-model.number="doc.planned_qty"
+										class="ss-input"
+										type="number"
+										inputmode="decimal"
+										:disabled="readonly"
+									/>
+								</label>
+							</div>
+							<Picker
+								v-model="doc.supplier"
+								label="ผู้ขาย / แพลนท์"
+								:options="setup.suppliers"
+								remote="Supplier"
+								:display_value="doc.supplier_name"
+								clearable
+								:class="{ 'is-readonly': readonly }"
+								@select="(o) => (doc.supplier_name = o.label)"
+							/>
+							<label
+								class="ss-toggle"
+								:class="{ 'is-on': doc.employer_supplied, 'is-readonly': readonly }"
+							>
+								<input
+									v-model="doc.employer_supplied"
+									type="checkbox"
+									:true-value="1"
+									:false-value="0"
+									:disabled="readonly"
+								/>
+								<span class="ss-toggle-track"><span></span></span>
+								<span>
+									<b>ผู้ว่าจ้างจัดหา</b>
+									<small
+										>ค่าตั้งต้นของตั๋วที่เพิ่มใหม่ (หักงวดผู้ว่าจ้างตามปริมาณจริง)</small
+									>
+								</span>
+							</label>
 						</div>
 					</div>
-					<div class="ss-form-row">
-						<label class="ss-field">
-							<span class="ss-field-label">ตำแหน่ง</span>
-							<input
-								v-model="doc.location"
-								class="ss-input"
-								placeholder="เช่น ฐานราก F3"
-								:disabled="readonly"
-							/>
-						</label>
-						<label class="ss-field">
-							<span class="ss-field-label">วันที่เท<em>*</em></span>
-							<input v-model="doc.date" class="ss-input" type="date" :disabled="readonly" />
-						</label>
-					</div>
-					<Picker
-						v-model="doc.concrete_item"
-						label="ชนิดคอนกรีต"
-						:options="setup.items"
-						remote="Item"
-						:display_value="doc.concrete_item_name"
-						required
-						:class="{ 'is-readonly': readonly }"
-						@select="(o) => (doc.concrete_item_name = o.label)"
-					/>
-					<div class="ss-form-row">
-						<label class="ss-field">
-							<span class="ss-field-label">กำลังอัด</span>
-							<input
-								v-model="doc.strength"
-								class="ss-input"
-								placeholder="240 ksc"
-								:disabled="readonly"
-							/>
-						</label>
-						<label class="ss-field">
-							<span class="ss-field-label">ตามแผน (คิว)</span>
-							<input
-								v-model.number="doc.planned_qty"
-								class="ss-input"
-								type="number"
-								inputmode="decimal"
-								:disabled="readonly"
-							/>
-						</label>
-					</div>
-					<Picker
-						v-model="doc.supplier"
-						label="ผู้ขาย / แพลนท์"
-						:options="setup.suppliers"
-						remote="Supplier"
-						:display_value="doc.supplier_name"
-						clearable
-						:class="{ 'is-readonly': readonly }"
-						@select="(o) => (doc.supplier_name = o.label)"
-					/>
-					<label
-						class="ss-toggle"
-						:class="{ 'is-on': doc.employer_supplied, 'is-readonly': readonly }"
-					>
-						<input
-							v-model="doc.employer_supplied"
-							type="checkbox"
-							:true-value="1"
-							:false-value="0"
-							:disabled="readonly"
-						/>
-						<span class="ss-toggle-track"><span></span></span>
-						<span>
-							<b>ผู้ว่าจ้างจัดหา</b>
-							<small>ค่าตั้งต้นของตั๋วที่เพิ่มใหม่ (หักงวดผู้ว่าจ้างตามปริมาณจริง)</small>
-						</span>
-					</label>
-				</div>
-
-				<h2 class="ss-section-title">
-					ตั๋วรถ ({{ doc.tickets.length }})
-					<span class="ss-section-total">{{ num(total) }} คิว</span>
-				</h2>
-				<div
-					v-if="doc.planned_qty"
-					class="ss-progress ss-progress--lg"
-					:class="{ 'is-over': total > doc.planned_qty }"
-				>
-					<span :style="{ width: `${Math.min((total / doc.planned_qty) * 100, 100)}%` }"></span>
-					<em>{{ Math.round((total / doc.planned_qty) * 100) }}% ของแผน</em>
-				</div>
-				<TransitionGroup tag="div" class="ss-list" name="ss-list">
-					<button
-						v-for="(t, i) in doc.tickets"
-						:key="t._key"
-						type="button"
-						class="ss-card ss-card--row ss-ticket"
-						:style="{ '--i': i }"
-						@click="edit_ticket(t)"
-					>
-						<span class="ss-ticket-no">#{{ i + 1 }}</span>
-						<span class="ss-card-main">
-							<span class="ss-card-title">ตั๋ว {{ t.ticket_no }}</span>
-							<span class="ss-card-meta">
-								<template v-if="t.vehicle_no">{{ t.vehicle_no }} · </template>
-								{{ short_time(t.arrive_time)
-								}}<template v-if="t.slump"> · slump {{ t.slump }}</template>
-								<span v-if="t.employer_supplied" class="ss-tag tone-violet">ผู้ว่าจ้าง</span>
-							</span>
-						</span>
-						<span class="ss-qty"
-							><b>{{ num(t.qty) }}</b
-							><small>คิว</small></span
+					<aside class="ss-split-side">
+						<h2 class="ss-section-title">
+							ตั๋วรถ ({{ doc.tickets.length }})
+							<span class="ss-section-total">{{ num(total) }} คิว</span>
+						</h2>
+						<div
+							v-if="doc.planned_qty"
+							class="ss-progress ss-progress--lg"
+							:class="{ 'is-over': total > doc.planned_qty }"
 						>
-					</button>
-				</TransitionGroup>
-				<button v-if="!readonly" type="button" class="ss-add-row" @click="new_ticket">
-					<Icon name="plus" :size="20" :stroke="2.6" /> เพิ่มตั๋วรถ
-				</button>
+							<span
+								:style="{ width: `${Math.min((total / doc.planned_qty) * 100, 100)}%` }"
+							></span>
+							<em>{{ Math.round((total / doc.planned_qty) * 100) }}% ของแผน</em>
+						</div>
+						<TransitionGroup tag="div" class="ss-list" name="ss-list">
+							<button
+								v-for="(t, i) in doc.tickets"
+								:key="t._key"
+								type="button"
+								class="ss-card ss-card--row ss-ticket"
+								:style="{ '--i': i }"
+								@click="edit_ticket(t)"
+							>
+								<span class="ss-ticket-no">#{{ i + 1 }}</span>
+								<span class="ss-card-main">
+									<span class="ss-card-title">ตั๋ว {{ t.ticket_no }}</span>
+									<span class="ss-card-meta">
+										<template v-if="t.vehicle_no">{{ t.vehicle_no }} · </template>
+										{{ short_time(t.arrive_time)
+										}}<template v-if="t.slump"> · slump {{ t.slump }}</template>
+										<span v-if="t.employer_supplied" class="ss-tag tone-violet"
+											>ผู้ว่าจ้าง</span
+										>
+									</span>
+								</span>
+								<span class="ss-qty"
+									><b>{{ num(t.qty) }}</b
+									><small>คิว</small></span
+								>
+							</button>
+						</TransitionGroup>
+						<button v-if="!readonly" type="button" class="ss-add-row" @click="new_ticket">
+							<Icon name="plus" :size="20" :stroke="2.6" /> เพิ่มตั๋วรถ
+						</button>
 
-				<label v-if="!readonly || doc.remarks" class="ss-field" style="margin-top: 16px">
-					<span class="ss-field-label">หมายเหตุ</span>
-					<textarea v-model="doc.remarks" class="ss-input" rows="2" :disabled="readonly"></textarea>
-				</label>
+						<label v-if="!readonly || doc.remarks" class="ss-field" style="margin-top: 16px">
+							<span class="ss-field-label">หมายเหตุ</span>
+							<textarea
+								v-model="doc.remarks"
+								class="ss-input"
+								rows="2"
+								:disabled="readonly"
+							></textarea>
+						</label>
+					</aside>
+				</div>
 			</template>
 		</div>
 
-		<Transition name="ss-bar">
-			<div v-if="setup && !readonly" class="ss-bottom-bar">
-				<button
-					type="button"
-					class="ss-btn ss-btn--ghost ss-btn--lg"
-					:disabled="saving"
-					@click="save(0)"
-				>
-					บันทึกร่าง
-				</button>
-				<button
-					type="button"
-					class="ss-btn ss-btn--primary ss-btn--lg ss-grow"
-					:disabled="saving || !doc.tickets.length"
-					@click="save(1)"
-				>
-					<span v-if="saving" class="ss-spinner"></span>
-					<template v-else>ยืนยัน {{ num(total) }} คิว</template>
-				</button>
-			</div>
-		</Transition>
+		<Teleport to="#ss-layer">
+			<Transition name="ss-bar">
+				<div v-if="setup && !readonly" class="ss-bottom-bar">
+					<button
+						type="button"
+						class="ss-btn ss-btn--ghost ss-btn--lg"
+						:disabled="saving"
+						@click="save(0)"
+					>
+						บันทึกร่าง
+					</button>
+					<button
+						type="button"
+						class="ss-btn ss-btn--primary ss-btn--lg ss-grow"
+						:disabled="saving || !doc.tickets.length"
+						@click="save(1)"
+					>
+						<span v-if="saving" class="ss-spinner"></span>
+						<template v-else>ยืนยัน {{ num(total) }} คิว</template>
+					</button>
+				</div>
+			</Transition>
+		</Teleport>
 
 		<Sheet :open="!!ticket" :title="ticket?._new ? 'เพิ่มตั๋วรถ' : 'ตั๋วรถ'" @close="ticket = null">
 			<div v-if="ticket" class="ss-form">

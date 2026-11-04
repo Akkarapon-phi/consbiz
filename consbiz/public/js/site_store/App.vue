@@ -1,5 +1,7 @@
 <template>
-	<div class="ss-app" :class="{ 'has-nav': show_nav }">
+	<div class="ss-app" :class="{ 'has-nav': show_nav, 'has-side': state.project }">
+		<!-- แถบล่าง/ปุ่มลอยของแต่ละหน้า (Teleport มาที่นี่: ไม่ให้ transform ตอนเปลี่ยนหน้าดึงตำแหน่ง fixed) -->
+		<div id="ss-layer"></div>
 		<main class="ss-stage">
 			<Transition :name="`ss-${state.direction}`">
 				<component
@@ -12,19 +14,35 @@
 			</Transition>
 		</main>
 
+		<!-- มือถือ: แถบล่าง (เฉพาะหน้าหลักของแต่ละเมนู) / แท็บเล็ต-จอใหญ่: แถบข้างซ้าย (ทุกหน้า) -->
 		<Transition name="ss-nav">
-			<nav v-if="show_nav" class="ss-nav" aria-label="เมนูหลัก">
+			<nav v-if="state.project" class="ss-nav" :class="{ 'is-sub': !show_nav }" aria-label="เมนูหลัก">
+				<div class="ss-nav-brand">
+					<span class="ss-nav-logo"><Icon name="package" :size="20" :stroke="2.2" /></span>
+					<span class="ss-nav-brand-text">สโตร์หน้างาน</span>
+				</div>
+				<button type="button" class="ss-nav-project" @click="picker = true">
+					<span class="ss-avatar" :class="`tone-${tone(state.project.name)}`">{{
+						initials(state.project.project_name || state.project.name)
+					}}</span>
+					<span class="ss-nav-project-text">
+						<span>{{ state.project.project_name || state.project.name }}</span>
+						<small>{{ state.project.name }}</small>
+					</span>
+					<Icon name="swap" :size="16" />
+				</button>
 				<span class="ss-nav-pill" :style="{ '--tab': tab_index }"></span>
 				<button
 					v-for="tab in tabs"
 					:key="tab.view"
 					type="button"
 					class="ss-nav-item"
-					:class="{ 'is-active': tab.view === state.route.view }"
+					:class="{ 'is-active': tab.view === active_view, 'is-wide-only': tab.wide_only }"
+					:title="tab.label"
 					@click="open_tab(tab.view)"
 				>
 					<span class="ss-nav-icon">
-						<Icon :name="tab.icon" :size="22" :stroke="tab.view === state.route.view ? 2.4 : 2" />
+						<Icon :name="tab.icon" :size="22" :stroke="tab.view === active_view ? 2.4 : 2" />
 						<Transition name="ss-pop">
 							<span
 								v-if="tab.badge"
@@ -37,6 +55,10 @@
 					</span>
 					<span class="ss-nav-label">{{ tab.label }}</span>
 				</button>
+				<a v-if="boot.desk" class="ss-nav-item ss-nav-desk" href="/app" title="เปิดระบบเต็ม">
+					<span class="ss-nav-icon"><Icon name="monitor" :size="22" /></span>
+					<span class="ss-nav-label">ระบบเต็ม</span>
+				</a>
 			</nav>
 		</Transition>
 
@@ -113,6 +135,7 @@ import Icon from "./components/Icon.vue";
 import Sheet from "./components/Sheet.vue";
 import {
 	TABS,
+	boot,
 	call,
 	go,
 	initials,
@@ -164,6 +187,7 @@ const tabs = computed(() => [
 		badge: state.summary?.pending_count || 0,
 	},
 	{ view: "issue", label: "เบิก", icon: "issue" },
+	{ view: "concrete", label: "คอนกรีต", icon: "concrete", wide_only: true },
 	{
 		view: "borrow",
 		label: "ยืม-คืน",
@@ -173,10 +197,20 @@ const tabs = computed(() => [
 	},
 	{ view: "stock", label: "คลัง", icon: "warehouse" },
 ]);
+// หน้าย่อยนับเป็นเมนูไหน (ไฮไลต์ในแถบข้างของจอใหญ่)
+const SECTION = {
+	"receive-form": "receive",
+	receipt: "receive",
+	"concrete-form": "concrete",
+	"borrow-detail": "borrow",
+	"borrow-new": "borrow",
+};
+const active_view = computed(() => SECTION[state.route.view] || state.route.view);
+// ตำแหน่งแถบไฮไลต์ของแถบล่าง (มือถือไม่มีเมนูคอนกรีต)
 const tab_index = computed(() =>
 	Math.max(
 		0,
-		tabs.value.findIndex((t) => t.view === state.route.view)
+		tabs.value.filter((t) => !t.wide_only).findIndex((t) => t.view === active_view.value)
 	)
 );
 
@@ -185,7 +219,8 @@ function open_tab(name) {
 		window.scrollTo({ top: 0, behavior: "smooth" });
 		return;
 	}
-	go(name, {}, { replace: true });
+	// สลับเมนูหลักแทนที่ประวัติ, จากหน้าย่อย (จอใหญ่) เพิ่มประวัติให้ย้อนกลับได้
+	go(name, {}, { replace: TABS.includes(state.route.view) });
 }
 
 // ---------------------------------------------------------------- โครงการ

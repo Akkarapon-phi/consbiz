@@ -5,156 +5,175 @@
 		<div class="ss-content">
 			<Skeleton v-if="!source" :rows="3" />
 			<template v-else>
-				<div class="ss-banner" :class="source.employer ? 'tone-violet' : 'tone-blue'">
-					<Icon :name="source.employer ? 'building' : 'file'" :size="20" />
-					<div>
-						<div class="ss-banner-title">
-							{{ source.employer ? "วัสดุผู้ว่าจ้างจัดหา" : "รับตามใบสั่งซื้อ" }}
-						</div>
-						<div class="ss-banner-text">
-							สั่งวันที่ {{ thai_date(source.date, { year: true }) }}
-							<template v-if="source.schedule_date">
-								· กำหนดส่ง {{ thai_date(source.schedule_date, { year: true }) }}</template
-							>
-						</div>
-					</div>
-				</div>
-
-				<div class="ss-row-actions">
-					<span class="ss-muted">{{ rows.length }} รายการค้างรับ</span>
-					<button type="button" class="ss-btn ss-btn--soft ss-btn--sm" @click="fill_all">
-						<Icon name="check" :size="16" :stroke="2.6" /> รับครบทุกรายการ
-					</button>
-				</div>
-
-				<TransitionGroup tag="div" class="ss-list" name="ss-list" appear>
-					<div
-						v-for="(row, i) in rows"
-						:key="row.row"
-						class="ss-card ss-item"
-						:class="row_state(row)"
-						:style="{ '--i': i }"
-					>
-						<div class="ss-item-head">
-							<span class="ss-thumb">
-								<img v-if="row.image" :src="row.image" alt="" loading="lazy" />
-								<Icon v-else name="package" :size="22" />
-							</span>
-							<span class="ss-card-main">
-								<span class="ss-card-title">{{ row.item_name }}</span>
-								<span class="ss-card-meta">
-									ค้างรับ <b>{{ num(row.pending) }}</b> {{ row.uom }}
-									<template v-if="row.received">
-										· รับแล้ว {{ num(row.received) }}</template
+				<div class="ss-split">
+					<div class="ss-split-main">
+						<div class="ss-banner" :class="source.employer ? 'tone-violet' : 'tone-blue'">
+							<Icon :name="source.employer ? 'building' : 'file'" :size="20" />
+							<div>
+								<div class="ss-banner-title">
+									{{ source.employer ? "วัสดุผู้ว่าจ้างจัดหา" : "รับตามใบสั่งซื้อ" }}
+								</div>
+								<div class="ss-banner-text">
+									สั่งวันที่ {{ thai_date(source.date, { year: true }) }}
+									<template v-if="source.schedule_date">
+										· กำหนดส่ง
+										{{ thai_date(source.schedule_date, { year: true }) }}</template
 									>
-								</span>
-							</span>
-							<button
-								type="button"
-								class="ss-full-btn"
-								:class="{
-									'is-on': row.qty === row.pending - row.rejected_qty && row.qty > 0,
-								}"
-								@click="fill(row)"
-							>
-								<Icon name="check" :size="16" :stroke="3" /> ครบ
+								</div>
+							</div>
+						</div>
+
+						<div class="ss-row-actions">
+							<span class="ss-muted">{{ rows.length }} รายการค้างรับ</span>
+							<button type="button" class="ss-btn ss-btn--soft ss-btn--sm" @click="fill_all">
+								<Icon name="check" :size="16" :stroke="2.6" /> รับครบทุกรายการ
 							</button>
 						</div>
 
-						<div class="ss-item-controls">
-							<div class="ss-control">
-								<span class="ss-control-label">รับเข้า</span>
-								<Stepper
-									v-model="row.qty"
-									:max="row.pending - row.rejected_qty"
-									tone="brand"
-								/>
+						<TransitionGroup tag="div" class="ss-list" name="ss-list" appear>
+							<div
+								v-for="(row, i) in rows"
+								:key="row.row"
+								class="ss-card ss-item"
+								:class="row_state(row)"
+								:style="{ '--i': i }"
+							>
+								<div class="ss-item-head">
+									<span class="ss-thumb">
+										<img v-if="row.image" :src="row.image" alt="" loading="lazy" />
+										<Icon v-else name="package" :size="22" />
+									</span>
+									<span class="ss-card-main">
+										<span class="ss-card-title">{{ row.item_name }}</span>
+										<span class="ss-card-meta">
+											ค้างรับ <b>{{ num(row.pending) }}</b> {{ row.uom }}
+											<template v-if="row.received">
+												· รับแล้ว {{ num(row.received) }}</template
+											>
+										</span>
+									</span>
+									<button
+										type="button"
+										class="ss-full-btn"
+										:class="{
+											'is-on':
+												row.qty === row.pending - row.rejected_qty && row.qty > 0,
+										}"
+										@click="fill(row)"
+									>
+										<Icon name="check" :size="16" :stroke="3" /> ครบ
+									</button>
+								</div>
+
+								<div class="ss-item-controls">
+									<div class="ss-control">
+										<span class="ss-control-label">รับเข้า</span>
+										<Stepper
+											v-model="row.qty"
+											:max="row.pending - row.rejected_qty"
+											tone="brand"
+										/>
+									</div>
+									<div class="ss-control">
+										<span class="ss-control-label">ตีกลับ</span>
+										<Stepper
+											v-model="row.rejected_qty"
+											:max="row.pending - row.qty"
+											tone="danger"
+										/>
+									</div>
+								</div>
+
+								<Transition name="ss-expand">
+									<div v-if="row.rejected_qty > 0" class="ss-reasons">
+										<button
+											v-for="r in REASONS"
+											:key="r"
+											type="button"
+											class="ss-reason"
+											:class="{ 'is-active': row.reason === r }"
+											@click="row.reason = row.reason === r ? '' : r"
+										>
+											{{ r }}
+										</button>
+										<input
+											v-model="row.reason_text"
+											class="ss-input ss-input--sm"
+											placeholder="เหตุผลอื่น / รายละเอียด"
+										/>
+									</div>
+								</Transition>
 							</div>
-							<div class="ss-control">
-								<span class="ss-control-label">ตีกลับ</span>
-								<Stepper
-									v-model="row.rejected_qty"
-									:max="row.pending - row.qty"
-									tone="danger"
+						</TransitionGroup>
+					</div>
+					<aside class="ss-split-side">
+						<h2 class="ss-section-title">ข้อมูลการส่ง</h2>
+						<div class="ss-form">
+							<label class="ss-field">
+								<span class="ss-field-label">เลขที่ใบส่งของ</span>
+								<input
+									v-model="form.delivery_note"
+									class="ss-input"
+									placeholder="เช่น DN-6811-0045"
 								/>
+							</label>
+							<div class="ss-form-row">
+								<label class="ss-field">
+									<span class="ss-field-label">ผู้ส่ง / ขนส่ง</span>
+									<input
+										v-model="form.delivered_by"
+										class="ss-input"
+										placeholder="ชื่อคนขับ"
+									/>
+								</label>
+								<label class="ss-field">
+									<span class="ss-field-label">ทะเบียนรถ</span>
+									<input
+										v-model="form.vehicle_no"
+										class="ss-input"
+										placeholder="1กข 1234"
+									/>
+								</label>
+							</div>
+							<label class="ss-field">
+								<span class="ss-field-label">หมายเหตุ</span>
+								<textarea
+									v-model="form.remarks"
+									class="ss-input"
+									rows="2"
+									placeholder="ถ้ามี"
+								></textarea>
+							</label>
+							<div class="ss-field">
+								<span class="ss-field-label">รูปใบส่งของ / สินค้า</span>
+								<PhotoInput v-model="photos" />
 							</div>
 						</div>
-
-						<Transition name="ss-expand">
-							<div v-if="row.rejected_qty > 0" class="ss-reasons">
-								<button
-									v-for="r in REASONS"
-									:key="r"
-									type="button"
-									class="ss-reason"
-									:class="{ 'is-active': row.reason === r }"
-									@click="row.reason = row.reason === r ? '' : r"
-								>
-									{{ r }}
-								</button>
-								<input
-									v-model="row.reason_text"
-									class="ss-input ss-input--sm"
-									placeholder="เหตุผลอื่น / รายละเอียด"
-								/>
-							</div>
-						</Transition>
-					</div>
-				</TransitionGroup>
-
-				<h2 class="ss-section-title">ข้อมูลการส่ง</h2>
-				<div class="ss-form">
-					<label class="ss-field">
-						<span class="ss-field-label">เลขที่ใบส่งของ</span>
-						<input
-							v-model="form.delivery_note"
-							class="ss-input"
-							placeholder="เช่น DN-6811-0045"
-						/>
-					</label>
-					<div class="ss-form-row">
-						<label class="ss-field">
-							<span class="ss-field-label">ผู้ส่ง / ขนส่ง</span>
-							<input v-model="form.delivered_by" class="ss-input" placeholder="ชื่อคนขับ" />
-						</label>
-						<label class="ss-field">
-							<span class="ss-field-label">ทะเบียนรถ</span>
-							<input v-model="form.vehicle_no" class="ss-input" placeholder="1กข 1234" />
-						</label>
-					</div>
-					<label class="ss-field">
-						<span class="ss-field-label">หมายเหตุ</span>
-						<textarea
-							v-model="form.remarks"
-							class="ss-input"
-							rows="2"
-							placeholder="ถ้ามี"
-						></textarea>
-					</label>
-					<div class="ss-field">
-						<span class="ss-field-label">รูปใบส่งของ / สินค้า</span>
-						<PhotoInput v-model="photos" />
-					</div>
+					</aside>
 				</div>
 			</template>
 		</div>
 
-		<Transition name="ss-bar">
-			<div v-if="source" class="ss-bottom-bar">
-				<div class="ss-bar-summary">
-					<b>รับ {{ accepted_count }}</b> รายการ
-					<span v-if="rejected_count" class="ss-text-danger"> · ตีกลับ {{ rejected_count }}</span>
+		<Teleport to="#ss-layer">
+			<Transition name="ss-bar">
+				<div v-if="source" class="ss-bottom-bar">
+					<div class="ss-bar-summary">
+						<b>รับ {{ accepted_count }}</b> รายการ
+						<span v-if="rejected_count" class="ss-text-danger">
+							· ตีกลับ {{ rejected_count }}</span
+						>
+					</div>
+					<button
+						type="button"
+						class="ss-btn ss-btn--primary ss-btn--lg"
+						:disabled="!accepted_count && !rejected_count"
+						@click="confirm = true"
+					>
+						ยืนยันรับของ
+					</button>
 				</div>
-				<button
-					type="button"
-					class="ss-btn ss-btn--primary ss-btn--lg"
-					:disabled="!accepted_count && !rejected_count"
-					@click="confirm = true"
-				>
-					ยืนยันรับของ
-				</button>
-			</div>
-		</Transition>
+			</Transition>
+		</Teleport>
 
 		<Sheet :open="confirm" title="ยืนยันรับของ" :subtitle="source?.party" @close="confirm = false">
 			<div class="ss-summary-list">

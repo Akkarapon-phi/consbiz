@@ -90,12 +90,14 @@
 			</Transition>
 		</div>
 
-		<Transition name="ss-pop">
-			<button v-if="boot.can.borrow" type="button" class="ss-fab" @click="go('borrow-new')">
-				<Icon name="plus" :size="26" :stroke="2.6" />
-				<span>ยืมอุปกรณ์</span>
-			</button>
-		</Transition>
+		<Teleport to="#ss-layer">
+			<Transition name="ss-pop">
+				<button v-if="boot.can.borrow" type="button" class="ss-fab" @click="go('borrow-new')">
+					<Icon name="plus" :size="26" :stroke="2.6" />
+					<span>ยืมอุปกรณ์</span>
+				</button>
+			</Transition>
+		</Teleport>
 	</div>
 </template>
 

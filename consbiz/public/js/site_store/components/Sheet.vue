@@ -66,11 +66,18 @@ function start_drag(event) {
 	window.addEventListener("pointerup", end);
 }
 
-// ล็อกการเลื่อนหน้าหลังขณะเปิด
+// ล็อกการเลื่อนหน้าหลังขณะเปิด, จอใหญ่กด Esc ปิดได้
+const on_key = (event) => event.key === "Escape" && close();
 watch(
 	() => props.open,
-	(open) => document.body.classList.toggle("ss-locked", open),
+	(open) => {
+		document.body.classList.toggle("ss-locked", open);
+		window[open ? "addEventListener" : "removeEventListener"]("keydown", on_key);
+	},
 	{ immediate: true }
 );
-onBeforeUnmount(() => document.body.classList.remove("ss-locked"));
+onBeforeUnmount(() => {
+	document.body.classList.remove("ss-locked");
+	window.removeEventListener("keydown", on_key);
+});
 </script>

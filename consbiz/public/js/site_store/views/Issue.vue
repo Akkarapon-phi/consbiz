@@ -130,20 +130,24 @@
 			</Transition>
 		</div>
 
-		<Transition name="ss-bar">
-			<div v-if="tab === 'new' && cart.length" class="ss-bottom-bar">
-				<button type="button" class="ss-cart-summary" @click="cart_open = true">
-					<span class="ss-cart-icon"
-						><Icon name="cart" :size="20" /><span class="ss-badge">{{ cart.length }}</span></span
-					>
-					<span>รายการเบิก</span>
-					<Icon name="chevron-down" :size="18" style="transform: rotate(180deg)" />
-				</button>
-				<button type="button" class="ss-btn ss-btn--primary ss-btn--lg" @click="cart_open = true">
-					ตรวจและเบิก
-				</button>
-			</div>
-		</Transition>
+		<Teleport to="#ss-layer">
+			<Transition name="ss-bar">
+				<div v-if="tab === 'new' && cart.length" class="ss-bottom-bar">
+					<button type="button" class="ss-cart-summary" @click="cart_open = true">
+						<span class="ss-cart-icon"
+							><Icon name="cart" :size="20" /><span class="ss-badge">{{
+								cart.length
+							}}</span></span
+						>
+						<span>รายการเบิก</span>
+						<Icon name="chevron-down" :size="18" style="transform: rotate(180deg)" />
+					</button>
+					<button type="button" class="ss-btn ss-btn--primary ss-btn--lg" @click="cart_open = true">
+						ตรวจและเบิก
+					</button>
+				</div>
+			</Transition>
+		</Teleport>
 
 		<!-- ใส่จำนวน -->
 		<Sheet

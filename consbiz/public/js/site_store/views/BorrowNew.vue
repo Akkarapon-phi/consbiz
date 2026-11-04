@@ -5,132 +5,156 @@
 		<div class="ss-content">
 			<Skeleton v-if="!setup" :rows="3" />
 			<template v-else>
-				<h2 class="ss-section-title ss-section-title--first">ผู้ยืม</h2>
-				<Segmented
-					v-model="form.borrower_type"
-					:options="[
-						{ value: 'Employee', label: 'พนักงาน' },
-						{ value: 'Subcontractor', label: 'ผู้รับเหมา' },
-						{ value: 'Worker', label: 'คนงาน' },
-					]"
-				/>
-				<div class="ss-form">
-					<Transition name="ss-fade" mode="out-in">
-						<Picker
-							v-if="form.borrower_type === 'Employee'"
-							key="emp"
-							v-model="form.employee"
-							label="พนักงาน"
-							remote="Employee"
-							required
+				<div class="ss-split">
+					<div class="ss-split-main">
+						<h2 class="ss-section-title ss-section-title--first">ผู้ยืม</h2>
+						<Segmented
+							v-model="form.borrower_type"
+							:options="[
+								{ value: 'Employee', label: 'พนักงาน' },
+								{ value: 'Subcontractor', label: 'ผู้รับเหมา' },
+								{ value: 'Worker', label: 'คนงาน' },
+							]"
 						/>
-						<label v-else-if="form.borrower_type === 'Worker'" key="worker" class="ss-field">
-							<span class="ss-field-label">ชื่อคนงาน<em>*</em></span>
-							<input v-model="form.worker_name" class="ss-input" placeholder="ชื่อ-นามสกุล" />
-						</label>
-						<span v-else key="none"></span>
-					</Transition>
-					<Picker
-						v-if="form.borrower_type !== 'Employee'"
-						v-model="form.supplier"
-						:label="form.borrower_type === 'Worker' ? 'สังกัดผู้รับเหมา (ถ้ามี)' : 'ผู้รับเหมา'"
-						remote="Supplier"
-						:required="form.borrower_type === 'Subcontractor'"
-						clearable
-					/>
-					<label class="ss-field">
-						<span class="ss-field-label">เบอร์ติดต่อ</span>
-						<input v-model="form.contact" class="ss-input" type="tel" inputmode="tel" />
-					</label>
-					<div class="ss-field">
-						<span class="ss-field-label">กำหนดคืน</span>
-						<div class="ss-quick ss-quick--left">
-							<button
-								v-for="d in DUE"
-								:key="d.days"
-								type="button"
-								class="ss-reason"
-								:class="{ 'is-active': form.due_date === add_days(d.days) }"
-								@click="form.due_date = add_days(d.days)"
-							>
-								{{ d.label }}
-							</button>
+						<div class="ss-form">
+							<Transition name="ss-fade" mode="out-in">
+								<Picker
+									v-if="form.borrower_type === 'Employee'"
+									key="emp"
+									v-model="form.employee"
+									label="พนักงาน"
+									remote="Employee"
+									required
+								/>
+								<label
+									v-else-if="form.borrower_type === 'Worker'"
+									key="worker"
+									class="ss-field"
+								>
+									<span class="ss-field-label">ชื่อคนงาน<em>*</em></span>
+									<input
+										v-model="form.worker_name"
+										class="ss-input"
+										placeholder="ชื่อ-นามสกุล"
+									/>
+								</label>
+								<span v-else key="none"></span>
+							</Transition>
+							<Picker
+								v-if="form.borrower_type !== 'Employee'"
+								v-model="form.supplier"
+								:label="
+									form.borrower_type === 'Worker'
+										? 'สังกัดผู้รับเหมา (ถ้ามี)'
+										: 'ผู้รับเหมา'
+								"
+								remote="Supplier"
+								:required="form.borrower_type === 'Subcontractor'"
+								clearable
+							/>
+							<label class="ss-field">
+								<span class="ss-field-label">เบอร์ติดต่อ</span>
+								<input v-model="form.contact" class="ss-input" type="tel" inputmode="tel" />
+							</label>
+							<div class="ss-field">
+								<span class="ss-field-label">กำหนดคืน</span>
+								<div class="ss-quick ss-quick--left">
+									<button
+										v-for="d in DUE"
+										:key="d.days"
+										type="button"
+										class="ss-reason"
+										:class="{ 'is-active': form.due_date === add_days(d.days) }"
+										@click="form.due_date = add_days(d.days)"
+									>
+										{{ d.label }}
+									</button>
+								</div>
+								<input v-model="form.due_date" class="ss-input" type="date" :min="today()" />
+							</div>
 						</div>
-						<input v-model="form.due_date" class="ss-input" type="date" :min="today()" />
-					</div>
-				</div>
 
-				<h2 class="ss-section-title">
-					อุปกรณ์ ({{ lines.length }})
-					<button type="button" class="ss-link" @click="picking = true">+ เพิ่ม</button>
-				</h2>
-				<TransitionGroup tag="div" class="ss-list" name="ss-list">
-					<div v-for="line in lines" :key="line.item_code" class="ss-card ss-card--row">
-						<span class="ss-card-main">
-							<span class="ss-card-title">{{ line.item_name }}</span>
-							<span class="ss-card-meta">ในคลัง {{ num(line.available) }} {{ line.uom }}</span>
-						</span>
-						<Stepper
-							v-model="line.qty"
-							:max="line.available"
-							:min="0"
-							@update:model-value="(v) => !v && remove(line)"
-						/>
+						<h2 class="ss-section-title">
+							อุปกรณ์ ({{ lines.length }})
+							<button type="button" class="ss-link" @click="picking = true">+ เพิ่ม</button>
+						</h2>
+						<TransitionGroup tag="div" class="ss-list" name="ss-list">
+							<div v-for="line in lines" :key="line.item_code" class="ss-card ss-card--row">
+								<span class="ss-card-main">
+									<span class="ss-card-title">{{ line.item_name }}</span>
+									<span class="ss-card-meta"
+										>ในคลัง {{ num(line.available) }} {{ line.uom }}</span
+									>
+								</span>
+								<Stepper
+									v-model="line.qty"
+									:max="line.available"
+									:min="0"
+									@update:model-value="(v) => !v && remove(line)"
+								/>
+							</div>
+						</TransitionGroup>
+						<button type="button" class="ss-add-row" @click="picking = true">
+							<Icon name="plus" :size="20" :stroke="2.6" /> เลือกอุปกรณ์
+						</button>
 					</div>
-				</TransitionGroup>
-				<button type="button" class="ss-add-row" @click="picking = true">
-					<Icon name="plus" :size="20" :stroke="2.6" /> เลือกอุปกรณ์
-				</button>
-
-				<h2 class="ss-section-title">ส่งมอบ</h2>
-				<div class="ss-form">
-					<div class="ss-field">
-						<span class="ss-field-label">ลายเซ็นผู้ยืม</span>
-						<SignaturePad v-model="form.borrower_signature" hint="ให้ผู้ยืมเซ็นรับอุปกรณ์" />
-					</div>
-					<div class="ss-field">
-						<span class="ss-field-label">รูปอุปกรณ์ตอนส่งมอบ</span>
-						<PhotoInput v-model="photos" :max="1" />
-					</div>
-					<label class="ss-field">
-						<span class="ss-field-label">หมายเหตุ</span>
-						<input v-model="form.remarks" class="ss-input" />
-					</label>
-					<details class="ss-details">
-						<summary>คลัง</summary>
-						<Picker
-							v-model="form.source_warehouse"
-							label="คลังต้นทาง"
-							:options="setup.warehouses"
-							required
-						/>
-						<Picker
-							v-model="form.loan_warehouse"
-							label="คลังอุปกรณ์ระหว่างยืม"
-							:options="setup.warehouses"
-							required
-						/>
-					</details>
+					<aside class="ss-split-side">
+						<h2 class="ss-section-title">ส่งมอบ</h2>
+						<div class="ss-form">
+							<div class="ss-field">
+								<span class="ss-field-label">ลายเซ็นผู้ยืม</span>
+								<SignaturePad
+									v-model="form.borrower_signature"
+									hint="ให้ผู้ยืมเซ็นรับอุปกรณ์"
+								/>
+							</div>
+							<div class="ss-field">
+								<span class="ss-field-label">รูปอุปกรณ์ตอนส่งมอบ</span>
+								<PhotoInput v-model="photos" :max="1" />
+							</div>
+							<label class="ss-field">
+								<span class="ss-field-label">หมายเหตุ</span>
+								<input v-model="form.remarks" class="ss-input" />
+							</label>
+							<details class="ss-details">
+								<summary>คลัง</summary>
+								<Picker
+									v-model="form.source_warehouse"
+									label="คลังต้นทาง"
+									:options="setup.warehouses"
+									required
+								/>
+								<Picker
+									v-model="form.loan_warehouse"
+									label="คลังอุปกรณ์ระหว่างยืม"
+									:options="setup.warehouses"
+									required
+								/>
+							</details>
+						</div>
+					</aside>
 				</div>
 			</template>
 		</div>
 
-		<Transition name="ss-bar">
-			<div v-if="setup" class="ss-bottom-bar">
-				<div class="ss-bar-summary">
-					<b>{{ lines.length }}</b> รายการ
+		<Teleport to="#ss-layer">
+			<Transition name="ss-bar">
+				<div v-if="setup" class="ss-bottom-bar">
+					<div class="ss-bar-summary">
+						<b>{{ lines.length }}</b> รายการ
+					</div>
+					<button
+						type="button"
+						class="ss-btn ss-btn--primary ss-btn--lg"
+						:disabled="!ready || saving"
+						@click="submit"
+					>
+						<span v-if="saving" class="ss-spinner"></span>
+						<template v-else>ส่งมอบอุปกรณ์</template>
+					</button>
 				</div>
-				<button
-					type="button"
-					class="ss-btn ss-btn--primary ss-btn--lg"
-					:disabled="!ready || saving"
-					@click="submit"
-				>
-					<span v-if="saving" class="ss-spinner"></span>
-					<template v-else>ส่งมอบอุปกรณ์</template>
-				</button>
-			</div>
-		</Transition>
+			</Transition>
+		</Teleport>
 
 		<Sheet
 			:open="picking"

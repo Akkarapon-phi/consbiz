@@ -2508,3 +2508,385 @@ button.ss-card:active {
 		grid-template-columns: repeat(4, minmax(0, 1fr));
 	}
 }
+
+/* ================================================================ Responsive
+   มือถือ (< 768): แถบเมนูล่าง, bottom sheet
+   แท็บเล็ต (768–1179): แถบไอคอนด้านซ้าย, การ์ดหลายคอลัมน์, sheet เป็นหน้าต่างกลางจอ
+   จอใหญ่ (≥ 1180): sidebar มีชื่อเมนูและโครงการ, ฟอร์มแบ่งซ้าย-ขวา */
+
+:root {
+	--ss-side: 0px;
+	--ss-max: 1240px;
+}
+
+.ss-nav-brand,
+.ss-nav-project,
+.ss-nav-desk,
+.ss-nav-item.is-wide-only,
+.ss-nav.is-sub {
+	display: none;
+}
+
+.ss-split,
+.ss-split-main,
+.ss-split-side {
+	display: flex;
+	flex-direction: column;
+	gap: 14px;
+	min-width: 0;
+}
+
+@media (hover: hover) {
+	button.ss-card:hover,
+	.ss-action:hover:not(:disabled),
+	.ss-stat:hover {
+		transform: translateY(-2px);
+		box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 18px 36px -18px rgba(15, 23, 42, 0.35);
+	}
+	.ss-option:hover {
+		background: var(--ss-surface-2);
+	}
+	.ss-icon-btn:hover {
+		background: var(--ss-border);
+	}
+	.ss-btn--primary:hover:not(:disabled) {
+		box-shadow: 0 16px 30px -12px var(--ss-brand);
+		filter: brightness(1.05);
+	}
+}
+
+@media (min-width: 768px) {
+	:root {
+		--ss-side: 88px;
+	}
+
+	.ss-app {
+		max-width: none;
+	}
+	.ss-app.has-side {
+		padding-left: var(--ss-side);
+	}
+	.ss-stage > .ss-view {
+		width: 100%;
+		max-width: var(--ss-max);
+		margin: 0 auto;
+	}
+	.ss-app.has-nav .ss-stage > .ss-view {
+		padding-bottom: calc(40px + var(--ss-bottom));
+	}
+
+	/* แถบข้าง */
+	.ss-nav,
+	.ss-nav.is-sub {
+		display: flex;
+		flex-direction: column;
+		align-items: stretch;
+		gap: 4px;
+		top: 0;
+		bottom: 0;
+		left: 0;
+		transform: none;
+		width: var(--ss-side);
+		max-width: none;
+		height: auto;
+		padding: calc(16px + var(--ss-top)) 10px calc(16px + var(--ss-bottom));
+		border-radius: 0;
+		border: 0;
+		border-right: 1px solid var(--ss-border);
+		box-shadow: none;
+		background: color-mix(in srgb, var(--ss-surface) 86%, transparent);
+		overflow-y: auto;
+	}
+	.ss-nav-pill {
+		display: none;
+	}
+	.ss-nav-item {
+		flex: none;
+		height: 66px;
+		border-radius: 18px;
+		transition: background 0.2s ease, color 0.2s ease;
+	}
+	.ss-nav-item.is-active {
+		background: var(--ss-brand-soft);
+	}
+	.ss-nav-item:not(.is-active):hover {
+		background: var(--ss-surface-2);
+		color: var(--ss-text);
+	}
+	.ss-nav-item.is-wide-only {
+		display: flex;
+	}
+	.ss-nav-desk {
+		display: flex;
+		margin-top: auto;
+	}
+	.ss-nav-brand {
+		display: flex;
+		justify-content: center;
+		margin-bottom: 14px;
+	}
+	.ss-nav-brand-text {
+		display: none;
+	}
+	.ss-nav-logo {
+		width: 46px;
+		height: 46px;
+		border-radius: 15px;
+		display: grid;
+		place-items: center;
+		color: #fff;
+		background: linear-gradient(140deg, var(--ss-brand), var(--ss-brand-2));
+		box-shadow: 0 12px 24px -12px var(--ss-brand);
+	}
+	.ss-nav-enter-from,
+	.ss-nav-leave-to {
+		transform: translateX(-100%);
+		opacity: 0;
+	}
+
+	/* แถบบน / เนื้อหา */
+	.ss-topbar {
+		min-height: calc(72px + var(--ss-top));
+		padding-left: 28px;
+		padding-right: 20px;
+	}
+	.ss-topbar:has(> .ss-icon-btn:first-child) {
+		padding-left: 16px;
+	}
+	.ss-topbar-main {
+		font-size: 23px;
+	}
+	.ss-content {
+		padding: 8px 28px 28px;
+		gap: 16px;
+	}
+	.ss-hero {
+		margin: calc(16px + var(--ss-top)) 28px 0;
+		padding: 28px 28px 72px;
+		border-radius: 30px;
+	}
+	.ss-hero-name {
+		font-size: 28px;
+	}
+	.ss-project-chip {
+		max-width: 560px;
+	}
+	.ss-content--lift {
+		margin-top: -44px;
+		padding-left: 52px;
+		padding-right: 52px;
+	}
+	.ss-segmented {
+		max-width: 460px;
+	}
+	.ss-search--sticky {
+		top: calc(76px + var(--ss-top));
+	}
+	.ss-filters {
+		margin: 0;
+		padding: 0;
+		flex-wrap: wrap;
+	}
+
+	/* การ์ดหลายคอลัมน์ */
+	.ss-list {
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+		align-items: start;
+		gap: 14px;
+	}
+	.ss-sheet .ss-list,
+	.ss-split-side .ss-list {
+		grid-template-columns: minmax(0, 1fr);
+	}
+	.ss-gallery {
+		grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+	}
+
+	/* แถบล่างของฟอร์ม: เริ่มหลังแถบข้าง ปุ่มชิดขวา */
+	.ss-bottom-bar {
+		left: var(--ss-side);
+		right: 0;
+		transform: none;
+		width: auto;
+		max-width: none;
+		padding: 14px max(28px, calc((100vw - var(--ss-side) - var(--ss-max)) / 2 + 28px))
+			calc(14px + var(--ss-bottom));
+	}
+	.ss-bar-summary,
+	.ss-cart-summary {
+		flex: 1;
+	}
+	.ss-bottom-bar > .ss-btn--primary:last-child {
+		flex: 0 0 auto;
+		min-width: 260px;
+	}
+	.ss-bar-enter-from,
+	.ss-bar-leave-to {
+		transform: translateY(110%);
+	}
+
+	.ss-fab,
+	.ss-app.has-nav .ss-fab {
+		right: 32px;
+		bottom: calc(32px + var(--ss-bottom));
+	}
+
+	/* sheet = หน้าต่างกลางจอ */
+	.ss-sheet {
+		top: 50%;
+		bottom: auto;
+		left: calc(50% + var(--ss-side) / 2);
+		transform: translate(-50%, -50%);
+		width: min(580px, calc(100vw - var(--ss-side) - 48px));
+		max-height: min(86vh, 860px);
+		border-radius: 26px;
+	}
+	.ss-sheet--full {
+		height: min(80vh, 760px);
+	}
+	.ss-sheet-grip {
+		display: none;
+	}
+	.ss-sheet-head {
+		padding-top: 20px;
+	}
+	.ss-sheet-close {
+		top: 12px;
+	}
+	.ss-sheet-foot {
+		padding-bottom: 16px;
+	}
+	.ss-sheet-enter-from,
+	.ss-sheet-leave-to {
+		transform: translate(-50%, -46%) scale(0.96);
+		opacity: 0;
+	}
+	.ss-sheet-enter-active {
+		transition: transform 0.4s var(--ss-spring), opacity 0.25s ease;
+	}
+	.ss-sheet-leave-active {
+		transition: transform 0.2s ease, opacity 0.2s ease;
+	}
+
+	.ss-toasts {
+		left: calc(50% + var(--ss-side) / 2);
+	}
+	.ss-success {
+		padding-left: var(--ss-side);
+	}
+	.ss-stats {
+		grid-template-columns: repeat(4, minmax(0, 1fr));
+	}
+	.ss-actions {
+		grid-template-columns: repeat(4, minmax(0, 1fr));
+	}
+}
+
+@media (min-width: 1180px) {
+	:root {
+		--ss-side: 268px;
+	}
+
+	.ss-nav,
+	.ss-nav.is-sub {
+		padding: calc(20px + var(--ss-top)) 16px calc(20px + var(--ss-bottom));
+		gap: 2px;
+	}
+	.ss-nav-brand {
+		justify-content: flex-start;
+		align-items: center;
+		gap: 12px;
+		padding: 0 6px;
+		margin-bottom: 18px;
+	}
+	.ss-nav-brand-text {
+		display: block;
+		font-size: 18px;
+		font-weight: 700;
+		letter-spacing: -0.01em;
+	}
+	.ss-nav-project {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		width: 100%;
+		padding: 10px;
+		margin-bottom: 14px;
+		border-radius: 16px;
+		background: var(--ss-surface-2);
+		text-align: left;
+		color: var(--ss-text);
+		transition: background 0.2s ease;
+	}
+	.ss-nav-project:hover {
+		background: var(--ss-brand-soft);
+	}
+	.ss-nav-project .ss-avatar {
+		width: 38px;
+		height: 38px;
+		border-radius: 12px;
+		font-size: 13px;
+	}
+	.ss-nav-project-text {
+		flex: 1;
+		min-width: 0;
+		display: flex;
+		flex-direction: column;
+	}
+	.ss-nav-project-text span {
+		font-size: 13.5px;
+		font-weight: 600;
+		line-height: 1.3;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		display: -webkit-box;
+		-webkit-line-clamp: 2;
+		-webkit-box-orient: vertical;
+	}
+	.ss-nav-project-text small {
+		font-size: 11.5px;
+		color: var(--ss-muted);
+	}
+	.ss-nav-item {
+		flex-direction: row;
+		justify-content: flex-start;
+		gap: 14px;
+		height: 48px;
+		padding: 0 14px;
+		border-radius: 14px;
+	}
+	.ss-nav-label {
+		font-size: 14.5px;
+	}
+	.ss-nav-item .ss-nav-icon {
+		position: static;
+	}
+	.ss-nav-item .ss-badge {
+		top: 50%;
+		right: 12px;
+		transform: translateY(-50%);
+	}
+
+	/* ฟอร์มแบ่งซ้าย-ขวา: ข้างขวาเลื่อนตาม */
+	.ss-split {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) 400px;
+		gap: 24px;
+		align-items: start;
+	}
+	.ss-split-side {
+		position: sticky;
+		top: calc(84px + var(--ss-top));
+		max-height: calc(100vh - 84px - 100px - var(--ss-top));
+		overflow-y: auto;
+		margin: -6px;
+		padding: 6px;
+	}
+	.ss-split-side > .ss-section-title:first-child {
+		margin-top: 0;
+	}
+	.ss-split-main .ss-list {
+		grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+	}
+}

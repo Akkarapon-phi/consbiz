@@ -90,17 +90,19 @@
 			</template>
 		</div>
 
-		<Transition name="ss-pop">
-			<button
-				v-if="data?.construction_management"
-				type="button"
-				class="ss-fab"
-				@click="go('concrete-form')"
-			>
-				<Icon name="plus" :size="26" :stroke="2.6" />
-				<span>เทคอนกรีต</span>
-			</button>
-		</Transition>
+		<Teleport to="#ss-layer">
+			<Transition name="ss-pop">
+				<button
+					v-if="data?.construction_management"
+					type="button"
+					class="ss-fab"
+					@click="go('concrete-form')"
+				>
+					<Icon name="plus" :size="26" :stroke="2.6" />
+					<span>เทคอนกรีต</span>
+				</button>
+			</Transition>
+		</Teleport>
 	</div>
 </template>
 
