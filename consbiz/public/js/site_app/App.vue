@@ -41,34 +41,31 @@
 				:style="{ '--count': mobile_tabs.length }"
 				aria-label="เมนูหลัก"
 			>
-				<!-- ชื่อหมวด = ปุ่มเปิดตารางหมวดงาน (แท็บเล็ตเห็นแค่ไอคอน) -->
-				<component
-					:is="boot.sections.length > 1 ? 'button' : 'div'"
-					:type="boot.sections.length > 1 ? 'button' : undefined"
-					class="ss-nav-brand"
-					:title="boot.sections.length > 1 ? 'เปลี่ยนหมวดงาน' : undefined"
-					@click="boot.sections.length > 1 && (launcher = true)"
-				>
-					<span class="ss-nav-logo">
-						<Icon :name="section.icon" :size="20" :stroke="2.2" />
-						<span v-if="boot.sections.length > 1" class="ss-nav-logo-grid"
-							><Icon name="grid" :size="11" :stroke="2.6"
+				<!-- หัว sidebar: ชื่อหมวด + ปุ่มพับ/กาง (พับ = เหลือแค่ไอคอน) เปลี่ยนหมวดที่ Dock -->
+				<div class="ss-nav-head">
+					<div class="ss-nav-brand">
+						<span class="ss-nav-logo"
+							><Icon :name="section.icon" :size="20" :stroke="2.2"
 						/></span>
-						<span v-if="other_badges" class="ss-nav-logo-dot">{{ other_badges }}</span>
-					</span>
-					<span class="ss-nav-brand-text">
-						<span>{{ section.title }}</span>
-						<small v-if="boot.sections.length > 1">เปลี่ยนหมวดงาน</small>
-					</span>
-					<Icon
-						v-if="boot.sections.length > 1"
-						class="ss-nav-brand-more"
-						name="chevron-down"
-						:size="16"
-					/>
-				</component>
-				<SectionDock v-if="boot.sections.length > 1" variant="rail" />
-				<button type="button" class="ss-nav-project" @click="picker = true">
+						<span class="ss-nav-brand-text">{{ section.title }}</span>
+					</div>
+					<button
+						type="button"
+						class="ss-icon-btn ss-nav-toggle"
+						:title="side === 'expanded' ? 'พับแถบเมนู' : 'กางแถบเมนู'"
+						:aria-label="side === 'expanded' ? 'พับแถบเมนู' : 'กางแถบเมนู'"
+						:aria-expanded="side === 'expanded'"
+						@click="toggle_side"
+					>
+						<Icon name="panel" :size="19" />
+					</button>
+				</div>
+				<button
+					type="button"
+					class="ss-nav-project"
+					:title="`โครงการ: ${state.project.project_name || state.project.name}`"
+					@click="picker = true"
+				>
 					<span class="ss-avatar" :class="`tone-${tone(state.project.name)}`">{{
 						initials(state.project.project_name || state.project.name)
 					}}</span>
@@ -367,14 +364,30 @@ provide("open_project_picker", () => (picker.value = true));
 // ---------------------------------------------------------------- หมวดงาน
 
 const launcher = ref(false);
+// แท็บเล็ต/จอใหญ่: Dock หมวดงานซ้ายสุด (มีมากกว่า 1 หมวด) ความกว้างรวมใน --ss-side (ดู site.css)
 if (boot.sections.length > 1) document.documentElement.dataset.dock = "1";
+
+// sidebar กาง (ไอคอน + ชื่อ) / พับ (ไอคอนอย่างเดียว) จำในเครื่อง ไม่เคยเลือก: จอใหญ่กาง แท็บเล็ตพับ
+const SIDE_KEY = "consbiz.site.sidebar";
+function saved_side() {
+	try {
+		return localStorage.getItem(SIDE_KEY);
+	} catch {
+		return null;
+	}
+}
+const side = ref(saved_side() || (window.innerWidth >= 1180 ? "expanded" : "collapsed"));
+document.documentElement.dataset.side = side.value;
+function toggle_side() {
+	side.value = side.value === "expanded" ? "collapsed" : "expanded";
+	document.documentElement.dataset.side = side.value;
+	try {
+		localStorage.setItem(SIDE_KEY, side.value);
+	} catch {
+		// private mode
+	}
+}
 provide("open_launcher", () => (launcher.value = true));
-// งานที่รอในหมวดอื่น (จุดแดงบนปุ่มหมวดงาน)
-const other_badges = computed(() =>
-	boot.sections
-		.filter((key) => key !== state.section)
-		.reduce((sum, key) => sum + (SECTIONS[key].badge?.(state.summaries[key]) || 0), 0)
-);
 
 onMounted(async () => {
 	// ?project=<รหัส> เลือกโครงการให้เลย (ลิงก์จากฟอร์ม Project / CM)

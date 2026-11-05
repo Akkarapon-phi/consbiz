@@ -169,7 +169,8 @@ pre-commit run --all-files                               # ruff + prettier (ต�
   Look-ahead: มือถือ = การ์ดทีละสัปดาห์, แท็บเล็ต = ตาราง 2 สัปดาห์, จอใหญ่ = ตารางทั้งช่วง (matchMedia ใน `Lookahead.vue`)
   summary ของหมวดที่ `lazy` (บริหารโครงการ) โหลดเมื่อเปิดหมวดนั้นเท่านั้น
   หมวดที่เห็นตามสิทธิ์ (`site_app.boot_data` → `sections`) สลับหมวด: มือถือ = ตารางไอคอน (`SectionLauncher.vue`) เปิดจากชิปบน hero (`Hero.vue`)
-  แท็บเล็ต = ปุ่มหมวดบนสุดของแถบไอคอน, จอใหญ่ = Dock คอลัมน์ซ้ายสุด (`SectionDock.vue`, `html[data-dock]` รวมความกว้าง Dock ไว้ใน `--ss-side`)
+  แท็บเล็ต/จอใหญ่ = Dock คอลัมน์ซ้ายสุด (`SectionDock.vue`) + sidebar เมนูของหมวด พับ (ไอคอน) / กาง (ไอคอน + ชื่อ) ได้ (`toggle_side` ใน App.vue)
+  จำการพับในเครื่อง ไม่เคยเลือก: แท็บเล็ตพับ จอใหญ่กาง  `html[data-dock]` + `html[data-side]` กำหนด `--ss-side` (ความกว้าง Dock + sidebar) ที่เนื้อหา/sheet/แถบล่างใช้
   สลับแล้วไปเมนูล่าสุดของหมวดนั้น (`state.last_tab`)
   สีหลักตามหมวด: `data-section` ที่ `<html>` (sheet ถูก Teleport ไป body) ทับ `--ss-brand*`
   ชื่อหน้า (view) ห้ามซ้ำข้ามหมวด (`go(view)` หาหมวดจาก `ROUTES`), summary แยกหมวดใน `state.summaries`

@@ -2817,89 +2817,6 @@ button.ss-card:active {
 }
 
 @media (min-width: 1180px) {
-	:root {
-		--ss-side: 268px;
-	}
-
-	.ss-nav,
-	.ss-nav.is-sub {
-		padding: calc(20px + var(--ss-top)) 16px calc(20px + var(--ss-bottom));
-		gap: 2px;
-	}
-	.ss-nav-brand {
-		justify-content: flex-start;
-		align-items: center;
-		gap: 12px;
-		padding: 0 6px;
-		margin-bottom: 18px;
-	}
-	.ss-nav-brand-text {
-		display: block;
-		font-size: 18px;
-		font-weight: 700;
-		letter-spacing: -0.01em;
-	}
-	.ss-nav-project {
-		display: flex;
-		align-items: center;
-		gap: 10px;
-		width: 100%;
-		padding: 10px;
-		margin-bottom: 14px;
-		border-radius: 16px;
-		background: var(--ss-surface-2);
-		text-align: left;
-		color: var(--ss-text);
-		transition: background 0.2s ease;
-	}
-	.ss-nav-project:hover {
-		background: var(--ss-brand-soft);
-	}
-	.ss-nav-project .ss-avatar {
-		width: 38px;
-		height: 38px;
-		border-radius: 12px;
-		font-size: 13px;
-	}
-	.ss-nav-project-text {
-		flex: 1;
-		min-width: 0;
-		display: flex;
-		flex-direction: column;
-	}
-	.ss-nav-project-text span {
-		font-size: 13.5px;
-		font-weight: 600;
-		line-height: 1.3;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		display: -webkit-box;
-		-webkit-line-clamp: 2;
-		-webkit-box-orient: vertical;
-	}
-	.ss-nav-project-text small {
-		font-size: 11.5px;
-		color: var(--ss-muted);
-	}
-	.ss-nav-item {
-		flex-direction: row;
-		justify-content: flex-start;
-		gap: 14px;
-		height: 48px;
-		padding: 0 14px;
-		border-radius: 14px;
-	}
-	.ss-nav-label {
-		font-size: 14.5px;
-	}
-	.ss-nav-item .ss-nav-icon {
-		position: static;
-	}
-	.ss-nav-item .ss-badge {
-		top: calc(50% - 10px);
-		right: 12px;
-	}
-
 	/* ฟอร์มแบ่งซ้าย-ขวา: ข้างขวาเลื่อนตาม */
 	.ss-split {
 		display: grid;
@@ -3156,46 +3073,8 @@ a.ss-option {
 	animation: ss-rise 0.6s 0.04s var(--ss-ease) both;
 }
 
-/* ชื่อหมวดบนแถบข้าง = ปุ่มเปิดตารางหมวดงาน */
-button.ss-nav-brand {
-	cursor: pointer;
-	text-align: left;
-	color: var(--ss-text);
-}
 .ss-nav-logo {
 	position: relative;
-}
-.ss-nav-logo-grid {
-	position: absolute;
-	right: -5px;
-	bottom: -5px;
-	width: 20px;
-	height: 20px;
-	display: grid;
-	place-items: center;
-	border-radius: 7px;
-	color: var(--ss-brand);
-	background: var(--ss-surface);
-	box-shadow: var(--ss-shadow);
-}
-.ss-nav-logo-dot {
-	position: absolute;
-	top: -6px;
-	right: -6px;
-	min-width: 18px;
-	height: 18px;
-	padding: 0 4px;
-	border-radius: 99px;
-	font-size: 10.5px;
-	font-weight: 700;
-	line-height: 14px;
-	text-align: center;
-	color: #fff;
-	background: var(--ss-danger);
-	border: 2px solid var(--ss-surface);
-}
-.ss-nav-brand-more {
-	display: none;
 }
 
 /* ---------------------------------------------------------------- ควบคุมงาน: ความคืบหน้า */
@@ -3325,13 +3204,6 @@ button.ss-nav-brand {
 	.ss-launcher {
 		grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
 	}
-	button.ss-nav-brand {
-		border-radius: 18px;
-		transition: background 0.2s ease;
-	}
-	button.ss-nav-brand:hover .ss-nav-logo {
-		transform: scale(1.05);
-	}
 	.ss-nav-logo {
 		transition: transform 0.25s var(--ss-spring);
 	}
@@ -3340,34 +3212,6 @@ button.ss-nav-brand {
 	}
 }
 
-@media (min-width: 1180px) {
-	button.ss-nav-brand {
-		padding: 8px 6px;
-		margin: -8px 0 10px;
-	}
-	button.ss-nav-brand:hover {
-		background: var(--ss-surface-2);
-	}
-	.ss-nav-brand-text {
-		flex: 1;
-		min-width: 0;
-		display: flex !important;
-		flex-direction: column;
-	}
-	.ss-nav-brand-text small {
-		font-size: 12px;
-		font-weight: 500;
-		letter-spacing: 0;
-		color: var(--ss-muted);
-	}
-	.ss-nav-brand-more {
-		display: block;
-		color: var(--ss-muted);
-	}
-	.ss-nav-logo-grid {
-		display: none;
-	}
-}
 
 /* ================================================================ ควบคุมงาน: S-Curve */
 
@@ -4920,8 +4764,7 @@ a.ss-btn--soft {
    จอใหญ่: คอลัมน์ 64px ซ้ายสุด (html[data-dock] รวมความกว้างไว้ใน --ss-side ให้ sheet/toast/แถบล่างเลื่อนตาม)
    แท็บเล็ต: ปุ่มหมวดอยู่บนสุดของแถบไอคอน แบ่งจากเมนูด้วยเส้น  มือถือ: ไม่แสดง */
 
-.ss-dock,
-.ss-sections--rail {
+.ss-dock {
 	display: none;
 }
 .ss-sections {
@@ -5002,24 +4845,8 @@ a.ss-btn--soft {
 	}
 }
 
-@media (min-width: 768px) and (max-width: 1179px) {
-	/* ปุ่มหมวดอยู่บนสุดของแถบแล้ว ไม่ต้องมีโลโก้หมวด */
-	.ss-nav.has-sections .ss-nav-brand {
-		display: none;
-	}
-	.ss-sections--rail {
-		display: flex;
-		padding-bottom: 10px;
-		margin-bottom: 8px;
-		border-bottom: 1px solid var(--ss-border);
-	}
-}
 
-@media (min-width: 1180px) {
-	html[data-dock] {
-		--ss-dock: 72px;
-		--ss-side: 340px;
-	}
+@media (min-width: 768px) {
 	html[data-dock] .ss-dock {
 		position: fixed;
 		z-index: 31;
@@ -5058,14 +4885,7 @@ a.ss-btn--soft {
 		margin-top: auto;
 		--sw: var(--ss-text-2);
 	}
-	/* Dock เปลี่ยนหมวดแล้ว: ชื่อหมวดบน sidebar เป็นหัวข้อธรรมดา ไม่ใช่ปุ่ม และไม่มีปุ่มระบบเต็มซ้ำ */
-	html[data-dock] button.ss-nav-brand {
-		pointer-events: none;
-	}
-	html[data-dock] .ss-nav-brand small,
-	html[data-dock] .ss-nav-brand-more,
-	html[data-dock] .ss-nav-logo-grid,
-	html[data-dock] .ss-nav-logo-dot,
+	/* ปุ่มระบบเต็มอยู่ที่ Dock แล้ว */
 	html[data-dock] .ss-nav-desk {
 		display: none !important;
 	}
@@ -5077,5 +4897,200 @@ a.ss-btn--soft {
 	.ss-dock-leave-to {
 		transform: translateX(-100%);
 		opacity: 0;
+	}
+}
+
+/* ================================================================ sidebar พับ (ไอคอนอย่างเดียว) / กาง (ไอคอน + ชื่อ)
+   html[data-side] จาก App.vue (toggle_side) ความกว้างรวม Dock ไว้ใน --ss-side ให้เนื้อหา/sheet/toast/แถบล่างเลื่อนตาม */
+
+.ss-nav-head {
+	display: none;
+}
+
+@media (min-width: 768px) {
+	:root {
+		--ss-side: 76px;
+	}
+	html[data-side="expanded"] {
+		--ss-side: 268px;
+	}
+	html[data-dock] {
+		--ss-dock: 72px;
+		--ss-side: 148px;
+	}
+	html[data-dock][data-side="expanded"] {
+		--ss-side: 340px;
+	}
+
+	.ss-nav,
+	.ss-nav.is-sub {
+		padding-left: 10px;
+		padding-right: 10px;
+		transition: width 0.3s var(--ss-ease), left 0.3s var(--ss-ease);
+	}
+	.ss-app.has-side {
+		transition: padding-left 0.3s var(--ss-ease);
+	}
+
+	/* หัว sidebar: พับ = ปุ่มกางอยู่บนสุด (มี Dock ไม่ต้องมีโลโก้หมวด), กาง = ชื่อหมวด + ปุ่มพับ */
+	.ss-nav-head {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 10px;
+		margin-bottom: 12px;
+	}
+	.ss-nav-head .ss-nav-brand {
+		margin: 0;
+	}
+	html[data-dock] .ss-nav-head .ss-nav-brand {
+		display: none;
+	}
+	.ss-nav-toggle {
+		color: var(--ss-muted);
+	}
+	.ss-nav-toggle:hover {
+		color: var(--ss-text);
+	}
+
+	/* พับ: โครงการเหลือแค่ตัวย่อ (แตะเพื่อเปลี่ยนโครงการ) */
+	.ss-nav-project {
+		display: flex;
+		justify-content: center;
+		margin-bottom: 10px;
+	}
+	.ss-nav-project .ss-avatar {
+		width: 40px;
+		height: 40px;
+		border-radius: 12px;
+		font-size: 13px;
+	}
+	.ss-nav-project-text,
+	.ss-nav-project > .ss-icon {
+		display: none;
+	}
+	html[data-side="expanded"] .ss-nav-project > .ss-icon {
+		display: block;
+	}
+	/* พับ: ไอคอนอย่างเดียว (ชื่อเมนูดูได้จาก tooltip) */
+	.ss-nav-item {
+		height: 52px;
+	}
+	.ss-nav-label {
+		display: none;
+	}
+	.ss-nav-item .ss-badge {
+		top: -7px;
+		right: -10px;
+	}
+}
+
+@media (min-width: 768px) {
+
+	html[data-side="expanded"] .ss-nav,
+	html[data-side="expanded"] .ss-nav.is-sub {
+		padding: calc(20px + var(--ss-top)) 16px calc(20px + var(--ss-bottom));
+		gap: 2px;
+	}
+	html[data-side="expanded"] .ss-nav-brand {
+		justify-content: flex-start;
+		align-items: center;
+		gap: 12px;
+		padding: 0 6px;
+		margin-bottom: 18px;
+	}
+	html[data-side="expanded"] .ss-nav-brand-text {
+		display: block;
+		font-size: 18px;
+		font-weight: 700;
+		letter-spacing: -0.01em;
+	}
+	html[data-side="expanded"] .ss-nav-project {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		width: 100%;
+		padding: 10px;
+		margin-bottom: 14px;
+		border-radius: 16px;
+		background: var(--ss-surface-2);
+		text-align: left;
+		color: var(--ss-text);
+		transition: background 0.2s ease;
+	}
+	html[data-side="expanded"] .ss-nav-project:hover {
+		background: var(--ss-brand-soft);
+	}
+	html[data-side="expanded"] .ss-nav-project .ss-avatar {
+		width: 38px;
+		height: 38px;
+		border-radius: 12px;
+		font-size: 13px;
+	}
+	html[data-side="expanded"] .ss-nav-project-text {
+		flex: 1;
+		min-width: 0;
+		display: flex;
+		flex-direction: column;
+	}
+	html[data-side="expanded"] .ss-nav-project-text span {
+		font-size: 13.5px;
+		font-weight: 600;
+		line-height: 1.3;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		display: -webkit-box;
+		-webkit-line-clamp: 2;
+		-webkit-box-orient: vertical;
+	}
+	html[data-side="expanded"] .ss-nav-project-text small {
+		font-size: 11.5px;
+		color: var(--ss-muted);
+	}
+	html[data-side="expanded"] .ss-nav-item {
+		flex-direction: row;
+		justify-content: flex-start;
+		gap: 14px;
+		height: 48px;
+		padding: 0 14px;
+		border-radius: 14px;
+	}
+	html[data-side="expanded"] .ss-nav-label {
+		font-size: 14.5px;
+	}
+	html[data-side="expanded"] .ss-nav-item .ss-nav-icon {
+		position: static;
+	}
+	html[data-side="expanded"] .ss-nav-item .ss-badge {
+		top: calc(50% - 10px);
+		right: 12px;
+	}
+
+
+	html[data-side="expanded"] .ss-nav-label {
+		display: block;
+	}
+	html[data-side="expanded"] .ss-nav-head {
+		flex-direction: row;
+		justify-content: space-between;
+		padding: 0 2px 0 6px;
+		margin-bottom: 16px;
+	}
+	html[data-side="expanded"] .ss-nav-head .ss-nav-brand,
+	html[data-dock][data-side="expanded"] .ss-nav-head .ss-nav-brand {
+		display: flex;
+		flex: 1;
+		min-width: 0;
+		padding: 0;
+	}
+	html[data-side="expanded"] .ss-nav-brand-text {
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	html[data-side="expanded"] .ss-nav,
+	html[data-side="expanded"] .ss-nav.is-sub {
+		padding-left: 16px;
+		padding-right: 16px;
 	}
 }

@@ -1,6 +1,6 @@
 <template>
 	<!-- ปุ่มหมวดงานเรียงลง (กดครั้งเดียวสลับหมวด พร้อมตัวเลขงานค้างของแต่ละหมวด)
-	     dock = คอลัมน์แยกซ้ายสุดของจอใหญ่ (App.vue .ss-dock), rail = บนสุดของแถบไอคอนของแท็บเล็ต
+	     อยู่ใน Dock คอลัมน์ซ้ายสุดของแท็บเล็ต/จอใหญ่ (App.vue .ss-dock)
 	     มือถือไม่แสดง (สลับหมวดผ่านตารางไอคอน SectionLauncher.vue) -->
 	<div class="ss-sections" :class="`ss-sections--${variant}`" role="tablist" aria-label="หมวดงาน">
 		<button
