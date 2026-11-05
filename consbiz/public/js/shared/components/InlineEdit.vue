@@ -1,7 +1,7 @@
+<!-- ค่าที่แก้ได้ทีละช่อง (เช่น ช่อง Allow on Submit ของเอกสารที่ส่งแล้ว): ค่า + ดินสอเล็ก
+     จอใช้เมาส์ = แก้ตรงที่เดิม (✓ / ✕, Enter บันทึก, Esc ยกเลิก) จอสัมผัส = sheet เล็กจากด้านล่าง
+     ค่าว่าง = ปุ่ม "+ เพิ่ม" save(value, apply) คืน Promise ปิดตัวแก้เมื่อสำเร็จ -->
 <template>
-	<!-- ค่าที่แก้ได้ทีละช่อง (เช่น ช่อง Allow on Submit ของเอกสารที่ส่งแล้ว): ค่า + ดินสอเล็ก
-	     จอใช้เมาส์ = แก้ตรงที่เดิม (✓ / ✕, Enter บันทึก, Esc ยกเลิก) จอสัมผัส = sheet เล็กจากด้านล่าง
-	     ค่าว่าง = ปุ่ม "+ เพิ่ม" save(value, apply) คืน Promise ปิดตัวแก้เมื่อสำเร็จ -->
 	<span class="ss-ie" :class="{ 'is-block': multiline, 'is-editing': editing && inline }">
 		<template v-if="!(editing && inline)">
 			<button v-if="editable && empty" type="button" class="ss-ie-add" @click="start">

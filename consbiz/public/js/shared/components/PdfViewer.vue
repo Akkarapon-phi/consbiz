@@ -1,6 +1,6 @@
+<!-- ดู PDF ในแอปเต็มจอ (ไม่เปิดแท็บใหม่) วาดด้วย PDF.js (public/js/lib/pdfjs) เพราะมือถือแสดง PDF ใน iframe ไม่ได้
+     (Android ดาวน์โหลดแทน, iOS เห็นแค่หน้าแรก) แถบบน: ซูม / แชร์ไฟล์ / ดาวน์โหลด  url จาก site_app.pdf_url -->
 <template>
-	<!-- ดู PDF ในแอปเต็มจอ (ไม่เปิดแท็บใหม่) วาดด้วย PDF.js (public/js/lib/pdfjs) เพราะมือถือแสดง PDF ใน iframe ไม่ได้
-	     (Android ดาวน์โหลดแทน, iOS เห็นแค่หน้าแรก) แถบบน: ซูม / แชร์ไฟล์ / ดาวน์โหลด  url จาก site_app.pdf_url -->
 	<Teleport to="body">
 		<Transition name="ss-pdf">
 			<div v-if="open" class="ss-pdf" role="dialog" aria-modal="true" :aria-label="`${title} ${name}`">

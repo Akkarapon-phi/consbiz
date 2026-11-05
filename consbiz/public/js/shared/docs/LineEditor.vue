@@ -1,10 +1,10 @@
+<!-- แถวรายการของฟอร์มจัดซื้อ/ขาย (DocForm.vue)
+     จอกว้าง (wide): ตารางแก้ไขในช่องแบบระบบเต็ม
+       - ลากที่จับ (⋮⋮) ย้ายลำดับแถว (emit reorder), ช่องติ๊กเลือกหลายแถวแล้วลบ (emit remove [rows])
+       - ปากกา = รายละเอียดของแถว (emit detail) เช่น คำอธิบาย WBS
+       - แถวล่างสุดพิมพ์ค้นหาแล้วเพิ่ม (↑↓ / Enter / Esc) Enter ในช่องจำนวน → ราคา → กลับช่องค้นหา
+     มือถือ: การ์ดต่อรายการ เพิ่มจาก sheet (emit browse) -->
 <template>
-	<!-- แถวรายการของฟอร์มจัดซื้อ/ขาย (DocForm.vue)
-	     จอกว้าง (wide): ตารางแก้ไขในช่องแบบระบบเต็ม
-	       - ลากที่จับ (⋮⋮) ย้ายลำดับแถว (emit reorder), ช่องติ๊กเลือกหลายแถวแล้วลบ (emit remove [rows])
-	       - ปากกา = รายละเอียดของแถว (emit detail) เช่น คำอธิบาย WBS
-	       - แถวล่างสุดพิมพ์ค้นหาแล้วเพิ่ม (↑↓ / Enter / Esc) Enter ในช่องจำนวน → ราคา → กลับช่องค้นหา
-	     มือถือ: การ์ดต่อรายการ เพิ่มจาก sheet (emit browse) -->
 	<div v-if="wide" ref="root" class="ss-grid-wrap">
 		<div v-if="picked.size" class="ss-grid-bulk">
 			<span
@@ -239,8 +239,8 @@
 		</table>
 	</div>
 
-	<!-- มือถือ / แท็บเล็ตแนวตั้ง: การ์ด -->
 	<div v-else>
+		<!-- มือถือ / แท็บเล็ตแนวตั้ง: การ์ด -->
 		<TransitionGroup tag="div" class="ss-list ss-list--form ss-lines" name="ss-list">
 			<div
 				v-for="(row, i) in items"

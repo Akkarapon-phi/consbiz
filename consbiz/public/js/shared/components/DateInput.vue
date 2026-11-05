@@ -1,7 +1,7 @@
+<!-- ช่องวันที่ของแอป: แสดงวันที่ไทย (พ.ศ.) เปิดปฏิทินเลือกวัน (แทน <input type="date"> ของเบราว์เซอร์)
+     ค่า = "YYYY-MM-DD" (ค.ศ. แบบที่ server ใช้) variant: field / cell
+     คีย์บอร์ด: Enter/Space/↓ เปิด, ลูกศรเลื่อนวัน, PageUp/PageDown เลื่อนเดือน, Enter เลือก, Esc ปิด -->
 <template>
-	<!-- ช่องวันที่ของแอป: แสดงวันที่ไทย (พ.ศ.) เปิดปฏิทินเลือกวัน (แทน <input type="date"> ของเบราว์เซอร์)
-	     ค่า = "YYYY-MM-DD" (ค.ศ. แบบที่ server ใช้) variant: field / cell
-	     คีย์บอร์ด: Enter/Space/↓ เปิด, ลูกศรเลื่อนวัน, PageUp/PageDown เลื่อนเดือน, Enter เลือก, Esc ปิด -->
 	<button
 		ref="trigger"
 		type="button"

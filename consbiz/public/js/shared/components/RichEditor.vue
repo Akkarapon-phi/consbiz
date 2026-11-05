@@ -1,6 +1,6 @@
+<!-- แก้ข้อความแบบ Text Editor (ตัวหนา/เอียง/ขีดเส้นใต้/ลำดับเลข/หัวข้อย่อย) ให้ข้อความจากระบบเต็มไม่เสียรูปแบบ
+     ค่า = HTML ที่ผ่าน sanitize_html แล้ว ระบบเต็ม (Quill) เปิดต่อได้ปกติ -->
 <template>
-	<!-- แก้ข้อความแบบ Text Editor (ตัวหนา/เอียง/ขีดเส้นใต้/ลำดับเลข/หัวข้อย่อย) ให้ข้อความจากระบบเต็มไม่เสียรูปแบบ
-	     ค่า = HTML ที่ผ่าน sanitize_html แล้ว ระบบเต็ม (Quill) เปิดต่อได้ปกติ -->
 	<div class="ss-rich-editor" :class="{ 'is-focus': focused }">
 		<div class="ss-rich-tools" role="toolbar" :aria-label="`จัดรูปแบบ ${label || ''}`">
 			<button

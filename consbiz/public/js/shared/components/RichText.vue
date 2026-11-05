@@ -1,6 +1,6 @@
+<!-- แสดงข้อความจาก Text Editor ของระบบเต็ม (HTML) ผ่าน sanitize_html เท่านั้น
+     lines = จำนวนบรรทัดก่อนตัด (0 = แสดงทั้งหมด) -->
 <template>
-	<!-- แสดงข้อความจาก Text Editor ของระบบเต็ม (HTML) ผ่าน sanitize_html เท่านั้น
-	     lines = จำนวนบรรทัดก่อนตัด (0 = แสดงทั้งหมด) -->
 	<div
 		v-if="clean"
 		class="ss-rich"

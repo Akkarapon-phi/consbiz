@@ -1,6 +1,6 @@
+<!-- ช่องกรอกจำนวนเงิน: ไม่ได้โฟกัส = 1,234.50 (จุลภาค + ทศนิยม 2 ตำแหน่ง), โฟกัส = ตัวเลขดิบให้แก้ง่าย
+     attrs อื่น (class, aria-label, data-col, @keydown) ส่งต่อให้ <input> -->
 <template>
-	<!-- ช่องกรอกจำนวนเงิน: ไม่ได้โฟกัส = 1,234.50 (จุลภาค + ทศนิยม 2 ตำแหน่ง), โฟกัส = ตัวเลขดิบให้แก้ง่าย
-	     attrs อื่น (class, aria-label, data-col, @keydown) ส่งต่อให้ <input> -->
 	<input
 		:value="focused ? raw : format_money_input(modelValue)"
 		type="text"
