@@ -172,12 +172,21 @@ pre-commit run --all-files                               # ruff + prettier (ต�
   | `/hr-app` | พนักงานทุกคน | ลงเวลา, ลา, เบิกล่วงหน้า, สลิป (หน้าจอครอบ HRMS) ชื่อไอคอน "ConsHR" |
   | `/contractor` | ผู้รับเหมาช่วง (คนนอก) | อัปเดตผลงาน, ดูสัญญา/งวดของตัวเอง API แยกและตรวจสิทธิ์ทุกคำขอ |
   ห้ามใช้ `/me` (หน้า My Account ของ Frappe), `/hr/...` (Roster ของ HRMS), `/hrms` (ESS ของ HRMS)
-  โค้ดหน้าจอที่ใช้ร่วมกัน (components, `api.js`, ธีม) ย้ายไป `public/js/shared/` ก่อนเริ่มแอปที่ 2 ตัวสลับแอปมุมซ้ายบนสำหรับคนที่ใช้หลายแอป
+  โค้ดหน้าจอกลางอยู่ `public/js/shared/`: `AppShell.vue` (Dock/sidebar/แถบล่าง/เลือกโครงการ/toast), `api.js` (เรียก API, router, state, รูปแบบ),
+  `app.js` (`configure()` ค่าของแต่ละแอป: base, storage, sections, routes, views, summary_api), `components/`, `docs/` (เอกสารซื้อ-ขาย + `kinds.js` = DOC_KINDS),
+  `style.css` (CSS ทุกแอป class `ss-`) แต่ละแอป = `<แอป>.bundle.js` ที่ `configure()` แล้ว mount `AppShell` ห้ามอ่าน `app` ตอนโหลดโมดูล (import มาก่อน configure)
+  แก้ไฟล์ใน `shared/` มีผลทุกแอป ตรวจทุกแอปทุกครั้ง ตัวสลับแอปมุมซ้ายบนสำหรับคนที่ใช้หลายแอป
   build ของ Frappe ไม่แบ่งโหลด (code splitting) จึงแยกเป็น bundle ต่อแอป ไม่ใช่ต่อหมวด
 - แอปหน้างาน `/site` (มือถือ, ติดตั้งลงหน้าจอได้) = หน้า www (`consbiz/www/site.html`) + Vue (`public/js/site_app/`) แอปเดียวแบ่งหมวดงาน
-  (ตอนนี้ยังมีหมวดจัดซื้อ/ขายอยู่ จะย้ายไป `/office` ตามแผนข้างบน)
-  หมวด (`sections.js`): สโตร์ (`views/store/`, API `consbiz/store_app.py`) / ควบคุมงาน (`views/work/`, รวมคอนกรีต) / บริหารโครงการ (`views/pm/`) API 2 หมวดนี้อยู่ `consbiz/site_app.py`
-  จัดซื้อ (MR ประเภท Purchase → PO → PI) / ขาย (Quotation → SO → SI): `views/docs/` ชุดเดียวกันทั้ง 6 ชนิด (`DOC_KINDS` ใน sections.js ตรงกับ `DOCS` ใน `consbiz/site_docs.py`)
+  หมวดขอซื้อของ `/site` = ใบขอซื้ออย่างเดียว (`doc_kinds: ["mr"]`) สั่งซื้อ/แจ้งหนี้/ขาย อยู่ `/office`
+- แอปออฟฟิศ `/office` (จอใหญ่) = `consbiz/www/office.html` + `public/js/office_app/` (sections/views/bundle) หมวดจัดซื้อ/ขายเต็ม (`doc_kinds` ทั้ง 6 ชนิด)
+  boot = `site_app.office_boot_data` หมวดตามสิทธิ์ `site_app.office_sections` / ของหน้างาน `site_app.site_sections`
+  ตัวสลับแอป: `site_app.APPS` + `available_apps` (แอปที่มีอย่างน้อย 1 หมวด) → `boot.apps` แสดงใน Dock / ท้าย sidebar / ตารางหมวดของมือถือ
+  เอกสารชนิดที่แอปไม่ได้ดูแล: `open_doc` / `doc_url` (`shared/docs/kinds.js`) เปิดในแอปออฟฟิศ (ไม่มีสิทธิ์ = ระบบเต็ม) ปุ่มสร้างเอกสารถัดไปซ่อน (`in_app`)
+  URL เดิม `/site/sell/...`, `/site/buy/(po|pi)...`, `/site/buy/(buy-doc|buy-form)/(po|pi)/...` เด้งไป `/office` (`website_redirects`)
+  `get_summary` คืน `drafts_by_kind` หน้าหลักนับร่างเฉพาะชนิดของแอปนั้น
+  หมวด (`site_app/sections.js`, หน้า → component ใน `site_app/views.js`): สโตร์ (`views/store/`, API `consbiz/store_app.py`) / ควบคุมงาน (`views/work/`, รวมคอนกรีต) / บริหารโครงการ (`views/pm/`) API 2 หมวดนี้อยู่ `consbiz/site_app.py`
+  จัดซื้อ (MR ประเภท Purchase → PO → PI) / ขาย (Quotation → SO → SI): `shared/docs/` ชุดเดียวกันทั้ง 6 ชนิด (`DOC_KINDS` ใน `shared/docs/kinds.js` ตรงกับ `DOCS` ใน `consbiz/site_docs.py`)
   ดูรายการ/รายละเอียด/เอกสารต้นทาง-ปลายทาง, ส่งเอกสารร่าง, PDF ขอบเขต โครงการนี้/ทุกโครงการ (`state.doc_scope`)
   สร้าง/แก้ไขร่างในแอป (`DocForm.vue`, หน้า `buy-form` / `sell-form`): ช่องที่กรอกได้อยู่ใน `FORM` ของ site_docs.py (รวมส่วนลดท้ายบิล %)
   หัก ณ ที่จ่าย/เงินประกันผลงานในแอป: `consbiz/deductions.py` (เรียกจาก `apply_form` เท่านั้น ไม่ได้ผูก validate)
@@ -189,18 +198,18 @@ pre-commit run --all-files                               # ruff + prettier (ต�
   ยอด/ภาษีของ MR = `consbiz/request_totals.py` (doc_events validate) สูตรเดียวกับ `material_request.js` แก้ที่หนึ่งต้องแก้อีกที่
   MR ใหม่: ERPNext `update_item_rates` ทับราคาด้วย Price List ตอนบันทึกครั้งแรก `save_doc` ใส่ราคาที่ผู้ใช้กรอกคืน (`keep_request_rates`)
   ดูเอกสาร: แถบขั้นตอน (`steps_of`), สรุปยอด (`summary_of`: แถว + ยอดสุทธิ + ตัวอักษร) ใช้ทั้งหน้าดูและฟอร์ม
-  แก้หลังส่ง: ดินสอข้างช่อง (`components/InlineEdit.vue`, จอใช้เมาส์แก้ตรงที่เดิม จอสัมผัสเป็น sheet) → `site_docs.save_after_submit`
+  แก้หลังส่ง: ดินสอข้างช่อง (`shared/components/InlineEdit.vue`, จอใช้เมาส์แก้ตรงที่เดิม จอสัมผัสเป็น sheet) → `site_docs.save_after_submit`
   ช่องที่แก้ได้ = `AFTER_SUBMIT` ใน site_docs.py ∩ ช่องที่ระบบตั้ง Allow on Submit (ไม่เปิดช่องบัญชี/ศูนย์ต้นทุน) วันที่ต้องการ/กำหนดส่งห้ามว่างและห้ามก่อนวันที่เอกสาร
   sidebar ขวาของหน้าดู แยกจากเนื้อหา เปิด-ปิดที่ปุ่มบน TopBar: จอ ≥1480 กางค้าง (`html[data-rside]` → `--ss-rside` ดันเนื้อหา/แถบล่าง จำในเครื่อง), เล็กกว่า = เลื่อนทับ (z-index ต่ำกว่า sheet)
   เนื้อหา sidebar (`DocActivity.vue`, `site_docs.get_activity`): ถูกใจ, มอบหมาย (`frappe.desk.form.assign_to`), ไฟล์แนบ (`upload(file, {doctype, docname})` / `remove_attachment`),
   เอกสารที่เกี่ยวข้อง, ความคิดเห็น (`add_comment` ผ่าน `clean_html`, ลบได้เฉพาะของตัวเอง) + ความเคลื่อนไหวจาก Version/Comment แบบ timeline ของระบบเต็ม
-  ช่องเลือก/วันที่ของแอปใช้ `components/SelectBox.vue` / `DateInput.vue` (ปฏิทิน พ.ศ.) ห้ามใช้ `<select>` / `<input type="date">` ของเบราว์เซอร์
+  ช่องเลือก/วันที่ของแอปใช้ `shared/components/SelectBox.vue` / `DateInput.vue` (ปฏิทิน พ.ศ.) ห้ามใช้ `<select>` / `<input type="date">` ของเบราว์เซอร์
   ช่องเงินใช้ `MoneyInput.vue` (แสดง 1,234.50 / โฟกัสแล้วเป็นตัวเลขดิบ) รายละเอียดรายการ (HTML ของ Quill) แสดงด้วย `RichText.vue` แก้ด้วย `RichEditor.vue`
   HTML จากระบบเต็มต้องผ่าน `sanitize_html` (api.js) ก่อน `v-html` ทุกครั้ง (ตัด `span.ql-ui`, Quill 2 ใช้ `li[data-list]` แยกลำดับเลข/หัวข้อย่อย)
   ดูเอกสาร (`DocView.vue`): หัวเอกสาร = คู่ค้า/สถานะ + ช่องข้อมูลเป็นตาราง, ≥768 = ตารางรายการ + สรุปยอดท้ายตาราง, ≥1180 = แผงข้าง (เอกสารที่เกี่ยวข้อง/หมายเหตุ)
   เอกสารถัดไป (`MAPPERS`: MR→PO, PO→PI, QTN→SO, SO→SI) ใช้ mapper ของ ERPNext ตอนบันทึกเรียก mapper ใหม่แล้วจับคู่แถวด้วย `key` (แถวบันทึกแล้ว = name, แถวจาก mapper = ลำดับ)
   ยอด/ภาษีคำนวณที่ server (`preview_doc`) แล้ว rollback เสมอ (ERPNext สร้าง Item Price อัตโนมัติระหว่างเติมค่า) PI มีเลขที่ใบกำกับภาษี (erpnext_thailand บังคับเมื่อมีภาษีซื้อ)
-  ทางเข้าจากระบบเต็ม: Desktop Icon "ConsERP" (`consbiz/desktop_icon/conserp.json`, External → /site) ผู้ใช้ที่มี Desktop Layout ของตัวเองเห็นไอคอนใหม่เฉพาะที่อยู่ใน layout (patch `add_conserp_to_desktop_layouts`)
+  ทางเข้าจากระบบเต็ม: Desktop Icon "ConsERP" (`consbiz/desktop_icon/conserp.json`, External → /site) และ "ConsOffice" (`consoffice.json` → /office, patch `add_consoffice_to_desktop_layouts`) ผู้ใช้ที่มี Desktop Layout ของตัวเองเห็นไอคอนใหม่เฉพาะที่อยู่ใน layout (patch `add_conserp_to_desktop_layouts`)
   บริหารโครงการ (สิทธิ์อ่าน CM) ดูอย่างเดียว: ภาพรวม (`dashboard.get_dashboard`), แผนงาน Gantt (`get_plan`), Look-ahead (`lookahead.get_lookahead` สถานะวันตรงกับ `LookAhead.vue`),
   ทรัพยากร + แผนจัดซื้อวัสดุ (`resources.get_overview`), เอกสาร (`get_documents`) แก้แผนที่หน้า Gantt ในระบบเต็ม
   Look-ahead: มือถือ = การ์ดทีละสัปดาห์, แท็บเล็ต = ตาราง 2 สัปดาห์, จอใหญ่ = ตารางทั้งช่วง (matchMedia ใน `Lookahead.vue`)
@@ -231,9 +240,12 @@ pre-commit run --all-files                               # ruff + prettier (ต�
   ฟอร์มใหม่เก็บร่างใน localStorage ระหว่างกรอก (สัญญาณหลุดไม่หาย) ขอตรวจงาน / Punch List ยังสร้างในระบบเต็ม
   ขออนุมัติได้ทุกวัน (ย้อนหลังได้) PDF/แชร์ไฟล์: `site_app.pdf_url` เลือกตัวสร้าง PDF แบบหน้าพิมพ์ของระบบเต็ม (Print Format → Print Settings)
   ดู PDF ในแอป (`PdfViewer.vue`) วาดด้วย PDF.js ที่ `public/js/lib/pdfjs/` (มือถือแสดง PDF ใน iframe ไม่ได้) โหลดเมื่อเปิดครั้งแรก
-  ไม่ใช้ desk: เรียก API ด้วย fetch เอง (`api.js`), router เอง (`/site/<หมวด>/<view>/<params>`, `website_route_rules`), CSS อยู่ `site.css` (class `ss-`)
+  ไม่ใช้ desk: เรียก API ด้วย fetch เอง (`api.js`), router เอง (`<base>/<หมวด>/<view>/<params>`, `website_route_rules`), CSS อยู่ `shared/style.css` (class `ss-`)
   `/store/...` เดิมเด้งไป `/site/store/...` (`website_redirects` ใน hooks.py) ไอคอนที่ติดตั้งไว้แล้วยังใช้ได้
-  CSS ต้อง `@import` ใน `<style>` ของ `App.vue` (Frappe ฝัง CSS เข้า bundle เฉพาะที่มาจาก .vue ถ้า import .css ตรงๆ ไฟล์ JS ถูกลบตอน build)
+  CSS ต้อง `@import` ใน `<style>` ของ `AppShell.vue` (Frappe ฝัง CSS เข้า bundle เฉพาะที่มาจาก .vue ถ้า import .css ตรงๆ ไฟล์ JS ถูกลบตอน build)
+  ห้ามวาง comment ระดับ root ใน `<template>` (ข้าง root element) ให้วางเหนือ `<template>` หรือในตัว element:
+  build `--production` (เซิร์ฟเวอร์จริง) นับ comment เป็น root ด้วย class/attrs จากตัวแม่ (เช่น `ss-view`) จึงหาย dev build ไม่เป็น
+  เคยทำให้หน้าแรกซื้อ/ขายกว้างเกินจอเมื่อชื่อโครงการยาว ตรวจเลย์เอาต์ก่อนขึ้นระบบด้วย `bench build --app consbiz --production`
   Responsive 3 ขนาด: มือถือ = แถบเมนูล่าง, ≥768 = แถบไอคอนซ้าย + sheet เป็นหน้าต่างกลางจอ, ≥1180 = sidebar + ฟอร์มแบ่งซ้าย-ขวา (`.ss-split`) ใช้เต็มจอ: จอกว้างได้คอลัมน์เพิ่ม (auto-fill) ไม่ยืดการ์ด, การ์ดในรายการสูงเท่ากัน (`grid-auto-rows: 1fr`)
   แถบล่าง/ปุ่มลอยของหน้า ต้อง `<Teleport to="#ss-layer">` (ตอนเปลี่ยนหน้า view มี transform ทำให้ position: fixed เพี้ยน)
   ห้ามส่ง reactive object ของ Vue เข้า `history.pushState/replaceState` (clone ไม่ได้ แอปค้าง) `/app/site-store` เดิมเด้งไป `/site/store`

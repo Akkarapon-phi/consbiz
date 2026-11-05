@@ -21,3 +21,4 @@ consbiz.patches.restructure_retention
 consbiz.patches.set_transmittal_status
 consbiz.patches.add_site_app_to_desktop_layouts
 consbiz.patches.add_conserp_to_desktop_layouts
+consbiz.patches.add_consoffice_to_desktop_layouts

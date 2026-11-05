@@ -314,13 +314,13 @@
 
 <script setup>
 import { computed, inject, nextTick, reactive, ref } from "vue";
-import DateInput from "../../components/DateInput.vue";
-import Icon from "../../components/Icon.vue";
-import TopBar from "../../components/TopBar.vue";
-import Skeleton from "../../components/Skeleton.vue";
-import Sheet from "../../components/Sheet.vue";
-import Stepper from "../../components/Stepper.vue";
-import Picker from "../../components/Picker.vue";
+import DateInput from "../../../shared/components/DateInput.vue";
+import Icon from "../../../shared/components/Icon.vue";
+import TopBar from "../../../shared/components/TopBar.vue";
+import Skeleton from "../../../shared/components/Skeleton.vue";
+import Sheet from "../../../shared/components/Sheet.vue";
+import Stepper from "../../../shared/components/Stepper.vue";
+import Picker from "../../../shared/components/Picker.vue";
 import {
 	back,
 	call,
@@ -335,7 +335,7 @@ import {
 	toast,
 	today,
 	vibrate,
-} from "../../api.js";
+} from "../../../shared/api.js";
 
 const reload_summary = inject("reload_summary");
 const params = state.route.params;

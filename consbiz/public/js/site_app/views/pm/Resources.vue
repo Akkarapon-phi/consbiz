@@ -1,5 +1,5 @@
+<!-- แผนทรัพยากร (คน/เครื่องจักร) และแผนจัดซื้อวัสดุ ดูอย่างเดียว ข้อมูลชุดเดียวกับ Tab ทรัพยากรของ CM -->
 <template>
-	<!-- แผนทรัพยากร (คน/เครื่องจักร) และแผนจัดซื้อวัสดุ ดูอย่างเดียว ข้อมูลชุดเดียวกับ Tab ทรัพยากรของ CM -->
 	<div>
 		<TopBar title="ทรัพยากร" :subtitle="state.project?.project_name">
 			<template #actions>
@@ -200,11 +200,11 @@
 
 <script setup>
 import { computed, ref, watch } from "vue";
-import Icon from "../../components/Icon.vue";
-import TopBar from "../../components/TopBar.vue";
-import Skeleton from "../../components/Skeleton.vue";
-import Empty from "../../components/Empty.vue";
-import Segmented from "../../components/Segmented.vue";
+import Icon from "../../../shared/components/Icon.vue";
+import TopBar from "../../../shared/components/TopBar.vue";
+import Skeleton from "../../../shared/components/Skeleton.vue";
+import Empty from "../../../shared/components/Empty.vue";
+import Segmented from "../../../shared/components/Segmented.vue";
 import {
 	boot,
 	call,
@@ -215,7 +215,7 @@ import {
 	show_error,
 	state,
 	thai_date,
-} from "../../api.js";
+} from "../../../shared/api.js";
 
 const MATERIAL_FILTERS = [
 	{ value: "todo", label: "ต้องสั่ง" },

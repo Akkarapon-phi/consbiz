@@ -97,10 +97,20 @@
 
 <script setup>
 import { ref } from "vue";
-import Icon from "../../components/Icon.vue";
-import TopBar from "../../components/TopBar.vue";
-import Skeleton from "../../components/Skeleton.vue";
-import { back, boot, call, desk_url, num, short_time, show_error, state, thai_date } from "../../api.js";
+import Icon from "../../../shared/components/Icon.vue";
+import TopBar from "../../../shared/components/TopBar.vue";
+import Skeleton from "../../../shared/components/Skeleton.vue";
+import {
+	back,
+	boot,
+	call,
+	desk_url,
+	num,
+	short_time,
+	show_error,
+	state,
+	thai_date,
+} from "../../../shared/api.js";
 
 const params = state.route.params;
 const data = ref(null);

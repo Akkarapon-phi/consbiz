@@ -178,13 +178,13 @@
 
 <script setup>
 import { computed, nextTick, ref, watch } from "vue";
-import Icon from "../../components/Icon.vue";
-import TopBar from "../../components/TopBar.vue";
-import Skeleton from "../../components/Skeleton.vue";
-import Empty from "../../components/Empty.vue";
-import Segmented from "../../components/Segmented.vue";
-import Sheet from "../../components/Sheet.vue";
-import { call, num, show_error, state, thai_date } from "../../api.js";
+import Icon from "../../../shared/components/Icon.vue";
+import TopBar from "../../../shared/components/TopBar.vue";
+import Skeleton from "../../../shared/components/Skeleton.vue";
+import Empty from "../../../shared/components/Empty.vue";
+import Segmented from "../../../shared/components/Segmented.vue";
+import Sheet from "../../../shared/components/Sheet.vue";
+import { call, num, show_error, state, thai_date } from "../../../shared/api.js";
 
 const ZOOMS = [
 	{ value: "week", label: "สัปดาห์" },

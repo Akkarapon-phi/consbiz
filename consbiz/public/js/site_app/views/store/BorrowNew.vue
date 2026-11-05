@@ -201,17 +201,28 @@
 
 <script setup>
 import { computed, inject, reactive, ref, watch } from "vue";
-import DateInput from "../../components/DateInput.vue";
-import Icon from "../../components/Icon.vue";
-import TopBar from "../../components/TopBar.vue";
-import Skeleton from "../../components/Skeleton.vue";
-import Segmented from "../../components/Segmented.vue";
-import Stepper from "../../components/Stepper.vue";
-import Picker from "../../components/Picker.vue";
-import Sheet from "../../components/Sheet.vue";
-import SignaturePad from "../../components/SignaturePad.vue";
-import PhotoInput from "../../components/PhotoInput.vue";
-import { back, call, celebrate, go, num, post, show_error, state, today, vibrate } from "../../api.js";
+import DateInput from "../../../shared/components/DateInput.vue";
+import Icon from "../../../shared/components/Icon.vue";
+import TopBar from "../../../shared/components/TopBar.vue";
+import Skeleton from "../../../shared/components/Skeleton.vue";
+import Segmented from "../../../shared/components/Segmented.vue";
+import Stepper from "../../../shared/components/Stepper.vue";
+import Picker from "../../../shared/components/Picker.vue";
+import Sheet from "../../../shared/components/Sheet.vue";
+import SignaturePad from "../../../shared/components/SignaturePad.vue";
+import PhotoInput from "../../../shared/components/PhotoInput.vue";
+import {
+	back,
+	call,
+	celebrate,
+	go,
+	num,
+	post,
+	show_error,
+	state,
+	today,
+	vibrate,
+} from "../../../shared/api.js";
 
 const DUE = [
 	{ days: 0, label: "วันนี้" },

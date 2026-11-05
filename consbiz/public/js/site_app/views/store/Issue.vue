@@ -248,14 +248,14 @@
 
 <script setup>
 import { computed, inject, ref, watch } from "vue";
-import Icon from "../../components/Icon.vue";
-import TopBar from "../../components/TopBar.vue";
-import Segmented from "../../components/Segmented.vue";
-import Skeleton from "../../components/Skeleton.vue";
-import Empty from "../../components/Empty.vue";
-import Sheet from "../../components/Sheet.vue";
-import Stepper from "../../components/Stepper.vue";
-import Picker from "../../components/Picker.vue";
+import Icon from "../../../shared/components/Icon.vue";
+import TopBar from "../../../shared/components/TopBar.vue";
+import Segmented from "../../../shared/components/Segmented.vue";
+import Skeleton from "../../../shared/components/Skeleton.vue";
+import Empty from "../../../shared/components/Empty.vue";
+import Sheet from "../../../shared/components/Sheet.vue";
+import Stepper from "../../../shared/components/Stepper.vue";
+import Picker from "../../../shared/components/Picker.vue";
 import {
 	call,
 	celebrate,
@@ -267,7 +267,7 @@ import {
 	show_error,
 	state,
 	vibrate,
-} from "../../api.js";
+} from "../../../shared/api.js";
 
 const reload_summary = inject("reload_summary");
 const tab = ref(state.route.params.tab === "history" ? "history" : "new");

@@ -103,11 +103,11 @@
 
 <script setup>
 import { ref, watch } from "vue";
-import Icon from "../../components/Icon.vue";
-import TopBar from "../../components/TopBar.vue";
-import Segmented from "../../components/Segmented.vue";
-import Skeleton from "../../components/Skeleton.vue";
-import Empty from "../../components/Empty.vue";
+import Icon from "../../../shared/components/Icon.vue";
+import TopBar from "../../../shared/components/TopBar.vue";
+import Segmented from "../../../shared/components/Segmented.vue";
+import Skeleton from "../../../shared/components/Skeleton.vue";
+import Empty from "../../../shared/components/Empty.vue";
 import {
 	boot,
 	call,
@@ -120,7 +120,7 @@ import {
 	state,
 	thai_date,
 	tone,
-} from "../../api.js";
+} from "../../../shared/api.js";
 
 const tab = ref(state.route.params.tab === "done" ? "done" : "out");
 const data = ref(null);

@@ -205,11 +205,11 @@
 
 <script setup>
 import { computed, onBeforeUnmount, ref } from "vue";
-import Icon from "../../components/Icon.vue";
-import TopBar from "../../components/TopBar.vue";
-import Skeleton from "../../components/Skeleton.vue";
-import Empty from "../../components/Empty.vue";
-import { call, iso_date, replace_params, show_error, state, thai_date } from "../../api.js";
+import Icon from "../../../shared/components/Icon.vue";
+import TopBar from "../../../shared/components/TopBar.vue";
+import Skeleton from "../../../shared/components/Skeleton.vue";
+import Empty from "../../../shared/components/Empty.vue";
+import { call, iso_date, replace_params, show_error, state, thai_date } from "../../../shared/api.js";
 
 // สถานะของวัน: ชุดเดียวกับ Tab Look-ahead ของ CM (project_dashboard/LookAhead.vue day_state)
 const DAY_STATES = {
