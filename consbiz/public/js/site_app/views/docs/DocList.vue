@@ -54,12 +54,24 @@
 					/>
 				</label>
 				<template v-if="wide">
-					<select v-model="range" class="ss-tool" aria-label="ช่วงวันที่">
-						<option v-for="r in RANGES" :key="r.value" :value="r.value">{{ r.label }}</option>
-					</select>
+					<SelectBox
+						v-model="range"
+						variant="tool"
+						label="ช่วงวันที่"
+						:options="RANGES"
+						placeholder="ทุกวันที่"
+					>
+						<template #prefix><Icon name="calendar" :size="15" /></template>
+					</SelectBox>
 					<template v-if="range === 'custom'">
-						<input v-model="date_from" type="date" class="ss-tool" aria-label="ตั้งแต่" />
-						<input v-model="date_to" type="date" class="ss-tool" aria-label="ถึง" />
+						<DateInput
+							v-model="date_from"
+							variant="tool"
+							label="ตั้งแต่"
+							placeholder="ตั้งแต่"
+							clearable
+						/>
+						<DateInput v-model="date_to" variant="tool" label="ถึง" placeholder="ถึง" clearable />
 					</template>
 					<Picker
 						v-if="config.party"
@@ -82,16 +94,14 @@
 					>
 						<Icon name="alert" :size="15" /> เกินกำหนด
 					</button>
-					<select
+					<SelectBox
 						v-if="config.project"
-						:value="state.doc_scope"
-						class="ss-tool"
-						aria-label="ขอบเขต"
-						@change="set_doc_scope($event.target.value)"
-					>
-						<option value="project">โครงการนี้</option>
-						<option value="all">ทุกโครงการ</option>
-					</select>
+						:model-value="state.doc_scope"
+						variant="tool"
+						label="ขอบเขต"
+						:options="SCOPES"
+						@update:model-value="set_doc_scope"
+					/>
 					<span class="ss-toolbar-gap"></span>
 					<button type="button" class="ss-tool" :disabled="exporting" @click="export_csv()">
 						<Icon name="receive" :size="16" /> ส่งออก CSV
@@ -158,9 +168,12 @@
 					<span class="ss-toolbar-gap"></span>
 					<label class="ss-list-size">
 						แถวต่อหน้า
-						<select v-model.number="page_size" class="ss-tool">
-							<option v-for="n in [30, 50, 100]" :key="n" :value="n">{{ n }}</option>
-						</select>
+						<SelectBox
+							v-model="page_size"
+							variant="tool"
+							label="แถวต่อหน้า"
+							:options="[30, 50, 100].map((n) => ({ value: n, label: String(n) }))"
+						/>
 					</label>
 					<div class="ss-pager">
 						<button
@@ -289,8 +302,8 @@
 						</button>
 					</div>
 					<div v-if="range === 'custom'" class="ss-form-row">
-						<input v-model="date_from" type="date" class="ss-input" aria-label="ตั้งแต่" />
-						<input v-model="date_to" type="date" class="ss-input" aria-label="ถึง" />
+						<DateInput v-model="date_from" label="ตั้งแต่" placeholder="ตั้งแต่" clearable />
+						<DateInput v-model="date_to" label="ถึง" placeholder="ถึง" clearable />
 					</div>
 				</div>
 				<Picker
@@ -357,6 +370,8 @@ import Empty from "../../components/Empty.vue";
 import Picker from "../../components/Picker.vue";
 import Sheet from "../../components/Sheet.vue";
 import PdfViewer from "../../components/PdfViewer.vue";
+import SelectBox from "../../components/SelectBox.vue";
+import DateInput from "../../components/DateInput.vue";
 import DocCard from "./DocCard.vue";
 import DocTable from "./DocTable.vue";
 import ScopeSwitch from "./ScopeSwitch.vue";
@@ -385,6 +400,10 @@ const RANGES = [
 	{ value: "90", label: "90 วันล่าสุด" },
 	{ value: "year", label: "ปีนี้" },
 	{ value: "custom", label: "กำหนดเอง" },
+];
+const SCOPES = [
+	{ value: "project", label: "โครงการนี้" },
+	{ value: "all", label: "ทุกโครงการ" },
 ];
 const PREF_KEY = `consbiz.site.list.${kind}`;
 

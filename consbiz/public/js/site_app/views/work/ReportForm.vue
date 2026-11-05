@@ -64,12 +64,7 @@
 							<div class="ss-form-row">
 								<label class="ss-field">
 									<span class="ss-field-label">วันที่<em>*</em></span>
-									<input
-										v-model="doc.date"
-										class="ss-input"
-										type="date"
-										@change="date_changed"
-									/>
+									<DateInput v-model="doc.date" label="วันที่" @change="date_changed" />
 								</label>
 								<label v-if="is_report" class="ss-field">
 									<span class="ss-field-label">ผู้ควบคุมงาน</span>
@@ -561,6 +556,7 @@
 
 <script setup>
 import { computed, inject, onBeforeUnmount, ref, watch } from "vue";
+import DateInput from "../../components/DateInput.vue";
 import Icon from "../../components/Icon.vue";
 import TopBar from "../../components/TopBar.vue";
 import Skeleton from "../../components/Skeleton.vue";

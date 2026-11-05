@@ -38,6 +38,8 @@ const paths = {
 	"chevron-left": '<path d="m15 18-6-6 6-6"/>',
 	"chevron-right": '<path d="m9 18 6-6-6-6"/>',
 	"chevron-down": '<path d="m6 9 6 6 6-6"/>',
+	heart: '<path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/>',
+	grip: '<circle cx="9" cy="6" r="1"/><circle cx="15" cy="6" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="9" cy="18" r="1"/><circle cx="15" cy="18" r="1"/>',
 	"chevron-up": '<path d="m18 15-6-6-6 6"/>',
 	sliders:
 		'<path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/>',

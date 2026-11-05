@@ -70,7 +70,7 @@
 										{{ d.label }}
 									</button>
 								</div>
-								<input v-model="form.due_date" class="ss-input" type="date" :min="today()" />
+								<DateInput v-model="form.due_date" label="กำหนดคืน" :min="today()" />
 							</div>
 						</div>
 
@@ -201,6 +201,7 @@
 
 <script setup>
 import { computed, inject, reactive, ref, watch } from "vue";
+import DateInput from "../../components/DateInput.vue";
 import Icon from "../../components/Icon.vue";
 import TopBar from "../../components/TopBar.vue";
 import Skeleton from "../../components/Skeleton.vue";

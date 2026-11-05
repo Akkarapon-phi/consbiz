@@ -27,70 +27,63 @@
 		<div class="ss-content ss-docview">
 			<Skeleton v-if="!doc" :rows="3" />
 			<template v-else>
-				<!-- หัวเอกสาร: คู่ค้า + สถานะ / ช่องข้อมูลเรียงเป็นตาราง (จอกว้างหลายคอลัมน์) -->
 				<section class="ss-dv-head">
-					<div class="ss-dv-title">
-						<div class="ss-dv-party">
-							<small>{{ config.party || "เรื่อง" }}</small>
-							<b>{{ doc.party || doc.title || doc.name }}</b>
-						</div>
-						<span class="ss-tag ss-tag--lg" :class="`tone-${doc.status_tone}`">{{
-							doc.status_label
-						}}</span>
-					</div>
-					<!-- มือถือ: ยอดเด่น (จอกว้างอยู่ในตารางช่องข้อมูลและท้ายตารางรายการ) -->
-					<div v-if="!wide && has_money" class="ss-doc-total">
-						<div>
-							<small>ยอดรวม</small>
-							<b>{{ money(grand_total) }}</b>
-						</div>
-						<div v-if="doc.totals.outstanding_amount" class="is-due">
-							<small>ค้าง{{ due_word }}</small>
-							<b>{{ money(doc.totals.outstanding_amount) }}</b>
-						</div>
-					</div>
+					<!-- ขั้นตอนของเอกสาร: ผ่านแล้ว / ขั้นปัจจุบัน (มี %) / ยังไม่ถึง -->
+					<ol class="ss-dv-steps" :aria-label="`ขั้นตอน: ${doc.status_label}`">
+						<li v-for="(st, i) in doc.steps" :key="i" :class="`is-${st.state}`">
+							<span class="ss-dv-step-dot">
+								<Icon v-if="st.state === 'done'" name="check" :size="13" :stroke="3" />
+								<Icon v-else-if="st.state === 'error'" name="x" :size="13" :stroke="3" />
+								<template v-else>{{ i + 1 }}</template>
+							</span>
+							<span class="ss-dv-step-text">
+								<b>{{ st.label }}</b>
+								<small v-if="st.note && st.state !== 'todo'">{{ st.note }}</small>
+							</span>
+						</li>
+					</ol>
+
 					<dl class="ss-dv-fields">
+						<div class="is-wide">
+							<dt>{{ config.party || "เรื่อง" }}</dt>
+							<dd>{{ doc.party || doc.title || doc.name }}</dd>
+						</div>
 						<div>
-							<dt>เลขที่</dt>
-							<dd>{{ doc.name }}</dd>
+							<dt>สถานะ</dt>
+							<dd>
+								<span class="ss-tag" :class="`tone-${doc.status_tone}`">{{
+									doc.status_label
+								}}</span>
+							</dd>
+						</div>
+						<div v-if="doc.purpose">
+							<dt>วัตถุประสงค์</dt>
+							<dd>{{ doc.purpose }}</dd>
 						</div>
 						<div>
 							<dt>วันที่</dt>
 							<dd>{{ thai_date(doc.date, { year: true }) }}</dd>
 						</div>
 						<div v-if="doc.due">
-							<dt>{{ config.due || "ต้องการภายใน" }}</dt>
+							<dt>{{ config.due || "วันที่ต้องการ" }}</dt>
 							<dd :class="{ 'is-due': overdue }">{{ thai_date(doc.due, { year: true }) }}</dd>
 						</div>
 						<div v-if="doc.bill_no">
 							<dt>เลขที่บิลผู้ขาย</dt>
 							<dd>{{ doc.bill_no }}</dd>
 						</div>
-						<div v-if="doc.project">
-							<dt>โครงการ</dt>
-							<dd>{{ doc.project }}</dd>
-						</div>
 						<div>
-							<dt>ผู้ทำเอกสาร</dt>
-							<dd>{{ doc.owner_name }}</dd>
+							<dt>ผู้จัดทำ</dt>
+							<dd>{{ doc.request_by || doc.owner_name }}</dd>
 						</div>
-						<template v-if="wide && has_money">
-							<div>
-								<dt>ยอดรวมทั้งสิ้น</dt>
-								<dd class="is-money">{{ money(grand_total) }}</dd>
-							</div>
-							<div v-if="doc.totals.outstanding_amount">
-								<dt>ค้าง{{ due_word }}</dt>
-								<dd class="is-money is-due">{{ money(doc.totals.outstanding_amount) }}</dd>
-							</div>
-						</template>
-						<div v-for="p in progress" :key="p.label" class="ss-dv-progress">
-							<dt>{{ p.label }}</dt>
-							<dd>
-								<span class="ss-table-pct">
-									<i><b :style="{ width: `${Math.min(100, p.value)}%` }"></b></i>
-									{{ Math.round(p.value) }}%
-								</span>
+						<div v-if="params.kind === 'mr'">
+							<dt>ผู้อนุมัติ</dt>
+							<dd :class="{ 'is-empty': !doc.approve_by }">{{ doc.approve_by || "–" }}</dd>
+						</div>
+						<div v-if="doc.project" class="is-full">
+							<dt>โครงการ</dt>
+							<dd class="is-line" :title="doc.project_name">
+								{{ doc.project_name || doc.project }} <small>{{ doc.project }}</small>
 							</dd>
 						</div>
 					</dl>
@@ -104,7 +97,7 @@
 							>
 						</h2>
 
-						<!-- จอกว้าง: ตารางรายการ + สรุปยอดท้ายตาราง แบบใบเอกสาร -->
+						<!-- จอกว้าง: ตารางรายการ -->
 						<div v-if="wide" class="ss-table-wrap">
 							<table class="ss-table ss-table--doc">
 								<thead>
@@ -113,10 +106,10 @@
 										<th>รายการ</th>
 										<th class="is-num">จำนวน</th>
 										<th>หน่วย</th>
-										<th v-if="has_money" class="is-num">ราคา/หน่วย</th>
-										<th v-if="has_money" class="is-num">จำนวนเงิน</th>
-										<th v-if="has_item_date">กำหนด</th>
-										<th v-if="item_cols.length">ดำเนินการแล้ว</th>
+										<th class="is-num">หน่วยละ</th>
+										<th class="is-num">เป็นเงิน</th>
+										<th v-if="has_item_date">วันที่ต้องการ</th>
+										<th v-if="is_mr" class="is-center">ไม่คิดภาษี</th>
 									</tr>
 								</thead>
 								<tbody>
@@ -124,156 +117,149 @@
 										<td class="is-idx">{{ i + 1 }}</td>
 										<td class="is-item">
 											<b>{{ it.item_name || it.item_code }}</b>
-											<small v-if="it.item_name && it.item_name !== it.item_code">{{
-												it.item_code
-											}}</small>
+											<small
+												>{{ it.item_code
+												}}<template v-if="item_progress(it)">
+													· {{ item_progress(it) }}</template
+												></small
+											>
+											<small
+												v-if="
+													it.description && strip(it.description) !== it.item_name
+												"
+												class="is-desc"
+												>{{ strip(it.description) }}</small
+											>
 										</td>
 										<td class="is-num">{{ num(it.qty) }}</td>
 										<td>{{ it.uom }}</td>
-										<td v-if="has_money" class="is-num">{{ money(it.rate) }}</td>
-										<td v-if="has_money" class="is-num is-strong">
-											{{ money(it.amount) }}
-										</td>
+										<td class="is-num">{{ money(it.rate) }}</td>
+										<td class="is-num is-strong">{{ money(it.amount) }}</td>
 										<td v-if="has_item_date" class="is-date">
-											{{ thai_date(it.schedule_date || it.delivery_date) }}
+											{{
+												thai_date(it.schedule_date || it.delivery_date, {
+													year: true,
+												})
+											}}
 										</td>
-										<td v-if="item_cols.length">
+										<td v-if="is_mr" class="is-center">
 											<span
-												v-for="c in item_cols"
-												:key="c.field"
-												class="ss-dv-done"
-												:class="{ 'is-full': Number(it[c.field]) >= Number(it.qty) }"
-												>{{ c.label }} {{ num(it[c.field] || 0) }}/{{
-													num(it.qty)
-												}}</span
+												class="ss-checkmark"
+												:class="{ 'is-on': it.custom_vat_nocal }"
 											>
+												<Icon
+													v-if="it.custom_vat_nocal"
+													name="check"
+													:size="12"
+													:stroke="3.2"
+												/>
+											</span>
 										</td>
 									</tr>
 								</tbody>
-								<tfoot v-if="has_money">
-									<tr>
-										<td :colspan="foot_span"></td>
-										<th>รวมเป็นเงิน</th>
-										<td class="is-num">{{ money(doc.totals.total) }}</td>
-										<td
-											v-if="has_item_date || item_cols.length"
-											:colspan="tail_span"
-										></td>
-									</tr>
-									<tr v-if="doc.totals.discount_amount">
-										<td :colspan="foot_span"></td>
-										<th>ส่วนลด</th>
-										<td class="is-num">−{{ money(doc.totals.discount_amount) }}</td>
-										<td
-											v-if="has_item_date || item_cols.length"
-											:colspan="tail_span"
-										></td>
-									</tr>
-									<tr v-for="t in doc.taxes" :key="t.description">
-										<td :colspan="foot_span"></td>
-										<th>
-											{{ t.description
-											}}<template v-if="t.rate"> {{ t.rate }}%</template>
-										</th>
-										<td class="is-num">{{ money(t.amount) }}</td>
-										<td
-											v-if="has_item_date || item_cols.length"
-											:colspan="tail_span"
-										></td>
-									</tr>
-									<tr class="is-grand">
-										<td :colspan="foot_span"></td>
-										<th>ยอดรวมทั้งสิ้น</th>
-										<td class="is-num">{{ money(grand_total) }}</td>
-										<td
-											v-if="has_item_date || item_cols.length"
-											:colspan="tail_span"
-										></td>
-									</tr>
-								</tfoot>
 							</table>
 						</div>
 
-						<!-- มือถือ: การ์ดรายการ + สรุปยอด -->
-						<template v-else>
-							<div class="ss-list ss-list--form">
-								<div
-									v-for="(it, i) in doc.items"
-									:key="i"
-									class="ss-card"
-									:style="{ '--i': Math.min(i, 12) }"
+						<!-- มือถือ: การ์ดรายการ -->
+						<div v-else class="ss-list ss-list--form">
+							<div
+								v-for="(it, i) in doc.items"
+								:key="i"
+								class="ss-card"
+								:style="{ '--i': Math.min(i, 12) }"
+							>
+								<div class="ss-doc-row">
+									<span class="ss-doc-title">{{ it.item_name || it.item_code }}</span>
+									<b class="ss-doc-money">{{ money(it.amount) }}</b>
+								</div>
+								<span class="ss-card-meta"
+									>{{ num(it.qty) }} {{ it.uom }} × {{ money(it.rate)
+									}}<template v-if="it.schedule_date || it.delivery_date">
+										· ต้องการ
+										{{ thai_date(it.schedule_date || it.delivery_date) }}</template
+									></span
 								>
-									<div class="ss-doc-row">
-										<span class="ss-doc-title">{{ it.item_name || it.item_code }}</span>
-										<b v-if="has_money" class="ss-doc-money">{{ money(it.amount) }}</b>
-									</div>
-									<span class="ss-card-meta"
-										>{{ num(it.qty) }} {{ it.uom
-										}}<template v-if="has_money"> × {{ money(it.rate) }}</template
-										><template v-if="it.schedule_date || it.delivery_date">
-											· ส่ง
-											{{ thai_date(it.schedule_date || it.delivery_date) }}</template
-										></span
-									>
-									<div v-if="item_progress(it)" class="ss-chips">
-										<span class="ss-chip">{{ item_progress(it) }}</span>
-									</div>
+								<div v-if="item_progress(it) || it.custom_vat_nocal" class="ss-chips">
+									<span v-if="item_progress(it)" class="ss-chip">{{
+										item_progress(it)
+									}}</span>
+									<span v-if="it.custom_vat_nocal" class="ss-chip">ไม่คิดภาษี</span>
 								</div>
 							</div>
-							<div v-if="has_money" class="ss-totals">
-								<div v-if="doc.totals.total !== undefined">
-									<span>รวมเป็นเงิน</span><b>{{ money(doc.totals.total) }}</b>
+						</div>
+
+						<!-- ท้ายเอกสาร: หมายเหตุ/ตัวอักษร (ซ้าย) + สรุปยอด (ขวา) แบบระบบเต็ม -->
+						<div class="ss-dv-foot">
+							<div class="ss-dv-notes">
+								<div v-if="doc.remarks">
+									<span class="ss-field-label">หมายเหตุ</span>
+									<div class="ss-text-block">{{ doc.remarks }}</div>
 								</div>
-								<div v-if="doc.totals.discount_amount">
-									<span>ส่วนลด</span><b>−{{ money(doc.totals.discount_amount) }}</b>
+								<div v-if="is_mr" class="ss-dv-flags">
+									<span class="ss-flag" :class="{ 'is-on': doc.included_vat }">
+										<span class="ss-checkmark" :class="{ 'is-on': doc.included_vat }"
+											><Icon
+												v-if="doc.included_vat"
+												name="check"
+												:size="12"
+												:stroke="3.2"
+										/></span>
+										มูลค่ารวมภาษี
+									</span>
+									<span class="ss-flag" :class="{ 'is-on': doc.vat_override }">
+										<span class="ss-checkmark" :class="{ 'is-on': doc.vat_override }"
+											><Icon
+												v-if="doc.vat_override"
+												name="check"
+												:size="12"
+												:stroke="3.2"
+										/></span>
+										แก้ไขภาษี
+									</span>
 								</div>
-								<div v-for="t in doc.taxes" :key="t.description">
-									<span
-										>{{ t.description
-										}}<template v-if="t.rate"> {{ t.rate }}%</template></span
-									><b>{{ money(t.amount) }}</b>
+							</div>
+							<div class="ss-totals">
+								<div v-for="r in doc.summary.rows" :key="r.label">
+									<span>{{ r.label }}</span
+									><b>{{ money(r.value) }}</b>
 								</div>
 								<div class="is-grand">
-									<span>ยอดรวมทั้งสิ้น</span><b>{{ money(grand_total) }}</b>
+									<span>รวมเป็นเงิน</span><b>{{ money(doc.summary.grand) }}</b>
+								</div>
+								<div v-if="doc.summary.in_words" class="ss-totals-words">
+									({{ doc.summary.in_words }})
+								</div>
+								<div v-if="doc.totals.outstanding_amount" class="is-due">
+									<span>ค้าง{{ due_word }}</span
+									><b>{{ money(doc.totals.outstanding_amount) }}</b>
 								</div>
 							</div>
-						</template>
+						</div>
 					</div>
 
-					<aside v-if="related.length || doc.remarks" class="ss-dv-side">
-						<template v-if="related.length">
-							<h2 class="ss-section-title ss-section-title--first">เอกสารที่เกี่ยวข้อง</h2>
-							<div class="ss-flow">
-								<button
-									v-for="l in related"
-									:key="l.doctype + l.name"
-									type="button"
-									class="ss-flow-item"
-									@click="open_link(l)"
-								>
-									<Icon
-										:name="l.dir === 'before' ? 'chevron-left' : 'chevron-right'"
-										:size="16"
-									/>
-									<span class="ss-flow-main">
-										<small>{{ link_label(l.doctype) }}</small>
-										<b>{{ l.name }}</b>
-									</span>
-									<span class="ss-tag" :class="`tone-${l.status_tone}`">{{
-										l.status_label
-									}}</span>
-								</button>
-							</div>
-						</template>
-						<template v-if="doc.remarks">
-							<h2
-								class="ss-section-title"
-								:class="{ 'ss-section-title--first': !related.length }"
+					<aside v-if="related.length" class="ss-dv-side">
+						<h2 class="ss-section-title ss-section-title--first">เอกสารที่เกี่ยวข้อง</h2>
+						<div class="ss-flow">
+							<button
+								v-for="l in related"
+								:key="l.doctype + l.name"
+								type="button"
+								class="ss-flow-item"
+								@click="open_link(l)"
 							>
-								หมายเหตุ
-							</h2>
-							<div class="ss-text-block">{{ doc.remarks }}</div>
-						</template>
+								<Icon
+									:name="l.dir === 'before' ? 'chevron-left' : 'chevron-right'"
+									:size="16"
+								/>
+								<span class="ss-flow-main">
+									<small>{{ link_label(l.doctype) }}</small>
+									<b>{{ l.name }}</b>
+								</span>
+								<span class="ss-tag" :class="`tone-${l.status_tone}`">{{
+									l.status_label
+								}}</span>
+							</button>
+						</div>
 					</aside>
 				</div>
 			</template>
@@ -329,7 +315,7 @@
 					><b>{{ doc.party || doc.title }}</b>
 				</div>
 				<div class="ss-fact">
-					<span>ยอดรวม</span><b>{{ money(doc.totals.grand_total) }}</b>
+					<span>ยอดรวม</span><b>{{ money(doc.summary.grand) }}</b>
 				</div>
 			</div>
 			<template #footer>
@@ -381,10 +367,13 @@ const on_media = () => (wide.value = mq_wide.matches);
 mq_wide.addEventListener("change", on_media);
 onBeforeUnmount(() => mq_wide.removeEventListener("change", on_media));
 
-// ใบขอซื้อไม่มีราคา/ยอดเงิน
-const has_money = params.kind !== "mr";
+const is_mr = params.kind === "mr";
+const strip = (html) =>
+	String(html || "")
+		.replace(/<[^>]*>/g, " ")
+		.replace(/\s+/g, " ")
+		.trim();
 const due_word = config.section === "buy" ? "จ่าย" : "รับ";
-const grand_total = computed(() => doc.value?.totals.rounded_total || doc.value?.totals.grand_total || 0);
 const overdue = computed(
 	() =>
 		doc.value?.docstatus === 1 &&
@@ -401,20 +390,6 @@ const related = computed(() =>
 		: []
 );
 const has_item_date = computed(() => doc.value?.items.some((it) => it.schedule_date || it.delivery_date));
-// คอลัมน์ "ดำเนินการแล้ว" ของตาราง (เฉพาะเอกสารที่ส่งแล้ว)
-const item_cols = computed(() =>
-	doc.value?.docstatus === 1
-		? (ITEM_PROGRESS[params.kind] || [])
-				.filter(([field]) =>
-					doc.value.items.some((it) => it[field] !== undefined && it[field] !== null)
-				)
-				.map(([field, label]) => ({ field, label }))
-		: []
-);
-// ท้ายตาราง: ป้ายอยู่ใต้คอลัมน์ราคา ยอดอยู่ใต้คอลัมน์จำนวนเงิน
-const foot_span = 4;
-const tail_span = computed(() => (has_item_date.value ? 1 : 0) + (item_cols.value.length ? 1 : 0));
-
 const has_bar = computed(
 	() => !!(doc.value && (doc.value.can_edit || doc.value.can_submit || doc.value.next_kind))
 );

@@ -30,9 +30,11 @@ DOCS = {
 		"party": None,
 		"date": "transaction_date",
 		"due": "schedule_date",
-		"amount": None,
+		"amount": "custom_grand_total",
 		"progress": ("per_ordered", "per_received"),
-		"base": {"material_request_type": "Purchase"},
+		"extra": ("material_request_type",),
+		# ซื้อเอง + ผู้ว่าจ้างจัดหา (วัตถุประสงค์อื่น เช่น โอน/เบิก ไม่ใช่งานจัดซื้อ)
+		"base": {"material_request_type": ("in", ("Purchase", "Customer Provided"))},
 		"todo": {"docstatus": 1, "status": ("in", ("Pending", "Partially Ordered"))},
 	},
 	"po": {
@@ -166,7 +168,7 @@ def scope_filters(config, project, scope):
 
 
 def list_fields(config):
-	fields = ["name", "status", "docstatus", "title", "currency", "modified"]
+	fields = ["name", "status", "docstatus", "title", "currency", "modified", "_assign", "_liked_by"]
 	fields += [f"{config['date']} as date", f"{config['due']} as due"]
 	if config["party"]:
 		fields.append(f"{config['party']} as party")
@@ -180,9 +182,38 @@ def list_fields(config):
 	return fields
 
 
+PURPOSE = {"Purchase": "ซื้อ", "Customer Provided": "ผู้ว่าจ้างจัดหา"}
+
+
+def user_list(value):
+	"""ช่อง _assign / _liked_by (JSON รายชื่อผู้ใช้)"""
+	try:
+		return [u for u in frappe.parse_json(value or "[]") if u]
+	except Exception:
+		return []
+
+
+def people(users):
+	return [{"user": u, "name": frappe.utils.get_fullname(u)} for u in users]
+
+
 def decorate(rows, config):
 	today = getdate(nowdate())
+	projects = {r.get("project") for r in rows if r.get("project")}
+	project_names = (
+		dict(frappe.get_all("Project", filters={"name": ("in", list(projects))}, fields=["name", "project_name"], as_list=True))
+		if projects
+		else {}
+	)
+	me = frappe.session.user
 	for row in rows:
+		row.project_name = project_names.get(row.get("project"))
+		row.assigned = people(user_list(row.pop("_assign", None)))
+		liked = user_list(row.pop("_liked_by", None))
+		row.liked = me in liked
+		row.likes = len(liked)
+		if row.get("material_request_type"):
+			row.purpose = _(PURPOSE.get(row.material_request_type, row.material_request_type))
 		row.status_label, row.status_tone = status_of(row.status, row.docstatus)
 		row.overdue = bool(
 			row.docstatus == 1
@@ -433,6 +464,9 @@ def get_summary(section, project=None, scope="project"):
 # ---------------------------------------------------------------- รายละเอียด
 
 ITEM_FIELDS = (
+	"name",
+	"custom_vat_nocal",
+	"custom_wbs",
 	"item_code",
 	"item_name",
 	"description",
@@ -510,6 +544,8 @@ def next_of(doc, kind):
 	target = next_kind(kind)
 	if not target or doc.docstatus != 1:
 		return None
+	if kind == "mr" and doc.material_request_type != "Purchase":
+		return None
 	statuses = DOCS[kind]["todo"].get("status", (None, ()))[1]
 	if doc.status not in statuses:
 		return None
@@ -518,6 +554,99 @@ def next_of(doc, kind):
 	if not frappe.has_permission(DOCS[target]["doctype"], "create"):
 		return None
 	return target
+
+
+def signature_name(name):
+	return (frappe.db.get_value("Signature", name, "full_name") or name) if name else None
+
+
+def header_info(doc, kind):
+	"""ข้อมูลหัวเอกสารสำหรับหน้าดู: เรื่อง วัตถุประสงค์ ผู้ขอ/ผู้อนุมัติ (MR ใช้ Signature) ตัวเลือกภาษีของ MR"""
+	out = {"title": doc.get("title")}
+	if kind == "mr":
+		out.update(
+			{
+				"purpose": _(PURPOSE.get(doc.material_request_type, doc.material_request_type)),
+				"material_request_type": doc.material_request_type,
+				"request_by": signature_name(doc.get("custom_request_by")),
+				"approve_by": signature_name(doc.get("custom_approve_by")),
+				"included_vat": cint(doc.get("custom_included_vat")),
+				"vat_override": cint(doc.get("custom_vat_override")),
+			}
+		)
+	return out
+
+
+def summary_of(doc, kind):
+	"""สรุปยอดท้ายเอกสารแบบระบบเต็ม: แถว (ป้าย, ยอด) + ยอดสุทธิ + ตัวอักษร
+	MR ใช้ช่อง custom_* (request_totals.py) เอกสารอื่นใช้ยอด/ภาษีของ ERPNext"""
+	from consbiz.utils import thai_baht_text
+
+	rows = []
+	if kind == "mr":
+		if flt(doc.get("custom_net_total_novat")):
+			rows.append({"label": _("มูลค่าสินค้า (ไม่คิดภาษี)"), "value": flt(doc.custom_net_total_novat)})
+		rows.append({"label": _("มูลค่าก่อนภาษี"), "value": flt(doc.get("custom_net_total"))})
+		if doc.material_request_type != "Customer Provided":
+			rows.append({"label": _("ภาษีมูลค่าเพิ่ม 7%"), "value": flt(doc.get("custom_vat")), "tax": 1})
+		grand = flt(doc.get("custom_grand_total"))
+	else:
+		rows.append({"label": _("รวมเป็นเงิน"), "value": flt(doc.get("total"))})
+		if flt(doc.get("discount_amount")):
+			rows.append({"label": _("ส่วนลด"), "value": -flt(doc.discount_amount)})
+		for t in doc.get("taxes") or []:
+			label = t.description + (f" {flt(t.rate):g}%" if flt(t.rate) else "")
+			rows.append({"label": label, "value": flt(t.tax_amount), "tax": 1})
+		grand = flt(doc.get("rounded_total")) or flt(doc.get("grand_total"))
+	return {"rows": rows, "grand": grand, "in_words": thai_baht_text(grand) if grand else ""}
+
+
+def steps_of(doc, kind):
+	"""ขั้นตอนของเอกสาร (แถบความคืบหน้าในหน้าดู) state = done / current / todo / error, note = % ของขั้นนั้น"""
+	if kind == "mr":
+		flow = [("สั่งซื้อ", "per_ordered"), ("รับของ", "per_received")]
+		if doc.material_request_type == "Customer Provided":
+			flow = [("รับของ", "per_received")]
+		labels = ("ร่าง", "ส่งแล้ว")
+	elif kind == "po":
+		flow, labels = [("รับของ", "per_received"), ("วางบิล", "per_billed")], ("ร่าง", "ส่งแล้ว")
+	elif kind == "so":
+		flow, labels = [("ส่งมอบ", "per_delivered"), ("วางบิล", "per_billed")], ("ร่าง", "ยืนยันแล้ว")
+	elif kind in ("pi", "si"):
+		paid = 100 - (flt(doc.outstanding_amount) / flt(doc.grand_total) * 100 if flt(doc.grand_total) else 0)
+		flow = [("รับชำระ" if kind == "si" else "ชำระเงิน", paid)]
+		labels = ("ร่าง", "ส่งแล้ว")
+	else:  # ใบเสนอราคา
+		ordered = {"Ordered": 100, "Partially Ordered": 50}.get(doc.status, 0)
+		flow, labels = [("ลูกค้าสั่งซื้อ", ordered)], ("ร่าง", "เสนอราคาแล้ว")
+
+	steps = [{"label": _(labels[0])}, {"label": _(labels[1])}]
+	for label, field in flow:
+		steps.append({"label": _(label), "pct": flt(field if not isinstance(field, str) else doc.get(field))})
+	steps.append({"label": _("เสร็จสิ้น")})
+
+	if doc.docstatus == 2:
+		return [{**steps[0], "state": "done"}, {"label": _("ยกเลิก"), "state": "error"}]
+	if doc.docstatus == 0:
+		return [{**s, "state": "current" if i == 0 else "todo"} for i, s in enumerate(steps)]
+	closed = doc.status in ("Completed", "Closed", "Paid", "Received", "Ordered", "Delivered")
+	lost = doc.status in ("Lost", "Expired")
+	current_set = False
+	for i, s in enumerate(steps):
+		if i < 2:
+			s["state"] = "done"
+		elif "pct" in s:
+			if s["pct"] >= 100 or closed:
+				s["state"] = "done"
+			elif not current_set:
+				s["state"] = "error" if lost else "current"
+				current_set = True
+			else:
+				s["state"] = "todo"
+			s["note"] = f"{round(min(s['pct'], 100))}%"
+		else:
+			s["state"] = "done" if not current_set and not lost else "todo"
+	return steps
 
 
 @frappe.whitelist()
@@ -530,7 +659,12 @@ def get_doc(kind, name):
 	label, tone = status_of(doc.status, doc.docstatus)
 	before, after = links_of(doc)
 	items = [{field: row.get(field) for field in ITEM_FIELDS if row.meta.has_field(field)} for row in doc.items]
+	project = doc.get(config["project"]) if config["project"] else None
 	return {
+		**header_info(doc, kind),
+		"project_name": frappe.db.get_value("Project", project, "project_name") if project else None,
+		"steps": steps_of(doc, kind),
+		"summary": summary_of(doc, kind),
 		"kind": kind,
 		"doctype": doc.doctype,
 		"name": doc.name,
@@ -565,7 +699,7 @@ def get_doc(kind, name):
 			{"description": t.description, "rate": flt(t.rate), "amount": flt(t.tax_amount)}
 			for t in doc.get("taxes") or []
 		],
-		"remarks": doc.get("remarks") if doc.meta.has_field("remarks") else None,
+		"remarks": doc.get(FORM[kind].get("remarks") or "remarks") if doc.meta.has_field(FORM[kind].get("remarks") or "remarks") else None,
 		"before": before,
 		"after": after,
 		"can_submit": bool(doc.docstatus == 0 and frappe.has_permission(doc.doctype, "submit", doc)),
@@ -594,14 +728,25 @@ DISCOUNT = "additional_discount_percentage"
 FORM = {
 	"mr": {
 		"party": None,
-		"header": ("transaction_date", "schedule_date", "custom_remark"),
-		"item": ("item_code", "qty", "uom", "schedule_date"),
+		"header": (
+			"material_request_type",
+			"title",
+			"transaction_date",
+			"schedule_date",
+			"custom_request_by",
+			"custom_approve_by",
+			"custom_included_vat",
+			"custom_vat_override",
+			"custom_vat",
+			"custom_remark",
+		),
+		"item": ("item_code", "qty", "uom", "rate", "schedule_date", "description", "custom_wbs", "custom_vat_nocal"),
 		"remarks": "custom_remark",
 	},
 	"po": {
 		"party": "supplier",
 		"header": ("supplier", "transaction_date", "schedule_date", "taxes_and_charges", DISCOUNT),
-		"item": ("item_code", "qty", "uom", "rate", "schedule_date"),
+		"item": ("item_code", "qty", "uom", "rate", "schedule_date", "description"),
 	},
 	"pi": {
 		"party": "supplier",
@@ -618,23 +763,23 @@ FORM = {
 			DISCOUNT,
 			"remarks",
 		),
-		"item": ("item_code", "qty", "uom", "rate"),
+		"item": ("item_code", "qty", "uom", "rate", "description"),
 		"remarks": "remarks",
 	},
 	"qtn": {
 		"party": "party_name",
 		"header": ("party_name", "transaction_date", "valid_till", "taxes_and_charges", DISCOUNT),
-		"item": ("item_code", "qty", "uom", "rate"),
+		"item": ("item_code", "qty", "uom", "rate", "description"),
 	},
 	"so": {
 		"party": "customer",
 		"header": ("customer", "transaction_date", "delivery_date", "taxes_and_charges", DISCOUNT),
-		"item": ("item_code", "qty", "uom", "rate", "delivery_date"),
+		"item": ("item_code", "qty", "uom", "rate", "delivery_date", "description"),
 	},
 	"si": {
 		"party": "customer",
 		"header": ("customer", "posting_date", "due_date", "taxes_and_charges", DISCOUNT, "remarks"),
-		"item": ("item_code", "qty", "uom", "rate"),
+		"item": ("item_code", "qty", "uom", "rate", "description"),
 		"remarks": "remarks",
 	},
 }
@@ -671,7 +816,8 @@ def mapped_doc(kind, source):
 def new_doc(kind, project):
 	config = DOCS[kind]
 	doc = frappe.new_doc(config["doctype"])
-	doc.update(config.get("base", {}))
+	if kind == "mr":
+		doc.material_request_type = "Purchase"
 	if kind == "qtn":
 		doc.quotation_to = "Customer"
 	company = frappe.db.get_value("Project", project, "company") if project else None
@@ -733,6 +879,8 @@ def apply_form(doc, kind, data):
 
 	form = FORM[kind]
 	old_template = doc.get("taxes_and_charges")
+	if kind == "mr" and data.get("material_request_type") not in (None, "Purchase", "Customer Provided"):
+		frappe.throw(_("วัตถุประสงค์ต้องเป็น ซื้อ หรือ ผู้ว่าจ้างจัดหา"))
 	for field in form["header"]:
 		if field in data and doc.meta.has_field(field):
 			value = data.get(field) or None
@@ -776,7 +924,11 @@ def apply_form(doc, kind, data):
 				row.set(field, doc.get(field) or doc.get("transaction_date"))
 		rows.append(row)
 	doc.set("items", rows)
-	for row in doc.items:
+	# ลำดับแถวตามที่จัดในแอป (ลากย้ายได้)
+	for index, row in enumerate(doc.items, 1):
+		row.idx = index
+		if kind == "mr":
+			row.amount = flt(row.qty) * flt(row.rate)
 		if row.meta.has_field("stock_qty"):
 			row.stock_qty = flt(row.qty) * flt(row.conversion_factor or 1)
 
@@ -794,7 +946,11 @@ def apply_form(doc, kind, data):
 		if doc.get("taxes_and_charges"):
 			doc.append_taxes_from_master()
 	doc.set_missing_values(for_validate=True)
-	if kind != "mr":
+	if kind == "mr":
+		from consbiz.request_totals import calculate
+
+		calculate(doc)
+	else:
 		doc.calculate_taxes_and_totals()
 	return doc
 
@@ -835,6 +991,9 @@ def serialize_form(doc, kind):
 				"amount": flt(row.get("amount")),
 				"schedule_date": row.get("schedule_date"),
 				"delivery_date": row.get("delivery_date"),
+				"description": row.get("description"),
+				"custom_wbs": row.get("custom_wbs"),
+				"custom_vat_nocal": cint(row.get("custom_vat_nocal")),
 				"uoms": item_uoms(row.item_code),
 			}
 		)
@@ -846,8 +1005,14 @@ def serialize_form(doc, kind):
 		"project": project_of(doc, kind),
 		"party_label": party_name,
 		**header,
+		"request_by_label": signature_name(doc.get("custom_request_by")),
+		"approve_by_label": signature_name(doc.get("custom_approve_by")),
+		"project_name": frappe.db.get_value("Project", project_of(doc, kind), "project_name")
+		if project_of(doc, kind)
+		else None,
 		"items": items,
 		"totals": totals_of(doc),
+		"summary": summary_of(doc, kind),
 		"taxes": [
 			{"description": t.description, "rate": flt(t.rate), "amount": flt(t.tax_amount)}
 			for t in doc.get("taxes") or []
@@ -900,7 +1065,22 @@ def preview_doc(kind, data):
 		# ERPNext อาจเขียนข้อมูลระหว่างเติมค่า (เช่น สร้าง Item Price อัตโนมัติ) ตัวอย่างยอดต้องไม่บันทึกอะไร
 		frappe.db.rollback()
 		frappe.local.message_log = []
-	return {"totals": out["totals"], "taxes": out["taxes"], "items": out["items"]}
+	return {"totals": out["totals"], "taxes": out["taxes"], "summary": out["summary"], "items": out["items"]}
+
+
+def keep_request_rates(doc, wanted):
+	"""MR ใหม่: ERPNext (MaterialRequest.on_update → update_item_rates) ทับราคาทุกแถวด้วย Price List ตอนบันทึกครั้งแรก
+	ใช้ราคาที่ผู้ใช้กรอกในแอปคืน แล้วคำนวณยอดใหม่ (request_totals)"""
+	from consbiz.request_totals import calculate
+
+	changed = False
+	for row, rate in zip(doc.items, wanted, strict=False):
+		if flt(row.rate) != rate:
+			row.rate, row.amount, changed = rate, flt(rate * flt(row.qty), row.precision("amount")), True
+			row.db_update()
+	if changed:
+		calculate(doc)
+		doc.db_update()
 
 
 @frappe.whitelist(methods=["POST"])
@@ -911,7 +1091,10 @@ def save_doc(kind, data, submit=0):
 	apply_form(doc, kind, data)
 	if not doc.get("items"):
 		frappe.throw(_("เพิ่มรายการอย่างน้อย 1 รายการ"))
+	wanted = [flt(row.rate) for row in doc.items] if kind == "mr" else None
 	doc.save()
+	if wanted:
+		keep_request_rates(doc, wanted)
 	if cint(submit):
 		doc.submit()
 	return {"name": doc.name, "docstatus": doc.docstatus}
@@ -985,6 +1168,22 @@ def search_parties(kind, txt=None, company=None):
 		or_filters=or_filters,
 		fields=["name as value", f"{label} as label"],
 		order_by="modified desc",
+		limit_page_length=30,
+	)
+
+
+@frappe.whitelist()
+def search_signatures(txt=None):
+	"""ผู้ขอ/ผู้อนุมัติของใบขอซื้อ (Signature: ชื่อ + ลายเซ็น)"""
+	or_filters = None
+	if txt:
+		like = f"%{txt.strip()}%"
+		or_filters = {"name": ("like", like), "full_name": ("like", like)}
+	return frappe.get_list(
+		"Signature",
+		or_filters=or_filters,
+		fields=["name as value", "full_name as label"],
+		order_by="full_name asc",
 		limit_page_length=30,
 	)
 

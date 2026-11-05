@@ -6699,3 +6699,715 @@ select.ss-cell {
 		font-size: 13px;
 	}
 }
+
+/* ================================================================ ช่องเลือก (SelectBox.vue) / วันที่ (DateInput.vue) / ตัวเลข
+   แทนหน้าตาของ <select> / <input type="date"> / ลูกศรขึ้นลงของเบราว์เซอร์ */
+
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+	-webkit-appearance: none;
+	margin: 0;
+}
+input[type="number"] {
+	-moz-appearance: textfield;
+	appearance: textfield;
+}
+
+.ss-select {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	width: 100%;
+	min-width: 0;
+	min-height: 46px;
+	padding: 0 12px 0 13px;
+	border-radius: 14px;
+	border: 1.5px solid transparent;
+	background: var(--ss-surface-2);
+	font-size: 16px;
+	color: var(--ss-text);
+	text-align: left;
+	cursor: pointer;
+	transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+}
+.ss-select:disabled {
+	opacity: 0.6;
+	cursor: default;
+}
+.ss-select-value {
+	flex: 1;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.ss-select.is-empty .ss-select-value {
+	color: var(--ss-muted);
+}
+.ss-select-arrow,
+.ss-date-icon {
+	flex: none;
+	color: var(--ss-muted);
+	transition: transform 0.2s var(--ss-ease);
+}
+.ss-select.is-open .ss-select-arrow {
+	transform: rotate(180deg);
+}
+.ss-select:focus-visible,
+.ss-select.is-open {
+	outline: none;
+	border-color: var(--ss-brand);
+	background: var(--ss-surface);
+	box-shadow: 0 0 0 3px var(--ss-brand-soft);
+}
+/* ช่องในตาราง: ไม่มีกรอบจนชี้/โฟกัส */
+.ss-select--cell {
+	min-height: 36px;
+	height: 36px;
+	padding: 0 8px;
+	border-radius: 8px;
+	border-width: 1px;
+	background: transparent;
+	font-size: 14px;
+	gap: 6px;
+}
+.ss-select--cell:hover {
+	border-color: var(--ss-border-strong);
+	background: var(--ss-surface);
+}
+/* ปุ่มในแถบเครื่องมือ */
+.ss-select--tool {
+	width: auto;
+	min-height: 40px;
+	height: 40px;
+	padding: 0 10px 0 12px;
+	border-radius: 11px;
+	border-width: 1px;
+	border-color: var(--ss-border-strong);
+	background: var(--ss-surface);
+	font-size: 14px;
+	font-weight: 500;
+	color: var(--ss-text-2);
+}
+.ss-select--tool:hover {
+	color: var(--ss-text);
+	border-color: color-mix(in srgb, var(--ss-brand) 40%, var(--ss-border-strong));
+}
+.ss-select--tool.is-empty .ss-select-value {
+	color: var(--ss-text-2);
+}
+
+.ss-select-menu {
+	position: fixed;
+	z-index: 120;
+	max-height: 320px;
+	overflow-y: auto;
+	margin: 0;
+	padding: 6px;
+	list-style: none;
+	border-radius: 14px;
+	background: var(--ss-surface);
+	border: 1px solid var(--ss-border-strong);
+	box-shadow: var(--ss-shadow-lg);
+	font-size: 14.5px;
+	color: var(--ss-text);
+}
+.ss-select-menu li {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 10px;
+	min-height: 38px;
+	padding: 6px 10px;
+	border-radius: 9px;
+	cursor: pointer;
+}
+.ss-select-menu li.is-active {
+	background: var(--ss-surface-2);
+}
+.ss-select-menu li.is-selected {
+	color: var(--ss-brand);
+	font-weight: 600;
+}
+.ss-select-menu li.is-note {
+	color: var(--ss-muted);
+	cursor: default;
+}
+.ss-select-text {
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+}
+.ss-select-text small {
+	font-size: 12px;
+	font-weight: 400;
+	color: var(--ss-muted);
+}
+.ss-pop-menu-enter-active,
+.ss-pop-menu-leave-active {
+	transition: opacity 0.14s ease, transform 0.14s var(--ss-ease);
+}
+.ss-pop-menu-enter-from,
+.ss-pop-menu-leave-to {
+	opacity: 0;
+	transform: translateY(-4px) scale(0.98);
+}
+
+/* ปฏิทินเลือกวัน */
+.ss-cal-pop {
+	position: fixed;
+	z-index: 120;
+	width: 296px;
+	padding: 12px;
+	border-radius: 16px;
+	background: var(--ss-surface);
+	border: 1px solid var(--ss-border-strong);
+	box-shadow: var(--ss-shadow-lg);
+	color: var(--ss-text);
+}
+.ss-cal-pop-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	margin-bottom: 8px;
+	font-size: 15px;
+}
+.ss-cal-pop-grid {
+	display: grid;
+	grid-template-columns: repeat(7, 1fr);
+	gap: 2px;
+}
+.ss-cal-pop-grid .is-dow {
+	padding: 4px 0;
+	font-size: 11.5px;
+	font-weight: 600;
+	text-align: center;
+	color: var(--ss-muted);
+}
+.ss-cal-pop-day {
+	height: 36px;
+	border-radius: 10px;
+	font-size: 14px;
+	font-variant-numeric: tabular-nums;
+	color: var(--ss-text);
+	transition: background 0.12s ease;
+}
+.ss-cal-pop-day:hover,
+.ss-cal-pop-day.is-focus {
+	background: var(--ss-surface-2);
+}
+.ss-cal-pop-day.is-other {
+	color: var(--ss-muted);
+	opacity: 0.6;
+}
+.ss-cal-pop-day.is-today {
+	font-weight: 700;
+	color: var(--ss-brand);
+	box-shadow: inset 0 0 0 1.5px var(--ss-brand);
+}
+.ss-cal-pop-day.is-selected {
+	font-weight: 700;
+	color: #fff;
+	background: var(--ss-brand);
+}
+.ss-cal-pop-foot {
+	display: flex;
+	justify-content: space-between;
+	padding-top: 8px;
+	margin-top: 6px;
+	border-top: 1px solid var(--ss-border);
+}
+.ss-link.is-muted {
+	color: var(--ss-muted);
+}
+
+@media (min-width: 768px) and (hover: hover) and (pointer: fine) {
+	.ss-select--field {
+		min-height: 42px;
+		padding: 0 10px 0 12px;
+		border-radius: 11px;
+		border-width: 1px;
+		border-color: var(--ss-border-strong);
+		background: var(--ss-surface);
+		font-size: 15px;
+	}
+	.ss-select--field:hover:not(:disabled) {
+		border-color: color-mix(in srgb, var(--ss-brand) 45%, var(--ss-border-strong));
+	}
+}
+
+/* ---------------------------------------------------------------- รายการเอกสาร: คอลัมน์ตามชนิด (DocTable.vue) */
+.ss-table--list .col-no {
+	width: 1%;
+	white-space: nowrap;
+}
+.ss-doc-no {
+	font-size: 13.5px;
+	font-weight: 600;
+	letter-spacing: -0.01em;
+	font-variant-numeric: tabular-nums;
+}
+.ss-table--list .col-status {
+	width: 1%;
+	white-space: nowrap;
+}
+.ss-table--list .col-subject {
+	min-width: 180px;
+	max-width: 340px;
+}
+.ss-table--list .col-subject .ss-cell-main,
+.ss-table--list .col-subject small {
+	display: block;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.ss-cell-main {
+	font-weight: 500;
+}
+.ss-table--list .col-date,
+.ss-table--list .col-pct,
+.ss-table--list .col-purpose,
+.ss-table--list .col-modified {
+	width: 1%;
+	white-space: nowrap;
+}
+.ss-table--list .col-modified {
+	color: var(--ss-muted);
+	font-size: 13px;
+}
+.ss-table--list .col-pct .ss-table-pct i {
+	width: 40px;
+}
+.ss-table-pct.is-muted {
+	opacity: 0.45;
+}
+.ss-table--list .col-assign {
+	width: 1%;
+}
+.ss-table--list .col-like {
+	width: 40px;
+	padding-left: 0;
+	text-align: center;
+}
+.ss-avatars {
+	display: inline-flex;
+}
+.ss-avatar--xs {
+	width: 26px;
+	height: 26px;
+	border-radius: 50%;
+	font-size: 10.5px;
+	box-shadow: 0 0 0 2px var(--ss-surface);
+}
+.ss-avatars .ss-avatar--xs + .ss-avatar--xs {
+	margin-left: -7px;
+}
+.ss-avatar--more {
+	color: var(--ss-text-2);
+	background: var(--ss-surface-2);
+}
+.ss-like {
+	display: inline-grid;
+	place-items: center;
+	width: 30px;
+	height: 30px;
+	border-radius: 50%;
+	color: var(--ss-muted);
+	opacity: 0.55;
+	transition: color 0.15s ease, opacity 0.15s ease, transform 0.2s var(--ss-spring);
+}
+.ss-like:hover {
+	opacity: 1;
+	color: var(--tone-rose);
+}
+.ss-like.is-on {
+	opacity: 1;
+	color: var(--tone-rose);
+}
+.ss-like.is-on svg {
+	fill: currentColor;
+}
+.ss-like:active {
+	transform: scale(0.85);
+}
+@media (max-width: 1179px) {
+	.ss-table .col-wide {
+		display: none;
+	}
+}
+/* คอลัมน์เรื่อง/คู่ค้ารับพื้นที่ที่เหลือแล้วตัดด้วย … (ไม่ให้ข้อความยาวดันตารางล้น) */
+.ss-table--list th.col-subject,
+.ss-table--list td.col-subject {
+	width: 100%;
+	max-width: 1px;
+	min-width: 160px;
+}
+.ss-table--list th,
+.ss-table--list td {
+	padding-left: 10px;
+	padding-right: 10px;
+}
+
+/* ---------------------------------------------------------------- ดูเอกสาร: ขั้นตอน / ช่องข้อมูล / ท้ายเอกสาร (DocView.vue) */
+.ss-dv-steps {
+	display: flex;
+	margin: 0;
+	padding: 0 0 2px;
+	list-style: none;
+	overflow-x: auto;
+	scrollbar-width: none;
+}
+.ss-dv-steps::-webkit-scrollbar {
+	display: none;
+}
+.ss-dv-steps li {
+	position: relative;
+	flex: 1 0 96px;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 6px;
+	text-align: center;
+	color: var(--ss-muted);
+}
+/* เส้นเชื่อมไปขั้นถัดไป: ผ่านแล้ว = สีหมวด */
+.ss-dv-steps li:not(:last-child)::after {
+	content: "";
+	position: absolute;
+	top: 13px;
+	left: calc(50% + 18px);
+	right: calc(-50% + 18px);
+	height: 2.5px;
+	border-radius: 2px;
+	background: var(--ss-border-strong);
+}
+.ss-dv-steps li.is-done:not(:last-child)::after {
+	background: var(--ss-brand);
+}
+.ss-dv-step-dot {
+	position: relative;
+	z-index: 1;
+	width: 28px;
+	height: 28px;
+	display: grid;
+	place-items: center;
+	border-radius: 50%;
+	font-size: 12.5px;
+	font-weight: 700;
+	background: var(--ss-surface);
+	border: 2px solid var(--ss-border-strong);
+}
+.ss-dv-steps li.is-done .ss-dv-step-dot {
+	color: #fff;
+	border-color: var(--ss-brand);
+	background: var(--ss-brand);
+}
+.ss-dv-steps li.is-current .ss-dv-step-dot {
+	color: var(--ss-brand);
+	border-color: var(--ss-brand);
+	box-shadow: 0 0 0 4px var(--ss-brand-soft);
+}
+.ss-dv-steps li.is-error .ss-dv-step-dot {
+	color: #fff;
+	border-color: var(--tone-rose);
+	background: var(--tone-rose);
+}
+.ss-dv-step-text {
+	display: flex;
+	flex-direction: column;
+	line-height: 1.25;
+}
+.ss-dv-step-text b {
+	font-size: 12.5px;
+	font-weight: 600;
+}
+.ss-dv-steps li.is-done .ss-dv-step-text b,
+.ss-dv-steps li.is-current .ss-dv-step-text b {
+	color: var(--ss-text);
+}
+.ss-dv-step-text small {
+	font-size: 11.5px;
+	color: var(--ss-brand);
+	font-weight: 600;
+	font-variant-numeric: tabular-nums;
+}
+.ss-dv-fields .is-wide {
+	grid-column: span 2;
+}
+.ss-dv-fields .is-full {
+	grid-column: 1 / -1;
+}
+.ss-dv-fields dd.is-line {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	overflow-wrap: normal;
+}
+.ss-dv-fields dd.is-line small,
+.ss-dv-fields dd.is-empty {
+	font-weight: 400;
+	color: var(--ss-muted);
+}
+.ss-dv-fields dd.is-line small {
+	margin-left: 6px;
+	font-size: 12px;
+}
+.ss-dv-fields dd .ss-tag {
+	font-size: 12.5px;
+}
+.ss-table--doc .is-center {
+	text-align: center;
+}
+.ss-table--doc .is-item small {
+	display: block;
+	font-size: 11.5px;
+	color: var(--ss-muted);
+}
+.ss-table--doc .is-item small.is-desc {
+	color: var(--ss-text-2);
+	white-space: normal;
+}
+/* ช่องติ๊กแบบอ่านอย่างเดียว */
+.ss-checkmark {
+	display: inline-grid;
+	place-items: center;
+	width: 18px;
+	height: 18px;
+	border-radius: 5px;
+	border: 1.5px solid var(--ss-border-strong);
+	color: #fff;
+	vertical-align: middle;
+}
+.ss-checkmark.is-on {
+	border-color: var(--ss-brand);
+	background: var(--ss-brand);
+}
+.ss-dv-foot {
+	display: flex;
+	flex-direction: column;
+	gap: 14px;
+}
+.ss-dv-notes {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+	min-width: 0;
+}
+.ss-dv-notes .ss-field-label {
+	display: block;
+	margin-bottom: 6px;
+}
+.ss-dv-flags {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 16px;
+}
+.ss-flag {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	font-size: 14px;
+	color: var(--ss-muted);
+}
+.ss-flag.is-on {
+	color: var(--ss-text);
+	font-weight: 600;
+}
+.ss-totals-words {
+	justify-content: flex-end !important;
+	font-size: 13px;
+	color: var(--ss-text-2);
+	text-align: right;
+}
+.ss-totals .is-due b {
+	color: var(--tone-rose);
+}
+@media (min-width: 768px) {
+	.ss-dv-head {
+		gap: 18px;
+	}
+	.ss-dv-steps {
+		padding-bottom: 16px;
+		border-bottom: 1px solid var(--ss-border);
+	}
+	.ss-dv-fields {
+		padding-top: 0;
+		border-top: 0;
+	}
+	.ss-dv-foot {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) minmax(300px, 380px);
+		gap: 24px;
+		align-items: start;
+	}
+}
+@media (max-width: 767px) {
+	.ss-dv-fields .is-wide {
+		grid-column: 1 / -1;
+	}
+}
+@media (max-width: 767px) {
+	.ss-dv-steps li {
+		flex: 1 0 64px;
+	}
+	.ss-dv-step-text b {
+		font-size: 11.5px;
+	}
+}
+
+/* ---------------------------------------------------------------- ฟอร์ม: ตารางรายการ (ลาก / เลือก / ปากกา) + ท้ายเอกสาร */
+.ss-grid .c-grip {
+	width: 26px;
+}
+.ss-grid .c-check {
+	width: 32px;
+}
+.ss-grid .c-flag {
+	width: 76px;
+}
+.ss-grid .c-tools {
+	width: 76px;
+}
+.ss-grid .is-grip,
+.ss-grid .is-check,
+.ss-grid .is-center {
+	text-align: center;
+	padding-left: 0;
+	padding-right: 0;
+}
+.ss-grid th:first-child,
+.ss-grid th:nth-child(2) {
+	padding-left: 0;
+	padding-right: 0;
+	text-align: center;
+}
+.ss-grid .is-tools {
+	white-space: nowrap;
+	text-align: right;
+}
+.ss-grid .is-tools .ss-icon-btn {
+	width: 30px;
+	height: 30px;
+}
+.ss-grip {
+	display: inline-grid;
+	place-items: center;
+	width: 22px;
+	height: 30px;
+	border-radius: 6px;
+	color: var(--ss-muted);
+	cursor: grab;
+	opacity: 0.45;
+	transition: opacity 0.15s ease, background 0.15s ease;
+}
+.ss-grid tr:hover .ss-grip {
+	opacity: 1;
+}
+.ss-grip:hover {
+	background: var(--ss-surface-2);
+}
+.ss-grid tr.is-dragging td {
+	opacity: 0.45;
+}
+.ss-grid tr.is-drop-before td {
+	box-shadow: inset 0 2px 0 var(--ss-brand);
+}
+.ss-grid tr.is-drop-after td {
+	box-shadow: inset 0 -2px 0 var(--ss-brand);
+}
+.ss-grid tr.is-picked td {
+	background: color-mix(in srgb, var(--ss-brand-soft) 70%, transparent);
+}
+.ss-grid-bulk {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	padding: 8px 12px;
+	border-bottom: 1px solid var(--ss-border);
+	font-size: 13.5px;
+	color: var(--ss-text-2);
+	background: var(--ss-brand-soft);
+	border-radius: var(--ss-radius) var(--ss-radius) 0 0;
+}
+.ss-grid-bulk > span {
+	flex: 1;
+}
+.ss-btn--danger {
+	color: var(--tone-rose);
+	background: var(--tone-rose-bg);
+}
+/* ช่องติ๊กพร้อมข้อความ */
+.ss-checkline {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	font-size: 14px;
+	font-weight: 500;
+	color: var(--ss-text);
+	cursor: pointer;
+}
+.ss-checkline input,
+.ss-check {
+	width: 18px;
+	height: 18px;
+	accent-color: var(--ss-brand);
+	cursor: pointer;
+}
+.ss-totals-input {
+	width: 130px;
+	height: 32px;
+	border-color: var(--ss-border-strong);
+	background: var(--ss-surface);
+	font-weight: 700;
+}
+.ss-docform-project {
+	grid-column: 1 / -1;
+}
+.ss-docform-project-name {
+	display: block;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-size: 14.5px;
+	font-weight: 600;
+}
+.ss-docform-project-name small {
+	margin-left: 6px;
+	font-weight: 400;
+	color: var(--ss-muted);
+}
+.ss-row-detail {
+	padding: 0;
+}
+.ss-row-detail-amount {
+	display: flex;
+	align-items: center;
+	min-height: 42px;
+	font-size: 17px;
+	font-variant-numeric: tabular-nums;
+}
+/* มือถือ: ปากกา + ถังขยะ มุมขวาบนของการ์ด */
+div.ss-line-del {
+	display: flex;
+	gap: 2px;
+}
+.ss-line-info {
+	padding-right: 70px;
+}
+@container (min-width: 640px) {
+	div.ss-line-del {
+		grid-column: 3;
+	}
+}
+.ss-cal-pop-day.is-off {
+	opacity: 0.3;
+	cursor: not-allowed;
+}
+.ss-cal-pop-day.is-off:hover {
+	background: none;
+}
+.ss-grid .is-tools .ss-icon-btn {
+	display: inline-grid;
+	vertical-align: middle;
+}

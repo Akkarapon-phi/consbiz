@@ -102,7 +102,9 @@ doc_events = {
         "before_validate": "consbiz.employer_supplied.swap_request_items",
         "validate": [
             "consbiz.consbiz.doctype.construction_material_plan.construction_material_plan.set_item_project",
-            "consbiz.site_stock.validate_wbs"
+            "consbiz.site_stock.validate_wbs",
+            # ยอดเงิน/ภาษีของ MR สูตรเดียวกับ material_request.js (แอปหน้างานใช้ค่าจากที่นี่)
+            "consbiz.request_totals.calculate"
         ]
     },
 

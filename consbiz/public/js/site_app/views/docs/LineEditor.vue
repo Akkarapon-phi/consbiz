@@ -1,42 +1,104 @@
 <template>
 	<!-- แถวรายการของฟอร์มจัดซื้อ/ขาย (DocForm.vue)
-	     แท็บเล็ต/จอใหญ่ (wide): ตารางแก้ไขในช่อง แบบตารางของระบบเต็ม แถวล่างสุดพิมพ์ค้นหาแล้วเพิ่มรายการ (↑↓ / Enter / Esc)
-	     Enter ในช่องจำนวน → ราคา → กลับไปช่องค้นหา (กรอกต่อเนื่องด้วยคีย์บอร์ด)
-	     มือถือ: การ์ดต่อรายการ เพิ่มรายการจาก sheet (emit browse) -->
+	     จอกว้าง (wide): ตารางแก้ไขในช่องแบบระบบเต็ม
+	       - ลากที่จับ (⋮⋮) ย้ายลำดับแถว (emit reorder), ช่องติ๊กเลือกหลายแถวแล้วลบ (emit remove [rows])
+	       - ปากกา = รายละเอียดของแถว (emit detail) เช่น คำอธิบาย WBS
+	       - แถวล่างสุดพิมพ์ค้นหาแล้วเพิ่ม (↑↓ / Enter / Esc) Enter ในช่องจำนวน → ราคา → กลับช่องค้นหา
+	     มือถือ: การ์ดต่อรายการ เพิ่มจาก sheet (emit browse) -->
 	<div v-if="wide" ref="root" class="ss-grid-wrap">
-		<table class="ss-grid" :class="{ 'is-qty-only': is_mr }">
+		<div v-if="picked.size" class="ss-grid-bulk">
+			<span
+				>เลือก <b>{{ picked.size }}</b> แถว</span
+			>
+			<button type="button" class="ss-btn ss-btn--ghost ss-btn--sm" @click="picked = new Set()">
+				ยกเลิกเลือก
+			</button>
+			<button type="button" class="ss-btn ss-btn--danger ss-btn--sm" @click="remove_picked">
+				<Icon name="trash" :size="15" /> ลบที่เลือก
+			</button>
+		</div>
+		<table class="ss-grid">
 			<colgroup>
+				<col class="c-grip" />
+				<col class="c-check" />
 				<col class="c-idx" />
 				<col class="c-item" />
 				<col class="c-qty" />
 				<col class="c-uom" />
-				<col v-if="!is_mr" class="c-rate" />
-				<col v-if="!is_mr" class="c-amount" />
+				<col class="c-rate" />
+				<col class="c-amount" />
 				<col v-if="date_field" class="c-date" />
-				<col class="c-del" />
+				<col v-if="is_mr" class="c-flag" />
+				<col class="c-tools" />
 			</colgroup>
 			<thead>
 				<tr>
+					<th></th>
+					<th>
+						<input
+							type="checkbox"
+							class="ss-check"
+							aria-label="เลือกทุกแถว"
+							:checked="items.length && picked.size === items.length"
+							:indeterminate.prop="picked.size > 0 && picked.size < items.length"
+							@change="toggle_all"
+						/>
+					</th>
 					<th class="is-idx">#</th>
 					<th>รายการ</th>
 					<th class="is-num">จำนวน</th>
 					<th>หน่วย</th>
-					<th v-if="!is_mr" class="is-num">ราคา/หน่วย</th>
-					<th v-if="!is_mr" class="is-num">จำนวนเงิน</th>
+					<th class="is-num">หน่วยละ</th>
+					<th class="is-num">เป็นเงิน</th>
 					<th v-if="date_field">{{ date_label }}</th>
-					<th><span class="ss-sr">ลบ</span></th>
+					<th v-if="is_mr" class="is-center">ไม่คิดภาษี</th>
+					<th><span class="ss-sr">คำสั่ง</span></th>
 				</tr>
 			</thead>
-			<TransitionGroup tag="tbody" name="ss-row">
+			<tbody>
 				<tr
 					v-for="(row, i) in items"
 					:key="row.uid"
-					:class="{ 'is-error': show_errors && error(row) }"
+					:class="{
+						'is-error': show_errors && error(row),
+						'is-picked': picked.has(row),
+						'is-dragging': drag_from === i,
+						'is-drop-before': drop_at === i && drag_from !== null && drag_from > i,
+						'is-drop-after': drop_at === i && drag_from !== null && drag_from < i,
+					}"
+					:draggable="drag_ready === i"
+					@dragstart="drag_start($event, i)"
+					@dragover.prevent="drop_at = i"
+					@drop.prevent="drop(i)"
+					@dragend="drag_end"
 				>
+					<td class="is-grip">
+						<span
+							class="ss-grip"
+							title="ลากเพื่อย้ายลำดับ"
+							aria-hidden="true"
+							@pointerdown="drag_ready = i"
+							@pointerup="drag_ready = null"
+						>
+							<Icon name="grip" :size="15" :stroke="2.6" />
+						</span>
+					</td>
+					<td class="is-check">
+						<input
+							type="checkbox"
+							class="ss-check"
+							:aria-label="`เลือก ${row.item_name}`"
+							:checked="picked.has(row)"
+							@change="toggle(row)"
+						/>
+					</td>
 					<td class="is-idx">{{ i + 1 }}</td>
 					<td class="is-item">
-						<b>{{ row.item_name || row.item_code }}</b>
-						<small>{{ row.item_code }}</small>
+						<b :title="row.item_name">{{ row.item_name || row.item_code }}</b>
+						<small
+							>{{ row.item_code
+							}}<template v-if="row.custom_wbs"> · WBS {{ row.custom_wbs }}</template></small
+						>
 						<small v-if="show_errors && error(row)" class="is-error-text">{{ error(row) }}</small>
 					</td>
 					<td>
@@ -50,15 +112,18 @@
 							:aria-label="`จำนวน ${row.item_name}`"
 							data-col="qty"
 							@focus="$event.target.select()"
-							@keydown.enter.prevent="next($event, is_mr ? 'search' : 'rate')"
+							@keydown.enter.prevent="next($event, 'rate')"
 						/>
 					</td>
 					<td>
-						<select v-model="row.uom" class="ss-cell" :aria-label="`หน่วย ${row.item_name}`">
-							<option v-for="u in row.uoms" :key="u" :value="u">{{ u }}</option>
-						</select>
+						<SelectBox
+							v-model="row.uom"
+							variant="cell"
+							:label="`หน่วย ${row.item_name}`"
+							:options="(row.uoms || [row.uom]).map((u) => ({ value: u, label: u }))"
+						/>
 					</td>
-					<td v-if="!is_mr">
+					<td>
 						<input
 							v-model.number="row.rate"
 							class="ss-cell ss-cell--num"
@@ -66,22 +131,40 @@
 							inputmode="decimal"
 							min="0"
 							step="any"
-							:aria-label="`ราคา ${row.item_name}`"
+							:aria-label="`หน่วยละ ${row.item_name}`"
 							data-col="rate"
 							@focus="$event.target.select()"
 							@keydown.enter.prevent="next($event, 'search')"
 						/>
 					</td>
-					<td v-if="!is_mr" class="is-num is-amount">{{ money(amount(row)) }}</td>
+					<td class="is-num is-amount">{{ money(amount(row)) }}</td>
 					<td v-if="date_field">
-						<input
+						<DateInput
 							v-model="row[date_field]"
-							class="ss-cell"
-							type="date"
-							:aria-label="`${date_label} ${row.item_name}`"
+							variant="cell"
+							:label="`${date_label} ${row.item_name}`"
 						/>
 					</td>
-					<td class="is-del">
+					<td v-if="is_mr" class="is-center">
+						<input
+							v-model="row.custom_vat_nocal"
+							type="checkbox"
+							class="ss-check"
+							:true-value="1"
+							:false-value="0"
+							:aria-label="`ไม่คิดภาษี ${row.item_name}`"
+						/>
+					</td>
+					<td class="is-tools">
+						<button
+							type="button"
+							class="ss-icon-btn ss-icon-btn--sm"
+							:aria-label="`รายละเอียด ${row.item_name}`"
+							title="รายละเอียด"
+							@click="$emit('detail', row)"
+						>
+							<Icon name="pen" :size="15" />
+						</button>
 						<button
 							type="button"
 							class="ss-icon-btn ss-icon-btn--sm"
@@ -89,14 +172,14 @@
 							title="ลบแถว"
 							@click="$emit('remove', row)"
 						>
-							<Icon name="trash" :size="16" />
+							<Icon name="trash" :size="15" />
 						</button>
 					</td>
 				</tr>
-			</TransitionGroup>
+			</tbody>
 			<tfoot>
 				<tr class="ss-grid-add">
-					<td class="is-idx"><Icon name="plus" :size="15" :stroke="2.6" /></td>
+					<td colspan="3" class="is-idx"><Icon name="plus" :size="15" :stroke="2.6" /></td>
 					<td :colspan="span">
 						<div class="ss-typeahead">
 							<input
@@ -140,7 +223,7 @@
 										<small>{{ it.item_code }} · {{ it.item_group }}</small>
 									</span>
 									<span class="is-num">
-										<template v-if="it.rate && !is_mr">{{ money(it.rate) }}</template>
+										<template v-if="it.rate">{{ money(it.rate) }}</template>
 										<small>{{ it.stock_uom }}</small>
 									</span>
 								</li>
@@ -152,7 +235,7 @@
 		</table>
 	</div>
 
-	<!-- มือถือ: การ์ด -->
+	<!-- มือถือ / แท็บเล็ตแนวตั้ง: การ์ด -->
 	<div v-else>
 		<TransitionGroup tag="div" class="ss-list ss-list--form ss-lines" name="ss-list">
 			<div
@@ -166,15 +249,25 @@
 					<span class="ss-card-title">{{ row.item_name || row.item_code }}</span>
 					<span class="ss-card-meta">{{ row.item_code }}</span>
 				</div>
-				<button
-					type="button"
-					class="ss-icon-btn ss-icon-btn--sm ss-line-del"
-					:aria-label="`ลบ ${row.item_name}`"
-					@click="$emit('remove', row)"
-				>
-					<Icon name="trash" :size="17" />
-				</button>
-				<div class="ss-line-inputs" :class="{ 'is-qty-only': is_mr }">
+				<div class="ss-line-del">
+					<button
+						type="button"
+						class="ss-icon-btn ss-icon-btn--sm"
+						:aria-label="`รายละเอียด ${row.item_name}`"
+						@click="$emit('detail', row)"
+					>
+						<Icon name="pen" :size="16" />
+					</button>
+					<button
+						type="button"
+						class="ss-icon-btn ss-icon-btn--sm"
+						:aria-label="`ลบ ${row.item_name}`"
+						@click="$emit('remove', row)"
+					>
+						<Icon name="trash" :size="16" />
+					</button>
+				</div>
+				<div class="ss-line-inputs">
 					<label class="ss-field">
 						<span class="ss-field-label">จำนวน</span>
 						<input
@@ -187,14 +280,16 @@
 							@focus="$event.target.select()"
 						/>
 					</label>
-					<label class="ss-field">
+					<div class="ss-field">
 						<span class="ss-field-label">หน่วย</span>
-						<select v-model="row.uom" class="ss-input">
-							<option v-for="u in row.uoms" :key="u" :value="u">{{ u }}</option>
-						</select>
-					</label>
-					<label v-if="!is_mr" class="ss-field">
-						<span class="ss-field-label">ราคา/หน่วย</span>
+						<SelectBox
+							v-model="row.uom"
+							label="หน่วย"
+							:options="(row.uoms || [row.uom]).map((u) => ({ value: u, label: u }))"
+						/>
+					</div>
+					<label class="ss-field">
+						<span class="ss-field-label">หน่วยละ</span>
 						<input
 							v-model.number="row.rate"
 							class="ss-input ss-input--num"
@@ -205,11 +300,15 @@
 							@focus="$event.target.select()"
 						/>
 					</label>
-					<div v-if="!is_mr" class="ss-line-amount">
-						<span class="ss-field-label">จำนวนเงิน</span>
+					<div class="ss-line-amount">
+						<span class="ss-field-label">เป็นเงิน</span>
 						<b>{{ money(amount(row)) }}</b>
 					</div>
 				</div>
+				<label v-if="is_mr" class="ss-checkline">
+					<input v-model="row.custom_vat_nocal" type="checkbox" :true-value="1" :false-value="0" />
+					<span>ไม่คิดภาษี</span>
+				</label>
 				<div v-if="show_errors && error(row)" class="ss-field-error">{{ error(row) }}</div>
 			</div>
 		</TransitionGroup>
@@ -222,6 +321,8 @@
 <script setup>
 import { computed, nextTick, ref } from "vue";
 import Icon from "../../components/Icon.vue";
+import SelectBox from "../../components/SelectBox.vue";
+import DateInput from "../../components/DateInput.vue";
 import { money } from "../../api.js";
 
 const props = defineProps({
@@ -235,7 +336,7 @@ const props = defineProps({
 	// (txt) => Promise<items> จาก site_docs.search_items
 	search_fn: { type: Function, required: true },
 });
-const emit = defineEmits(["add", "remove", "browse"]);
+const emit = defineEmits(["add", "remove", "reorder", "detail", "browse"]);
 
 const root = ref(null);
 const search_input = ref(null);
@@ -247,13 +348,58 @@ const active = ref(0);
 let timer = null;
 let request = 0;
 
-// คอลัมน์ที่ช่องค้นหาคลุม (ทุกคอลัมน์ยกเว้น # และปุ่มลบ)
-const span = computed(() => 3 + (props.is_mr ? 0 : 2) + (props.date_field ? 1 : 0));
+// คอลัมน์ที่ช่องค้นหาคลุม (รายการ ถึง ก่อนปุ่มท้ายแถว)
+const span = computed(() => 5 + (props.date_field ? 1 : 0) + (props.is_mr ? 1 : 0) + 1);
 
 const amount = (row) => (Number(row.qty) || 0) * (Number(row.rate) || 0);
 function error(row) {
 	return Number(row.qty) > 0 ? "" : "ใส่จำนวนมากกว่า 0";
 }
+
+// ---------------------------------------------------------------- เลือกหลายแถว
+
+const picked = ref(new Set());
+function toggle(row) {
+	const next = new Set(picked.value);
+	next.has(row) ? next.delete(row) : next.add(row);
+	picked.value = next;
+}
+function toggle_all() {
+	picked.value = picked.value.size === props.items.length ? new Set() : new Set(props.items);
+}
+function remove_picked() {
+	emit("remove", [...picked.value]);
+	picked.value = new Set();
+}
+
+// ---------------------------------------------------------------- ลากย้ายลำดับ (ลากได้เฉพาะเมื่อกดที่จับ ช่องกรอกยังเลือกข้อความได้)
+
+const drag_ready = ref(null);
+const drag_from = ref(null);
+const drop_at = ref(null);
+
+function drag_start(event, index) {
+	drag_from.value = index;
+	event.dataTransfer.effectAllowed = "move";
+	event.dataTransfer.setData("text/plain", String(index));
+}
+
+function drop(index) {
+	const from = drag_from.value;
+	if (from !== null && from !== index) {
+		const list = [...props.items];
+		const [row] = list.splice(from, 1);
+		list.splice(index, 0, row);
+		emit("reorder", list);
+	}
+	drag_end();
+}
+
+function drag_end() {
+	drag_from.value = drop_at.value = drag_ready.value = null;
+}
+
+// ---------------------------------------------------------------- ค้นหาเพิ่มรายการ
 
 function search() {
 	clearTimeout(timer);
@@ -287,8 +433,7 @@ async function pick(it) {
 	results.value = [];
 	open.value = false;
 	await nextTick();
-	const inputs = root.value?.querySelectorAll('tbody tr:last-child input[data-col="qty"]');
-	inputs?.[0]?.focus();
+	root.value?.querySelector('tbody tr:last-child input[data-col="qty"]')?.focus();
 }
 
 function close_soon() {

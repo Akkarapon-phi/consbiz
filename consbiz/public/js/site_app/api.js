@@ -438,3 +438,15 @@ export function tone(text) {
 
 export const desk_url = (doctype, name) =>
 	`/app/${doctype.toLowerCase().replace(/ /g, "-")}/${encodeURIComponent(name)}`;
+
+// เวลาที่ผ่านมาแบบสั้น (แก้ไขล่าสุดในรายการ): เมื่อสักครู่ / 5 นาที / 3 ชม. / 2 วัน / วันที่
+export function time_ago(value) {
+	if (!value) return "";
+	const then = new Date(String(value).replace(" ", "T"));
+	const minutes = Math.round((Date.now() - then) / 60000);
+	if (minutes < 1) return "เมื่อสักครู่";
+	if (minutes < 60) return `${minutes} นาที`;
+	if (minutes < 60 * 24) return `${Math.round(minutes / 60)} ชม.`;
+	if (minutes < 60 * 24 * 30) return `${Math.round(minutes / 1440)} วัน`;
+	return thai_date(value, { year: then.getFullYear() !== new Date().getFullYear() });
+}

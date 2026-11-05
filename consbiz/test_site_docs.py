@@ -150,3 +150,50 @@ class IntegrationTestSiteDocs(IntegrationTestCase):
 		self.assertEqual(frappe.db.get_value("Purchase Order", saved["name"], "grand_total"), 900)
 		self.assertIn("additional_discount_percentage", site_docs.get_form("po", name=saved["name"])["fields"])
 
+	def test_request_totals_match_desk_formula(self):
+		from consbiz.request_totals import calculate
+
+		doc = frappe._dict(
+			material_request_type="Purchase",
+			custom_included_vat=0,
+			custom_vat_override=0,
+			items=[
+				frappe._dict(qty=2, rate=100, custom_vat_nocal=0),
+				frappe._dict(qty=1, rate=50, custom_vat_nocal=1),
+			],
+		)
+		calculate(doc)
+		self.assertEqual((doc.custom_net_total, doc.custom_vat, doc.custom_grand_total), (200, 14, 264))
+		doc.custom_included_vat = 1
+		calculate(doc)
+		self.assertEqual((doc.custom_net_total, doc.custom_vat, doc.custom_grand_total), (186.92, 13.08, 250))
+		doc.custom_vat_override, doc.custom_vat = 1, 10
+		calculate(doc)
+		self.assertEqual((doc.custom_net_total, doc.custom_vat, doc.custom_grand_total), (190, 10, 250))
+
+	def test_material_request_form_keeps_rates_and_order(self):
+		data = {
+			"project": self.project,
+			"material_request_type": "Purchase",
+			"title": "_Test ขอซื้อ",
+			"custom_included_vat": 0,
+			"items": [
+				{"key": None, "item_code": ITEM, "qty": 2, "rate": 123, "custom_vat_nocal": 0},
+				{"key": None, "item_code": ITEM, "qty": 1, "rate": 50, "custom_vat_nocal": 1},
+			],
+		}
+		saved = site_docs.save_doc("mr", json.dumps(data, default=str))
+		mr = frappe.get_doc("Material Request", saved["name"])
+		self.assertEqual([r.rate for r in mr.items], [123, 50])
+		self.assertEqual(mr.custom_grand_total, round(246 * 1.07, 2) + 50)
+
+		form = site_docs.get_form("mr", name=mr.name)
+		data.update({"name": mr.name, "items": list(reversed(form["items"]))})
+		site_docs.save_doc("mr", json.dumps(data, default=str))
+		mr.reload()
+		self.assertEqual([r.rate for r in mr.items], [50, 123])
+		view = site_docs.get_doc("mr", mr.name)
+		self.assertEqual(view["purpose"], "ซื้อ")
+		self.assertEqual(view["steps"][0]["state"], "current")
+		self.assertEqual(view["summary"]["grand"], mr.custom_grand_total)
+

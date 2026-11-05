@@ -26,19 +26,6 @@
 				</button>
 			</div>
 
-			<h2 class="ss-section-title">สร้างเอกสาร</h2>
-			<div class="ss-create-row">
-				<button
-					v-for="k in kinds"
-					:key="k.key"
-					type="button"
-					class="ss-btn ss-btn--soft"
-					@click="go(`${section}-form`, { kind: k.key, name: 'new' })"
-				>
-					<Icon name="plus" :size="16" :stroke="2.6" /> {{ k.label }}
-				</button>
-			</div>
-
 			<h2 class="ss-section-title">เอกสาร</h2>
 			<div class="ss-actions">
 				<button
