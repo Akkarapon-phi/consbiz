@@ -136,3 +136,17 @@ class IntegrationTestSiteDocs(IntegrationTestCase):
 		self.assertEqual([r["ok"] for r in results], [True, False])
 		self.assertEqual(frappe.db.get_value("Purchase Order", draft.name, "docstatus"), 1)
 
+	def test_header_discount(self):
+		data = {
+			"project": self.project,
+			"supplier": SUPPLIER,
+			"schedule_date": frappe.utils.add_days(frappe.utils.nowdate(), 3),
+			"additional_discount_percentage": 10,
+			"items": [{"key": None, "item_code": ITEM, "qty": 2, "rate": 500}],
+		}
+		preview = site_docs.preview_doc("po", json.dumps(data, default=str))
+		self.assertEqual((preview["totals"]["discount_amount"], preview["totals"]["grand_total"]), (100, 900))
+		saved = site_docs.save_doc("po", json.dumps(data, default=str))
+		self.assertEqual(frappe.db.get_value("Purchase Order", saved["name"], "grand_total"), 900)
+		self.assertIn("additional_discount_percentage", site_docs.get_form("po", name=saved["name"])["fields"])
+

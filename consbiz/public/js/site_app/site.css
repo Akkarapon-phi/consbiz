@@ -6205,3 +6205,497 @@ th[aria-sort] .ss-th-sort {
 		max-width: 260px;
 	}
 }
+
+/* ================================================================ จัดซื้อ/ขาย: ฟอร์ม (DocForm.vue + LineEditor.vue) แบบใบเอกสาร ERP
+   หัวเอกสาร (ช่องเรียงเป็นตาราง) → ตารางรายการแก้ไขในช่อง → หมายเหตุ + สรุปยอด */
+
+.ss-docform,
+.ss-docview {
+	max-width: 1320px;
+	width: 100%;
+	margin-inline: auto;
+}
+.ss-docform-head {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 12px 10px;
+	align-items: end;
+}
+.ss-docform-party {
+	grid-column: 1 / -1;
+}
+.ss-docform-items {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+}
+.ss-docform-foot {
+	display: flex;
+	flex-direction: column;
+	gap: 14px;
+}
+.ss-docform-notes {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+}
+.ss-docform-note {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+}
+.ss-totals .is-grand > span {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+}
+
+@media (min-width: 768px) {
+	.ss-docform-head {
+		grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+		gap: 14px 16px;
+	}
+	.ss-docform-party {
+		grid-column: span 2;
+	}
+	.ss-docform-foot {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) minmax(300px, 380px);
+		gap: 24px;
+		align-items: start;
+	}
+}
+
+/* ตารางรายการแก้ไขในช่อง */
+.ss-grid-wrap {
+	border-radius: var(--ss-radius);
+	background: var(--ss-surface);
+	box-shadow: var(--ss-shadow);
+}
+.ss-grid {
+	width: 100%;
+	border-collapse: collapse;
+	table-layout: fixed;
+	font-size: 14px;
+}
+.ss-grid .c-idx {
+	width: 44px;
+}
+.ss-grid .c-qty {
+	width: 110px;
+}
+.ss-grid .c-uom {
+	width: 120px;
+}
+.ss-grid .c-rate {
+	width: 140px;
+}
+.ss-grid .c-amount {
+	width: 150px;
+}
+.ss-grid .c-date {
+	width: 160px;
+}
+.ss-grid .c-del {
+	width: 48px;
+}
+.ss-grid th {
+	padding: 10px 8px;
+	font-size: 12px;
+	font-weight: 600;
+	text-align: left;
+	color: var(--ss-muted);
+	border-bottom: 1px solid var(--ss-border-strong);
+	white-space: nowrap;
+}
+.ss-grid td {
+	padding: 4px 6px;
+	border-bottom: 1px solid var(--ss-border);
+	vertical-align: middle;
+}
+.ss-grid .is-num {
+	text-align: right;
+	font-variant-numeric: tabular-nums;
+}
+.ss-grid .is-idx {
+	text-align: center;
+	color: var(--ss-muted);
+	font-size: 12.5px;
+	font-variant-numeric: tabular-nums;
+}
+.ss-grid .is-item {
+	padding-left: 8px;
+	min-width: 0;
+}
+.ss-grid .is-item b,
+.ss-grid .is-item small {
+	display: block;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.ss-grid .is-item b {
+	font-weight: 600;
+}
+.ss-grid .is-item small {
+	font-size: 11.5px;
+	color: var(--ss-muted);
+}
+.ss-grid .is-error-text {
+	color: var(--ss-danger) !important;
+	font-weight: 600;
+}
+.ss-grid tr.is-error td {
+	background: color-mix(in srgb, var(--tone-rose-bg) 60%, transparent);
+}
+.ss-grid .is-amount {
+	padding-right: 10px;
+	font-weight: 600;
+}
+.ss-grid .is-del {
+	text-align: center;
+}
+.ss-grid tbody tr:hover td {
+	background: var(--ss-surface-2);
+}
+/* ช่องในตาราง: ไม่มีกรอบจนกว่าจะชี้/โฟกัส (แบบ spreadsheet) */
+.ss-cell {
+	width: 100%;
+	height: 36px;
+	padding: 0 8px;
+	border-radius: 8px;
+	border: 1px solid transparent;
+	background: transparent;
+	font-size: 14px;
+	color: var(--ss-text);
+	outline: none;
+	transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+}
+select.ss-cell {
+	appearance: none;
+	-webkit-appearance: none;
+	padding-right: 24px;
+	background-image: linear-gradient(45deg, transparent 50%, var(--ss-muted) 50%),
+		linear-gradient(135deg, var(--ss-muted) 50%, transparent 50%);
+	background-position: calc(100% - 13px) 50%, calc(100% - 9px) 50%;
+	background-size: 4px 4px;
+	background-repeat: no-repeat;
+}
+.ss-cell--num {
+	text-align: right;
+	font-variant-numeric: tabular-nums;
+}
+.ss-cell:hover {
+	border-color: var(--ss-border-strong);
+	background-color: var(--ss-surface);
+}
+.ss-cell:focus {
+	border-color: var(--ss-brand);
+	background-color: var(--ss-surface);
+	box-shadow: 0 0 0 3px var(--ss-brand-soft);
+}
+/* แถวเพิ่มรายการ */
+.ss-grid tfoot td {
+	border-bottom: 0;
+	padding-top: 8px;
+	padding-bottom: 8px;
+}
+.ss-grid-add .is-idx {
+	color: var(--ss-brand);
+}
+.ss-typeahead {
+	position: relative;
+	display: flex;
+	align-items: center;
+	gap: 12px;
+}
+.ss-cell--search {
+	flex: 1;
+	height: 40px;
+	border: 1px dashed var(--ss-border-strong);
+	background: var(--ss-surface-2);
+}
+.ss-typeahead > .ss-link {
+	flex: none;
+	white-space: nowrap;
+}
+.ss-typeahead-list {
+	position: absolute;
+	z-index: 20;
+	top: calc(100% + 4px);
+	left: 0;
+	width: min(560px, 100%);
+	max-height: 320px;
+	overflow-y: auto;
+	margin: 0;
+	padding: 6px;
+	list-style: none;
+	border-radius: 14px;
+	background: var(--ss-surface);
+	border: 1px solid var(--ss-border-strong);
+	box-shadow: var(--ss-shadow-lg);
+}
+.ss-typeahead-list li {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	gap: 12px;
+	padding: 8px 10px;
+	border-radius: 10px;
+	cursor: pointer;
+}
+.ss-typeahead-list li.is-active {
+	background: var(--ss-brand-soft);
+}
+.ss-typeahead-list li.is-note {
+	color: var(--ss-muted);
+	cursor: default;
+}
+.ss-typeahead-list b,
+.ss-typeahead-list small {
+	display: block;
+}
+.ss-typeahead-list b {
+	font-weight: 600;
+}
+.ss-typeahead-list small {
+	font-size: 12px;
+	color: var(--ss-muted);
+}
+.ss-typeahead-list .is-num {
+	flex: none;
+	text-align: right;
+	font-weight: 600;
+	font-variant-numeric: tabular-nums;
+}
+.ss-row-enter-active,
+.ss-row-leave-active {
+	transition: opacity 0.2s ease;
+}
+.ss-row-enter-from,
+.ss-row-leave-to {
+	opacity: 0;
+}
+
+/* ================================================================ จัดซื้อ/ขาย: ดูเอกสาร (DocView.vue) */
+
+.ss-docview {
+	display: flex;
+	flex-direction: column;
+	gap: 14px;
+}
+.ss-dv-head {
+	display: flex;
+	flex-direction: column;
+	gap: 14px;
+	padding: 16px;
+	border-radius: var(--ss-radius);
+	background: var(--ss-surface);
+	box-shadow: var(--ss-shadow);
+	animation: ss-rise 0.45s var(--ss-ease) both;
+}
+.ss-dv-title {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 12px;
+}
+.ss-dv-party {
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+}
+.ss-dv-party small {
+	font-size: 12px;
+	color: var(--ss-muted);
+}
+.ss-dv-party b {
+	font-size: 18px;
+	font-weight: 700;
+	line-height: 1.35;
+	letter-spacing: -0.01em;
+}
+.ss-tag--lg {
+	flex: none;
+	padding: 5px 12px;
+	font-size: 13px;
+}
+.ss-dv-fields {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 12px 16px;
+	margin: 0;
+}
+.ss-dv-fields > div {
+	min-width: 0;
+}
+.ss-dv-fields dt {
+	font-size: 12px;
+	font-weight: 500;
+	color: var(--ss-muted);
+}
+.ss-dv-fields dd {
+	margin: 2px 0 0;
+	font-size: 14.5px;
+	font-weight: 600;
+	overflow-wrap: anywhere;
+	font-variant-numeric: tabular-nums;
+}
+.ss-dv-fields dd.is-money {
+	font-size: 16px;
+}
+.ss-dv-fields dd.is-due {
+	color: var(--tone-rose);
+}
+.ss-dv-progress .ss-table-pct i {
+	width: 72px;
+}
+.ss-dv-body,
+.ss-dv-main,
+.ss-dv-side {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+	min-width: 0;
+}
+.ss-dv-body {
+	gap: 14px;
+}
+.ss-dv-done {
+	display: inline-block;
+	margin: 1px 6px 1px 0;
+	padding: 1px 8px;
+	border-radius: 99px;
+	font-size: 12px;
+	white-space: nowrap;
+	color: var(--ss-text-2);
+	background: var(--ss-surface-2);
+	font-variant-numeric: tabular-nums;
+}
+.ss-dv-done.is-full {
+	color: var(--tone-green);
+	background: var(--tone-green-bg);
+}
+/* ตารางรายการของใบเอกสาร */
+.ss-table--doc tbody tr.is-static {
+	cursor: default;
+}
+.ss-table--doc tbody tr.is-static:hover {
+	background: none;
+}
+.ss-table--doc .is-idx {
+	width: 44px;
+	text-align: center;
+	color: var(--ss-muted);
+	font-variant-numeric: tabular-nums;
+}
+.ss-table--doc .is-item b {
+	display: block;
+	font-weight: 600;
+}
+.ss-table--doc td.is-strong {
+	font-weight: 700;
+}
+.ss-table--doc tfoot th {
+	padding: 7px 14px;
+	font-size: 13.5px;
+	font-weight: 500;
+	text-align: right;
+	color: var(--ss-text-2);
+	white-space: nowrap;
+	border: 0;
+	position: static;
+	background: none;
+}
+.ss-table--doc tfoot td {
+	padding: 7px 14px;
+	border: 0;
+}
+.ss-table--doc tfoot tr:first-child th,
+.ss-table--doc tfoot tr:first-child td {
+	padding-top: 14px;
+}
+.ss-table--doc tfoot tr.is-grand th,
+.ss-table--doc tfoot tr.is-grand td.is-num {
+	padding-top: 10px;
+	padding-bottom: 14px;
+	font-size: 16px;
+	font-weight: 700;
+	color: var(--ss-text);
+	border-top: 1px solid var(--ss-border-strong);
+}
+.ss-table--doc tfoot tr.is-grand td.is-num {
+	color: var(--ss-brand);
+}
+
+@media (min-width: 768px) {
+	.ss-dv-head {
+		padding: 20px 24px;
+	}
+	.ss-dv-party b {
+		font-size: 21px;
+	}
+	.ss-dv-fields {
+		grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+		gap: 16px 24px;
+		padding-top: 14px;
+		border-top: 1px solid var(--ss-border);
+	}
+}
+@media (min-width: 1180px) {
+	.ss-dv-body {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) 320px;
+		gap: 24px;
+		align-items: start;
+	}
+	.ss-dv-body:not(:has(.ss-dv-side)) {
+		grid-template-columns: minmax(0, 1fr);
+	}
+}
+/* ตารางรายการแคบ (แท็บเล็ต): ย่อคอลัมน์ตัวเลข ชื่อรายการตัดขึ้นบรรทัดใหม่ได้ 2 บรรทัด */
+.ss-docform-items {
+	container-type: inline-size;
+}
+@container (max-width: 980px) {
+	.ss-grid .c-qty {
+		width: 76px;
+	}
+	.ss-grid .c-uom {
+		width: 92px;
+	}
+	.ss-grid .c-rate {
+		width: 104px;
+	}
+	.ss-grid .c-amount {
+		width: 112px;
+	}
+	.ss-grid .c-date {
+		width: 138px;
+	}
+	.ss-grid .c-del {
+		width: 40px;
+	}
+	.ss-grid .c-idx {
+		width: 32px;
+	}
+	.ss-grid .is-item b {
+		white-space: normal;
+		display: -webkit-box;
+		-webkit-line-clamp: 2;
+		-webkit-box-orient: vertical;
+		line-height: 1.3;
+	}
+	.ss-grid th {
+		padding: 10px 6px;
+	}
+	.ss-grid td {
+		padding: 4px 3px;
+	}
+	.ss-cell {
+		padding: 0 6px;
+	}
+	.ss-cell[type="date"] {
+		font-size: 13px;
+	}
+}

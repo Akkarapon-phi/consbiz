@@ -587,6 +587,9 @@ def submit_doc(kind, name):
 
 # ---------------------------------------------------------------- สร้าง / แก้ไขร่างในแอป
 
+# ส่วนลดท้ายบิล (%) ERPNext คำนวณยอดหลังส่วนลดเองใน calculate_taxes_and_totals
+DISCOUNT = "additional_discount_percentage"
+
 # ช่องหัวเอกสารที่แอปส่งมาได้ (ช่องอื่นไม่รับ) และช่องของแถวรายการ
 FORM = {
 	"mr": {
@@ -597,7 +600,7 @@ FORM = {
 	},
 	"po": {
 		"party": "supplier",
-		"header": ("supplier", "transaction_date", "schedule_date", "taxes_and_charges"),
+		"header": ("supplier", "transaction_date", "schedule_date", "taxes_and_charges", DISCOUNT),
 		"item": ("item_code", "qty", "uom", "rate", "schedule_date"),
 	},
 	"pi": {
@@ -612,6 +615,7 @@ FORM = {
 			"tax_invoice_date",
 			"due_date",
 			"taxes_and_charges",
+			DISCOUNT,
 			"remarks",
 		),
 		"item": ("item_code", "qty", "uom", "rate"),
@@ -619,17 +623,17 @@ FORM = {
 	},
 	"qtn": {
 		"party": "party_name",
-		"header": ("party_name", "transaction_date", "valid_till", "taxes_and_charges"),
+		"header": ("party_name", "transaction_date", "valid_till", "taxes_and_charges", DISCOUNT),
 		"item": ("item_code", "qty", "uom", "rate"),
 	},
 	"so": {
 		"party": "customer",
-		"header": ("customer", "transaction_date", "delivery_date", "taxes_and_charges"),
+		"header": ("customer", "transaction_date", "delivery_date", "taxes_and_charges", DISCOUNT),
 		"item": ("item_code", "qty", "uom", "rate", "delivery_date"),
 	},
 	"si": {
 		"party": "customer",
-		"header": ("customer", "posting_date", "due_date", "taxes_and_charges", "remarks"),
+		"header": ("customer", "posting_date", "due_date", "taxes_and_charges", DISCOUNT, "remarks"),
 		"item": ("item_code", "qty", "uom", "rate"),
 		"remarks": "remarks",
 	},

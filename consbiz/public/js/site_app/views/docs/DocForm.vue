@@ -4,54 +4,75 @@
 	<div class="ss-has-bar">
 		<TopBar :title="title" :subtitle="subtitle" :back_to="back_view" :back_params="back_params" />
 
-		<div class="ss-content">
+		<div class="ss-content ss-docform">
 			<Skeleton v-if="!form" :rows="3" />
-			<div v-else class="ss-split ss-docform">
-				<div class="ss-split-main">
-					<div v-if="form.source" class="ss-banner tone-blue">
-						<Icon name="info" :size="22" />
-						<div>
-							<div class="ss-banner-title">สร้างจาก {{ source_label }} {{ form.source }}</div>
-							<div class="ss-banner-text">
-								ดึงรายการที่ยังค้างมาให้แล้ว ลบหรือแก้จำนวนได้ เอกสารจะอ้างถึงต้นทางให้เอง
-							</div>
+			<template v-else>
+				<div v-if="form.source" class="ss-banner tone-blue">
+					<Icon name="info" :size="22" />
+					<div>
+						<div class="ss-banner-title">สร้างจาก {{ source_label }} {{ form.source }}</div>
+						<div class="ss-banner-text">
+							ดึงรายการที่ยังค้างมาให้แล้ว ลบหรือแก้จำนวนได้ เอกสารจะอ้างถึงต้นทางให้เอง
 						</div>
 					</div>
+				</div>
 
-					<div class="ss-form">
-						<Picker
-							v-if="party_field"
-							v-model="form[party_field]"
-							:label="config.party"
-							:display_value="form.party_label"
-							:remote_fn="search_parties"
-							required
-							@select="(o) => (form.party_label = o.label)"
+				<!-- หัวเอกสาร: แท็บเล็ต/จอใหญ่ = ตาราง 3-4 คอลัมน์ -->
+				<section class="ss-form ss-docform-head">
+					<Picker
+						v-if="party_field"
+						v-model="form[party_field]"
+						class="ss-docform-party"
+						:label="config.party"
+						:display_value="form.party_label"
+						:remote_fn="search_parties"
+						required
+						@select="(o) => (form.party_label = o.label)"
+					/>
+					<label v-for="f in fields" :key="f.field" class="ss-field">
+						<span class="ss-field-label">{{ f.label }}<em v-if="f.required">*</em></span>
+						<input
+							v-model="form[f.field]"
+							class="ss-input"
+							:type="f.type || 'text'"
+							:placeholder="f.placeholder"
+							@change="f.rows && fill_rows(f.rows, form[f.field])"
 						/>
-						<div class="ss-form-grid">
-							<label v-for="f in fields" :key="f.field" class="ss-field">
-								<span class="ss-field-label">{{ f.label }}<em v-if="f.required">*</em></span>
-								<input
-									v-model="form[f.field]"
-									class="ss-input"
-									:type="f.type || 'text'"
-									:placeholder="f.placeholder"
-									@change="f.rows && fill_rows(f.rows, form[f.field])"
-								/>
-							</label>
-						</div>
-					</div>
+					</label>
+					<label v-if="form.tax_templates.length" class="ss-field">
+						<span class="ss-field-label">ภาษี</span>
+						<select v-model="tax_value" class="ss-input">
+							<option v-for="t in tax_options" :key="t.value || 'none'" :value="t.value">
+								{{ t.label }}
+							</option>
+						</select>
+					</label>
+					<label v-if="has_discount" class="ss-field">
+						<span class="ss-field-label">ส่วนลดท้ายบิล (%)</span>
+						<input
+							v-model.number="form.additional_discount_percentage"
+							class="ss-input ss-input--num"
+							type="number"
+							inputmode="decimal"
+							min="0"
+							max="100"
+							step="any"
+							placeholder="0"
+						/>
+					</label>
+				</section>
 
-					<h2 class="ss-section-title">
+				<section class="ss-docform-items">
+					<h2 class="ss-section-title ss-section-title--first">
 						<span
 							>รายการ <span class="ss-count">{{ form.items.length }}</span></span
 						>
-						<button type="button" class="ss-link" @click="item_sheet = true">
-							+ เพิ่มรายการ
-						</button>
+						<span v-if="!is_mr && form.items.length" class="ss-section-total">
+							{{ money(lines_total) }}
+						</span>
 					</h2>
 					<Empty
-						v-if="!form.items.length"
+						v-if="!form.items.length && !wide"
 						:icon="config.icon"
 						title="ยังไม่มีรายการ"
 						:text="
@@ -60,126 +81,53 @@
 								: 'เลือกสินค้า/บริการ แล้วใส่จำนวนและราคา'
 						"
 					/>
-					<TransitionGroup tag="div" class="ss-list ss-list--form ss-lines" name="ss-list">
-						<div
-							v-for="(row, i) in form.items"
-							:key="row.uid"
-							class="ss-card ss-line"
-							:class="{ 'is-late': show_errors && row_error(row) }"
-							:style="{ '--i': Math.min(i, 12) }"
-						>
-							<div class="ss-line-info">
-								<span class="ss-card-title">{{ row.item_name || row.item_code }}</span>
-								<span class="ss-card-meta">{{ row.item_code }}</span>
-							</div>
-							<button
-								type="button"
-								class="ss-icon-btn ss-icon-btn--sm ss-line-del"
-								aria-label="ลบรายการ"
-								title="ลบรายการ"
-								@click="remove_row(row)"
-							>
-								<Icon name="trash" :size="17" />
-							</button>
-							<div class="ss-line-inputs" :class="{ 'is-qty-only': is_mr }">
-								<label class="ss-field">
-									<span class="ss-field-label">จำนวน</span>
-									<input
-										v-model.number="row.qty"
-										class="ss-input ss-input--num"
-										type="number"
-										inputmode="decimal"
-										min="0"
-										step="any"
-										@focus="$event.target.select()"
-									/>
-								</label>
-								<label class="ss-field">
-									<span class="ss-field-label">หน่วย</span>
-									<select v-model="row.uom" class="ss-input">
-										<option v-for="u in row.uoms" :key="u" :value="u">{{ u }}</option>
-									</select>
-								</label>
-								<label v-if="!is_mr" class="ss-field">
-									<span class="ss-field-label">ราคา/หน่วย</span>
-									<input
-										v-model.number="row.rate"
-										class="ss-input ss-input--num"
-										type="number"
-										inputmode="decimal"
-										min="0"
-										step="any"
-										@focus="$event.target.select()"
-									/>
-								</label>
-								<div v-if="!is_mr" class="ss-line-amount">
-									<span class="ss-field-label">จำนวนเงิน</span>
-									<b>{{ money((Number(row.qty) || 0) * (Number(row.rate) || 0)) }}</b>
-								</div>
-							</div>
-							<div v-if="show_errors && row_error(row)" class="ss-field-error">
-								{{ row_error(row) }}
-							</div>
-						</div>
-					</TransitionGroup>
-					<button type="button" class="ss-add-row" @click="item_sheet = true">
-						<Icon name="plus" :size="20" :stroke="2.6" /> เพิ่มรายการ
-					</button>
-				</div>
+					<LineEditor
+						:items="form.items"
+						:wide="wide"
+						:is_mr="is_mr"
+						:date_field="row_date.field"
+						:date_label="row_date.label"
+						:show_errors="show_errors"
+						:search_fn="find_items"
+						@add="add_item"
+						@remove="remove_row"
+						@browse="item_sheet = true"
+					/>
+				</section>
 
-				<aside class="ss-split-side">
-					<template v-if="form.tax_templates.length">
-						<h2 class="ss-section-title ss-section-title--first">ภาษี</h2>
-						<div class="ss-choices">
-							<button
-								v-for="t in tax_options"
-								:key="t.value || 'none'"
-								type="button"
-								class="ss-choice"
-								:class="{ 'is-active': (form.taxes_and_charges || '') === t.value }"
-								@click="form.taxes_and_charges = t.value || null"
-							>
-								{{ t.label }}
-							</button>
+				<!-- ท้ายเอกสาร: หมายเหตุ (ซ้าย) + สรุปยอด (ขวา) แบบใบเอกสารของระบบเต็ม -->
+				<section class="ss-docform-foot">
+					<div class="ss-docform-notes">
+						<label v-if="remarks_field" class="ss-field">
+							<span class="ss-field-label">หมายเหตุ</span>
+							<textarea v-model="form[remarks_field]" class="ss-input" rows="3"></textarea>
+						</label>
+						<p class="ss-muted ss-docform-note">
+							<Icon name="info" :size="14" /> หัก ณ ที่จ่าย เงินประกันผลงาน และเงื่อนไขชำระเงิน
+							แก้ต่อได้ในระบบเต็มหลังบันทึก
+						</p>
+					</div>
+					<div v-if="!is_mr" class="ss-totals" :class="{ 'is-stale': previewing }">
+						<div>
+							<span>รวมเป็นเงิน</span><b>{{ money(form.totals.total) }}</b>
 						</div>
-					</template>
-
-					<template v-if="!is_mr">
-						<h2
-							class="ss-section-title"
-							:class="{ 'ss-section-title--first': !form.tax_templates.length }"
-						>
-							ยอดเงิน
-							<span v-if="previewing" class="ss-spinner ss-spinner--sm"></span>
-						</h2>
-						<div class="ss-totals" :class="{ 'is-stale': previewing }">
-							<div>
-								<span>รวมเป็นเงิน</span><b>{{ money(form.totals.total) }}</b>
-							</div>
-							<div v-if="form.totals.discount_amount">
-								<span>ส่วนลด</span><b>−{{ money(form.totals.discount_amount) }}</b>
-							</div>
-							<div v-for="t in form.taxes" :key="t.description">
-								<span
-									>{{ t.description
-									}}<template v-if="t.rate"> {{ t.rate }}%</template></span
-								><b>{{ money(t.amount) }}</b>
-							</div>
-							<div class="is-grand">
-								<span>ยอดรวมทั้งสิ้น</span><b>{{ money(grand_total) }}</b>
-							</div>
+						<div v-if="form.totals.discount_amount">
+							<span>ส่วนลด</span><b>−{{ money(form.totals.discount_amount) }}</b>
 						</div>
-					</template>
-
-					<label v-if="remarks_field" class="ss-field ss-docform-remarks">
-						<span class="ss-field-label">หมายเหตุ</span>
-						<textarea v-model="form[remarks_field]" class="ss-input" rows="3"></textarea>
-					</label>
-					<p class="ss-muted ss-docform-note">
-						หัก ณ ที่จ่าย เงินประกันผลงาน ส่วนลด และช่องอื่นๆ แก้ต่อได้ในระบบเต็มหลังบันทึก
-					</p>
-				</aside>
-			</div>
+						<div v-for="t in form.taxes" :key="t.description">
+							<span
+								>{{ t.description }}<template v-if="t.rate"> {{ t.rate }}%</template></span
+							><b>{{ money(t.amount) }}</b>
+						</div>
+						<div class="is-grand">
+							<span
+								>ยอดรวมทั้งสิ้น
+								<span v-if="previewing" class="ss-spinner ss-spinner--sm"></span></span
+							><b>{{ money(grand_total) }}</b>
+						</div>
+					</div>
+				</section>
+			</template>
 		</div>
 
 		<Teleport to="#ss-layer">
@@ -296,17 +244,26 @@
 </template>
 
 <script setup>
-import { computed, inject, nextTick, ref, watch } from "vue";
+import { computed, inject, nextTick, onBeforeUnmount, ref, watch } from "vue";
 import Icon from "../../components/Icon.vue";
 import TopBar from "../../components/TopBar.vue";
 import Skeleton from "../../components/Skeleton.vue";
 import Empty from "../../components/Empty.vue";
 import Picker from "../../components/Picker.vue";
 import Sheet from "../../components/Sheet.vue";
+import LineEditor from "./LineEditor.vue";
 import { DOC_KINDS } from "../../sections.js";
 import { call, celebrate, go, money, post, show_error, state, toast } from "../../api.js";
 
 const reload_summary = inject("reload_summary");
+
+// จอกว้าง ≥1000 (แท็บเล็ตแนวนอน/คอมพิวเตอร์): ตารางรายการแก้ไขในช่อง
+// แคบกว่านั้น (มือถือ, แท็บเล็ตแนวตั้ง ที่เนื้อหากว้างไม่ถึง ~650px): การ์ด กดง่ายบนจอสัมผัส
+const mq_wide = window.matchMedia("(min-width: 1000px)");
+const wide = ref(mq_wide.matches);
+const on_media = () => (wide.value = mq_wide.matches);
+mq_wide.addEventListener("change", on_media);
+onBeforeUnmount(() => mq_wide.removeEventListener("change", on_media));
 const params = state.route.params;
 const kind = DOC_KINDS[params.kind] ? params.kind : "po";
 const config = DOC_KINDS[kind];
@@ -379,6 +336,27 @@ const tax_options = computed(() => [
 	...form.value.tax_templates.map((t) => ({ value: t.name, label: t.title || t.name })),
 	{ value: "", label: "ไม่มีภาษี" },
 ]);
+// ภาษี: select ใช้ "" แทน "ไม่มีภาษี"
+const tax_value = computed({
+	get: () => form.value?.taxes_and_charges || "",
+	set: (value) => (form.value.taxes_and_charges = value || null),
+});
+const has_discount = computed(() => !!form.value?.fields?.includes("additional_discount_percentage"));
+// วันที่รายแถว (แก้ต่างจากหัวเอกสารได้)
+const row_date = computed(
+	() =>
+		({
+			mr: { field: "schedule_date", label: "ต้องการภายใน" },
+			po: { field: "schedule_date", label: "กำหนดส่ง" },
+			so: { field: "delivery_date", label: "กำหนดส่งมอบ" },
+		}[kind] || {})
+);
+const lines_total = computed(() =>
+	(form.value?.items || []).reduce((s, r) => s + (Number(r.qty) || 0) * (Number(r.rate) || 0), 0)
+);
+const find_items = (txt) =>
+	call("consbiz.site_docs.search_items", { kind, txt, project: state.project?.name || null });
+
 const in_form = computed(() => new Set(form.value?.items.map((r) => r.item_code)));
 
 // ---------------------------------------------------------------- โหลด / ร่างในเครื่อง
@@ -425,6 +403,7 @@ function payload() {
 		party_field,
 		remarks_field,
 		"taxes_and_charges",
+		has_discount.value && "additional_discount_percentage",
 	]) {
 		if (field) out[field] = f[field] ?? null;
 	}
