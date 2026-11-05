@@ -159,13 +159,31 @@ pre-commit run --all-files                               # ruff + prettier (ต�
 - ยืม-คืนอุปกรณ์: `Equipment Borrowing` สโตร์บันทึก ผู้ยืม = พนักงาน / ผรม. / คนงาน (คนงานของ ผรม. ระบุ ผรม. เป็นผู้รับผิดชอบ)
   Submit = โอนเข้าคลังอุปกรณ์ระหว่างยืม รับคืนผ่าน `record_return` (dialog `consbiz.equipment_return_dialog` ใน utils.js)
   ปกติ/ชำรุด โอนกลับ, สูญหาย Material Issue แถวคืนที่บันทึกแล้วแก้/ลบไม่ได้ รายงาน `Borrowed Equipment Outstanding`
-- แอปสโตร์หน้างาน `/store` (มือถือ, ติดตั้งลงหน้าจอได้) = หน้า www (`consbiz/www/store.html`) + Vue (`public/js/site_store/`) + API `consbiz/store_app.py`
-  ไม่ใช้ desk: เรียก API ด้วย fetch เอง (`api.js`), router เอง (`/store/<view>/<params>`, `website_route_rules`), CSS อยู่ `store.css` (class `ss-`)
+- แอปหน้างาน `/site` (มือถือ, ติดตั้งลงหน้าจอได้) = หน้า www (`consbiz/www/site.html`) + Vue (`public/js/site_app/`) แอปเดียวแบ่งหมวดงาน
+  หมวด (`sections.js`): สโตร์ (`views/store/`, API `consbiz/store_app.py`) / ควบคุมงาน (`views/work/`, รวมคอนกรีต) / บริหารโครงการ (`views/pm/`) API 2 หมวดนี้อยู่ `consbiz/site_app.py`
+  จัดซื้อ (MR ประเภท Purchase → PO → PI) / ขาย (Quotation → SO → SI): `views/docs/` ชุดเดียวกันทั้ง 6 ชนิด (`DOC_KINDS` ใน sections.js ตรงกับ `DOCS` ใน `consbiz/site_docs.py`)
+  ดูรายการ/รายละเอียด/เอกสารต้นทาง-ปลายทาง, ส่งเอกสารร่าง, PDF ขอบเขต โครงการนี้/ทุกโครงการ (`state.doc_scope`) สร้างเอกสารใหม่ในระบบเต็ม
+  ทางเข้าจากระบบเต็ม: Desktop Icon "Site App" (`consbiz/desktop_icon/site_app.json`, External → /site) ผู้ใช้ที่มี Desktop Layout ของตัวเองเห็นไอคอนใหม่เฉพาะที่อยู่ใน layout (patch `add_site_app_to_desktop_layouts`)
+  บริหารโครงการ (สิทธิ์อ่าน CM) ดูอย่างเดียว: ภาพรวม (`dashboard.get_dashboard`), แผนงาน Gantt (`get_plan`), Look-ahead (`lookahead.get_lookahead` สถานะวันตรงกับ `LookAhead.vue`),
+  ทรัพยากร + แผนจัดซื้อวัสดุ (`resources.get_overview`), เอกสาร (`get_documents`) แก้แผนที่หน้า Gantt ในระบบเต็ม
+  Look-ahead: มือถือ = การ์ดทีละสัปดาห์, แท็บเล็ต = ตาราง 2 สัปดาห์, จอใหญ่ = ตารางทั้งช่วง (matchMedia ใน `Lookahead.vue`)
+  summary ของหมวดที่ `lazy` (บริหารโครงการ) โหลดเมื่อเปิดหมวดนั้นเท่านั้น
+  หมวดที่เห็นตามสิทธิ์ (`site_app.boot_data` → `sections`) สลับหมวดผ่านตารางไอคอน (`SectionLauncher.vue`, เพิ่มหมวดได้ไม่จำกัด)
+  เปิดจากชิปบน hero (มือถือ, `Hero.vue`) หรือชื่อหมวดบนแถบข้าง สลับแล้วไปเมนูล่าสุดของหมวดนั้น (`state.last_tab`)
+  สีหลักตามหมวด: `data-section` ที่ `<html>` (sheet ถูก Teleport ไป body) ทับ `--ss-brand*`
+  ชื่อหน้า (view) ห้ามซ้ำข้ามหมวด (`go(view)` หาหมวดจาก `ROUTES`), summary แยกหมวดใน `state.summaries`
+  ควบคุมงาน: หน้าหลัก % จริง/แผน + S-Curve (`SCurve.vue`, ข้อมูล `dashboard.progress_curve`), ปฏิทินรายงาน (`get_site_calendar`)
+  เขียน Daily Report / ขอ-อนุมัติ-ไม่อนุมัติ Daily Request ในแอป (`ReportForm.vue` ทีละขั้น, `ReportView.vue`, API `site_app.save_report`)
+  แอปส่งเฉพาะช่องใน `FORM_FIELDS` / `ITEM_FIELDS` ค่าอื่นคำนวณใน validate ของเอกสารเหมือนกรอกในระบบเต็ม
+  ฟอร์มใหม่เก็บร่างใน localStorage ระหว่างกรอก (สัญญาณหลุดไม่หาย) ขอตรวจงาน / Punch List ยังสร้างในระบบเต็ม
+  ขออนุมัติได้ทุกวัน (ย้อนหลังได้) PDF/แชร์ไฟล์: `site_app.pdf_url` เลือกตัวสร้าง PDF แบบหน้าพิมพ์ของระบบเต็ม (Print Format → Print Settings)
+  ไม่ใช้ desk: เรียก API ด้วย fetch เอง (`api.js`), router เอง (`/site/<หมวด>/<view>/<params>`, `website_route_rules`), CSS อยู่ `site.css` (class `ss-`)
+  `/store/...` เดิมเด้งไป `/site/store/...` (`website_redirects` ใน hooks.py) ไอคอนที่ติดตั้งไว้แล้วยังใช้ได้
   CSS ต้อง `@import` ใน `<style>` ของ `App.vue` (Frappe ฝัง CSS เข้า bundle เฉพาะที่มาจาก .vue ถ้า import .css ตรงๆ ไฟล์ JS ถูกลบตอน build)
   Responsive 3 ขนาด: มือถือ = แถบเมนูล่าง, ≥768 = แถบไอคอนซ้าย + sheet เป็นหน้าต่างกลางจอ, ≥1180 = sidebar + ฟอร์มแบ่งซ้าย-ขวา (`.ss-split`) ใช้เต็มจอ: จอกว้างได้คอลัมน์เพิ่ม (auto-fill) ไม่ยืดการ์ด, การ์ดในรายการสูงเท่ากัน (`grid-auto-rows: 1fr`)
   แถบล่าง/ปุ่มลอยของหน้า ต้อง `<Teleport to="#ss-layer">` (ตอนเปลี่ยนหน้า view มี transform ทำให้ position: fixed เพี้ยน)
-  ห้ามส่ง reactive object ของ Vue เข้า `history.pushState/replaceState` (clone ไม่ได้ แอปค้าง) `/app/site-store` เดิมเด้งไป `/store`
-  รับของ: PO ของโครงการ → Purchase Receipt (บัญชีทำ PI ต่อจาก PR), MR ผู้ว่าจ้างจัดหา → Stock Entry Material Receipt
+  ห้ามส่ง reactive object ของ Vue เข้า `history.pushState/replaceState` (clone ไม่ได้ แอปค้าง) `/app/site-store` เดิมเด้งไป `/site/store`
+  สโตร์ รับของ: PO ของโครงการ → Purchase Receipt (บัญชีทำ PI ต่อจาก PR), MR ผู้ว่าจ้างจัดหา → Stock Entry Material Receipt
   ตีกลับที่หน้างาน = ไม่รับเข้า ยอดค้างที่ PO/MR เก็บใน `custom_site_rejected_qty` / `custom_site_reject_reason` ของแถว
   ตีกลับทั้งหมด = ไม่มีใบรับ บันทึก Comment ที่ PO/MR, รูปอัปโหลดก่อนแล้ว server ผูกกับเอกสาร (`attach_files`)
 - แผนตัดเหล็ก: `Bar Cut Plan` ใช้ `Rebar Type` และ `Bar Shape` (สูตรความยาว + รูป SVG) ตัวจัดตัดอยู่ใน `bar_cut_plan/optimizer.py`

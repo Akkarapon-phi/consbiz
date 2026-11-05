@@ -19,3 +19,4 @@ consbiz.patches.set_revised_finish_date
 consbiz.patches.seed_cost_categories
 consbiz.patches.restructure_retention
 consbiz.patches.set_transmittal_status
+consbiz.patches.add_site_app_to_desktop_layouts

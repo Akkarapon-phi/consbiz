@@ -39,8 +39,16 @@ app_include_js = [
 ]
 
 
-# แอปสโตร์หน้างานบนมือถือ (www/store.html) ทุก path ใต้ /store ให้แอปจัดการเอง
-website_route_rules = [{"from_route": "/store/<path:app_path>", "to_route": "store"}]
+# แอปหน้างาน (www/site.html) ทุก path ใต้ /site ให้แอปจัดการเอง, /store เดิม (แอปสโตร์) เด้งไปหมวดสโตร์
+website_route_rules = [{"from_route": "/site/<path:app_path>", "to_route": "site"}]
+website_redirects = [
+	{
+		"source": r"store(/.*)?",
+		"target": r"/site/store\1",
+		"redirect_http_status": 302,
+		"forward_query_parameters": True,
+	}
+]
 
 naming_series_variables = {
     "ABBR": "consbiz.utils.parse_naming_series_variable"
