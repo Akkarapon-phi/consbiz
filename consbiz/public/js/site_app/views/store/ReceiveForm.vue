@@ -212,13 +212,24 @@
 
 <script setup>
 import { computed, inject, reactive, ref } from "vue";
-import Icon from "../../components/Icon.vue";
-import TopBar from "../../components/TopBar.vue";
-import Stepper from "../../components/Stepper.vue";
-import Sheet from "../../components/Sheet.vue";
-import Skeleton from "../../components/Skeleton.vue";
-import PhotoInput from "../../components/PhotoInput.vue";
-import { back, call, celebrate, go, num, post, show_error, state, thai_date, vibrate } from "../../api.js";
+import Icon from "../../../shared/components/Icon.vue";
+import TopBar from "../../../shared/components/TopBar.vue";
+import Stepper from "../../../shared/components/Stepper.vue";
+import Sheet from "../../../shared/components/Sheet.vue";
+import Skeleton from "../../../shared/components/Skeleton.vue";
+import PhotoInput from "../../../shared/components/PhotoInput.vue";
+import {
+	back,
+	call,
+	celebrate,
+	go,
+	num,
+	post,
+	show_error,
+	state,
+	thai_date,
+	vibrate,
+} from "../../../shared/api.js";
 
 const REASONS = ["ชำรุด / เสียหาย", "ไม่ตรงสเปก", "ส่งเกิน", "คุณภาพไม่ผ่าน"];
 const reload_summary = inject("reload_summary");

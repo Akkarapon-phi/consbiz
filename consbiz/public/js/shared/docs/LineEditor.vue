@@ -317,12 +317,12 @@
 
 <script setup>
 import { computed, nextTick, ref } from "vue";
-import Icon from "../../components/Icon.vue";
-import SelectBox from "../../components/SelectBox.vue";
-import DateInput from "../../components/DateInput.vue";
-import MoneyInput from "../../components/MoneyInput.vue";
-import RichText from "../../components/RichText.vue";
-import { html_text, money } from "../../api.js";
+import Icon from "../components/Icon.vue";
+import SelectBox from "../components/SelectBox.vue";
+import DateInput from "../components/DateInput.vue";
+import MoneyInput from "../components/MoneyInput.vue";
+import RichText from "../components/RichText.vue";
+import { html_text, money } from "../api.js";
 
 const props = defineProps({
 	items: { type: Array, required: true },

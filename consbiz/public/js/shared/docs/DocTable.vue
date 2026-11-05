@@ -147,9 +147,9 @@
 
 <script setup>
 import { computed } from "vue";
-import Icon from "../../components/Icon.vue";
-import { DOC_KINDS } from "../../sections.js";
-import { go, initials, money, post, show_error, thai_date, time_ago, tone } from "../../api.js";
+import Icon from "../components/Icon.vue";
+import { DOC_KINDS } from "./kinds.js";
+import { go, initials, money, post, show_error, thai_date, time_ago, tone } from "../api.js";
 
 const props = defineProps({
 	rows: Array,

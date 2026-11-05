@@ -21,7 +21,7 @@
 		<!-- จอใหญ่: Dock หมวดงานซ้ายสุด (แท็บเล็ตอยู่บนสุดของแถบไอคอน, มือถือใช้ตารางหมวดงาน) -->
 		<Transition name="ss-dock">
 			<aside v-if="state.project && boot.sections.length > 1" class="ss-dock" aria-label="หมวดงาน">
-				<span class="ss-dock-logo" title="ConsERP"
+				<span class="ss-dock-logo" :title="app.title"
 					><Icon name="building" :size="20" :stroke="2.2"
 				/></span>
 				<SectionDock variant="dock" />
@@ -190,11 +190,12 @@ import Icon from "./components/Icon.vue";
 import Sheet from "./components/Sheet.vue";
 import SectionLauncher from "./components/SectionLauncher.vue";
 import SectionDock from "./components/SectionDock.vue";
-import { PARENT_TAB, SECTIONS, is_tab } from "./sections.js";
+import { app, is_tab } from "./app.js";
 import {
 	boot,
 	call,
 	go,
+	init_app,
 	initials,
 	remember_project,
 	remembered_project,
@@ -203,71 +204,12 @@ import {
 	state,
 	tone,
 } from "./api.js";
-// สโตร์
-import Home from "./views/store/Home.vue";
-import Receive from "./views/store/Receive.vue";
-import ReceiveForm from "./views/store/ReceiveForm.vue";
-import ReceiptView from "./views/store/ReceiptView.vue";
-import Issue from "./views/store/Issue.vue";
-import Borrow from "./views/store/Borrow.vue";
-import BorrowDetail from "./views/store/BorrowDetail.vue";
-import BorrowNew from "./views/store/BorrowNew.vue";
-import Stock from "./views/store/Stock.vue";
-// ควบคุมงาน
-import WorkHome from "./views/work/WorkHome.vue";
-import ReportForm from "./views/work/ReportForm.vue";
-import ReportView from "./views/work/ReportView.vue";
-import Reports from "./views/work/Reports.vue";
-import Inspections from "./views/work/Inspections.vue";
-// บริหารโครงการ
-import PmHome from "./views/pm/PmHome.vue";
-import Plan from "./views/pm/Plan.vue";
-import Lookahead from "./views/pm/Lookahead.vue";
-import PmDocs from "./views/pm/PmDocs.vue";
-import Resources from "./views/pm/Resources.vue";
-import Concrete from "./views/work/Concrete.vue";
-import ConcreteForm from "./views/work/ConcreteForm.vue";
-// จัดซื้อ / ขาย (ชุดเดียวกัน แยกตาม kind)
-import DocsHome from "./views/docs/DocsHome.vue";
-import DocList from "./views/docs/DocList.vue";
-import DocView from "./views/docs/DocView.vue";
-import DocForm from "./views/docs/DocForm.vue";
 
-const VIEWS = {
-	home: Home,
-	receive: Receive,
-	"receive-form": ReceiveForm,
-	receipt: ReceiptView,
-	issue: Issue,
-	concrete: Concrete,
-	"concrete-form": ConcreteForm,
-	borrow: Borrow,
-	"borrow-detail": BorrowDetail,
-	"borrow-new": BorrowNew,
-	stock: Stock,
-	work: WorkHome,
-	reports: Reports,
-	"report-form": ReportForm,
-	"report-view": ReportView,
-	inspections: Inspections,
-	pm: PmHome,
-	plan: Plan,
-	lookahead: Lookahead,
-	"pm-docs": PmDocs,
-	resources: Resources,
-	buy: DocsHome,
-	sell: DocsHome,
-	mr: DocList,
-	po: DocList,
-	pi: DocList,
-	qtn: DocList,
-	so: DocList,
-	si: DocList,
-	"buy-doc": DocView,
-	"sell-doc": DocView,
-	"buy-form": DocForm,
-	"sell-form": DocForm,
-};
+// โครงกลางของทุกแอป: Dock หมวดงาน + sidebar/แถบล่าง + หน้าเลือกโครงการ + toast
+// หมวด/หน้า/component ของแต่ละแอปมาจาก app.js (configure ใน bundle ของแอป)
+init_app();
+const SECTIONS = app.sections;
+const VIEWS = app.views;
 
 const section = computed(() => SECTIONS[state.section]);
 const view = computed(() => VIEWS[state.route.view] || VIEWS[section.value.home]);
@@ -286,11 +228,10 @@ const tabs = computed(() => {
 });
 const mobile_tabs = computed(() => tabs.value.filter((t) => !t.wide_only));
 // หน้าเอกสารจัดซื้อ/ขาย (ดู/ฟอร์ม) ไฮไลต์เมนูของชนิดเอกสาร (params.kind)
-const DOC_PAGES = ["buy-doc", "sell-doc", "buy-form", "sell-form"];
 const active_view = computed(
 	() =>
-		PARENT_TAB[state.route.view] ||
-		(DOC_PAGES.includes(state.route.view) && state.route.params.kind) ||
+		app.parent_tab[state.route.view] ||
+		(app.kind_pages.includes(state.route.view) && state.route.params.kind) ||
 		state.route.view
 );
 // ตำแหน่งแถบไฮไลต์ของแถบล่าง (มือถือไม่มีเมนู wide_only)
@@ -346,14 +287,8 @@ function close_picker() {
 	if (state.project) picker.value = false;
 }
 
-// summary ของแต่ละหมวด (ตัวเลขบนเมนูและบนปุ่มสลับหมวด)
-const SUMMARY_API = {
-	store: () => ["get_summary", {}],
-	work: () => ["consbiz.site_app.get_work_summary", {}],
-	pm: () => ["consbiz.site_app.get_pm_summary", {}],
-	buy: () => ["consbiz.site_docs.get_summary", { section: "buy", scope: state.doc_scope }],
-	sell: () => ["consbiz.site_docs.get_summary", { section: "sell", scope: state.doc_scope }],
-};
+// summary ของแต่ละหมวด (ตัวเลขบนเมนูและบนปุ่มสลับหมวด) ตาม app.summary_api
+const SUMMARY_API = app.summary_api;
 
 async function load_summary(key = state.section) {
 	if (!state.project || !SUMMARY_API[key]) return;
@@ -389,7 +324,7 @@ if (boot.sections.length > 1) document.documentElement.dataset.dock = "1";
 // - พับ (ค่าเริ่มต้น): ไอคอนอย่างเดียว กางชั่วคราวทับเนื้อหาเอง (html[data-peek])
 //   ใช้เมาส์ = ชี้แล้วกาง เอาออกแล้วพับ, จอสัมผัส = กดปุ่มล่างสุดแล้วกาง เลือกเมนู/แตะนอกแถบแล้วพับ
 // - ปักหมุด (expanded): กางค้างและดันเนื้อหา (ปุ่มล่างสุด) จำในเครื่อง
-const SIDE_KEY = "consbiz.site.sidebar";
+const SIDE_KEY = `${app.storage}.sidebar`;
 const can_hover = window.matchMedia("(hover: hover) and (pointer: fine)").matches;
 function saved_side() {
 	try {
@@ -471,6 +406,6 @@ onMounted(async () => {
 </script>
 
 <style>
-/* CSS ทั้งแอปอยู่ใน site.css (ต้องผ่าน <style> ของ .vue: Frappe ฝัง CSS เข้า bundle เฉพาะแบบนี้) */
-@import "./site.css";
+/* CSS ของทุกแอปอยู่ใน style.css (ต้องผ่าน <style> ของ .vue: Frappe ฝัง CSS เข้า bundle เฉพาะแบบนี้) */
+@import "./style.css";
 </style>

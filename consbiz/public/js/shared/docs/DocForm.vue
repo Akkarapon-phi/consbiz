@@ -467,20 +467,20 @@
 
 <script setup>
 import { computed, inject, nextTick, onBeforeUnmount, ref, watch } from "vue";
-import Icon from "../../components/Icon.vue";
-import TopBar from "../../components/TopBar.vue";
-import Skeleton from "../../components/Skeleton.vue";
-import Empty from "../../components/Empty.vue";
-import Picker from "../../components/Picker.vue";
-import Sheet from "../../components/Sheet.vue";
+import Icon from "../components/Icon.vue";
+import TopBar from "../components/TopBar.vue";
+import Skeleton from "../components/Skeleton.vue";
+import Empty from "../components/Empty.vue";
+import Picker from "../components/Picker.vue";
+import Sheet from "../components/Sheet.vue";
 import LineEditor from "./LineEditor.vue";
 import ItemInsight from "./ItemInsight.vue";
-import MoneyInput from "../../components/MoneyInput.vue";
-import RichEditor from "../../components/RichEditor.vue";
-import SelectBox from "../../components/SelectBox.vue";
-import DateInput from "../../components/DateInput.vue";
-import { DOC_KINDS } from "../../sections.js";
-import { call, celebrate, go, money, post, show_error, state, toast } from "../../api.js";
+import MoneyInput from "../components/MoneyInput.vue";
+import RichEditor from "../components/RichEditor.vue";
+import SelectBox from "../components/SelectBox.vue";
+import DateInput from "../components/DateInput.vue";
+import { DOC_KINDS } from "./kinds.js";
+import { call, celebrate, go, money, post, show_error, state, toast } from "../api.js";
 
 const reload_summary = inject("reload_summary");
 

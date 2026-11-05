@@ -44,8 +44,10 @@
 <script setup>
 import { computed, inject } from "vue";
 import Icon from "./Icon.vue";
-import { SECTIONS } from "../sections.js";
+import { app } from "../app.js";
 import { boot, state } from "../api.js";
+
+const SECTIONS = app.sections;
 
 defineEmits(["pick-project"]);
 const open_launcher = inject("open_launcher");

@@ -112,9 +112,9 @@
 
 <script setup>
 import { computed, ref, watch } from "vue";
-import Icon from "../../components/Icon.vue";
-import Skeleton from "../../components/Skeleton.vue";
-import { call, money, num, thai_date } from "../../api.js";
+import Icon from "../components/Icon.vue";
+import Skeleton from "../components/Skeleton.vue";
+import { call, money, num, thai_date } from "../api.js";
 
 const props = defineProps({ kind: String, project: String, row: Object });
 

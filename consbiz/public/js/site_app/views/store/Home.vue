@@ -87,10 +87,10 @@
 
 <script setup>
 import { computed, inject, onMounted } from "vue";
-import Icon from "../../components/Icon.vue";
-import Empty from "../../components/Empty.vue";
-import Hero from "../../components/Hero.vue";
-import { go, initials, num, relative_date, state, toast, tone } from "../../api.js";
+import Icon from "../../../shared/components/Icon.vue";
+import Empty from "../../../shared/components/Empty.vue";
+import Hero from "../../../shared/components/Hero.vue";
+import { go, initials, num, relative_date, state, toast, tone } from "../../../shared/api.js";
 
 defineEmits(["pick-project"]);
 const reload_summary = inject("reload_summary");

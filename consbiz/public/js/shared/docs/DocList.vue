@@ -382,20 +382,20 @@
 
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import Icon from "../../components/Icon.vue";
-import TopBar from "../../components/TopBar.vue";
-import Skeleton from "../../components/Skeleton.vue";
-import Empty from "../../components/Empty.vue";
-import Picker from "../../components/Picker.vue";
-import Sheet from "../../components/Sheet.vue";
-import PdfViewer from "../../components/PdfViewer.vue";
-import SelectBox from "../../components/SelectBox.vue";
-import DateInput from "../../components/DateInput.vue";
+import Icon from "../components/Icon.vue";
+import TopBar from "../components/TopBar.vue";
+import Skeleton from "../components/Skeleton.vue";
+import Empty from "../components/Empty.vue";
+import Picker from "../components/Picker.vue";
+import Sheet from "../components/Sheet.vue";
+import PdfViewer from "../components/PdfViewer.vue";
+import SelectBox from "../components/SelectBox.vue";
+import DateInput from "../components/DateInput.vue";
 import DocCard from "./DocCard.vue";
 import DocTable from "./DocTable.vue";
 import DocPreview from "./DocPreview.vue";
 import ScopeSwitch from "./ScopeSwitch.vue";
-import { DOC_KINDS } from "../../sections.js";
+import { DOC_KINDS } from "./kinds.js";
 import {
 	call,
 	go,
@@ -408,7 +408,7 @@ import {
 	state,
 	thai_date,
 	toast,
-} from "../../api.js";
+} from "../api.js";
 
 const kind = state.route.view;
 const config = DOC_KINDS[kind];

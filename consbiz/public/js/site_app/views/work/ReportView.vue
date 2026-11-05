@@ -224,13 +224,13 @@
 
 <script setup>
 import { computed, inject, ref } from "vue";
-import Icon from "../../components/Icon.vue";
-import TopBar from "../../components/TopBar.vue";
-import Skeleton from "../../components/Skeleton.vue";
-import Sheet from "../../components/Sheet.vue";
-import PdfViewer from "../../components/PdfViewer.vue";
+import Icon from "../../../shared/components/Icon.vue";
+import TopBar from "../../../shared/components/TopBar.vue";
+import Skeleton from "../../../shared/components/Skeleton.vue";
+import Sheet from "../../../shared/components/Sheet.vue";
+import PdfViewer from "../../../shared/components/PdfViewer.vue";
 import { REPORT_KINDS } from "../../sections.js";
-import { call, celebrate, desk_url, go, num, post, show_error, state } from "../../api.js";
+import { call, celebrate, desk_url, go, num, post, show_error, state } from "../../../shared/api.js";
 
 const reload_summary = inject("reload_summary");
 const params = state.route.params;

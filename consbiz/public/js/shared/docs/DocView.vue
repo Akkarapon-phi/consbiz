@@ -494,15 +494,15 @@
 
 <script setup>
 import { computed, inject, onBeforeUnmount, ref, watch } from "vue";
-import Icon from "../../components/Icon.vue";
-import TopBar from "../../components/TopBar.vue";
-import Skeleton from "../../components/Skeleton.vue";
-import Sheet from "../../components/Sheet.vue";
-import PdfViewer from "../../components/PdfViewer.vue";
-import RichText from "../../components/RichText.vue";
+import Icon from "../components/Icon.vue";
+import TopBar from "../components/TopBar.vue";
+import Skeleton from "../components/Skeleton.vue";
+import Sheet from "../components/Sheet.vue";
+import PdfViewer from "../components/PdfViewer.vue";
+import RichText from "../components/RichText.vue";
 import DocActivity from "./DocActivity.vue";
-import InlineEdit from "../../components/InlineEdit.vue";
-import { DOC_KINDS } from "../../sections.js";
+import InlineEdit from "../components/InlineEdit.vue";
+import { DOC_KINDS } from "./kinds.js";
 import {
 	call,
 	celebrate,
@@ -516,7 +516,7 @@ import {
 	state,
 	thai_date,
 	toast,
-} from "../../api.js";
+} from "../api.js";
 
 const reload_summary = inject("reload_summary");
 const params = state.route.params;

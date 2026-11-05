@@ -44,8 +44,10 @@
 import { computed } from "vue";
 import Icon from "./Icon.vue";
 import Sheet from "./Sheet.vue";
-import { SECTIONS } from "../sections.js";
+import { app } from "../app.js";
 import { boot, state, switch_section, vibrate } from "../api.js";
+
+const SECTIONS = app.sections;
 
 defineProps({ open: Boolean });
 const emit = defineEmits(["close"]);

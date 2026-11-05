@@ -166,11 +166,11 @@
 
 <script setup>
 import { computed, ref, watch } from "vue";
-import Icon from "../../components/Icon.vue";
-import Skeleton from "../../components/Skeleton.vue";
-import PdfViewer from "../../components/PdfViewer.vue";
-import { DOC_KINDS } from "../../sections.js";
-import { call, celebrate, desk_url, go, money, num, post, show_error, thai_date } from "../../api.js";
+import Icon from "../components/Icon.vue";
+import Skeleton from "../components/Skeleton.vue";
+import PdfViewer from "../components/PdfViewer.vue";
+import { DOC_KINDS } from "./kinds.js";
+import { call, celebrate, desk_url, go, money, num, post, show_error, thai_date } from "../api.js";
 
 const props = defineProps({ kind: String, name: String });
 // แสดงรายการแค่ 3 แถวแรก (แผงต้องพอดีจอโน้ตบุ๊กโดยไม่ต้องเลื่อน) ที่เหลือดูในหน้าเต็ม

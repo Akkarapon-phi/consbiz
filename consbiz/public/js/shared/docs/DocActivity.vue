@@ -142,11 +142,11 @@
 
 <script setup>
 import { ref, watch } from "vue";
-import Icon from "../../components/Icon.vue";
-import Skeleton from "../../components/Skeleton.vue";
-import Picker from "../../components/Picker.vue";
-import RichText from "../../components/RichText.vue";
-import { call, initials, post, show_error, time_ago, toast, tone, upload } from "../../api.js";
+import Icon from "../components/Icon.vue";
+import Skeleton from "../components/Skeleton.vue";
+import Picker from "../components/Picker.vue";
+import RichText from "../components/RichText.vue";
+import { call, initials, post, show_error, time_ago, toast, tone, upload } from "../api.js";
 
 const props = defineProps({ kind: String, name: String, doctype: String });
 

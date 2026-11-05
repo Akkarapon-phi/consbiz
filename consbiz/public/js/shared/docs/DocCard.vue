@@ -37,9 +37,9 @@
 
 <script setup>
 import { computed } from "vue";
-import Icon from "../../components/Icon.vue";
-import { DOC_KINDS } from "../../sections.js";
-import { go, money, relative_date, thai_date } from "../../api.js";
+import Icon from "../components/Icon.vue";
+import { DOC_KINDS } from "./kinds.js";
+import { go, money, relative_date, thai_date } from "../api.js";
 
 const props = defineProps({ row: Object, kind: String, i: { type: Number, default: 0 } });
 const config = computed(() => DOC_KINDS[props.kind]);

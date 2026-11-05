@@ -238,11 +238,11 @@
 
 <script setup>
 import { computed, inject, onMounted } from "vue";
-import Icon from "../../components/Icon.vue";
-import Empty from "../../components/Empty.vue";
-import Hero from "../../components/Hero.vue";
-import SCurve from "../../components/SCurve.vue";
-import { go, state, thai_date, today } from "../../api.js";
+import Icon from "../../../shared/components/Icon.vue";
+import Empty from "../../../shared/components/Empty.vue";
+import Hero from "../../../shared/components/Hero.vue";
+import SCurve from "../../../shared/components/SCurve.vue";
+import { go, state, thai_date, today } from "../../../shared/api.js";
 
 defineEmits(["pick-project"]);
 const reload_summary = inject("reload_summary");

@@ -556,16 +556,27 @@
 
 <script setup>
 import { computed, inject, onBeforeUnmount, ref, watch } from "vue";
-import DateInput from "../../components/DateInput.vue";
-import Icon from "../../components/Icon.vue";
-import TopBar from "../../components/TopBar.vue";
-import Skeleton from "../../components/Skeleton.vue";
-import Empty from "../../components/Empty.vue";
-import Picker from "../../components/Picker.vue";
-import Sheet from "../../components/Sheet.vue";
-import Stepper from "../../components/Stepper.vue";
+import DateInput from "../../../shared/components/DateInput.vue";
+import Icon from "../../../shared/components/Icon.vue";
+import TopBar from "../../../shared/components/TopBar.vue";
+import Skeleton from "../../../shared/components/Skeleton.vue";
+import Empty from "../../../shared/components/Empty.vue";
+import Picker from "../../../shared/components/Picker.vue";
+import Sheet from "../../../shared/components/Sheet.vue";
+import Stepper from "../../../shared/components/Stepper.vue";
 import { REPORT_KINDS } from "../../sections.js";
-import { call, celebrate, go, num, post, show_error, state, thai_date, toast, vibrate } from "../../api.js";
+import {
+	call,
+	celebrate,
+	go,
+	num,
+	post,
+	show_error,
+	state,
+	thai_date,
+	toast,
+	vibrate,
+} from "../../../shared/api.js";
 
 const reload_summary = inject("reload_summary");
 const params = state.route.params;

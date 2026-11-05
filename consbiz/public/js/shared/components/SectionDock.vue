@@ -27,8 +27,10 @@
 <script setup>
 import { computed } from "vue";
 import Icon from "./Icon.vue";
-import { SECTIONS } from "../sections.js";
+import { app } from "../app.js";
 import { boot, state, switch_section } from "../api.js";
+
+const SECTIONS = app.sections;
 
 defineProps({ variant: { type: String, default: "dock" } });
 

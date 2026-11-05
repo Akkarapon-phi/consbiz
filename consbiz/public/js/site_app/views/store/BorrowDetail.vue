@@ -198,12 +198,12 @@
 
 <script setup>
 import { computed, inject, ref } from "vue";
-import Icon from "../../components/Icon.vue";
-import TopBar from "../../components/TopBar.vue";
-import Skeleton from "../../components/Skeleton.vue";
-import Stepper from "../../components/Stepper.vue";
-import SignaturePad from "../../components/SignaturePad.vue";
-import PhotoInput from "../../components/PhotoInput.vue";
+import Icon from "../../../shared/components/Icon.vue";
+import TopBar from "../../../shared/components/TopBar.vue";
+import Skeleton from "../../../shared/components/Skeleton.vue";
+import Stepper from "../../../shared/components/Stepper.vue";
+import SignaturePad from "../../../shared/components/SignaturePad.vue";
+import PhotoInput from "../../../shared/components/PhotoInput.vue";
 import {
 	back,
 	boot,
@@ -216,7 +216,7 @@ import {
 	state,
 	thai_date,
 	vibrate,
-} from "../../api.js";
+} from "../../../shared/api.js";
 
 const STATUS = {
 	Borrowed: "ยืมอยู่",

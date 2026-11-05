@@ -1,6 +1,6 @@
-// หมวดงานของแอปหน้างาน (/site/<หมวด>/<หน้า>/<params...>)
+// หมวดงานของแอปหน้างาน (/site/<หมวด>/<หน้า>/<params...>) ตั้งค่าแอปที่ site_app.bundle.js (configure)
 // สลับหมวดผ่าน SectionLauncher.vue (ตารางไอคอน เพิ่มหมวดได้ไม่จำกัด)
-// เพิ่มหมวดใหม่: ใส่ใน SECTIONS + หน้าใน ROUTES + component ใน VIEWS ของ App.vue + สิทธิ์ใน site_app.boot_data
+// เพิ่มหมวดใหม่: ใส่ใน SECTIONS + หน้าใน ROUTES + component ใน views.js + สิทธิ์ใน site_app.boot_data
 // ชื่อหน้า (view) ห้ามซ้ำข้ามหมวด เพราะ go("<view>") หาหมวดจากชื่อหน้า
 
 export const SECTIONS = {
@@ -176,90 +176,7 @@ export const PARENT_TAB = {
 	"report-view": "reports",
 };
 
-// เอกสารจัดซื้อ/ขาย (consbiz/site_docs.py DOCS) filters = ตัวกรองรายการ, project = มีช่องโครงการ
-export const DOC_KINDS = {
-	mr: {
-		doctype: "Material Request",
-		section: "buy",
-		label: "ใบขอซื้อ",
-		icon: "clipboard",
-		tone: "teal",
-		project: true,
-		todo: "รอสั่งซื้อ",
-		progress: [
-			["per_ordered", "สั่งซื้อ"],
-			["per_received", "รับของ"],
-		],
-	},
-	po: {
-		doctype: "Purchase Order",
-		section: "buy",
-		label: "ใบสั่งซื้อ",
-		icon: "cart",
-		tone: "blue",
-		project: true,
-		party: "ผู้ขาย",
-		todo: "รอรับ/วางบิล",
-		due: "กำหนดส่ง",
-		progress: [
-			["per_received", "รับของ"],
-			["per_billed", "วางบิล"],
-		],
-	},
-	pi: {
-		doctype: "Purchase Invoice",
-		section: "buy",
-		label: "ใบแจ้งหนี้ซื้อ",
-		icon: "file",
-		tone: "violet",
-		project: true,
-		party: "ผู้ขาย",
-		todo: "ค้างจ่าย",
-		due: "ครบกำหนดจ่าย",
-	},
-	qtn: {
-		doctype: "Quotation",
-		section: "sell",
-		label: "ใบเสนอราคา",
-		icon: "file",
-		tone: "violet",
-		project: false,
-		party: "ลูกค้า",
-		todo: "รอตอบรับ",
-		due: "ยืนราคาถึง",
-	},
-	so: {
-		doctype: "Sales Order",
-		section: "sell",
-		label: "ใบสั่งขาย",
-		icon: "clipboard-check",
-		tone: "blue",
-		project: true,
-		party: "ลูกค้า",
-		todo: "รอส่งมอบ/วางบิล",
-		due: "กำหนดส่งมอบ",
-		progress: [
-			["per_delivered", "ส่งมอบ"],
-			["per_billed", "วางบิล"],
-		],
-	},
-	si: {
-		doctype: "Sales Invoice",
-		section: "sell",
-		label: "ใบแจ้งหนี้ขาย",
-		icon: "receive",
-		tone: "green",
-		project: true,
-		party: "ลูกค้า",
-		todo: "ค้างรับ",
-		due: "ครบกำหนดรับ",
-	},
-};
-
 export const REPORT_KINDS = {
 	dr: { doctype: "Daily Report", label: "รายงานประจำวัน", short: "รายงาน", icon: "clipboard" },
 	drq: { doctype: "Daily Request", label: "ขออนุมัติปฏิบัติงาน", short: "ขออนุมัติ", icon: "send" },
 };
-
-export const section_of = (view) => ROUTES[view]?.section || "store";
-export const is_tab = (view) => SECTIONS[section_of(view)].tabs.some((t) => t.view === view);

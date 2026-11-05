@@ -79,12 +79,12 @@
 
 <script setup>
 import { computed, inject, onMounted, watch } from "vue";
-import Icon from "../../components/Icon.vue";
-import Hero from "../../components/Hero.vue";
+import Icon from "../components/Icon.vue";
+import Hero from "../components/Hero.vue";
 import DocCard from "./DocCard.vue";
 import ScopeSwitch from "./ScopeSwitch.vue";
-import { DOC_KINDS } from "../../sections.js";
-import { go, money, state } from "../../api.js";
+import { DOC_KINDS } from "./kinds.js";
+import { go, money, state } from "../api.js";
 
 defineEmits(["pick-project"]);
 const reload_summary = inject("reload_summary");

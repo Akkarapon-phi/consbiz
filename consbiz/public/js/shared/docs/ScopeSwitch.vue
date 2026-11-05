@@ -12,8 +12,8 @@
 </template>
 
 <script setup>
-import Segmented from "../../components/Segmented.vue";
-import { set_doc_scope, state } from "../../api.js";
+import Segmented from "../components/Segmented.vue";
+import { set_doc_scope, state } from "../api.js";
 
 defineProps({ disabled: Boolean });
 </script>

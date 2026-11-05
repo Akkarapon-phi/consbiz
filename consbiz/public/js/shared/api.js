@@ -1,13 +1,15 @@
-// ตัวช่วยกลางของแอปหน้างาน: เรียก API (consbiz/store_app.py, consbiz/site_app.py), อัปโหลดรูป,
-// router (/site/<หมวด>/<หน้า>/...), สลับหมวดงาน, toast, รูปแบบตัวเลข/วันที่
+// ตัวช่วยกลางของทุกแอป (/site, /office, ...): เรียก API, อัปโหลดรูป,
+// router (<base>/<หมวด>/<หน้า>/...), สลับหมวดงาน, toast, รูปแบบตัวเลข/วันที่
+// ค่าของแต่ละแอป (หมวด/หน้า/base) อยู่ใน app.js (configure ใน bundle ของแอป)
 import { reactive } from "vue";
-import { ROUTES, SECTIONS, is_tab, section_of } from "./sections.js";
+import { app, is_tab, section_of } from "./app.js";
 
 const API = "consbiz.store_app.";
 const PROJECT_KEY = "consbiz.store.project"; // ชื่อเดิมจากแอปสโตร์: ผู้ใช้เดิมไม่ต้องเลือกโครงการใหม่
-const SECTION_KEY = "consbiz.site.section";
+const section_key = () => `${app.storage}.section`;
 
-export const boot = window.SITE_BOOT || {};
+// ข้อมูลตั้งต้นจากหน้า www ของแอป (boot_data ฝั่ง server)
+export const boot = window.APP_BOOT || window.SITE_BOOT || {};
 
 function remembered(key, fallback) {
 	try {
@@ -36,12 +38,9 @@ export function money(value, { short = false } = {}) {
 		return `${(n / 1e3).toLocaleString("th-TH", { maximumFractionDigits: 1 })} พัน`;
 	return n.toLocaleString("th-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
-// ไม่มีสิทธิ์หมวดไหนเลย: เปิดหมวดสโตร์ (แต่ละหน้าแจ้งสิทธิ์เองเหมือนแอปสโตร์เดิม)
-if (!boot.sections?.length) boot.sections = ["store"];
-
 export const state = reactive({
 	project: null, // {name, project_name, company}
-	section: boot.sections[0],
+	section: null, // ตั้งใน init_app()
 	// summary ของแต่ละหมวด (สโตร์ = store_app.get_summary, ควบคุมงาน = site_app.get_work_summary)
 	summaries: {},
 	// หน้าหลักล่าสุดของแต่ละหมวด: สลับหมวดกลับมาแล้วอยู่เมนูเดิม
@@ -242,7 +241,7 @@ export function remember_project(project) {
 
 export function remembered_section() {
 	try {
-		return localStorage.getItem(SECTION_KEY);
+		return localStorage.getItem(section_key());
 	} catch {
 		return null;
 	}
@@ -250,7 +249,7 @@ export function remembered_section() {
 
 function remember_section(section) {
 	try {
-		localStorage.setItem(SECTION_KEY, section);
+		localStorage.setItem(section_key(), section);
 	} catch {
 		// private mode
 	}
@@ -265,45 +264,63 @@ function set_section(section, force = false) {
 	// สีหลักตามหมวด: ใส่ที่ <html> ด้วย (sheet ถูก Teleport ไปที่ body อยู่นอก .ss-app)
 	document.documentElement.dataset.section = section;
 	// สีแถบสถานะของมือถือตามหมวด
-	document.getElementById("theme-color")?.setAttribute("content", SECTIONS[section].theme);
+	document.getElementById("theme-color")?.setAttribute("content", app.sections[section].theme);
 }
 
 // สลับหมวด: ไปหน้าหลักล่าสุดของหมวดนั้น (ไม่สร้างประวัติ: ปุ่มย้อนกลับไม่วนสลับหมวด)
 export function switch_section(section) {
 	if (!allowed(section)) return;
 	if (section === state.section) {
-		go(SECTIONS[section].home, {}, { replace: true });
+		go(app.sections[section].home, {}, { replace: true });
 		return;
 	}
-	const last = state.last_tab[section] || { view: SECTIONS[section].home, params: {} };
+	const last = state.last_tab[section] || { view: app.sections[section].home, params: {} };
 	go(last.view, last.params, { replace: is_tab(state.route.view) });
 }
 
-// ---------------------------------------------------------------- router (/site/<หมวด>/<หน้า>/<params...>)
+// ---------------------------------------------------------------- เริ่มแอป
+
+// เรียกครั้งแรกใน setup ของ AppShell (หลัง configure ก่อนวาดหน้า)
+export function init_app() {
+	// ไม่มีสิทธิ์หมวดไหนเลย: เปิดหมวดสำรองของแอป (แต่ละหน้าแจ้งสิทธิ์เอง)
+	if (!boot.sections?.length) boot.sections = [app.fallback || Object.keys(app.sections)[0]];
+	// หมวดที่แอปนี้มี (boot ของ server อาจรวมหมวดของแอปอื่น)
+	boot.sections = boot.sections.filter((key) => app.sections[key]);
+	if (!boot.sections.length) boot.sections = [app.fallback || Object.keys(app.sections)[0]];
+	state.section = boot.sections[0];
+	document.documentElement.dataset.app = app.key;
+}
+
+// ---------------------------------------------------------------- router (<base>/<หมวด>/<หน้า>/<params...>)
 
 function to_path({ view, params }) {
 	const section = section_of(view);
-	const parts = (ROUTES[view]?.params || [])
+	const parts = (app.routes[view]?.params || [])
 		.map((key) => params[key])
 		.filter((v) => v !== undefined && v !== null && v !== "");
-	return ["/site", section, view === SECTIONS[section].home ? "" : view, ...parts.map(encodeURIComponent)]
+	return [
+		app.base,
+		section,
+		view === app.sections[section].home ? "" : view,
+		...parts.map(encodeURIComponent),
+	]
 		.filter((p, i) => i < 2 || p)
 		.join("/");
 }
 
 export function parse_path(pathname = location.pathname) {
 	const parts = pathname
-		.replace(/^\/site\/?/, "")
+		.slice(pathname.startsWith(app.base) ? app.base.length : 0)
 		.split("/")
 		.filter(Boolean)
 		.map(decodeURIComponent);
-	// /site เปล่า = หมวดที่ใช้ล่าสุด, หมวดที่ไม่มีสิทธิ์ = หมวดแรกที่มีสิทธิ์
-	let section = SECTIONS[parts[0]] ? parts.shift() : remembered_section();
+	// <base> เปล่า = หมวดที่ใช้ล่าสุด, หมวดที่ไม่มีสิทธิ์ = หมวดแรกที่มีสิทธิ์
+	let section = app.sections[parts[0]] ? parts.shift() : remembered_section();
 	if (!allowed(section)) section = boot.sections[0];
 	let view = parts[0];
-	if (!ROUTES[view] || section_of(view) !== section) view = SECTIONS[section].home;
+	if (!app.routes[view] || section_of(view) !== section) view = app.sections[section].home;
 	const params = {};
-	ROUTES[view].params.forEach((key, i) => {
+	app.routes[view].params.forEach((key, i) => {
 		if (parts[i + 1] !== undefined) params[key] = parts[i + 1];
 	});
 	return { view, params };
