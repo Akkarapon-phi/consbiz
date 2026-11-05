@@ -4932,7 +4932,10 @@ a.ss-btn--soft {
 		transition: padding-left 0.3s var(--ss-ease);
 	}
 
-	/* หัว sidebar: พับ = ปุ่มกางอยู่บนสุด (มี Dock ไม่ต้องมีโลโก้หมวด), กาง = ชื่อหมวด + ปุ่มพับ */
+	/* หัว sidebar: พับ = โลโก้หมวด (มี Dock = ไม่แสดง เพราะ Dock บอกหมวดแล้ว), กาง = ชื่อหมวด */
+	html[data-dock]:not([data-side="expanded"]):not([data-peek]) .ss-nav-head {
+		display: none;
+	}
 	.ss-nav-head {
 		display: flex;
 		flex-direction: column;
@@ -4969,7 +4972,7 @@ a.ss-btn--soft {
 	.ss-nav-project > .ss-icon {
 		display: none;
 	}
-	html[data-side="expanded"] .ss-nav-project > .ss-icon {
+	:is(html[data-side="expanded"], html[data-peek]) .ss-nav-project > .ss-icon {
 		display: block;
 	}
 	/* พับ: ไอคอนอย่างเดียว (ชื่อเมนูดูได้จาก tooltip) */
@@ -4987,25 +4990,25 @@ a.ss-btn--soft {
 
 @media (min-width: 768px) {
 
-	html[data-side="expanded"] .ss-nav,
-	html[data-side="expanded"] .ss-nav.is-sub {
+	:is(html[data-side="expanded"], html[data-peek]) .ss-nav,
+	:is(html[data-side="expanded"], html[data-peek]) .ss-nav.is-sub {
 		padding: calc(20px + var(--ss-top)) 16px calc(20px + var(--ss-bottom));
 		gap: 2px;
 	}
-	html[data-side="expanded"] .ss-nav-brand {
+	:is(html[data-side="expanded"], html[data-peek]) .ss-nav-brand {
 		justify-content: flex-start;
 		align-items: center;
 		gap: 12px;
 		padding: 0 6px;
 		margin-bottom: 18px;
 	}
-	html[data-side="expanded"] .ss-nav-brand-text {
+	:is(html[data-side="expanded"], html[data-peek]) .ss-nav-brand-text {
 		display: block;
 		font-size: 18px;
 		font-weight: 700;
 		letter-spacing: -0.01em;
 	}
-	html[data-side="expanded"] .ss-nav-project {
+	:is(html[data-side="expanded"], html[data-peek]) .ss-nav-project {
 		display: flex;
 		align-items: center;
 		gap: 10px;
@@ -5018,22 +5021,22 @@ a.ss-btn--soft {
 		color: var(--ss-text);
 		transition: background 0.2s ease;
 	}
-	html[data-side="expanded"] .ss-nav-project:hover {
+	:is(html[data-side="expanded"], html[data-peek]) .ss-nav-project:hover {
 		background: var(--ss-brand-soft);
 	}
-	html[data-side="expanded"] .ss-nav-project .ss-avatar {
+	:is(html[data-side="expanded"], html[data-peek]) .ss-nav-project .ss-avatar {
 		width: 38px;
 		height: 38px;
 		border-radius: 12px;
 		font-size: 13px;
 	}
-	html[data-side="expanded"] .ss-nav-project-text {
+	:is(html[data-side="expanded"], html[data-peek]) .ss-nav-project-text {
 		flex: 1;
 		min-width: 0;
 		display: flex;
 		flex-direction: column;
 	}
-	html[data-side="expanded"] .ss-nav-project-text span {
+	:is(html[data-side="expanded"], html[data-peek]) .ss-nav-project-text span {
 		font-size: 13.5px;
 		font-weight: 600;
 		line-height: 1.3;
@@ -5043,11 +5046,11 @@ a.ss-btn--soft {
 		-webkit-line-clamp: 2;
 		-webkit-box-orient: vertical;
 	}
-	html[data-side="expanded"] .ss-nav-project-text small {
+	:is(html[data-side="expanded"], html[data-peek]) .ss-nav-project-text small {
 		font-size: 11.5px;
 		color: var(--ss-muted);
 	}
-	html[data-side="expanded"] .ss-nav-item {
+	:is(html[data-side="expanded"], html[data-peek]) .ss-nav-item {
 		flex-direction: row;
 		justify-content: flex-start;
 		gap: 14px;
@@ -5055,42 +5058,215 @@ a.ss-btn--soft {
 		padding: 0 14px;
 		border-radius: 14px;
 	}
-	html[data-side="expanded"] .ss-nav-label {
+	:is(html[data-side="expanded"], html[data-peek]) .ss-nav-label {
 		font-size: 14.5px;
 	}
-	html[data-side="expanded"] .ss-nav-item .ss-nav-icon {
+	:is(html[data-side="expanded"], html[data-peek]) .ss-nav-item .ss-nav-icon {
 		position: static;
 	}
-	html[data-side="expanded"] .ss-nav-item .ss-badge {
+	:is(html[data-side="expanded"], html[data-peek]) .ss-nav-item .ss-badge {
 		top: calc(50% - 10px);
 		right: 12px;
 	}
 
 
-	html[data-side="expanded"] .ss-nav-label {
+	:is(html[data-side="expanded"], html[data-peek]) .ss-nav-label {
 		display: block;
 	}
-	html[data-side="expanded"] .ss-nav-head {
+	:is(html[data-side="expanded"], html[data-peek]) .ss-nav-head {
 		flex-direction: row;
 		justify-content: space-between;
 		padding: 0 2px 0 6px;
 		margin-bottom: 16px;
 	}
-	html[data-side="expanded"] .ss-nav-head .ss-nav-brand,
-	html[data-dock][data-side="expanded"] .ss-nav-head .ss-nav-brand {
+	:is(html[data-side="expanded"], html[data-peek]) .ss-nav-head .ss-nav-brand,
+	html[data-dock]:is([data-side="expanded"], [data-peek]) .ss-nav-head .ss-nav-brand {
 		display: flex;
 		flex: 1;
 		min-width: 0;
 		padding: 0;
 	}
-	html[data-side="expanded"] .ss-nav-brand-text {
+	:is(html[data-side="expanded"], html[data-peek]) .ss-nav-brand-text {
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
 	}
-	html[data-side="expanded"] .ss-nav,
-	html[data-side="expanded"] .ss-nav.is-sub {
+	:is(html[data-side="expanded"], html[data-peek]) .ss-nav,
+	:is(html[data-side="expanded"], html[data-peek]) .ss-nav.is-sub {
 		padding-left: 16px;
 		padding-right: 16px;
+	}
+}
+
+/* ---------------------------------------------------------------- sidebar: กางชั่วคราวทับเนื้อหา + ปุ่มล่างสุด */
+
+.ss-nav-foot {
+	display: none;
+}
+@media (min-width: 768px) {
+	.ss-nav-foot {
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+		margin-top: auto;
+		padding-top: 8px;
+	}
+	.ss-nav-foot .ss-nav-desk {
+		margin-top: 0;
+	}
+	.ss-nav-pin {
+		color: var(--ss-muted);
+	}
+	/* กางชั่วคราว: กว้างเท่าตอนกาง ทับเนื้อหา (เนื้อหาไม่ขยับ) */
+	html[data-peek] .ss-nav,
+	html[data-peek] .ss-nav.is-sub {
+		width: 268px;
+		z-index: 32;
+		box-shadow: 18px 0 40px -18px rgba(15, 23, 42, 0.35);
+		background: var(--ss-surface);
+	}
+}
+
+/* ---------------------------------------------------------------- ตารางรายการเอกสาร (DocTable.vue, แท็บเล็ต/จอใหญ่) */
+
+.ss-table-wrap {
+	overflow-x: auto;
+	border-radius: var(--ss-radius);
+	background: var(--ss-surface);
+	box-shadow: var(--ss-shadow);
+	animation: ss-rise 0.4s var(--ss-ease) both;
+}
+.ss-table {
+	width: 100%;
+	border-collapse: collapse;
+	font-size: 14px;
+}
+.ss-table th {
+	position: sticky;
+	top: 0;
+	z-index: 1;
+	padding: 11px 14px;
+	font-size: 12px;
+	font-weight: 600;
+	text-align: left;
+	white-space: nowrap;
+	color: var(--ss-muted);
+	background: var(--ss-surface);
+	border-bottom: 1px solid var(--ss-border);
+}
+.ss-table td {
+	padding: 11px 14px;
+	vertical-align: middle;
+	border-bottom: 1px solid var(--ss-border);
+}
+.ss-table tbody tr {
+	cursor: pointer;
+	transition: background 0.15s ease;
+}
+.ss-table tbody tr:last-child td {
+	border-bottom: 0;
+}
+.ss-table tbody tr:hover,
+.ss-table tbody tr:focus-visible {
+	background: var(--ss-brand-soft);
+	outline: none;
+}
+.ss-table tbody tr.is-late td:first-child {
+	box-shadow: inset 3px 0 0 var(--tone-rose);
+}
+.ss-table .is-num {
+	text-align: right;
+	white-space: nowrap;
+	font-variant-numeric: tabular-nums;
+}
+.ss-table td.is-num {
+	font-weight: 600;
+}
+.ss-table .is-id {
+	white-space: nowrap;
+	font-weight: 600;
+	font-variant-numeric: tabular-nums;
+}
+.ss-table .is-date {
+	white-space: nowrap;
+	color: var(--ss-text-2);
+	font-variant-numeric: tabular-nums;
+}
+.ss-table td small {
+	display: block;
+	font-size: 11.5px;
+	font-weight: 400;
+	color: var(--ss-muted);
+}
+.ss-table .is-party {
+	min-width: 200px;
+}
+.ss-table .is-party span {
+	display: -webkit-box;
+	-webkit-line-clamp: 2;
+	-webkit-box-orient: vertical;
+	overflow: hidden;
+}
+.ss-table .is-due {
+	color: var(--tone-rose);
+	font-weight: 600;
+}
+.ss-table-pct {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	font-size: 12.5px;
+	white-space: nowrap;
+	font-variant-numeric: tabular-nums;
+}
+.ss-table-pct i {
+	display: block;
+	width: 48px;
+	height: 6px;
+	border-radius: 99px;
+	background: var(--ss-surface-2);
+	overflow: hidden;
+}
+.ss-table-pct b {
+	display: block;
+	height: 100%;
+	background: var(--ss-brand);
+}
+.ss-table .col-compact,
+.ss-table .col-compact-date {
+	display: none;
+}
+@media (max-width: 1179px) {
+	.ss-table .col-opt,
+	.ss-table .col-status {
+		display: none;
+	}
+	.ss-table .col-compact {
+		display: flex;
+		width: fit-content;
+		margin-top: 4px;
+	}
+	.ss-table th,
+	.ss-table td {
+		padding: 10px 10px;
+	}
+	.ss-table .is-party {
+		min-width: 150px;
+	}
+}
+/* แท็บเล็ตจอเล็ก: วันที่ย้ายไปใต้เลขที่ */
+@media (max-width: 899px) {
+	.ss-table .col-date {
+		display: none;
+	}
+	.ss-table .col-compact-date {
+		display: block;
+	}
+	.ss-table th,
+	.ss-table td {
+		padding: 10px 8px;
+	}
+	.ss-table .is-party {
+		min-width: 120px;
 	}
 }

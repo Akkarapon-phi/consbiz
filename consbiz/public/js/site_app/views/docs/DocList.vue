@@ -60,7 +60,9 @@
 				"
 			/>
 			<template v-else>
-				<TransitionGroup tag="div" class="ss-list" name="ss-list" appear>
+				<!-- แท็บเล็ต/จอใหญ่: ตาราง, มือถือ: การ์ด -->
+				<DocTable v-if="wide" :rows="rows" :kind="kind" />
+				<TransitionGroup v-else tag="div" class="ss-list" name="ss-list" appear>
 					<DocCard v-for="(row, i) in rows" :key="row.name" :row="row" :kind="kind" :i="i % 30" />
 				</TransitionGroup>
 				<button
@@ -79,12 +81,13 @@
 </template>
 
 <script setup>
-import { computed, ref, watch } from "vue";
+import { computed, onBeforeUnmount, ref, watch } from "vue";
 import Icon from "../../components/Icon.vue";
 import TopBar from "../../components/TopBar.vue";
 import Skeleton from "../../components/Skeleton.vue";
 import Empty from "../../components/Empty.vue";
 import DocCard from "./DocCard.vue";
+import DocTable from "./DocTable.vue";
 import ScopeSwitch from "./ScopeSwitch.vue";
 import { DOC_KINDS } from "../../sections.js";
 import { call, replace_params, show_error, state } from "../../api.js";
@@ -102,6 +105,11 @@ const filters = [
 const filter = ref(FILTERS.includes(state.route.params.filter) ? state.route.params.filter : "todo");
 const search = ref("");
 const rows = ref(null);
+const mq_wide = window.matchMedia("(min-width: 768px)");
+const wide = ref(mq_wide.matches);
+const on_media = () => (wide.value = mq_wide.matches);
+mq_wide.addEventListener("change", on_media);
+onBeforeUnmount(() => mq_wide.removeEventListener("change", on_media));
 const more = ref(false);
 const loading = ref(false);
 

@@ -40,8 +40,10 @@
 				:class="{ 'is-sub': !show_nav, 'has-sections': boot.sections.length > 1 }"
 				:style="{ '--count': mobile_tabs.length }"
 				aria-label="เมนูหลัก"
+				@mouseenter="hover_side(true)"
+				@mouseleave="hover_side(false)"
 			>
-				<!-- หัว sidebar: ชื่อหมวด + ปุ่มพับ/กาง (พับ = เหลือแค่ไอคอน) เปลี่ยนหมวดที่ Dock -->
+				<!-- หัว sidebar: ชื่อหมวด (แสดงเมื่อกาง) เปลี่ยนหมวดที่ Dock -->
 				<div class="ss-nav-head">
 					<div class="ss-nav-brand">
 						<span class="ss-nav-logo"
@@ -49,16 +51,6 @@
 						/></span>
 						<span class="ss-nav-brand-text">{{ section.title }}</span>
 					</div>
-					<button
-						type="button"
-						class="ss-icon-btn ss-nav-toggle"
-						:title="side === 'expanded' ? 'พับแถบเมนู' : 'กางแถบเมนู'"
-						:aria-label="side === 'expanded' ? 'พับแถบเมนู' : 'กางแถบเมนู'"
-						:aria-expanded="side === 'expanded'"
-						@click="toggle_side"
-					>
-						<Icon name="panel" :size="19" />
-					</button>
 				</div>
 				<button
 					type="button"
@@ -100,10 +92,26 @@
 					</span>
 					<span class="ss-nav-label">{{ tab.label }}</span>
 				</button>
-				<a v-if="boot.desk" class="ss-nav-item ss-nav-desk" href="/app" title="เปิดระบบเต็ม">
-					<span class="ss-nav-icon"><Icon name="monitor" :size="22" /></span>
-					<span class="ss-nav-label">ระบบเต็ม</span>
-				</a>
+				<!-- ท้าย sidebar: ระบบเต็ม (ไม่มี Dock) + ปุ่มปักหมุด/พับ -->
+				<div class="ss-nav-foot">
+					<a v-if="boot.desk" class="ss-nav-item ss-nav-desk" href="/app" title="เปิดระบบเต็ม">
+						<span class="ss-nav-icon"><Icon name="monitor" :size="22" /></span>
+						<span class="ss-nav-label">ระบบเต็ม</span>
+					</a>
+					<button
+						type="button"
+						class="ss-nav-item ss-nav-pin"
+						:title="pin_label"
+						:aria-label="pin_label"
+						:aria-pressed="side === 'expanded'"
+						@click="toggle_side"
+					>
+						<span class="ss-nav-icon"
+							><Icon :name="side === 'expanded' ? 'chevrons-left' : 'panel'" :size="20"
+						/></span>
+						<span class="ss-nav-label">{{ pin_label }}</span>
+					</button>
+				</div>
 			</nav>
 		</Transition>
 
@@ -177,7 +185,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, provide, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, provide, ref, watch } from "vue";
 import Icon from "./components/Icon.vue";
 import Sheet from "./components/Sheet.vue";
 import SectionLauncher from "./components/SectionLauncher.vue";
@@ -367,8 +375,12 @@ const launcher = ref(false);
 // แท็บเล็ต/จอใหญ่: Dock หมวดงานซ้ายสุด (มีมากกว่า 1 หมวด) ความกว้างรวมใน --ss-side (ดู site.css)
 if (boot.sections.length > 1) document.documentElement.dataset.dock = "1";
 
-// sidebar กาง (ไอคอน + ชื่อ) / พับ (ไอคอนอย่างเดียว) จำในเครื่อง ไม่เคยเลือก: จอใหญ่กาง แท็บเล็ตพับ
+// sidebar แท็บเล็ต/จอใหญ่
+// - พับ (ค่าเริ่มต้น): ไอคอนอย่างเดียว กางชั่วคราวทับเนื้อหาเอง (html[data-peek])
+//   ใช้เมาส์ = ชี้แล้วกาง เอาออกแล้วพับ, จอสัมผัส = กดปุ่มล่างสุดแล้วกาง เลือกเมนู/แตะนอกแถบแล้วพับ
+// - ปักหมุด (expanded): กางค้างและดันเนื้อหา (ปุ่มล่างสุด) จำในเครื่อง
 const SIDE_KEY = "consbiz.site.sidebar";
+const can_hover = window.matchMedia("(hover: hover) and (pointer: fine)").matches;
 function saved_side() {
 	try {
 		return localStorage.getItem(SIDE_KEY);
@@ -376,10 +388,27 @@ function saved_side() {
 		return null;
 	}
 }
-const side = ref(saved_side() || (window.innerWidth >= 1180 ? "expanded" : "collapsed"));
+const side = ref(saved_side() === "expanded" ? "expanded" : "collapsed");
+const peek = ref(false);
 document.documentElement.dataset.side = side.value;
+
+watch(peek, (value) => {
+	if (value) document.documentElement.dataset.peek = "1";
+	else delete document.documentElement.dataset.peek;
+});
+const pin_label = computed(() => {
+	if (side.value === "expanded") return "พับแถบเมนู";
+	return can_hover ? "ปักหมุดแถบเมนู" : peek.value ? "ซ่อนชื่อเมนู" : "แสดงชื่อเมนู";
+});
+
 function toggle_side() {
+	// จอสัมผัสตอนพับ: กาง/ซ่อนชั่วคราว (ไม่ปักหมุด เพื่อไม่บังเนื้อหาถาวรบนจอแท็บเล็ต)
+	if (!can_hover && side.value === "collapsed") {
+		peek.value = !peek.value;
+		return;
+	}
 	side.value = side.value === "expanded" ? "collapsed" : "expanded";
+	peek.value = false;
 	document.documentElement.dataset.side = side.value;
 	try {
 		localStorage.setItem(SIDE_KEY, side.value);
@@ -387,6 +416,24 @@ function toggle_side() {
 		// private mode
 	}
 }
+
+let peek_timer = null;
+function hover_side(inside) {
+	if (!can_hover || side.value === "expanded" || window.innerWidth < 768) return;
+	clearTimeout(peek_timer);
+	// หน่วงเล็กน้อย: เมาส์ผ่านเฉยๆ ไม่กาง, ออกแล้วไม่พับทันที
+	peek_timer = setTimeout(() => (peek.value = inside), inside ? 150 : 250);
+}
+// เปลี่ยนหน้า / แตะนอกแถบ: พับกลับ
+watch(
+	() => state.route,
+	() => (peek.value = false)
+);
+function close_peek(event) {
+	if (peek.value && !event.target.closest?.(".ss-nav")) peek.value = false;
+}
+document.addEventListener("pointerdown", close_peek);
+onBeforeUnmount(() => document.removeEventListener("pointerdown", close_peek));
 provide("open_launcher", () => (launcher.value = true));
 
 onMounted(async () => {
