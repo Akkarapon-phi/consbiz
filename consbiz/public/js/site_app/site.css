@@ -100,6 +100,10 @@ body {
 body.ss-locked {
 	overflow: hidden;
 }
+/* เว้นที่ scrollbar ไว้เสมอ: หน้าที่ยาว (เช่น ใบสั่งซื้อหลายรายการ) กับหน้าสั้น/ตอนเปิด sheet กว้างเท่ากัน ไม่ขยับ/ดูเล็กลง */
+html {
+	scrollbar-gutter: stable;
+}
 
 button,
 input,
@@ -5477,19 +5481,12 @@ a.ss-btn--soft {
 	height: 100%;
 	background: var(--ss-brand);
 }
-.ss-table .col-compact,
 .ss-table .col-compact-date {
 	display: none;
 }
 @media (max-width: 1179px) {
-	.ss-table .col-opt,
-	.ss-table .col-status {
+	.ss-table .col-opt {
 		display: none;
-	}
-	.ss-table .col-compact {
-		display: flex;
-		width: fit-content;
-		margin-top: 4px;
 	}
 	.ss-table th,
 	.ss-table td {
@@ -6169,6 +6166,10 @@ th[aria-sort] .ss-th-sort {
 	}
 	.ss-list-create {
 		padding: 0 16px 0 12px;
+	}
+	/* ปุ่มทึบชิดขอบเดียวกับเนื้อหา (ปุ่มไอคอนมีขอบใสในตัวจึงใช้ระยะ 20px) */
+	.ss-topbar:has(.ss-list-create) {
+		padding-right: 28px;
 	}
 	.ss-tabs {
 		margin: 0;
@@ -6947,10 +6948,6 @@ input[type="number"] {
 	letter-spacing: -0.01em;
 	font-variant-numeric: tabular-nums;
 }
-.ss-table--list .col-status {
-	width: 1%;
-	white-space: nowrap;
-}
 .ss-table--list .col-subject {
 	min-width: 180px;
 	max-width: 340px;
@@ -7047,6 +7044,43 @@ input[type="number"] {
 .ss-table--list td {
 	padding-left: 10px;
 	padding-right: 10px;
+}
+/* ตารางต้องพอดีกรอบ ไม่เลื่อนซ้าย-ขวา: ดูความกว้างกรอบตาราง (เปลี่ยนตาม sidebar ปักหมุด/แผงตัวอย่าง) ไม่ใช่ความกว้างจอ
+   ลดทีละขั้น: แถบ % เหลือตัวเลข → ซ่อนมอบหมาย/แก้ไขล่าสุด → ซ่อน % (สถานะบอกอยู่แล้ว) */
+.ss-table-wrap:has(> .ss-table--list) {
+	container: doclist / inline-size;
+}
+@container doclist (max-width: 1060px) {
+	.ss-table--list .col-pct .ss-table-pct i {
+		display: none;
+	}
+}
+@container doclist (max-width: 1000px) {
+	.ss-table--list .col-meta {
+		display: none;
+	}
+}
+@container doclist (max-width: 850px) {
+	.ss-table--list .col-pct {
+		display: none;
+	}
+	.ss-table--list th.col-subject,
+	.ss-table--list td.col-subject {
+		min-width: 120px;
+	}
+}
+/* ใต้เลขที่: ป้ายสถานะ + เลขบิลของผู้ขาย (ยาวได้มาก ตัดด้วย … ไม่ให้ดันคอลัมน์ ชี้ดูเลขเต็ม) */
+.ss-doc-meta {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	margin-top: 4px;
+}
+.ss-table--list .ss-doc-bill {
+	max-width: 120px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
 
 /* ---------------------------------------------------------------- ดูเอกสาร: ขั้นตอน / ช่องข้อมูล / ท้ายเอกสาร (DocView.vue) */
@@ -7764,15 +7798,9 @@ div.ss-line-del {
 	gap: 20px;
 	align-items: start;
 }
-/* ตารางคู่ตัวอย่าง: ซ่อนคอลัมน์รอง สถานะย้ายไปใต้เลขที่ */
-.ss-table--list.is-compact .col-wide,
-.ss-table--list.is-compact .col-status {
+/* ตารางคู่ตัวอย่าง: ซ่อนคอลัมน์รอง */
+.ss-table--list.is-compact .col-wide {
 	display: none;
-}
-.ss-table--list.is-compact .col-compact {
-	display: flex;
-	width: fit-content;
-	margin-top: 4px;
 }
 .ss-table tbody tr.is-active {
 	background: var(--ss-brand-soft);

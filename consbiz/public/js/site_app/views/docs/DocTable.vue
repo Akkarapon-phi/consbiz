@@ -2,7 +2,7 @@
 	<!-- ตารางเอกสารจัดซื้อ/ขาย (แท็บเล็ต/จอใหญ่) มือถือใช้การ์ด (DocCard.vue)
 	     คอลัมน์ตามชนิดเอกสาร (COLUMNS) ท้ายตาราง: ผู้รับมอบหมาย / แก้ไขล่าสุด / ถูกใจ แบบรายการของระบบเต็ม
 	     หัวคอลัมน์กดเรียงได้ (emit sort) ช่องเลือกหลายแถว (toggle / toggle-all)
-	     แท็บเล็ต (<1180): ซ่อน .col-wide และย้ายสถานะไปใต้เลขที่ -->
+	     สถานะอยู่ใต้เลขที่ทุกขนาด, แท็บเล็ต (<1180): ซ่อน .col-wide -->
 	<div class="ss-table-wrap">
 		<table class="ss-table ss-table--list" :class="{ 'is-compact': preview }">
 			<thead>
@@ -66,17 +66,16 @@
 					<td v-for="c in columns" :key="c.key" :class="c.class">
 						<template v-if="c.key === 'name'">
 							<span class="ss-doc-no">{{ row.name }}</span>
-							<small v-if="row.bill_no">บิล {{ row.bill_no }}</small>
-							<span class="ss-tag col-compact" :class="`tone-${row.status_tone}`">{{
-								row.status_label
-							}}</span>
+							<!-- สถานะอยู่ใต้เลขที่ (ไม่มีคอลัมน์สถานะ: ประหยัดความกว้าง กรองสถานะที่แท็บ) -->
+							<span class="ss-doc-meta">
+								<span class="ss-tag" :class="`tone-${row.status_tone}`">{{
+									row.status_label
+								}}</span>
+								<small v-if="row.bill_no" class="ss-doc-bill" :title="`บิล ${row.bill_no}`"
+									>บิล {{ row.bill_no }}</small
+								>
+							</span>
 						</template>
-						<span
-							v-else-if="c.key === 'status'"
-							class="ss-tag"
-							:class="`tone-${row.status_tone}`"
-							>{{ row.status_label }}</span
-						>
 						<template v-else-if="c.key === 'subject'">
 							<span class="ss-cell-main" :title="subject(row)">{{ subject(row) }}</span>
 							<small v-if="row.project" :title="row.project_name">{{
@@ -168,11 +167,11 @@ const config = computed(() => DOC_KINDS[props.kind]);
 
 // คอลัมน์ต่อชนิดเอกสาร sort = key ของ site_docs.SORTS, pct = ช่อง % ความคืบหน้า
 // class: col-wide = ซ่อนบนแท็บเล็ต (<1180) is-num = ชิดขวา
+// กรอบตารางแคบ (container query ใน site.css): ย่อแถบ % → ซ่อน col-meta (มอบหมาย/แก้ไขล่าสุด) → ซ่อน col-pct
 const columns = computed(() => {
 	const c = config.value;
 	const head = [
 		{ key: "name", label: "เลขที่", sort: "name", class: "col-no" },
-		{ key: "status", label: "สถานะ", sort: "status", class: "col-status" },
 		{ key: "subject", label: c.party || "เรื่อง", sort: c.party ? "party" : null, class: "col-subject" },
 		{ key: "date", label: "วันที่เอกสาร", sort: "date", class: "col-date is-date" },
 		...(c.due ? [{ key: "due", label: c.due, sort: "due", class: "col-date is-date col-wide" }] : []),
@@ -202,8 +201,8 @@ const columns = computed(() => {
 	return [
 		...head,
 		...money_cols,
-		{ key: "assigned", label: "มอบหมาย", class: "col-assign col-wide" },
-		{ key: "modified", label: "แก้ไขล่าสุด", class: "col-modified col-wide" },
+		{ key: "assigned", label: "มอบหมาย", class: "col-assign col-meta col-wide" },
+		{ key: "modified", label: "แก้ไขล่าสุด", class: "col-modified col-meta col-wide" },
 		{ key: "like", label: "", class: "col-like" },
 	];
 });
