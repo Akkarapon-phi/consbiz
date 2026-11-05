@@ -1,0 +1,20 @@
+{
+ "app": "consbiz",
+ "creation": "2026-11-05 12:00:00.000000",
+ "docstatus": 0,
+ "doctype": "Desktop Icon",
+ "hidden": 0,
+ "icon_type": "App",
+ "idx": 1,
+ "label": "Site App",
+ "link": "/site",
+ "link_type": "External",
+ "logo_url": "/assets/consbiz/site_app/icon-192.png",
+ "modified": "2026-11-05 12:00:00.000000",
+ "modified_by": "Administrator",
+ "name": "Site App",
+ "owner": "Administrator",
+ "restrict_removal": 0,
+ "roles": [],
+ "standard": 1
+}

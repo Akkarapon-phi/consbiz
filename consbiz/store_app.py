@@ -139,9 +139,25 @@ def get_summary(project):
 		if frappe.has_permission("Stock Entry", "read")
 		else 0
 	)
+	receipts_today = 0
+	if frappe.has_permission("Purchase Receipt", "read"):
+		receipts_today += len(
+			frappe.get_list(
+				"Purchase Receipt",
+				filters={"project": project, "docstatus": 1, "posting_date": nowdate()},
+				pluck="name",
+				limit_page_length=0,
+			)
+		)
+	if frappe.has_permission("Stock Entry", "read"):
+		receipts_today += frappe.db.count(
+			"Stock Entry",
+			{"project": project, "purpose": "Material Receipt", "docstatus": 1, "posting_date": nowdate()},
+		)
 	return {
 		"project": project,
 		"project_name": info.project_name,
+		"receipts_today": receipts_today,
 		"company": info.company,
 		"construction_management": cm,
 		"warehouse": project_warehouse(project),

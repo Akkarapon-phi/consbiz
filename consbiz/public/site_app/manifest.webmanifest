@@ -1,0 +1,17 @@
+{
+	"name": "หน้างาน",
+	"short_name": "หน้างาน",
+	"description": "สโตร์ (รับของ เบิก คอนกรีต ยืม-คืน คลัง) และควบคุมงาน (รายงานประจำวัน ตรวจงาน) ของโครงการ",
+	"start_url": "/site",
+	"scope": "/site",
+	"display": "standalone",
+	"orientation": "portrait",
+	"background_color": "#eef2f8",
+	"theme_color": "#1f6feb",
+	"lang": "th",
+	"icons": [
+		{ "src": "/assets/consbiz/site_app/icon-192.png", "sizes": "192x192", "type": "image/png" },
+		{ "src": "/assets/consbiz/site_app/icon-512.png", "sizes": "512x512", "type": "image/png" },
+		{ "src": "/assets/consbiz/site_app/icon-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+	]
+}

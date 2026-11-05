@@ -75,12 +75,13 @@
 						<thead>
 							<tr>
 								<th class="text-center" style="width: 6%">ลำดับ</th>
-								<th style="width: 34%">กิจกรรม</th>
+								<th style="width: 26%">กิจกรรม</th>
 								<th class="text-right" style="width: 11%">ปริมาณวันนี้</th>
 								<th class="text-center" style="width: 7%">หน่วย</th>
 								<th class="text-right" style="width: 11%">ราคาต่อหน่วย</th>
 								<th class="text-right" style="width: 12%">มูลค่าบันทึก</th>
-								<th style="width: 19%">หมายเหตุ</th>
+								<th style="width: 13%">ตำแหน่ง / พื้นที่</th>
+								<th style="width: 14%">หมายเหตุ</th>
 							</tr>
 						</thead>
 						<tbody>
@@ -98,10 +99,11 @@
 								<td class="text-center">{{ row.uom or "" }}</td>
 								<td class="text-right">{{ money.format(row.rate or 0) }}</td>
 								<td class="text-right">{{ money.format(row.amount or 0) }}</td>
+								<td>{{ row.location or "" }}</td>
 								<td>{{ row.remarks or "" }}</td>
 							</tr>
 							{%- else %}
-							<tr><td colspan="7" class="empty">ไม่มีรายการ</td></tr>
+							<tr><td colspan="8" class="empty">ไม่มีรายการ</td></tr>
 							{%- endfor %}
 						</tbody>
 					</table>
