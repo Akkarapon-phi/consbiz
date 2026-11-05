@@ -109,3 +109,30 @@ class IntegrationTestSiteDocs(IntegrationTestCase):
 		self.assertRaises(frappe.ValidationError, site_docs.get_form, "po", name=po.name)
 		self.assertRaises(frappe.ValidationError, site_docs.get_form, "qtn", source=po.name)
 
+	def test_list_counts_sums_sort_and_filters(self):
+		first = make_po(self.project, qty=2)
+		second = make_po(self.project, qty=5)
+		result = site_docs.get_docs("po", project=self.project, filter="todo", sort="amount", order="asc")
+		names = [r.name for r in result["rows"]]
+		self.assertLess(names.index(first.name), names.index(second.name))
+		self.assertEqual(result["total"], result["counts"]["todo"])
+		self.assertGreaterEqual(result["sums"]["amount"], first.grand_total + second.grand_total)
+		self.assertIn("download_pdf", result["rows"][0].pdf_url)
+
+		# ช่วงวันที่ในอนาคต = ไม่พบ, คู่ค้า = ผู้ขายของใบ
+		empty = site_docs.get_docs("po", project=self.project, filter="all", date_from="2999-01-01")
+		self.assertEqual(empty["total"], 0)
+		by_party = site_docs.get_docs("po", project=self.project, filter="all", party=SUPPLIER)
+		self.assertIn(first.name, [r.name for r in by_party["rows"]])
+		exported = site_docs.get_docs("po", project=self.project, filter="all", export=1)
+		self.assertNotIn("total", exported)
+
+	def test_bulk_submit_reports_each_document(self):
+		po = make_po(self.project)
+		po.cancel()
+		draft = frappe.copy_doc(po)
+		draft.insert()
+		results = site_docs.submit_docs("po", json.dumps([draft.name, po.name]))
+		self.assertEqual([r["ok"] for r in results], [True, False])
+		self.assertEqual(frappe.db.get_value("Purchase Order", draft.name, "docstatus"), 1)
+

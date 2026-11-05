@@ -1,5 +1,6 @@
 <template>
-	<!-- หัวหน้าหลักของทุกหมวด: หมวดงาน (มือถือ) / ทักทาย / ปุ่มระบบเต็ม / โครงการที่เลือก -->
+	<!-- หัวหน้าหลักของทุกหมวด: หมวดงาน (มือถือ) / ทักทาย / ปุ่มระบบเต็ม / โครงการที่เลือก
+	     แท็บเล็ต/จอใหญ่: แถบเตี้ยแถวเดียว (ชื่อหมวด + ทักทาย | โครงการ | ระบบเต็ม) ไม่กินพื้นที่เนื้อหา -->
 	<section class="ss-hero">
 		<div class="ss-hero-glow"></div>
 		<div class="ss-hero-top">
@@ -23,6 +24,7 @@
 			</a>
 		</div>
 		<div class="ss-hero-greet">
+			<div class="ss-hero-title">{{ section.title }}</div>
 			<div class="ss-hero-hello">{{ greeting }}</div>
 			<div class="ss-hero-name">{{ boot.full_name }}</div>
 		</div>

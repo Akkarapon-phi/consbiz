@@ -92,6 +92,14 @@ DOCS = {
 	},
 }
 KIND_OF = {config["doctype"]: kind for kind, config in DOCS.items()}
+# ช่องลิงก์คู่ค้า (กรองตามผู้ขาย/ลูกค้าที่เลือก) config["party"] เป็นชื่อสำหรับแสดง
+PARTY_LINK = {
+	"Purchase Order": "supplier",
+	"Purchase Invoice": "supplier",
+	"Quotation": "party_name",
+	"Sales Order": "customer",
+	"Sales Invoice": "customer",
+}
 
 # สถานะของ ERPNext → (ป้าย, tone ของแอป) ชนิดที่ความหมายต่างกันระบุแยก
 STATUS = {
@@ -185,13 +193,40 @@ def decorate(rows, config):
 	return rows
 
 
-@frappe.whitelist()
-def get_docs(kind, project=None, scope="project", filter="todo", search=None, start=0):
-	"""รายการเอกสาร filter = todo (รอดำเนินการ) / draft / done / all ล่าสุดก่อน"""
-	config = config_of(kind)
+# คอลัมน์ที่เรียงได้ (key ของแอป → ช่องของเอกสาร ตาม config)
+SORTS = ("date", "due", "name", "party", "amount", "outstanding", "status")
+PAGE_SIZES = (30, 50, 100)
+EXPORT_LIMIT = 5000
+
+
+def sort_field(config, sort):
+	field = {
+		"date": config["date"],
+		"due": config["due"],
+		"name": "name",
+		"party": config["party"],
+		"amount": config["amount"],
+		"outstanding": config.get("outstanding"),
+		"status": "status",
+	}.get(sort)
+	return field or config["date"]
+
+
+def list_filters(config, project, scope, filter, date_from=None, date_to=None, party=None, overdue=0):
+	"""ตัวกรองของรายการ (ไม่รวมคำค้น) filter = todo / draft / done / all"""
 	doctype = config["doctype"]
-	frappe.has_permission(doctype, "read", throw=True)
 	filters = {**config.get("base", {}), **scope_filters(config, project, scope)}
+	if date_from and date_to:
+		filters[config["date"]] = ("between", (getdate(date_from), getdate(date_to)))
+	elif date_from:
+		filters[config["date"]] = (">=", getdate(date_from))
+	elif date_to:
+		filters[config["date"]] = ("<=", getdate(date_to))
+	if party and doctype in PARTY_LINK:
+		filters[PARTY_LINK[doctype]] = party
+	if cint(overdue):
+		filters.update(config["todo"])
+		filters[config["due"]] = ("<", getdate(nowdate()))
 	if filter == "todo":
 		filters.update(config["todo"])
 	elif filter == "draft":
@@ -203,22 +238,124 @@ def get_docs(kind, project=None, scope="project", filter="todo", search=None, st
 			filters["name"] = ("not in", todo_names)
 	else:
 		filters["docstatus"] = ("<", 2)
-	or_filters = None
-	if search:
-		like = f"%{search.strip()}%"
-		or_filters = {"name": ("like", like), "title": ("like", like)}
-		if config["party"]:
-			or_filters[config["party"]] = ("like", like)
+	return filters
+
+
+def search_filters(config, search):
+	if not search or not search.strip():
+		return None
+	like = f"%{search.strip()}%"
+	or_filters = {"name": ("like", like), "title": ("like", like)}
+	if config["party"]:
+		or_filters[config["party"]] = ("like", like)
+	return or_filters
+
+
+def count(doctype, filters, or_filters):
+	return cint(
+		frappe.get_list(
+			doctype, filters=filters, or_filters=or_filters, fields=[{"COUNT": "name", "as": "n"}], order_by=None
+		)[0].n
+	)
+
+
+@frappe.whitelist()
+def get_docs(
+	kind,
+	project=None,
+	scope="project",
+	filter="todo",
+	search=None,
+	start=0,
+	sort=None,
+	order="desc",
+	date_from=None,
+	date_to=None,
+	party=None,
+	overdue=0,
+	page_size=PAGE,
+	export=0,
+):
+	"""รายการเอกสาร ล่าสุดก่อน (เรียงตาม sort/order ได้)
+	คืน rows + total (จำนวนตามตัวกรอง) + sums (ยอดรวมทั้งชุด) + counts (จำนวนของแต่ละแท็บ)
+	export = 1: คืนทุกแถว (ไม่เกิน EXPORT_LIMIT) สำหรับส่งออก CSV"""
+	from urllib.parse import quote_plus
+
+	from consbiz.site_app import pdf_url
+
+	config = config_of(kind)
+	doctype = config["doctype"]
+	frappe.has_permission(doctype, "read", throw=True)
+	extra = {"date_from": date_from, "date_to": date_to, "party": party, "overdue": overdue}
+	filters = list_filters(config, project, scope, filter, **extra)
+	or_filters = search_filters(config, search)
+	page_size = cint(page_size) if cint(page_size) in PAGE_SIZES else PAGE
+	order = "asc" if order == "asc" else "desc"
+	field = sort_field(config, sort if sort in SORTS else None)
 	rows = frappe.get_list(
 		doctype,
 		filters=filters,
 		or_filters=or_filters,
 		fields=list_fields(config),
-		order_by=f"{config['date']} desc, creation desc",
-		start=cint(start),
-		limit_page_length=PAGE + 1,
+		order_by=f"`tab{doctype}`.`{field}` {order}, `tab{doctype}`.creation desc",
+		start=0 if cint(export) else cint(start),
+		limit_page_length=EXPORT_LIMIT if cint(export) else page_size,
 	)
-	return {"rows": decorate(rows[:PAGE], config), "more": len(rows) > PAGE}
+	decorate(rows, config)
+	base_pdf = pdf_url(doctype, "__NAME__")
+	for row in rows:
+		row.pdf_url = base_pdf.replace("__NAME__", quote_plus(row.name))
+	if cint(export):
+		return {"rows": rows}
+
+	sum_fields = [f for f in (config["amount"], config.get("outstanding")) if f]
+	sums = {}
+	if sum_fields:
+		result = frappe.get_list(
+			doctype,
+			filters=filters,
+			or_filters=or_filters,
+			fields=[{"SUM": f, "as": f} for f in sum_fields],
+			order_by=None,
+		)[0]
+		sums = {
+			"amount": flt(result.get(config["amount"])) if config["amount"] else None,
+			"outstanding": flt(result.get(config.get("outstanding"))) if config.get("outstanding") else None,
+		}
+	counts = {
+		tab: count(doctype, list_filters(config, project, scope, tab, **extra), or_filters)
+		for tab in ("todo", "draft", "done", "all")
+	}
+	total = counts[filter] if filter in counts else count(doctype, filters, or_filters)
+	return {
+		"rows": rows,
+		"total": total,
+		"more": cint(start) + len(rows) < total,
+		"sums": sums,
+		"counts": counts,
+	}
+
+
+@frappe.whitelist(methods=["POST"])
+def submit_docs(kind, names):
+	"""ส่งเอกสารร่างหลายใบ (เลือกจากรายการ) ใบที่ไม่ผ่านย้อนกลับเฉพาะใบนั้น (savepoint) คืนผลรายใบ"""
+	config = config_of(kind)
+	names = frappe.parse_json(names) if isinstance(names, str) else names
+	results = []
+	for name in (names or [])[:100]:
+		frappe.db.savepoint("site_bulk_submit")
+		try:
+			doc = frappe.get_doc(config["doctype"], name)
+			if doc.docstatus != 0:
+				frappe.throw(_("ส่งแล้ว"))
+			doc.submit()
+			results.append({"name": name, "ok": True})
+		except Exception as error:
+			frappe.db.rollback(save_point="site_bulk_submit")
+			message = frappe.utils.strip_html(str(error)) or _("ส่งไม่สำเร็จ")
+			results.append({"name": name, "ok": False, "error": message[:200]})
+		frappe.local.message_log = []
+	return results
 
 
 def count_and_sum(kind, filters, field=None):

@@ -5171,15 +5171,23 @@ a.ss-btn--soft {
 	}
 
 	/* หัว sidebar: พับ = โลโก้หมวด (มี Dock = ไม่แสดง เพราะ Dock บอกหมวดแล้ว), กาง = ชื่อหมวด */
-	html[data-dock]:not([data-side="expanded"]):not([data-peek]) .ss-nav-head {
+	html[data-dock] .ss-nav-head {
 		display: none;
 	}
+	/* พับ/กาง ใช้โครงแนวตั้งเดียวกัน (หัว 52px, โครงการ 52px, เมนู 48px ห่าง 2px) เมนูไม่ขยับขึ้นลงตอนเปิด-ปิด */
 	.ss-nav-head {
 		display: flex;
 		flex-direction: column;
+		justify-content: center;
 		align-items: center;
-		gap: 10px;
-		margin-bottom: 12px;
+		flex: none;
+		height: 52px;
+		margin-bottom: 6px;
+	}
+	.ss-nav-head .ss-nav-logo {
+		width: 40px;
+		height: 40px;
+		border-radius: 13px;
 	}
 	.ss-nav-head .ss-nav-brand {
 		margin: 0;
@@ -5197,12 +5205,17 @@ a.ss-btn--soft {
 	/* พับ: โครงการเหลือแค่ตัวย่อ (แตะเพื่อเปลี่ยนโครงการ) */
 	.ss-nav-project {
 		display: flex;
+		align-items: center;
 		justify-content: center;
+		flex: none;
+		height: 52px;
 		margin-bottom: 10px;
+		border-radius: 14px;
 	}
 	.ss-nav-project .ss-avatar {
-		width: 40px;
-		height: 40px;
+		flex: none;
+		width: 38px;
+		height: 38px;
 		border-radius: 12px;
 		font-size: 13px;
 	}
@@ -5214,8 +5227,12 @@ a.ss-btn--soft {
 		display: block;
 	}
 	/* พับ: ไอคอนอย่างเดียว (ชื่อเมนูดูได้จาก tooltip) */
+	.ss-nav,
+	.ss-nav.is-sub {
+		gap: 2px;
+	}
 	.ss-nav-item {
-		height: 52px;
+		height: 48px;
 	}
 	.ss-nav-label {
 		display: none;
@@ -5229,15 +5246,15 @@ a.ss-btn--soft {
 @media (min-width: 768px) {
 	:is(html[data-side="expanded"], html[data-peek]) .ss-nav,
 	:is(html[data-side="expanded"], html[data-peek]) .ss-nav.is-sub {
-		padding: calc(20px + var(--ss-top)) 16px calc(20px + var(--ss-bottom));
+		padding: calc(16px + var(--ss-top)) 10px calc(16px + var(--ss-bottom));
 		gap: 2px;
 	}
 	:is(html[data-side="expanded"], html[data-peek]) .ss-nav-brand {
 		justify-content: flex-start;
 		align-items: center;
 		gap: 12px;
-		padding: 0 6px;
-		margin-bottom: 18px;
+		padding: 0;
+		margin: 0;
 	}
 	:is(html[data-side="expanded"], html[data-peek]) .ss-nav-brand-text {
 		display: block;
@@ -5248,11 +5265,11 @@ a.ss-btn--soft {
 	:is(html[data-side="expanded"], html[data-peek]) .ss-nav-project {
 		display: flex;
 		align-items: center;
+		justify-content: flex-start;
 		gap: 10px;
 		width: 100%;
-		padding: 10px;
-		margin-bottom: 14px;
-		border-radius: 16px;
+		padding: 0 8px 0 9px;
+		border-radius: 14px;
 		background: var(--ss-surface-2);
 		text-align: left;
 		color: var(--ss-text);
@@ -5279,9 +5296,7 @@ a.ss-btn--soft {
 		line-height: 1.3;
 		overflow: hidden;
 		text-overflow: ellipsis;
-		display: -webkit-box;
-		-webkit-line-clamp: 2;
-		-webkit-box-orient: vertical;
+		white-space: nowrap;
 	}
 	:is(html[data-side="expanded"], html[data-peek]) .ss-nav-project-text small {
 		font-size: 11.5px;
@@ -5292,7 +5307,7 @@ a.ss-btn--soft {
 		justify-content: flex-start;
 		gap: 14px;
 		height: 48px;
-		padding: 0 14px;
+		padding: 0 16px;
 		border-radius: 14px;
 	}
 	:is(html[data-side="expanded"], html[data-peek]) .ss-nav-label {
@@ -5312,8 +5327,7 @@ a.ss-btn--soft {
 	:is(html[data-side="expanded"], html[data-peek]) .ss-nav-head {
 		flex-direction: row;
 		justify-content: space-between;
-		padding: 0 2px 0 6px;
-		margin-bottom: 16px;
+		padding: 0 0 0 8px;
 	}
 	:is(html[data-side="expanded"], html[data-peek]) .ss-nav-head .ss-nav-brand,
 	html[data-dock]:is([data-side="expanded"], [data-peek]) .ss-nav-head .ss-nav-brand {
@@ -5326,11 +5340,6 @@ a.ss-btn--soft {
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
-	}
-	:is(html[data-side="expanded"], html[data-peek]) .ss-nav,
-	:is(html[data-side="expanded"], html[data-peek]) .ss-nav.is-sub {
-		padding-left: 16px;
-		padding-right: 16px;
 	}
 }
 
@@ -5726,4 +5735,473 @@ select.ss-input {
 }
 .ss-docform .ss-split-main {
 	container-type: inline-size;
+}
+
+/* ---------------------------------------------------------------- hero แบบแถบเตี้ย (แท็บเล็ต/จอใหญ่) */
+.ss-hero-title {
+	display: none;
+}
+@media (min-width: 768px) {
+	.ss-hero {
+		display: flex;
+		align-items: center;
+		gap: 16px;
+		min-height: 84px;
+		margin: calc(16px + var(--ss-top)) 28px 0;
+		padding: 14px 16px 14px 24px;
+		border-radius: 22px;
+	}
+	.ss-hero-glow {
+		width: 200px;
+		height: 200px;
+		top: -120px;
+		right: 18%;
+	}
+	.ss-hero-greet {
+		flex: 1;
+		min-width: 0;
+		display: flex;
+		flex-wrap: wrap;
+		align-items: baseline;
+		column-gap: 6px;
+		margin: 0;
+	}
+	.ss-hero-title {
+		display: block;
+		flex-basis: 100%;
+		font-size: 22px;
+		font-weight: 700;
+		letter-spacing: -0.02em;
+		line-height: 1.25;
+	}
+	.ss-hero-hello,
+	.ss-hero-name {
+		font-size: 13.5px;
+		font-weight: 500;
+		letter-spacing: 0;
+		opacity: 0.85;
+	}
+	.ss-hero-hello::after {
+		content: ",";
+	}
+	.ss-project-chip {
+		flex: 0 1 360px;
+		width: auto;
+		max-width: 360px;
+		padding: 8px 12px 8px 8px;
+		border-radius: 16px;
+	}
+	.ss-project-chip-icon {
+		width: 34px;
+		height: 34px;
+		border-radius: 11px;
+	}
+	.ss-hero-top {
+		order: 3;
+		position: static;
+		margin: 0;
+	}
+	.ss-content--lift {
+		margin-top: 0;
+		padding-top: 18px;
+		padding-left: 28px;
+		padding-right: 28px;
+	}
+}
+
+/* แถวตัวเลขสรุป (ส่วนใหญ่ 4 ช่อง) อยู่แถวเดียวตั้งแต่แท็บเล็ต */
+@media (min-width: 768px) {
+	.ss-stats {
+		grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+	}
+}
+
+/* ================================================================ รายการเอกสาร (DocList.vue): แท็บ / แถบเครื่องมือ / ตาราง / ท้ายตาราง */
+
+.ss-sr {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	overflow: hidden;
+	clip: rect(0 0 0 0);
+	white-space: nowrap;
+}
+/* ปุ่มสร้างบนแถบบน: มือถือเหลือไอคอน */
+.ss-list-create {
+	min-height: 40px;
+	padding: 0 12px;
+	border-radius: 12px;
+	font-size: 14px;
+}
+.ss-list-create span {
+	display: none;
+}
+.ss-list-page {
+	gap: 12px;
+}
+
+.ss-tabs {
+	display: flex;
+	gap: 4px;
+	overflow-x: auto;
+	scrollbar-width: none;
+	border-bottom: 1px solid var(--ss-border-strong);
+	margin: 0 -16px;
+	padding: 0 16px;
+}
+.ss-tabs::-webkit-scrollbar {
+	display: none;
+}
+.ss-tab {
+	position: relative;
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	flex: none;
+	padding: 10px 12px 11px;
+	font-size: 14px;
+	font-weight: 600;
+	color: var(--ss-muted);
+	white-space: nowrap;
+	transition: color 0.2s ease;
+}
+.ss-tab::after {
+	content: "";
+	position: absolute;
+	left: 8px;
+	right: 8px;
+	bottom: -1px;
+	height: 2.5px;
+	border-radius: 3px 3px 0 0;
+	background: var(--ss-brand);
+	transform: scaleX(0);
+	transition: transform 0.25s var(--ss-ease);
+}
+.ss-tab.is-active {
+	color: var(--ss-text);
+}
+.ss-tab.is-active::after {
+	transform: scaleX(1);
+}
+.ss-tab-count {
+	min-width: 22px;
+	padding: 1px 7px;
+	border-radius: 99px;
+	font-size: 11.5px;
+	font-weight: 700;
+	text-align: center;
+	color: var(--ss-text-2);
+	background: var(--ss-border);
+	font-variant-numeric: tabular-nums;
+}
+.ss-tab.is-active .ss-tab-count {
+	color: var(--ss-brand);
+	background: var(--ss-brand-soft);
+}
+
+.ss-toolbar {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 8px;
+}
+.ss-toolbar-search {
+	flex: 1 1 220px;
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	min-width: 0;
+	height: 40px;
+	padding: 0 12px;
+	border-radius: 11px;
+	color: var(--ss-muted);
+	background: var(--ss-surface);
+	border: 1px solid var(--ss-border-strong);
+	transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.ss-toolbar-search:focus-within {
+	border-color: var(--ss-brand);
+	box-shadow: 0 0 0 3px var(--ss-brand-soft);
+}
+.ss-toolbar-search input {
+	flex: 1;
+	min-width: 0;
+	border: 0;
+	outline: 0;
+	background: none;
+	font-size: 15px;
+	color: var(--ss-text);
+}
+.ss-toolbar-gap {
+	flex: 1;
+}
+.ss-tool {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	height: 40px;
+	padding: 0 12px;
+	border-radius: 11px;
+	font-size: 14px;
+	font-weight: 500;
+	color: var(--ss-text-2);
+	background: var(--ss-surface);
+	border: 1px solid var(--ss-border-strong);
+	white-space: nowrap;
+	transition: border-color 0.2s ease, background 0.2s ease, color 0.2s ease;
+}
+select.ss-tool {
+	appearance: none;
+	-webkit-appearance: none;
+	padding-right: 30px;
+	background-image: linear-gradient(45deg, transparent 50%, var(--ss-muted) 50%),
+		linear-gradient(135deg, var(--ss-muted) 50%, transparent 50%);
+	background-position: calc(100% - 16px) 50%, calc(100% - 11px) 50%;
+	background-size: 5px 5px;
+	background-repeat: no-repeat;
+}
+.ss-tool:hover:not(:disabled) {
+	color: var(--ss-text);
+	border-color: color-mix(in srgb, var(--ss-brand) 40%, var(--ss-border-strong));
+}
+.ss-tool.is-active {
+	color: var(--ss-brand);
+	border-color: var(--ss-brand);
+	background: var(--ss-brand-soft);
+}
+.ss-tool--filter {
+	width: auto;
+	padding: 0 11px;
+}
+/* Picker ในแถบเครื่องมือ: ซ่อนป้าย เหลือกล่องค่าเตี้ย */
+.ss-tool-picker {
+	flex: 0 1 220px;
+	min-width: 150px;
+}
+.ss-tool-picker .ss-field-label {
+	display: none;
+}
+.ss-tool-picker .ss-picker-value {
+	min-height: 40px;
+	padding: 0 12px;
+	border-radius: 11px;
+	font-size: 14px;
+	background: var(--ss-surface);
+	border: 1px solid var(--ss-border-strong);
+}
+.ss-tool-picker .ss-picker.is-empty .ss-picker-value {
+	color: var(--ss-text-2);
+}
+
+.ss-active-filters {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 6px;
+	margin-top: -4px;
+}
+.ss-filter-chip {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	padding: 3px 4px 3px 10px;
+	border-radius: 99px;
+	font-size: 12.5px;
+	font-weight: 600;
+	color: var(--ss-brand);
+	background: var(--ss-brand-soft);
+}
+.ss-filter-chip button {
+	display: grid;
+	place-items: center;
+	width: 20px;
+	height: 20px;
+	border-radius: 50%;
+}
+.ss-filter-chip button:hover {
+	background: color-mix(in srgb, var(--ss-brand) 15%, transparent);
+}
+
+/* ตาราง: ช่องเลือก / หัวคอลัมน์เรียงได้ / ปุ่มของแถว / แถวที่เลือก */
+.ss-check {
+	width: 17px;
+	height: 17px;
+	accent-color: var(--ss-brand);
+	cursor: pointer;
+	vertical-align: middle;
+}
+.ss-table .col-check {
+	width: 44px;
+	padding-right: 0;
+	cursor: default;
+}
+.ss-th-sort {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	margin: -4px -6px;
+	padding: 4px 6px;
+	border-radius: 7px;
+	font: inherit;
+	color: inherit;
+	white-space: nowrap;
+}
+.ss-th-sort:hover {
+	color: var(--ss-text);
+	background: var(--ss-surface-2);
+}
+.ss-th-sort .is-idle {
+	opacity: 0.35;
+}
+th[aria-sort] .ss-th-sort {
+	color: var(--ss-text);
+}
+.ss-table th.is-num .ss-th-sort {
+	flex-direction: row-reverse;
+}
+.ss-table .col-actions {
+	width: 84px;
+	padding-left: 0;
+	text-align: right;
+}
+.ss-row-tools {
+	display: inline-flex;
+	gap: 2px;
+	opacity: 0;
+	transition: opacity 0.15s ease;
+}
+.ss-table tr:hover .ss-row-tools,
+.ss-table tr:focus-within .ss-row-tools {
+	opacity: 1;
+}
+/* จอสัมผัสไม่มี hover: แสดงปุ่มตลอด */
+@media (hover: none) {
+	.ss-row-tools {
+		opacity: 1;
+	}
+}
+.ss-table tbody tr.is-selected {
+	background: color-mix(in srgb, var(--ss-brand-soft) 70%, transparent);
+}
+.ss-table--list td.is-party span {
+	font-weight: 500;
+}
+
+/* ท้ายตาราง: ติดกับการ์ดตาราง */
+.ss-list-foot {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 8px 18px;
+	padding: 10px 14px 10px 18px;
+	border-radius: 0 0 var(--ss-radius) var(--ss-radius);
+	font-size: 13.5px;
+	color: var(--ss-text-2);
+	background: var(--ss-surface);
+	box-shadow: var(--ss-shadow);
+	border-top: 1px solid var(--ss-border);
+	font-variant-numeric: tabular-nums;
+}
+.ss-list-page .ss-table-wrap:has(+ .ss-list-foot) {
+	border-radius: var(--ss-radius) var(--ss-radius) 0 0;
+}
+.ss-list-page .ss-table-wrap + .ss-list-foot {
+	margin-top: -12px;
+}
+.ss-list-foot b {
+	color: var(--ss-text);
+}
+.ss-list-sum.is-due b {
+	color: var(--tone-rose);
+}
+.ss-list-size {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	color: var(--ss-muted);
+}
+.ss-list-size .ss-tool {
+	height: 32px;
+	padding-left: 10px;
+	font-size: 13px;
+}
+.ss-pager {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	font-weight: 600;
+}
+
+/* เลือกหลายแถว */
+.ss-bulk-bar .ss-btn {
+	min-height: 40px;
+}
+.ss-bulk-bar .ss-bar-summary b {
+	font-size: 15px;
+}
+.ss-bulk-results {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+}
+.ss-bulk-row {
+	display: grid;
+	grid-template-columns: 18px auto minmax(0, 1fr);
+	align-items: center;
+	gap: 8px;
+	padding: 8px 10px;
+	border-radius: 10px;
+	font-size: 13.5px;
+	color: var(--tone-green);
+	background: var(--tone-green-bg);
+}
+.ss-bulk-row span {
+	color: var(--ss-text-2);
+}
+.ss-bulk-row.is-fail {
+	color: var(--tone-rose);
+	background: var(--tone-rose-bg);
+}
+
+@media (min-width: 768px) {
+	.ss-list-create span {
+		display: inline;
+	}
+	.ss-list-create {
+		padding: 0 16px 0 12px;
+	}
+	.ss-tabs {
+		margin: 0;
+		padding: 0;
+	}
+	.ss-list-page {
+		gap: 14px;
+	}
+	/* ขอบเขตแสดงในแถบเครื่องมือแล้ว (ScopeSwitch ใช้ใน sheet ตัวกรองของมือถือเท่านั้น) */
+}
+
+/* รายการแบบตาราง: แถวเตี้ย ชื่อคู่ค้าบรรทัดเดียว (ชี้ดูชื่อเต็มได้) */
+.ss-table--list td {
+	padding-top: 9px;
+	padding-bottom: 9px;
+}
+.ss-table--list .is-party {
+	min-width: 160px;
+	max-width: 320px;
+}
+.ss-table--list .is-party span,
+.ss-table--list .is-party small {
+	display: block;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+/* % รับของ/วางบิล แสดงเฉพาะจอกว้างมาก (สถานะบอกอยู่แล้ว) */
+@media (max-width: 1439px) {
+	.ss-table .col-progress {
+		display: none;
+	}
+	.ss-table--list .is-party {
+		max-width: 260px;
+	}
 }
