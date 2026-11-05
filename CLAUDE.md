@@ -189,6 +189,8 @@ pre-commit run --all-files                               # ruff + prettier (ต�
   ยอด/ภาษีคำนวณที่ server (`preview_doc`) แล้ว rollback เสมอ (ERPNext สร้าง Item Price อัตโนมัติระหว่างเติมค่า) PI มีเลขที่ใบกำกับภาษี (erpnext_thailand บังคับเมื่อมีภาษีซื้อ)
   ทางเข้าจากระบบเต็ม: Desktop Icon "ConsERP" (`consbiz/desktop_icon/conserp.json`, External → /site) ผู้ใช้ที่มี Desktop Layout ของตัวเองเห็นไอคอนใหม่เฉพาะที่อยู่ใน layout (patch `add_conserp_to_desktop_layouts`)
   บริหารโครงการ (สิทธิ์อ่าน CM) ดูอย่างเดียว: ภาพรวม (`dashboard.get_dashboard`), แผนงาน Gantt (`get_plan`), Look-ahead (`lookahead.get_lookahead` สถานะวันตรงกับ `LookAhead.vue`),
+  แก้หลังส่ง: ดินสอข้างช่อง (`components/InlineEdit.vue`, จอใช้เมาส์แก้ตรงที่เดิม จอสัมผัสเป็น sheet) → `site_docs.save_after_submit`
+  ช่องที่แก้ได้ = `AFTER_SUBMIT` ใน site_docs.py ∩ ช่องที่ระบบตั้ง Allow on Submit (ไม่เปิดช่องบัญชี/ศูนย์ต้นทุน) วันที่ต้องการ/กำหนดส่งห้ามว่างและห้ามก่อนวันที่เอกสาร
   ทรัพยากร + แผนจัดซื้อวัสดุ (`resources.get_overview`), เอกสาร (`get_documents`) แก้แผนที่หน้า Gantt ในระบบเต็ม
   Look-ahead: มือถือ = การ์ดทีละสัปดาห์, แท็บเล็ต = ตาราง 2 สัปดาห์, จอใหญ่ = ตารางทั้งช่วง (matchMedia ใน `Lookahead.vue`)
   summary ของหมวดที่ `lazy` (บริหารโครงการ) โหลดเมื่อเปิดหมวดนั้นเท่านั้น
