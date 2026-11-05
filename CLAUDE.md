@@ -41,6 +41,11 @@ pre-commit run --all-files                               # ruff + prettier (ต�
 - เพิ่มฟีเจอร์หรือแก้ logic ต้องมีเทสต์ใน `test_<doctype>.py` ของ DocType นั้น และ `run-tests` ต้องผ่าน
 - DocType ที่ Link ไป DocType ของ ERPNext (เช่น Project) ต้องใส่ชื่อนั้นใน `IGNORE_TEST_RECORD_DEPENDENCIES`
   ไม่งั้นเทสต์จะสร้าง test record ของ ERPNext ทั้งชุดแล้วชนข้อมูลเดิม
+  (ไล่ไปถึง DocType ของแอปที่ไม่ได้ติดตั้ง เช่น `Payment Gateway` แล้วพัง) รวม Link ในตารางลูกด้วย
+  ใส่ได้เฉพาะเทสต์ในโฟลเดอร์ DocType: ไฟล์เทสต์นอกโฟลเดอร์ DocType (รายงาน, `consbiz/test_*.py`, `consbiz/tests/`) ห้ามใส่ Frappe v16 ขึ้น `NotImplementedError`
+- เทสต์ที่ต้องใช้ BOQ ใช้ `consbiz.tests.utils.insert_boq` (BOQ คำนวณ `total_amount` = ปริมาณ x ราคา เองทุกครั้ง)
+- Frappe v16: `frappe.copy_doc` คง `docstatus` ต้นฉบับ ทำฉบับแก้ไข (amend) ในเทสต์ต้องตั้ง `docstatus = 0` เอง
+  ระหว่างเทสต์ไม่มี Version (`ignore_version = in_test`) และ `cancel` ที่ไม่ผ่านเขียน docstatus ไปแล้ว ต้องย้อนด้วย savepoint เอง
 - งานที่เปลี่ยน DocType, fixtures, Sidebar หรือ Dock: restore backup ล่าสุดของเซิร์ฟเวอร์จริงลงไซต์ทดสอบ แล้ว migrate
   ตรวจ log ว่าไม่มีบรรทัด "Orphaned ... found" และข้อมูลไม่หาย
 

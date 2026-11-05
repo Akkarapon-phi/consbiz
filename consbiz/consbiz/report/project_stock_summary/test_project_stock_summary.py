@@ -8,13 +8,20 @@ from frappe.tests import IntegrationTestCase
 
 from consbiz.consbiz.report.project_stock_summary.project_stock_summary import execute
 
-IGNORE_TEST_RECORD_DEPENDENCIES = ["Project", "Company", "Item", "Construction Management"]
-
 MODULE = "consbiz.consbiz.report.project_stock_summary.project_stock_summary"
 
 
 def source(**values):
-	return {"requested": 0, "ordered": 0, "received": 0, "pending": 0, "qty_in": 0, "qty_out": 0, "balance": 0, **values}
+	return {
+		"requested": 0,
+		"ordered": 0,
+		"received": 0,
+		"pending": 0,
+		"qty_in": 0,
+		"qty_out": 0,
+		"balance": 0,
+		**values,
+	}
 
 
 class IntegrationTestProjectStockSummary(IntegrationTestCase):

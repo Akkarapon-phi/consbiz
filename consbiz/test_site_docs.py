@@ -9,9 +9,7 @@ import frappe
 from frappe.tests import IntegrationTestCase
 
 from consbiz import site_docs, store_app
-from consbiz.test_store_app import ITEM, SUPPLIER, make_po, setup_store
-
-IGNORE_TEST_RECORD_DEPENDENCIES = ["Company", "Customer", "Supplier", "Project", "Account", "Mode of Payment"]
+from consbiz.test_store_app import ITEM, ITEM_2, SUPPLIER, make_po, setup_store
 
 
 class IntegrationTestSiteDocs(IntegrationTestCase):
@@ -45,10 +43,13 @@ class IntegrationTestSiteDocs(IntegrationTestCase):
 		po = make_po(self.project)
 		po.cancel()
 		draft = frappe.copy_doc(po)
+		draft.docstatus = 0  # copy_doc ของ v16 คง docstatus ของต้นฉบับ (ยกเลิกแล้ว = 2)
 		draft.insert()
 		self.assertIn(draft.name, self.names(filter="draft"))
 		# อีกโครงการ: ไม่เห็นเมื่อเลือกขอบเขตโครงการ เห็นเมื่อทุกโครงการ
-		other = frappe.get_doc({"doctype": "Project", "project_name": "_Test Site Docs Other", "company": po.company})
+		other = frappe.get_doc(
+			{"doctype": "Project", "project_name": "_Test Site Docs Other", "company": po.company}
+		)
 		other.insert(ignore_permissions=True)
 		rows = site_docs.get_docs("po", project=other.name, filter="draft")["rows"]
 		self.assertNotIn(draft.name, [r.name for r in rows])
@@ -131,6 +132,7 @@ class IntegrationTestSiteDocs(IntegrationTestCase):
 		po = make_po(self.project)
 		po.cancel()
 		draft = frappe.copy_doc(po)
+		draft.docstatus = 0  # copy_doc ของ v16 คง docstatus ของต้นฉบับ (ยกเลิกแล้ว = 2)
 		draft.insert()
 		results = site_docs.submit_docs("po", json.dumps([draft.name, po.name]))
 		self.assertEqual([r["ok"] for r in results], [True, False])
@@ -148,7 +150,9 @@ class IntegrationTestSiteDocs(IntegrationTestCase):
 		self.assertEqual((preview["totals"]["discount_amount"], preview["totals"]["grand_total"]), (100, 900))
 		saved = site_docs.save_doc("po", json.dumps(data, default=str))
 		self.assertEqual(frappe.db.get_value("Purchase Order", saved["name"], "grand_total"), 900)
-		self.assertIn("additional_discount_percentage", site_docs.get_form("po", name=saved["name"])["fields"])
+		self.assertIn(
+			"additional_discount_percentage", site_docs.get_form("po", name=saved["name"])["fields"]
+		)
 
 	def test_request_totals_match_desk_formula(self):
 		from consbiz.request_totals import calculate
@@ -179,7 +183,7 @@ class IntegrationTestSiteDocs(IntegrationTestCase):
 			"custom_included_vat": 0,
 			"items": [
 				{"key": None, "item_code": ITEM, "qty": 2, "rate": 123, "custom_vat_nocal": 0},
-				{"key": None, "item_code": ITEM, "qty": 1, "rate": 50, "custom_vat_nocal": 1},
+				{"key": None, "item_code": ITEM_2, "qty": 1, "rate": 50, "custom_vat_nocal": 1},
 			],
 		}
 		saved = site_docs.save_doc("mr", json.dumps(data, default=str))
@@ -214,14 +218,16 @@ class IntegrationTestSiteDocs(IntegrationTestCase):
 		self.assertEqual(preview["summary"]["net"], 920)
 		saved = site_docs.save_doc("po", json.dumps(data, default=str))
 		po = frappe.get_doc("Purchase Order", saved["name"])
-		self.assertEqual((po.custom_wht_amount, po.custom_retention_amount, po.custom_paid_amount), (30, 50, 920))
+		self.assertEqual(
+			(po.custom_wht_amount, po.custom_retention_amount, po.custom_paid_amount), (30, 50, 920)
+		)
 
 	def test_item_insight(self):
 		po = make_po(self.project, qty=4)
 		info = site_docs.get_item_insight("po", ITEM, self.project)
 		self.assertEqual(info["item_code"], ITEM)
 		self.assertTrue(info["buying"])
-		self.assertIn(po.name, [p.name for p in info["prices"]])
+		self.assertIn(po.name, [p["name"] for p in info["prices"]])
 		pending = {o.name: o.pending for o in info["open_orders"]}
 		self.assertEqual(pending.get(po.name), 4)
 		self.assertIn("stock", info)
@@ -233,7 +239,11 @@ class IntegrationTestSiteDocs(IntegrationTestCase):
 		po = make_po(self.project)
 		activity = site_docs.get_activity("po", po.name)
 		self.assertEqual(activity["timeline"][-1]["type"], "created")
-		self.assertIn("ส่งเอกสาร", [t.get("text") for t in activity["timeline"]])
+		# ระหว่างเทสต์ Frappe ไม่สร้าง Version (ignore_version = in_test) จึงเทสต์ข้อความจาก Version ตรงๆ
+		self.assertEqual(site_docs.version_text(po, {"changed": [["docstatus", 0, 1]]}), "ส่งเอกสาร")
+		self.assertIn(
+			"แก้", site_docs.version_text(po, {"changed": [["schedule_date", "2026-01-01", "2026-01-02"]]})
+		)
 
 		site_docs.add_comment("po", po.name, "<p>ตรวจแล้ว</p><script>alert(1)</script>")
 		comment = next(t for t in site_docs.get_activity("po", po.name)["timeline"] if t["type"] == "comment")
@@ -256,4 +266,3 @@ class IntegrationTestSiteDocs(IntegrationTestCase):
 		self.assertEqual([f.name for f in site_docs.get_activity("po", po.name)["files"]], [file.name])
 		site_docs.remove_attachment("po", po.name, file.name)
 		self.assertFalse(frappe.db.exists("File", file.name))
-

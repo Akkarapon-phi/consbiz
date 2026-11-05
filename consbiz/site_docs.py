@@ -201,7 +201,14 @@ def decorate(rows, config):
 	today = getdate(nowdate())
 	projects = {r.get("project") for r in rows if r.get("project")}
 	project_names = (
-		dict(frappe.get_all("Project", filters={"name": ("in", list(projects))}, fields=["name", "project_name"], as_list=True))
+		dict(
+			frappe.get_all(
+				"Project",
+				filters={"name": ("in", list(projects))},
+				fields=["name", "project_name"],
+				as_list=True,
+			)
+		)
 		if projects
 		else {}
 	)
@@ -264,7 +271,9 @@ def list_filters(config, project, scope, filter, date_from=None, date_to=None, p
 		filters["docstatus"] = 0
 	elif filter == "done":
 		filters["docstatus"] = 1
-		todo_names = frappe.get_list(doctype, filters={**filters, **config["todo"]}, pluck="name", limit_page_length=0)
+		todo_names = frappe.get_list(
+			doctype, filters={**filters, **config["todo"]}, pluck="name", limit_page_length=0
+		)
 		if todo_names:
 			filters["name"] = ("not in", todo_names)
 	else:
@@ -285,7 +294,11 @@ def search_filters(config, search):
 def count(doctype, filters, or_filters):
 	return cint(
 		frappe.get_list(
-			doctype, filters=filters, or_filters=or_filters, fields=[{"COUNT": "name", "as": "n"}], order_by=None
+			doctype,
+			filters=filters,
+			or_filters=or_filters,
+			fields=[{"COUNT": "name", "as": "n"}],
+			order_by=None,
 		)[0].n
 	)
 
@@ -431,9 +444,13 @@ def get_summary(section, project=None, scope="project"):
 		return {
 			"mr_todo": count_and_sum("mr", scoped("mr", DOCS["mr"]["todo"])),
 			"po_receive": count_and_sum(
-				"po", scoped("po", {"docstatus": 1, "status": ("in", ("To Receive and Bill", "To Receive"))}), "grand_total"
+				"po",
+				scoped("po", {"docstatus": 1, "status": ("in", ("To Receive and Bill", "To Receive"))}),
+				"grand_total",
 			),
-			"po_bill": count_and_sum("po", scoped("po", {"docstatus": 1, "status": "To Bill"}), "grand_total"),
+			"po_bill": count_and_sum(
+				"po", scoped("po", {"docstatus": 1, "status": "To Bill"}), "grand_total"
+			),
 			"pi_unpaid": count_and_sum("pi", scoped("pi", DOCS["pi"]["todo"]), "outstanding_amount"),
 			"pi_overdue": count_and_sum(
 				"pi", scoped("pi", {**DOCS["pi"]["todo"], "due_date": ("<", today)}), "outstanding_amount"
@@ -441,10 +458,19 @@ def get_summary(section, project=None, scope="project"):
 			"drafts": sum(count_and_sum(k, scoped(k, {"docstatus": 0}))["count"] for k in ("mr", "po", "pi")),
 			"due_soon": top(
 				"po",
-				scoped("po", {"docstatus": 1, "status": ("in", ("To Receive and Bill", "To Receive")), "schedule_date": ("<=", soon)}),
+				scoped(
+					"po",
+					{
+						"docstatus": 1,
+						"status": ("in", ("To Receive and Bill", "To Receive")),
+						"schedule_date": ("<=", soon),
+					},
+				),
 				"schedule_date asc",
 			),
-			"to_pay": top("pi", scoped("pi", {**DOCS["pi"]["todo"], "due_date": ("<=", soon)}), "due_date asc"),
+			"to_pay": top(
+				"pi", scoped("pi", {**DOCS["pi"]["todo"], "due_date": ("<=", soon)}), "due_date asc"
+			),
 		}
 	if section == "sell":
 		return {
@@ -454,9 +480,15 @@ def get_summary(section, project=None, scope="project"):
 			"si_overdue": count_and_sum(
 				"si", scoped("si", {**DOCS["si"]["todo"], "due_date": ("<", today)}), "outstanding_amount"
 			),
-			"drafts": sum(count_and_sum(k, scoped(k, {"docstatus": 0}))["count"] for k in ("qtn", "so", "si")),
-			"expiring": top("qtn", scoped("qtn", {**DOCS["qtn"]["todo"], "valid_till": ("<=", soon)}), "valid_till asc"),
-			"to_collect": top("si", scoped("si", {**DOCS["si"]["todo"], "due_date": ("<=", soon)}), "due_date asc"),
+			"drafts": sum(
+				count_and_sum(k, scoped(k, {"docstatus": 0}))["count"] for k in ("qtn", "so", "si")
+			),
+			"expiring": top(
+				"qtn", scoped("qtn", {**DOCS["qtn"]["todo"], "valid_till": ("<=", soon)}), "valid_till asc"
+			),
+			"to_collect": top(
+				"si", scoped("si", {**DOCS["si"]["todo"], "due_date": ("<=", soon)}), "due_date asc"
+			),
 		}
 	frappe.throw(_("ไม่รองรับหมวด {0}").format(section))
 
@@ -609,13 +641,20 @@ def summary_of(doc, kind):
 	if kind != "mr" and doc.meta.has_field("custom_subject_to_wht"):
 		for subject, percent, amount, label in (
 			("custom_subject_to_wht", "custom_wht_percent", "custom_wht_amount", "หัก ณ ที่จ่าย"),
-			("custom_subject_to_retention", "custom_retention_percent", "custom_retention_amount", "เงินประกันผลงาน"),
+			(
+				"custom_subject_to_retention",
+				"custom_retention_percent",
+				"custom_retention_amount",
+				"เงินประกันผลงาน",
+			),
 		):
 			if cint(doc.get(subject)) and flt(doc.get(amount)):
 				out["deductions"].append(
 					{"label": _(label) + f" {flt(doc.get(percent)):g}%", "value": -flt(doc.get(amount))}
 				)
-		net_field = "custom_net_paid_amount" if doc.meta.has_field("custom_net_paid_amount") else "custom_paid_amount"
+		net_field = (
+			"custom_net_paid_amount" if doc.meta.has_field("custom_net_paid_amount") else "custom_paid_amount"
+		)
 		if out["deductions"] or flt(doc.get("total_advance")):
 			out["net"] = flt(doc.get(net_field))
 			out["net_label"] = _("ยอดชำระสุทธิ")
@@ -679,7 +718,9 @@ def get_doc(kind, name):
 	doc.check_permission("read")
 	label, tone = status_of(doc.status, doc.docstatus)
 	before, after = links_of(doc)
-	items = [{field: row.get(field) for field in ITEM_FIELDS if row.meta.has_field(field)} for row in doc.items]
+	items = [
+		{field: row.get(field) for field in ITEM_FIELDS if row.meta.has_field(field)} for row in doc.items
+	]
 	project = doc.get(config["project"]) if config["project"] else None
 	return {
 		**header_info(doc, kind),
@@ -720,7 +761,9 @@ def get_doc(kind, name):
 			{"description": t.description, "rate": flt(t.rate), "amount": flt(t.tax_amount)}
 			for t in doc.get("taxes") or []
 		],
-		"remarks": doc.get(FORM[kind].get("remarks") or "remarks") if doc.meta.has_field(FORM[kind].get("remarks") or "remarks") else None,
+		"remarks": doc.get(FORM[kind].get("remarks") or "remarks")
+		if doc.meta.has_field(FORM[kind].get("remarks") or "remarks")
+		else None,
 		"before": before,
 		"after": after,
 		"can_submit": bool(doc.docstatus == 0 and frappe.has_permission(doc.doctype, "submit", doc)),
@@ -736,7 +779,7 @@ def submit_doc(kind, name):
 	config = config_of(kind)
 	doc = frappe.get_doc(config["doctype"], name)
 	doc.submit()
-	label, tone = status_of(doc.status, doc.docstatus)
+	label, _tone = status_of(doc.status, doc.docstatus)
 	return {"name": doc.name, "status_label": label}
 
 
@@ -745,7 +788,12 @@ def submit_doc(kind, name):
 # ส่วนลดท้ายบิล (%) ERPNext คำนวณยอดหลังส่วนลดเองใน calculate_taxes_and_totals
 DISCOUNT = "additional_discount_percentage"
 # หัก ณ ที่จ่าย / เงินประกันผลงาน (Custom Field) ยอดคำนวณใน consbiz/deductions.py
-DEDUCT = ("custom_subject_to_wht", "custom_wht_percent", "custom_subject_to_retention", "custom_retention_percent")
+DEDUCT = (
+	"custom_subject_to_wht",
+	"custom_wht_percent",
+	"custom_subject_to_retention",
+	"custom_retention_percent",
+)
 
 # ช่องหัวเอกสารที่แอปส่งมาได้ (ช่องอื่นไม่รับ) และช่องของแถวรายการ
 FORM = {
@@ -763,7 +811,16 @@ FORM = {
 			"custom_vat",
 			"custom_remark",
 		),
-		"item": ("item_code", "qty", "uom", "rate", "schedule_date", "description", "custom_wbs", "custom_vat_nocal"),
+		"item": (
+			"item_code",
+			"qty",
+			"uom",
+			"rate",
+			"schedule_date",
+			"description",
+			"custom_wbs",
+			"custom_vat_nocal",
+		),
 		"remarks": "custom_remark",
 	},
 	"po": {
@@ -797,7 +854,15 @@ FORM = {
 	},
 	"so": {
 		"party": "customer",
-		"header": ("customer", "po_no", "transaction_date", "delivery_date", "taxes_and_charges", DISCOUNT, *DEDUCT),
+		"header": (
+			"customer",
+			"po_no",
+			"transaction_date",
+			"delivery_date",
+			"taxes_and_charges",
+			DISCOUNT,
+			*DEDUCT,
+		),
 		"item": ("item_code", "qty", "uom", "rate", "delivery_date", "description"),
 	},
 	"si": {
@@ -828,7 +893,15 @@ MAPPERS = {
 	"so": ("qtn", "erpnext.selling.doctype.quotation.quotation.make_sales_order"),
 	"si": ("so", "erpnext.selling.doctype.sales_order.sales_order.make_sales_invoice"),
 }
-DATE_FIELDS = {"transaction_date", "schedule_date", "posting_date", "bill_date", "due_date", "valid_till", "delivery_date"}
+DATE_FIELDS = {
+	"transaction_date",
+	"schedule_date",
+	"posting_date",
+	"bill_date",
+	"due_date",
+	"valid_till",
+	"delivery_date",
+}
 PARTY_DOCTYPE = {"supplier": "Supplier", "customer": "Customer", "party_name": "Customer"}
 
 
@@ -875,7 +948,8 @@ def new_doc(kind, project):
 	# แม่แบบภาษีค่าเริ่มต้นของบริษัท (แถวภาษีใส่ตอน apply_form)
 	if doc.meta.has_field("taxes_and_charges"):
 		doc.taxes_and_charges = frappe.db.get_value(
-			doc.meta.get_field("taxes_and_charges").options, {"is_default": 1, "company": doc.company, "disabled": 0}
+			doc.meta.get_field("taxes_and_charges").options,
+			{"is_default": 1, "company": doc.company, "disabled": 0},
 		)
 	return doc
 
@@ -909,6 +983,17 @@ def project_of(doc, kind):
 	return doc.get(field) if field else None
 
 
+NUMERIC = ("Check", "Int", "Float", "Currency", "Percent")
+
+
+def form_value(df, value):
+	"""ค่าจากแอปลงช่องเอกสาร: ช่องติ๊ก/ตัวเลขเก็บ 0 ไว้ (ถ้าเป็น None ตอน insert Frappe ใส่ค่า default ทับ
+	เช่น "มูลค่ารวมภาษี" ที่ผู้ใช้เอาติ๊กออกกลับเป็นติ๊ก) ช่องอื่นค่าว่าง = None"""
+	if df.fieldtype in NUMERIC:
+		return cint(value) if df.fieldtype in ("Check", "Int") else flt(value)
+	return value if value not in ("", None) else None
+
+
 def apply_form(doc, kind, data):
 	"""ใส่ค่าจากแอปลงเอกสาร: ช่องหัวเอกสารตาม FORM, แถวเดิมจับคู่ด้วย key, แถวใหม่ตั้งค่าเริ่มจาก ERPNext"""
 	from erpnext.stock.get_item_details import get_conversion_factor
@@ -921,8 +1006,7 @@ def apply_form(doc, kind, data):
 		frappe.throw(_("วัตถุประสงค์ต้องเป็น ซื้อ หรือ ผู้ว่าจ้างจัดหา"))
 	for field in form["header"]:
 		if field in data and doc.meta.has_field(field):
-			value = data.get(field) or None
-			doc.set(field, value)
+			doc.set(field, form_value(doc.meta.get_field(field), data.get(field)))
 	if kind in ("pi", "si") and data.get("posting_date"):
 		doc.set_posting_time = 1
 	if kind == "pi":
@@ -956,7 +1040,9 @@ def apply_form(doc, kind, data):
 		if not row.get("uom"):
 			row.uom = frappe.db.get_value("Item", row.item_code, "stock_uom")
 		if row.uom != old_uom or not row.get("conversion_factor"):
-			row.conversion_factor = flt(get_conversion_factor(row.item_code, row.uom).get("conversion_factor")) or 1
+			row.conversion_factor = (
+				flt(get_conversion_factor(row.item_code, row.uom).get("conversion_factor")) or 1
+			)
 		for field in ("schedule_date", "delivery_date"):
 			if row.meta.has_field(field) and not row.get(field):
 				row.set(field, doc.get(field) or doc.get("transaction_date"))
@@ -1009,14 +1095,15 @@ def tax_templates(doc):
 
 
 def serialize_form(doc, kind):
-	config = DOCS[kind]
 	form = FORM[kind]
 	party_field = form["party"]
 	party_name = None
 	if party_field and doc.get(party_field):
 		party_doctype = PARTY_DOCTYPE[party_field]
 		party_name = frappe.db.get_value(
-			party_doctype, doc.get(party_field), "supplier_name" if party_doctype == "Supplier" else "customer_name"
+			party_doctype,
+			doc.get(party_field),
+			"supplier_name" if party_doctype == "Supplier" else "customer_name",
 		)
 	items = []
 	for i, row in enumerate(doc.get("items") or []):
@@ -1073,7 +1160,9 @@ def totals_of(doc):
 
 def item_uoms(item_code):
 	stock_uom = frappe.get_cached_value("Item", item_code, "stock_uom")
-	uoms = frappe.get_all("UOM Conversion Detail", filters={"parent": item_code, "parenttype": "Item"}, pluck="uom")
+	uoms = frappe.get_all(
+		"UOM Conversion Detail", filters={"parent": item_code, "parenttype": "Item"}, pluck="uom"
+	)
 	return list(dict.fromkeys([stock_uom, *uoms]))
 
 
@@ -1099,12 +1188,14 @@ def preview_doc(kind, data):
 	"""คำนวณยอด/ภาษีตามที่กรอก (ไม่บันทึก)"""
 	data = parse(data)
 	doc = load_doc(kind, name=data.get("name"), source=data.get("source"), project=data.get("project"))
+	# ERPNext อาจเขียนข้อมูลระหว่างเติมค่า (เช่น สร้าง Item Price อัตโนมัติ) ตัวอย่างยอดต้องไม่บันทึกอะไร
+	# ย้อนเฉพาะส่วนนี้ด้วย savepoint (ไม่ย้อนทั้ง transaction ที่อาจมีงานอื่นอยู่ก่อน)
+	frappe.db.savepoint("site_preview")
 	try:
 		apply_form(doc, kind, data)
 		out = serialize_form(doc, kind)
 	finally:
-		# ERPNext อาจเขียนข้อมูลระหว่างเติมค่า (เช่น สร้าง Item Price อัตโนมัติ) ตัวอย่างยอดต้องไม่บันทึกอะไร
-		frappe.db.rollback()
+		frappe.db.rollback(save_point="site_preview")
 		frappe.local.message_log = []
 	return {"totals": out["totals"], "taxes": out["taxes"], "summary": out["summary"], "items": out["items"]}
 
@@ -1158,13 +1249,22 @@ def search_items(kind, txt=None, project=None):
 		"Item",
 		filters=filters,
 		or_filters=or_filters,
-		fields=["name as item_code", "item_name", "item_group", "stock_uom", "last_purchase_rate", "standard_rate"],
+		fields=[
+			"name as item_code",
+			"item_name",
+			"item_group",
+			"stock_uom",
+			"last_purchase_rate",
+			"standard_rate",
+		],
 		order_by="modified desc",
 		limit_page_length=40,
 	)
 	prices = {}
 	if rows and not buying:
-		price_list = frappe.db.get_single_value("Selling Settings", "selling_price_list") or "Standard Selling"
+		price_list = (
+			frappe.db.get_single_value("Selling Settings", "selling_price_list") or "Standard Selling"
+		)
 		prices = dict(
 			frappe.get_all(
 				"Item Price",
@@ -1174,7 +1274,9 @@ def search_items(kind, txt=None, project=None):
 			)
 		)
 	for row in rows:
-		row.rate = flt(row.last_purchase_rate) if buying else flt(prices.get(row.item_code) or row.standard_rate)
+		row.rate = (
+			flt(row.last_purchase_rate) if buying else flt(prices.get(row.item_code) or row.standard_rate)
+		)
 		row.uoms = item_uoms(row.item_code)
 		row.pop("last_purchase_rate")
 		row.pop("standard_rate")
@@ -1229,7 +1331,6 @@ def search_signatures(txt=None):
 	)
 
 
-
 # ---------------------------------------------------------------- ข้อมูลช่วยตัดสินใจของรายการ (แผงขวาของฟอร์ม จอ ≥1480)
 
 
@@ -1249,12 +1350,18 @@ def get_item_insight(kind, item_code, project=None):
 
 	# คงเหลือ: คลังของโครงการ / ทั้งบริษัท
 	if frappe.has_permission("Bin", "read") or frappe.has_permission("Stock Ledger Entry", "read"):
-		bins = frappe.get_all("Bin", filters={"item_code": item_code}, fields=["warehouse", "actual_qty", "projected_qty"])
+		bins = frappe.get_all(
+			"Bin", filters={"item_code": item_code}, fields=["warehouse", "actual_qty", "projected_qty"]
+		)
 		project_whs = (
-			set(frappe.get_all("Warehouse", filters={"custom_project": project}, pluck="name")) if project else set()
+			set(frappe.get_all("Warehouse", filters={"custom_project": project}, pluck="name"))
+			if project
+			else set()
 		)
 		out["stock"] = {
-			"project": flt(sum(b.actual_qty for b in bins if b.warehouse in project_whs)) if project else None,
+			"project": flt(sum(b.actual_qty for b in bins if b.warehouse in project_whs))
+			if project
+			else None,
 			"all": flt(sum(b.actual_qty for b in bins)),
 			"projected": flt(sum(b.projected_qty for b in bins)),
 		}
@@ -1277,7 +1384,11 @@ def get_item_insight(kind, item_code, project=None):
 				for r in rows
 			)
 			supply = get_supply(project, [item_code])[item_code]["total"]
-			out["plan"] = {"planned": planned, **{k: flt(v) for k, v in supply.items()}, "in_plan": bool(rows)}
+			out["plan"] = {
+				"planned": planned,
+				**{k: flt(v) for k, v in supply.items()},
+				"in_plan": bool(rows),
+			}
 
 	# ราคาล่าสุด: ซื้อ = PO ที่ส่งแล้ว, ขาย = ใบแจ้งหนี้ขาย/ใบเสนอราคาที่ส่งแล้ว
 	sources = (
@@ -1367,7 +1478,7 @@ def person(user):
 def version_text(doc, data):
 	"""สรุป Version เป็นข้อความสั้น: ส่ง/ยกเลิก หรือ แก้ช่อง ก, ข (+n) / เพิ่ม-ลบแถว"""
 	changed = data.get("changed") or []
-	for field, old, new in changed:
+	for field, _old, new in changed:
 		if field == "docstatus":
 			return _("ส่งเอกสาร") if new == 1 else _("ยกเลิกเอกสาร") if new == 2 else _("แก้สถานะเอกสาร")
 	labels = []
@@ -1416,7 +1527,11 @@ def get_activity(kind, name):
 
 	for c in frappe.get_all(
 		"Comment",
-		filters={"reference_doctype": doctype, "reference_name": name, "comment_type": ("in", TIMELINE_COMMENTS)},
+		filters={
+			"reference_doctype": doctype,
+			"reference_name": name,
+			"comment_type": ("in", TIMELINE_COMMENTS),
+		},
 		fields=["name", "comment_type", "content", "owner", "creation"],
 		order_by="creation desc",
 		limit_page_length=50,
@@ -1461,7 +1576,9 @@ def get_activity(kind, name):
 			"comment": True,
 			"attach": bool(frappe.has_permission(doctype, "read", doc)),
 			"remove_file": can_write or doc.docstatus == 1,
-			"assign": bool(frappe.has_permission(doctype, "write", doc) or frappe.has_permission(doctype, "share", doc)),
+			"assign": bool(
+				frappe.has_permission(doctype, "write", doc) or frappe.has_permission(doctype, "share", doc)
+			),
 		},
 	}
 
@@ -1486,7 +1603,11 @@ def delete_comment(kind, name, comment):
 	row = frappe.db.get_value(
 		"Comment", comment, ["owner", "reference_doctype", "reference_name", "comment_type"], as_dict=True
 	)
-	if not row or (row.reference_doctype, row.reference_name) != (doc.doctype, doc.name) or row.comment_type != "Comment":
+	if (
+		not row
+		or (row.reference_doctype, row.reference_name) != (doc.doctype, doc.name)
+		or row.comment_type != "Comment"
+	):
 		frappe.throw(_("ไม่พบความคิดเห็น"))
 	if row.owner != frappe.session.user:
 		frappe.throw(_("ลบได้เฉพาะความคิดเห็นของตัวเอง"), frappe.PermissionError)

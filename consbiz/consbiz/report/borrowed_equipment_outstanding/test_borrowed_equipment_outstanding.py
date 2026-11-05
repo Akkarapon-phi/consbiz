@@ -5,8 +5,6 @@ from frappe.tests import IntegrationTestCase
 
 from consbiz.consbiz.report.borrowed_equipment_outstanding.borrowed_equipment_outstanding import execute
 
-IGNORE_TEST_RECORD_DEPENDENCIES = ["Equipment Borrowing", "Project", "Company", "Supplier"]
-
 
 class IntegrationTestBorrowedEquipmentOutstanding(IntegrationTestCase):
 	def test_runs(self):

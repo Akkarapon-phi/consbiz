@@ -10,8 +10,6 @@ from consbiz.consbiz.report.site_delivery_summary.site_delivery_summary import e
 from consbiz.employer_supplied import employer_item
 from consbiz.tests.test_employer_supplied import make_item
 
-IGNORE_TEST_RECORD_DEPENDENCIES = ["Item", "Item Group", "UOM", "Company", "Warehouse", "Project", "Supplier"]
-
 MODULE = "consbiz.consbiz.report.site_delivery_summary.site_delivery_summary"
 FILTERS = {"company": "_Test Company", "from_date": "2026-11-01", "to_date": "2026-11-30"}
 
@@ -35,5 +33,7 @@ class IntegrationTestSiteDeliverySummary(IntegrationTestCase):
 		):
 			data = execute(FILTERS)[1]
 			employer_only = execute({**FILTERS, "supply": "Employer"})[1]
-		self.assertEqual([(r.voucher_no, r.supply) for r in data], [("SE-1", "ผู้ว่าจ้างจัดหา"), ("PR-2", "ซื้อเอง")])
+		self.assertEqual(
+			[(r.voucher_no, r.supply) for r in data], [("SE-1", "ผู้ว่าจ้างจัดหา"), ("PR-2", "ซื้อเอง")]
+		)
 		self.assertEqual([r.voucher_no for r in employer_only], ["SE-1"])

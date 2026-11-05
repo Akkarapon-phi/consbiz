@@ -74,10 +74,19 @@ SOURCES = {
 
 
 class Transmittal(Document):
-	def validate(self):
+	def _validate_links(self):
+		# Frappe ตรวจ Dynamic Link (party → party_type) ก่อน before_insert / validate
+		# ตั้ง party_type จากประเภทผู้รับก่อน ไม่งั้นสร้างจาก server (API, นำเข้า, เทสต์) ได้ "Party Type must be set first"
+		self.set_party_type()
+		super()._validate_links()
+
+	def set_party_type(self):
 		self.party_type = PARTY_TYPES.get(self.recipient_type)
 		if not self.party_type:
 			self.party = None
+
+	def validate(self):
+		self.set_party_type()
 		if self.party and not self.recipient_name:
 			self.recipient_name = get_party_name(self.party_type, self.party)
 		self.validate_dates()
@@ -86,7 +95,10 @@ class Transmittal(Document):
 
 	def before_update_after_submit(self):
 		self.validate_dates()
-		self.set_status()
+
+	def on_update_after_submit(self):
+		# status ไม่ได้ allow_on_submit: แก้ก่อนบันทึกได้ UpdateAfterSubmitError ตั้งหลังบันทึกด้วย db_set แทน
+		self.set_status(update=True)
 
 	def on_submit(self):
 		self.set_status(update=True)
@@ -187,7 +199,7 @@ def _source_fields(doctype, cfg):
 		if cfg.get(key) and (cfg[key] == "name" or meta.has_field(cfg[key])):
 			fields.add(cfg[key])
 	amount = cfg.get("amount")
-	for f in (amount if isinstance(amount, tuple) else (amount,)):
+	for f in amount if isinstance(amount, tuple) else (amount,):
 		if f and meta.has_field(f):
 			fields.add(f)
 	return list(fields)
@@ -223,7 +235,9 @@ def _generic_row(doctype, name):
 		(f for f in ("posting_date", "transaction_date", "date") if meta.has_field(f)),
 		None,
 	)
-	amount_field = next((f for f in ("grand_total", "total_amount", "paid_amount", "amount") if meta.has_field(f)), None)
+	amount_field = next(
+		(f for f in ("grand_total", "total_amount", "paid_amount", "amount") if meta.has_field(f)), None
+	)
 	title = doc.get(meta.title_field) if meta.title_field else None
 	return {
 		"reference_doctype": doctype,

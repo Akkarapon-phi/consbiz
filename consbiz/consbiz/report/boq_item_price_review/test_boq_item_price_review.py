@@ -7,7 +7,6 @@ from frappe.tests import IntegrationTestCase
 from consbiz.consbiz.report.boq_item_price_review.boq_item_price_review import execute, update_standard_rates
 
 EXTRA_TEST_RECORD_DEPENDENCIES = []
-IGNORE_TEST_RECORD_DEPENDENCIES = ["UOM", "BOQ Item Group", "BOQ Item", "BOQ", "Customer", "Company"]
 
 
 class IntegrationTestBOQItemPriceReview(IntegrationTestCase):

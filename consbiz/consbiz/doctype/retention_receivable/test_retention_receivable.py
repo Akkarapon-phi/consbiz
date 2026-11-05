@@ -10,7 +10,15 @@ from frappe.utils import add_days, nowdate
 from consbiz import retention
 from consbiz.utils import thai_baht_text
 
-IGNORE_TEST_RECORD_DEPENDENCIES = ["Company", "Customer", "Supplier", "Project", "Account"]
+IGNORE_TEST_RECORD_DEPENDENCIES = [
+	"Company",
+	"Customer",
+	"Supplier",
+	"Project",
+	"Account",
+	"Purchase Invoice",
+	"Sales Invoice",
+]
 
 COMPANY = "_Test Retention Company"
 ABBR = "_TRC"
@@ -64,10 +72,18 @@ def setup_retention_masters():
 		accounts[field] = account
 	frappe.db.set_value("Company", COMPANY, accounts)
 
+	# erpnext_thailand บังคับให้บริษัทมีแถวใน Thai Tax Settings (เอกสารเทสต์ไม่มี VAT จึงไม่ต้องระบุบัญชีภาษี)
+	settings = frappe.get_single("Thai Tax Settings")
+	if not any(row.company == COMPANY for row in settings.company_accounts):
+		settings.append("company_accounts", {"company": COMPANY})
+		settings.save(ignore_permissions=True)
+
 	customer_group = ensure_master(
 		"Customer Group", "_Test Retention Group", customer_group_name="_Test Retention Group"
 	)
-	territory = ensure_master("Territory", "_Test Retention Territory", territory_name="_Test Retention Territory")
+	territory = ensure_master(
+		"Territory", "_Test Retention Territory", territory_name="_Test Retention Territory"
+	)
 	ensure_master(
 		"Customer",
 		CUSTOMER,
@@ -165,7 +181,9 @@ class IntegrationTestRetentionReceivable(IntegrationTestCase):
 		)
 		self.assertTrue(retention.has_retention(invoice))
 		doc = retention.make_source_from_invoice(invoice)
-		self.assertEqual((doc.doctype, doc.customer, doc.customer_po), ("Retention Receivable", CUSTOMER, "PO-123"))
+		self.assertEqual(
+			(doc.doctype, doc.customer, doc.customer_po), ("Retention Receivable", CUSTOMER, "PO-123")
+		)
 		row = doc.retention_items[0]
 		self.assertEqual((row.sales_invoice_no, row.base_amount, row.amount), ("SINV-TEST-1", 50000, 2500))
 

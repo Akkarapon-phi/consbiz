@@ -8,6 +8,7 @@ from frappe.utils import cint
 from consbiz.consbiz.doctype.construction_management.construction_management import create_from_boq
 from consbiz.consbiz.doctype.daily_report.daily_report import DEFAULT_LABOUR, get_default_resources
 from consbiz.consbiz.doctype.daily_request.daily_request import make_daily_report, reject
+from consbiz.tests.utils import insert_boq
 
 EXTRA_TEST_RECORD_DEPENDENCIES = []
 IGNORE_TEST_RECORD_DEPENDENCIES = [
@@ -34,7 +35,7 @@ class IntegrationTestDailyRequest(IntegrationTestCase):
 			{"wbs": "1.2", "item_name": "งานเหมา", "quantity": 0, "total_amount": 1000},
 		):
 			boq.append("boq_details", row)
-		boq.insert()
+		insert_boq(boq)
 		# งานทุกแถวเริ่มและจบวันที่ 2026-11-02 (วันเริ่มของ BOQ, 1 วัน)
 		self.plan = create_from_boq(boq.name)
 
@@ -144,7 +145,9 @@ class IntegrationTestDailyRequest(IntegrationTestCase):
 		self.assertEqual(request.status, "Approved")
 		self.assertEqual(request.approved_by, frappe.session.user)
 		# คำขออนุมัติไม่นับเป็นความคืบหน้าจริง
-		self.assertFalse(frappe.db.exists("Construction Progress Entry", {"construction_management": self.plan}))
+		self.assertFalse(
+			frappe.db.exists("Construction Progress Entry", {"construction_management": self.plan})
+		)
 
 		request.cancel()
 		self.assertEqual(frappe.db.get_value("Daily Request", request.name, "status"), "Cancelled")
@@ -179,12 +182,17 @@ class IntegrationTestDailyRequest(IntegrationTestCase):
 		self.assertEqual(self.request_status(request), "Approved")
 		report.submit()
 		self.assertEqual(self.request_status(request), "Completed")
-		self.assertAlmostEqual(frappe.db.get_value("Construction Management", self.plan, "actual_progress"), 15)
+		self.assertAlmostEqual(
+			frappe.db.get_value("Construction Management", self.plan, "actual_progress"), 15
+		)
 		with self.assertRaises(frappe.ValidationError):
 			make_daily_report(request.name)
 		# มี Daily Report ที่ Submit อ้างอยู่ ยกเลิกคำขอไม่ได้
+		# ยกเลิกไม่สำเร็จ: request จริงย้อนทั้งหมดเอง ในเทสต์ต้องย้อนเอง (cancel เขียน docstatus ก่อนตรวจ link)
+		frappe.db.savepoint("drq_cancel")
 		with self.assertRaises(frappe.LinkExistsError):
 			frappe.get_doc("Daily Request", request.name).cancel()
+		frappe.db.rollback(save_point="drq_cancel")
 
 		# ความคืบหน้าจริงที่เพิ่มขึ้นนับในคำขอฉบับถัดไป
 		next_request = self.make_request([{"wbs": "1.1", "qty": 1}], date="2026-11-03")
@@ -196,6 +204,8 @@ class IntegrationTestDailyRequest(IntegrationTestCase):
 		report.cancel()
 		self.assertEqual(self.request_status(request), "Approved")
 		amended = frappe.copy_doc(report)
+		# แบบปุ่ม Amend ของระบบเต็ม: ฉบับแก้ไขเริ่มเป็นร่าง (copy_doc ของ v16 คง docstatus เดิมไว้)
+		amended.docstatus = 0
 		amended.amended_from = report.name
 		amended.insert()
 		self.assertEqual(amended.daily_request, request.name)

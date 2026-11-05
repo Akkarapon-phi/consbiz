@@ -19,8 +19,6 @@ from consbiz.site_stock import (
 )
 from consbiz.tests.test_employer_supplied import make_item
 
-IGNORE_TEST_RECORD_DEPENDENCIES = ["Item", "Item Group", "UOM", "Company", "Warehouse", "Project"]
-
 MODULE = "consbiz.site_stock"
 OWNER_WH = "_Test Owner Store - X"
 COMPANY_WH = "_Test Site Store - X"
@@ -44,7 +42,9 @@ class IntegrationTestSiteStock(IntegrationTestCase):
 		"""stock: {(item_code, warehouse): actual_qty}"""
 		with (
 			patch(f"{MODULE}.project_owner_warehouses", return_value=list(owners)),
-			patch(f"{MODULE}.owner_warehouses", side_effect=lambda names: {n for n in names if n == OWNER_WH}),
+			patch(
+				f"{MODULE}.owner_warehouses", side_effect=lambda names: {n for n in names if n == OWNER_WH}
+			),
 			patch(f"{MODULE}.actual_qty", side_effect=lambda item, wh: stock.get((item, wh), 0)),
 			patch(f"{MODULE}.issue_priority", return_value=priority),
 			patch(f"{MODULE}.row_project", return_value="_Test Project"),
@@ -74,7 +74,9 @@ class IntegrationTestSiteStock(IntegrationTestCase):
 
 	def test_issue_company_first(self):
 		entry = self.issue({"item_code": self.base.name, "qty": 10})
-		rows = self.split(entry, {(self.twin, OWNER_WH): 6, (self.base.name, COMPANY_WH): 7}, priority=COMPANY_FIRST)
+		rows = self.split(
+			entry, {(self.twin, OWNER_WH): 6, (self.base.name, COMPANY_WH): 7}, priority=COMPANY_FIRST
+		)
 		self.assertEqual(rows, [(self.base.name, COMPANY_WH, 7), (self.twin, OWNER_WH, 3)])
 
 	def test_issue_counts_other_rows(self):
@@ -95,7 +97,9 @@ class IntegrationTestSiteStock(IntegrationTestCase):
 			entry.append("items", {"item_code": item_code, "t_warehouse": warehouse})
 			return entry
 
-		with patch(f"{MODULE}.owner_warehouses", side_effect=lambda names: {n for n in names if n == OWNER_WH}):
+		with patch(
+			f"{MODULE}.owner_warehouses", side_effect=lambda names: {n for n in names if n == OWNER_WH}
+		):
 			validate_warehouses(receipt(self.twin, OWNER_WH))
 			validate_warehouses(receipt(self.base.name, COMPANY_WH))
 			# 1 คลังต่อโครงการ: ของผู้ว่าจ้างจัดหาอยู่คลังเดียวกับของบริษัทได้ (แยกด้วย Item คู่)
@@ -113,20 +117,38 @@ class IntegrationTestSiteStock(IntegrationTestCase):
 		company = frappe.db.get_value("Company", {}, "name")
 		if not company:
 			self.skipTest("ไซต์ทดสอบไม่มีบริษัท")
-		project = frappe.get_doc({"doctype": "Project", "project_name": "_Test Site Stock Project", "company": company}).insert()
+		project = frappe.get_doc(
+			{"doctype": "Project", "project_name": "_Test Site Stock Project", "company": company}
+		).insert()
 		warehouse = project_warehouse(project.name)
 		self.assertTrue(warehouse)
 		parent = frappe.db.get_value("Warehouse", warehouse, "parent_warehouse")
-		self.assertIn(frappe.db.get_value("Warehouse", parent, "warehouse_name"), ("โครงการ", "Project", "Projects"))
+		self.assertIn(
+			frappe.db.get_value("Warehouse", parent, "warehouse_name"), ("โครงการ", "Project", "Projects")
+		)
 		self.assertEqual(ensure_project_warehouse(project), warehouse)
-		self.assertEqual(frappe.db.get_value("Warehouse", warehouse, "warehouse_name"), "_Test Site Stock Project")
+		self.assertEqual(
+			frappe.db.get_value("Warehouse", warehouse, "warehouse_name"), "_Test Site Stock Project"
+		)
 
 		# ตั้งชื่อคลังเอง / ชื่อซ้ำกับคลังที่มีอยู่บันทึกไม่ได้ (แก้ชื่อคลังภายหลังไม่ได้)
 		named = frappe.get_doc(
-			{"doctype": "Project", "project_name": "_Test Named Project", "company": company, "custom_warehouse_name": "_Test Site A"}
+			{
+				"doctype": "Project",
+				"project_name": "_Test Named Project",
+				"company": company,
+				"custom_warehouse_name": "_Test Site A",
+			}
 		).insert()
-		self.assertEqual(frappe.db.get_value("Warehouse", project_warehouse(named.name), "warehouse_name"), "_Test Site A")
+		self.assertEqual(
+			frappe.db.get_value("Warehouse", project_warehouse(named.name), "warehouse_name"), "_Test Site A"
+		)
 		with self.assertRaises(frappe.ValidationError):
 			frappe.get_doc(
-				{"doctype": "Project", "project_name": "_Test Other", "company": company, "custom_warehouse_name": "_Test Site A"}
+				{
+					"doctype": "Project",
+					"project_name": "_Test Other",
+					"company": company,
+					"custom_warehouse_name": "_Test Site A",
+				}
 			).insert()

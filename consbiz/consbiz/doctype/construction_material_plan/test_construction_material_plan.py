@@ -7,7 +7,10 @@ import frappe
 from frappe.tests import IntegrationTestCase
 from frappe.utils import getdate
 
-from consbiz.consbiz.doctype.construction_management.construction_management import create_from_boq, save_tasks
+from consbiz.consbiz.doctype.construction_management.construction_management import (
+	create_from_boq,
+	save_tasks,
+)
 from consbiz.consbiz.doctype.construction_management.resources import get_overview
 from consbiz.consbiz.doctype.construction_material_plan.construction_material_plan import (
 	allocate,
@@ -17,6 +20,7 @@ from consbiz.consbiz.doctype.construction_material_plan.construction_material_pl
 	set_item_project,
 	with_totals,
 )
+from consbiz.tests.utils import insert_boq
 
 EXTRA_TEST_RECORD_DEPENDENCIES = []
 IGNORE_TEST_RECORD_DEPENDENCIES = [
@@ -29,6 +33,7 @@ IGNORE_TEST_RECORD_DEPENDENCIES = [
 	"Holiday List",
 	"UOM",
 	"Project",
+	"Material Request",
 ]
 
 MODULE = "consbiz.consbiz.doctype.construction_material_plan.construction_material_plan"
@@ -52,7 +57,7 @@ class IntegrationTestConstructionMaterialPlan(IntegrationTestCase):
 			{"wbs": "1.1", "item_name": "งานฐานราก", "quantity": 10, "total_amount": 3000},
 		):
 			boq.append("boq_details", row)
-		boq.insert()
+		insert_boq(boq)
 		self.plan = create_from_boq(boq.name)
 		self.task = frappe.get_doc("Construction Management", self.plan).tasks[1]
 		self.set_start("2026-11-20")
@@ -126,7 +131,9 @@ class IntegrationTestConstructionMaterialPlan(IntegrationTestCase):
 		with patch(f"{MODULE}.item_info", return_value={p.name: p for p in provided}):
 			with patch(f"{MODULE}.customer_of", return_value="_Test Customer"):
 				(request,) = build_material_requests(doc, [line])
-		self.assertEqual((request.material_request_type, request.customer), ("Customer Provided", "_Test Customer"))
+		self.assertEqual(
+			(request.material_request_type, request.customer), ("Customer Provided", "_Test Customer")
+		)
 
 	def test_employer_supplied_row_uses_employer_item(self):
 		from consbiz.tests.test_employer_supplied import make_item
@@ -141,7 +148,9 @@ class IntegrationTestConstructionMaterialPlan(IntegrationTestCase):
 		row.employer_supplied = 0
 		doc.append("items", {"wbs": "1.1", "item_code": twin.name, "qty": 1})
 		doc.save()
-		self.assertEqual([(r.item_code, r.employer_supplied) for r in doc.items], [(base.name, 0), (twin.name, 1)])
+		self.assertEqual(
+			[(r.item_code, r.employer_supplied) for r in doc.items], [(base.name, 0), (twin.name, 1)]
+		)
 
 	def test_item_project_from_header(self):
 		request = frappe.new_doc("Material Request")
@@ -155,7 +164,15 @@ class IntegrationTestConstructionMaterialPlan(IntegrationTestCase):
 		# ช่อง Link ที่ค่าเริ่มต้นเป็น __user แต่ผู้ใช้ไม่มีเอกสารปลายทาง ต้องว่าง ไม่งั้น insert ไม่ผ่าน
 		doc = self.make_plan()
 		(request,) = build_material_requests(
-			doc, [{"item_code": "_Test Item", "stock_qty": 5, "required_by": doc.items[0].required_by, "rows": doc.items}]
+			doc,
+			[
+				{
+					"item_code": "_Test Item",
+					"stock_qty": 5,
+					"required_by": doc.items[0].required_by,
+					"rows": doc.items,
+				}
+			],
 		)
 		for df in request.meta.get_link_fields():
 			if df.default == "__user" and request.get(df.fieldname):
@@ -165,7 +182,15 @@ class IntegrationTestConstructionMaterialPlan(IntegrationTestCase):
 		doc = self.make_plan()
 		with patch(f"{MODULE}.nowdate", return_value="2026-11-20"):
 			(request,) = build_material_requests(
-				doc, [{"item_code": "_Test Item", "stock_qty": 5, "required_by": doc.items[0].required_by, "rows": doc.items}]
+				doc,
+				[
+					{
+						"item_code": "_Test Item",
+						"stock_qty": 5,
+						"required_by": doc.items[0].required_by,
+						"rows": doc.items,
+					}
+				],
 			)
 		self.assertEqual(getdate(request.items[0].schedule_date), getdate("2026-11-20"))
 
@@ -188,7 +213,9 @@ class IntegrationTestConstructionMaterialPlan(IntegrationTestCase):
 		with patch("frappe.model.document.Document._validate_links"):
 			self.save_with_materials(doc, [{**ordered.as_dict(), "qty": 9}])
 		doc.reload()
-		self.assertEqual([(r.name, r.qty, r.material_request) for r in doc.items], [(ordered.name, 9, "MAT-MR-TEST")])
+		self.assertEqual(
+			[(r.name, r.qty, r.material_request) for r in doc.items], [(ordered.name, 9, "MAT-MR-TEST")]
+		)
 		self.assertFalse(frappe.db.exists(other.doctype, other.name))
 
 	def save_with_materials(self, doc, items):
@@ -202,10 +229,12 @@ class IntegrationTestConstructionMaterialPlan(IntegrationTestCase):
 		)
 
 	def test_overview(self):
-		doc = self.make_plan()
+		self.make_plan()
 		# งานเริ่ม 20 พ.ย. buffer 3 lead 7 = ต้องสั่ง 10 พ.ย.
 		(row,) = get_overview(self.plan, day="2026-11-01")["materials"]
-		self.assertEqual((getdate(row["order_by"]), row["days_left"], row["status"]), (getdate("2026-11-10"), 9, "due"))
+		self.assertEqual(
+			(getdate(row["order_by"]), row["days_left"], row["status"]), (getdate("2026-11-10"), 9, "due")
+		)
 		self.assertEqual(get_overview(self.plan, day="2026-11-11")["materials"][0]["status"], "late")
 		with patch(f"{MODULE}.get_supply", return_value={"_Test Item": supply_of({"requested": 5})}):
 			overview = get_overview(self.plan, day="2026-11-11")

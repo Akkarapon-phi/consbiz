@@ -14,7 +14,18 @@ from consbiz.consbiz.doctype.retention_receivable.test_retention_receivable impo
 	setup_retention_masters,
 )
 
-IGNORE_TEST_RECORD_DEPENDENCIES = ["Company", "Customer", "Supplier", "Project", "Account", "Mode of Payment"]
+IGNORE_TEST_RECORD_DEPENDENCIES = [
+	"Company",
+	"Customer",
+	"Supplier",
+	"Project",
+	"Account",
+	"Mode of Payment",
+	"Bank Account",
+	"DocType",
+	"Journal Entry",
+	"Purchase Order",
+]
 
 
 class IntegrationTestRetentionRelease(IntegrationTestCase):
@@ -31,7 +42,9 @@ class IntegrationTestRetentionRelease(IntegrationTestCase):
 		self.assertEqual(status(source), "Billed")
 
 		cash = cash_account()
-		je = frappe.get_doc("Journal Entry", retention.make_journal_entry(release.doctype, release.name, cash))
+		je = frappe.get_doc(
+			"Journal Entry", retention.make_journal_entry(release.doctype, release.name, cash)
+		)
 		je.submit()
 		# จ่ายคืน: Dr. เงินประกันผลงานค้างจ่าย / Cr. เงินสด
 		self.assertEqual(gl(je.name), {self.accounts["custom_retention_payable"]: 1000, cash: -1000})

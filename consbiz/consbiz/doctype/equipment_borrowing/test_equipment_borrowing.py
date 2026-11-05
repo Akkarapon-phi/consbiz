@@ -9,7 +9,18 @@ from frappe.tests import IntegrationTestCase
 from consbiz.consbiz.doctype.equipment_borrowing.equipment_borrowing import record_return
 from consbiz.tests.test_employer_supplied import make_item
 
-IGNORE_TEST_RECORD_DEPENDENCIES = ["Item", "Item Group", "UOM", "Company", "Warehouse", "Project", "Employee", "Supplier", "Stock Entry"]
+IGNORE_TEST_RECORD_DEPENDENCIES = [
+	"Item",
+	"Item Group",
+	"UOM",
+	"Company",
+	"Warehouse",
+	"Project",
+	"Employee",
+	"Supplier",
+	"Stock Entry",
+	"User",
+]
 
 MODULE = "consbiz.consbiz.doctype.equipment_borrowing.equipment_borrowing"
 
@@ -59,13 +70,25 @@ class IntegrationTestEquipmentBorrowing(IntegrationTestCase):
 	def test_handover_and_returns(self):
 		doc = self.make_borrowing()
 		self.assertEqual((doc.status, doc.borrower_name), ("Borrowed", "สมชาย"))
-		self.assertEqual(self.entries[0], ("Material Transfer", [(self.drill.name, 2), (self.ladder.name, 1)], "Store", "On Loan"))
+		self.assertEqual(
+			self.entries[0],
+			("Material Transfer", [(self.drill.name, 2), (self.ladder.name, 1)], "Store", "On Loan"),
+		)
 
 		# คืนสว่าน 1 ปกติ + บันไดหาย: โอนกลับคลังต้นทาง 1 ใบ และตัดของหาย 1 ใบ
-		record_return(doc.name, [{"item_code": self.drill.name, "qty": 1}, {"item_code": self.ladder.name, "qty": 1, "condition": "Lost"}], returned_by="สมชาย")
+		record_return(
+			doc.name,
+			[
+				{"item_code": self.drill.name, "qty": 1},
+				{"item_code": self.ladder.name, "qty": 1, "condition": "Lost"},
+			],
+			returned_by="สมชาย",
+		)
 		doc.reload()
 		self.assertEqual(doc.status, "Partially Returned")
-		self.assertEqual([(r.returned_qty, r.lost_qty, r.outstanding_qty) for r in doc.items], [(1, 0, 1), (0, 1, 0)])
+		self.assertEqual(
+			[(r.returned_qty, r.lost_qty, r.outstanding_qty) for r in doc.items], [(1, 0, 1), (0, 1, 0)]
+		)
 		self.assertEqual([e[0] for e in self.entries[1:]], ["Material Transfer", "Material Issue"])
 		self.assertEqual([r.stock_entry for r in doc.returns], ["SE-2", "SE-3"])
 

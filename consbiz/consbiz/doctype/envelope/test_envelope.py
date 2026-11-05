@@ -14,7 +14,18 @@ from consbiz.consbiz.doctype.retention_receivable.test_retention_receivable impo
 )
 from consbiz.consbiz.doctype.transmittal.test_transmittal import make_transmittal
 
-IGNORE_TEST_RECORD_DEPENDENCIES = ["Company", "Customer", "Supplier", "Project", "Account", "Mode of Payment"]
+IGNORE_TEST_RECORD_DEPENDENCIES = [
+	"Company",
+	"Customer",
+	"Supplier",
+	"Project",
+	"Account",
+	"Mode of Payment",
+	"Address",
+	"Contact",
+	"DocType",
+	"User",
+]
 
 
 def ensure_address(title, link_doctype, link_name):
@@ -72,7 +83,9 @@ class IntegrationTestEnvelope(IntegrationTestCase):
 		self.assertEqual(envelope.to, self.customer_address)
 		self.assertEqual(envelope.receiver, self.contact)
 		self.assertEqual(envelope.remark, transmittal.title)
-		self.assertEqual((envelope.reference_doctype, envelope.reference_name), ("Transmittal", transmittal.name))
+		self.assertEqual(
+			(envelope.reference_doctype, envelope.reference_name), ("Transmittal", transmittal.name)
+		)
 
 		envelope.insert()
 		envelope.submit()
@@ -82,7 +95,9 @@ class IntegrationTestEnvelope(IntegrationTestCase):
 		)
 
 	def test_transmittal_without_party(self):
-		transmittal = make_transmittal(recipient_type="Accounting Office", party=None, recipient_name="สนง.บัญชี")
+		transmittal = make_transmittal(
+			recipient_type="Accounting Office", party=None, recipient_name="สนง.บัญชี"
+		)
 		envelope = make_envelope("Transmittal", transmittal.name)
 		self.assertIsNone(envelope.to)
 		self.assertIsNone(envelope.receiver)

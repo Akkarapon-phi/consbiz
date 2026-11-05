@@ -11,21 +11,7 @@ from frappe.tests import IntegrationTestCase
 from consbiz import site_app
 from consbiz.consbiz.doctype.construction_management.construction_management import create_from_boq
 from consbiz.test_store_app import setup_store
-
-IGNORE_TEST_RECORD_DEPENDENCIES = [
-	"Company",
-	"Customer",
-	"Supplier",
-	"Project",
-	"Account",
-	"Mode of Payment",
-	"Construction Management",
-	"Daily Report",
-	"BOQ",
-	"Holiday List",
-	"UOM",
-	"User",
-]
+from consbiz.tests.utils import insert_boq
 
 
 def make_plan(project):
@@ -38,7 +24,7 @@ def make_plan(project):
 		{"wbs": "1.1", "item_name": "งานมีปริมาณ", "quantity": 10, "total_amount": 3000},
 	):
 		boq.append("boq_details", row)
-	boq.insert()
+	insert_boq(boq)
 	plan = create_from_boq(boq.name)
 	frappe.db.set_value("Construction Management", plan, "project", project)
 	return plan
@@ -123,7 +109,10 @@ class IntegrationTestSiteApp(IntegrationTestCase):
 		self.assertEqual(
 			frappe.db.get_value("Daily Report Item", {"parent": result["name"]}, "location"), "ชั้น 2 โซน A"
 		)
-		self.assertIn("download_pdf", site_app.get_report_form(self.project, "Daily Report", name=result["name"], view=1)["pdf_url"])
+		self.assertIn(
+			"download_pdf",
+			site_app.get_report_form(self.project, "Daily Report", name=result["name"], view=1)["pdf_url"],
+		)
 		self.assertEqual(result["docstatus"], 1)
 		self.assertEqual(frappe.db.get_value("Daily Request", request.name, "status"), "Completed")
 		self.assertEqual(
