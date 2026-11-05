@@ -3,14 +3,15 @@
 	<div>
 		<TopBar :title="config.label" :subtitle="subtitle">
 			<template #actions>
-				<a
+				<button
+					type="button"
 					class="ss-icon-btn"
-					:href="new_url"
-					:aria-label="`สร้าง${config.label}ในระบบเต็ม`"
-					:title="`สร้าง${config.label} (ระบบเต็ม)`"
+					:aria-label="`สร้าง${config.label}`"
+					:title="`สร้าง${config.label}`"
+					@click="go(`${config.section}-form`, { kind, name: 'new' })"
 				>
 					<Icon name="plus" :size="21" :stroke="2.4" />
-				</a>
+				</button>
 				<button
 					type="button"
 					class="ss-icon-btn"
@@ -90,7 +91,7 @@ import DocCard from "./DocCard.vue";
 import DocTable from "./DocTable.vue";
 import ScopeSwitch from "./ScopeSwitch.vue";
 import { DOC_KINDS } from "../../sections.js";
-import { call, replace_params, show_error, state } from "../../api.js";
+import { call, go, replace_params, show_error, state } from "../../api.js";
 
 const kind = state.route.view;
 const config = DOC_KINDS[kind];
@@ -116,9 +117,6 @@ const loading = ref(false);
 const subtitle = computed(() =>
 	config.project && state.doc_scope === "project" ? state.project?.project_name : "ทุกโครงการ"
 );
-const new_url = `/app/${config.doctype.toLowerCase().replace(/ /g, "-")}/new${
-	kind === "mr" ? "?material_request_type=Purchase" : ""
-}`;
 
 let request_id = 0;
 async function load(append = false) {

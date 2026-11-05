@@ -3,11 +3,13 @@
 
 # หมวดจัดซื้อ/ขายของแอปหน้างาน (site_docs.py): รายการ ตัวกรอง ขอบเขตโครงการ รายละเอียด และส่งเอกสาร
 
+import json
+
 import frappe
 from frappe.tests import IntegrationTestCase
 
-from consbiz import site_docs
-from consbiz.test_store_app import make_po, setup_store
+from consbiz import site_docs, store_app
+from consbiz.test_store_app import ITEM, SUPPLIER, make_po, setup_store
 
 IGNORE_TEST_RECORD_DEPENDENCIES = ["Company", "Customer", "Supplier", "Project", "Account", "Mode of Payment"]
 
@@ -61,3 +63,49 @@ class IntegrationTestSiteDocs(IntegrationTestCase):
 		self.assertEqual(site_docs.status_of("Overdue", 1), ("เกินกำหนด", "rose"))
 		self.assertEqual(site_docs.status_of("Unpaid", 0), ("ร่าง", "gray"))
 		self.assertRaises(frappe.ValidationError, site_docs.get_docs, "xx")
+
+	def test_create_and_edit_purchase_order(self):
+		form = site_docs.get_form("po", project=self.project)
+		self.assertEqual(form["project"], self.project)
+		self.assertIsNone(form["name"])
+		data = {
+			"project": self.project,
+			"supplier": SUPPLIER,
+			"transaction_date": form["transaction_date"],
+			"schedule_date": form["schedule_date"],
+			"taxes_and_charges": None,
+			"items": [{"key": None, "item_code": ITEM, "qty": 4, "rate": 25}],
+		}
+		preview = site_docs.preview_doc("po", json.dumps(data, default=str))
+		self.assertEqual(preview["totals"]["grand_total"], 100)
+
+		saved = site_docs.save_doc("po", json.dumps(data, default=str))
+		po = frappe.get_doc("Purchase Order", saved["name"])
+		self.assertEqual((po.docstatus, po.project, po.items[0].qty), (0, self.project, 4))
+		self.assertEqual(po.items[0].warehouse, store_app.project_warehouse(self.project))
+
+		# แก้ร่าง: แถวเดิมจับคู่ด้วย key (name ของแถว) แล้วส่ง
+		form = site_docs.get_form("po", name=po.name)
+		row = form["items"][0]
+		self.assertEqual(row["key"], po.items[0].name)
+		data["name"] = po.name
+		data["items"] = [{**row, "qty": 6}]
+		site_docs.save_doc("po", json.dumps(data, default=str), submit=1)
+		po.reload()
+		self.assertEqual((po.docstatus, len(po.items), po.items[0].qty, po.grand_total), (1, 1, 6, 150))
+
+	def test_next_document_from_purchase_order(self):
+		po = make_po(self.project)
+		self.assertEqual(site_docs.get_doc("po", po.name)["next_kind"], "pi")
+		form = site_docs.get_form("pi", source=po.name)
+		self.assertEqual(form["supplier"], po.supplier)
+		data = {**form, "items": [{**form["items"][0], "qty": 3}]}
+		saved = site_docs.save_doc("pi", json.dumps(data, default=str))
+		pi = frappe.get_doc("Purchase Invoice", saved["name"])
+		self.assertEqual((pi.items[0].purchase_order, pi.items[0].qty), (po.name, 3))
+
+	def test_form_rejects_submitted_and_unknown(self):
+		po = make_po(self.project)
+		self.assertRaises(frappe.ValidationError, site_docs.get_form, "po", name=po.name)
+		self.assertRaises(frappe.ValidationError, site_docs.get_form, "qtn", source=po.name)
+

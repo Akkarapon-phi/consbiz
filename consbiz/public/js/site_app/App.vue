@@ -231,6 +231,7 @@ import ConcreteForm from "./views/work/ConcreteForm.vue";
 import DocsHome from "./views/docs/DocsHome.vue";
 import DocList from "./views/docs/DocList.vue";
 import DocView from "./views/docs/DocView.vue";
+import DocForm from "./views/docs/DocForm.vue";
 
 const VIEWS = {
 	home: Home,
@@ -264,6 +265,8 @@ const VIEWS = {
 	si: DocList,
 	"buy-doc": DocView,
 	"sell-doc": DocView,
+	"buy-form": DocForm,
+	"sell-form": DocForm,
 };
 
 const section = computed(() => SECTIONS[state.section]);
@@ -282,7 +285,14 @@ const tabs = computed(() => {
 	}));
 });
 const mobile_tabs = computed(() => tabs.value.filter((t) => !t.wide_only));
-const active_view = computed(() => PARENT_TAB[state.route.view] || state.route.view);
+// หน้าเอกสารจัดซื้อ/ขาย (ดู/ฟอร์ม) ไฮไลต์เมนูของชนิดเอกสาร (params.kind)
+const DOC_PAGES = ["buy-doc", "sell-doc", "buy-form", "sell-form"];
+const active_view = computed(
+	() =>
+		PARENT_TAB[state.route.view] ||
+		(DOC_PAGES.includes(state.route.view) && state.route.params.kind) ||
+		state.route.view
+);
 // ตำแหน่งแถบไฮไลต์ของแถบล่าง (มือถือไม่มีเมนู wide_only)
 const tab_index = computed(() =>
 	Math.max(

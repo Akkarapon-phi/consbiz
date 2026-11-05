@@ -1,6 +1,6 @@
 <template>
 	<!-- รายละเอียดเอกสารจัดซื้อ/ขาย: หัวเอกสาร, ความคืบหน้า, รายการ, ยอดรวม, เอกสารต้นทาง/ปลายทาง, PDF, ส่งเอกสาร -->
-	<div :class="{ 'ss-has-bar': doc?.can_submit }">
+	<div :class="{ 'ss-has-bar': has_bar }">
 		<TopBar :title="config.label" :subtitle="params.name" :back_to="params.kind">
 			<template #actions>
 				<button
@@ -168,17 +168,41 @@
 
 		<Teleport to="#ss-layer">
 			<Transition name="ss-bar">
-				<div v-if="doc?.can_submit" class="ss-bottom-bar">
-					<a class="ss-btn ss-btn--ghost ss-btn--lg" :href="desk_url(config.doctype, params.name)"
-						>แก้ไข</a
-					>
+				<div v-if="has_bar" class="ss-bottom-bar">
 					<button
+						v-if="doc.can_edit"
+						type="button"
+						class="ss-btn ss-btn--ghost ss-btn--lg"
+						:class="{ 'ss-grow': !doc.can_submit }"
+						@click="go(`${config.section}-form`, { kind: params.kind, name: params.name })"
+					>
+						<Icon name="pen" :size="17" /> แก้ไข
+					</button>
+					<button
+						v-if="doc.can_submit"
 						type="button"
 						class="ss-btn ss-btn--primary ss-btn--lg ss-grow"
 						:disabled="busy"
 						@click="confirm = true"
 					>
 						ส่ง{{ config.label }}
+					</button>
+					<!-- เอกสารที่ส่งแล้ว: สร้างเอกสารถัดไป (ขอซื้อ → สั่งซื้อ → แจ้งหนี้, เสนอราคา → สั่งขาย → แจ้งหนี้) -->
+					<button
+						v-if="doc.next_kind"
+						type="button"
+						class="ss-btn ss-btn--primary ss-btn--lg ss-grow"
+						@click="
+							go(`${config.section}-form`, {
+								kind: doc.next_kind,
+								name: 'new',
+								source: params.name,
+							})
+						"
+					>
+						<Icon name="plus" :size="18" :stroke="2.4" /> สร้าง{{
+							DOC_KINDS[doc.next_kind].label
+						}}
 					</button>
 				</div>
 			</Transition>
@@ -236,6 +260,10 @@ const doc = ref(null);
 const busy = ref(false);
 const confirm = ref(false);
 const pdf = ref(false);
+
+const has_bar = computed(
+	() => !!(doc.value && (doc.value.can_edit || doc.value.can_submit || doc.value.next_kind))
+);
 
 const progress = computed(() =>
 	doc.value?.docstatus === 1

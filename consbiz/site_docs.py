@@ -6,7 +6,8 @@
 - จัดซื้อ: ขอซื้อ (Material Request ประเภท Purchase) → สั่งซื้อ (Purchase Order) → ใบแจ้งหนี้ซื้อ (Purchase Invoice)
 - ขาย: ใบเสนอราคา (Quotation) → ใบสั่งขาย (Sales Order) → ใบแจ้งหนี้ขาย (Sales Invoice)
 แอปทำได้: ดูรายการ/รายละเอียด, ติดตามเอกสารต้นทาง-ปลายทาง, ส่งเอกสารร่าง (Submit), PDF
-สร้างเอกสารใหม่/สร้างเอกสารถัดไปทำในระบบเต็ม (ต้องเลือกผู้ขาย ราคา ภาษี)
+สร้าง/แก้ไขร่าง และสร้างเอกสารถัดไป (ขอซื้อ → สั่งซื้อ → แจ้งหนี้, เสนอราคา → สั่งขาย → แจ้งหนี้) ด้วย mapper ของ ERPNext
+(ช่องที่แอปไม่แสดง เช่น หัก ณ ที่จ่าย/เงินประกัน คงค่าจาก mapper หรือแก้ในระบบเต็ม)
 ขอบเขต: โครงการที่เลือก (ช่องโครงการของเอกสาร) หรือทุกโครงการ (Quotation ไม่มีช่องโครงการ = ทุกโครงการเสมอ)
 สิทธิ์ตามเอกสารแต่ละชนิด (get_list / get_doc ตรวจสิทธิ์ของผู้ใช้เอง)
 """
@@ -367,6 +368,21 @@ def links_of(doc):
 	return before, after
 
 
+def next_of(doc, kind):
+	"""kind ของเอกสารถัดไปที่สร้างต่อในแอปได้ (ยังค้างดำเนินการ + มีสิทธิ์สร้าง) ไม่ได้ = None"""
+	target = next_kind(kind)
+	if not target or doc.docstatus != 1:
+		return None
+	statuses = DOCS[kind]["todo"].get("status", (None, ()))[1]
+	if doc.status not in statuses:
+		return None
+	if doc.meta.has_field("per_billed") and kind != "mr" and flt(doc.per_billed) >= 100:
+		return None
+	if not frappe.has_permission(DOCS[target]["doctype"], "create"):
+		return None
+	return target
+
+
 @frappe.whitelist()
 def get_doc(kind, name):
 	from consbiz.site_app import pdf_url
@@ -416,6 +432,8 @@ def get_doc(kind, name):
 		"before": before,
 		"after": after,
 		"can_submit": bool(doc.docstatus == 0 and frappe.has_permission(doc.doctype, "submit", doc)),
+		"can_edit": bool(doc.docstatus == 0 and frappe.has_permission(doc.doctype, "write", doc)),
+		"next_kind": next_of(doc, kind),
 		"pdf_url": pdf_url(doc.doctype, doc.name),
 	}
 
@@ -428,3 +446,404 @@ def submit_doc(kind, name):
 	doc.submit()
 	label, tone = status_of(doc.status, doc.docstatus)
 	return {"name": doc.name, "status_label": label}
+
+
+# ---------------------------------------------------------------- สร้าง / แก้ไขร่างในแอป
+
+# ช่องหัวเอกสารที่แอปส่งมาได้ (ช่องอื่นไม่รับ) และช่องของแถวรายการ
+FORM = {
+	"mr": {
+		"party": None,
+		"header": ("transaction_date", "schedule_date", "custom_remark"),
+		"item": ("item_code", "qty", "uom", "schedule_date"),
+		"remarks": "custom_remark",
+	},
+	"po": {
+		"party": "supplier",
+		"header": ("supplier", "transaction_date", "schedule_date", "taxes_and_charges"),
+		"item": ("item_code", "qty", "uom", "rate", "schedule_date"),
+	},
+	"pi": {
+		"party": "supplier",
+		# tax_invoice_* มาจาก erpnext_thailand (บังคับเมื่อมีภาษีซื้อ) ไม่มีช่อง = ข้าม
+		"header": (
+			"supplier",
+			"posting_date",
+			"bill_no",
+			"bill_date",
+			"tax_invoice_number",
+			"tax_invoice_date",
+			"due_date",
+			"taxes_and_charges",
+			"remarks",
+		),
+		"item": ("item_code", "qty", "uom", "rate"),
+		"remarks": "remarks",
+	},
+	"qtn": {
+		"party": "party_name",
+		"header": ("party_name", "transaction_date", "valid_till", "taxes_and_charges"),
+		"item": ("item_code", "qty", "uom", "rate"),
+	},
+	"so": {
+		"party": "customer",
+		"header": ("customer", "transaction_date", "delivery_date", "taxes_and_charges"),
+		"item": ("item_code", "qty", "uom", "rate", "delivery_date"),
+	},
+	"si": {
+		"party": "customer",
+		"header": ("customer", "posting_date", "due_date", "taxes_and_charges", "remarks"),
+		"item": ("item_code", "qty", "uom", "rate"),
+		"remarks": "remarks",
+	},
+}
+# เอกสารถัดไป: kind ปลายทาง → (kind ต้นทาง, mapper ของ ERPNext)
+MAPPERS = {
+	"po": ("mr", "erpnext.stock.doctype.material_request.material_request.make_purchase_order"),
+	"pi": ("po", "erpnext.buying.doctype.purchase_order.purchase_order.make_purchase_invoice"),
+	"so": ("qtn", "erpnext.selling.doctype.quotation.quotation.make_sales_order"),
+	"si": ("so", "erpnext.selling.doctype.sales_order.sales_order.make_sales_invoice"),
+}
+DATE_FIELDS = {"transaction_date", "schedule_date", "posting_date", "bill_date", "due_date", "valid_till", "delivery_date"}
+PARTY_DOCTYPE = {"supplier": "Supplier", "customer": "Customer", "party_name": "Customer"}
+
+
+def next_kind(kind):
+	"""kind ของเอกสารถัดไปที่สร้างจากเอกสารนี้ได้ (ไม่มี = None)"""
+	return next((target for target, (source, _m) in MAPPERS.items() if source == kind), None)
+
+
+def mapped_doc(kind, source):
+	if kind not in MAPPERS:
+		frappe.throw(_("สร้าง{0}จากเอกสารอื่นไม่ได้").format(_(DOCS[kind]["doctype"])))
+	source_kind, method = MAPPERS[kind]
+	source_doc = frappe.get_doc(DOCS[source_kind]["doctype"], source)
+	source_doc.check_permission("read")
+	if source_doc.docstatus != 1:
+		frappe.throw(_("{0} ต้องส่งแล้วจึงสร้างเอกสารถัดไปได้").format(source))
+	doc = frappe.get_attr(method)(source)
+	if not doc.get("items"):
+		frappe.throw(_("{0} ดำเนินการครบทุกรายการแล้ว").format(source))
+	return doc
+
+
+def new_doc(kind, project):
+	config = DOCS[kind]
+	doc = frappe.new_doc(config["doctype"])
+	doc.update(config.get("base", {}))
+	if kind == "qtn":
+		doc.quotation_to = "Customer"
+	company = frappe.db.get_value("Project", project, "company") if project else None
+	doc.company = company or frappe.defaults.get_user_default("Company")
+	today = nowdate()
+	for field in ("transaction_date", "posting_date"):
+		if doc.meta.has_field(field):
+			doc.set(field, today)
+	# วันต้องการ/กำหนดส่งเริ่มต้น 7 วัน (แก้ได้ในฟอร์ม)
+	for field in ("schedule_date", "delivery_date"):
+		if kind in ("mr", "po", "so") and doc.meta.has_field(field):
+			doc.set(field, add_days(today, 7))
+	if config["project"] and project:
+		doc.set(config["project"], project)
+	if kind in ("so", "si") and project and not doc.get("customer"):
+		doc.customer = frappe.db.get_value("Project", project, "customer")
+	# แม่แบบภาษีค่าเริ่มต้นของบริษัท (แถวภาษีใส่ตอน apply_form)
+	if doc.meta.has_field("taxes_and_charges"):
+		doc.taxes_and_charges = frappe.db.get_value(
+			doc.meta.get_field("taxes_and_charges").options, {"is_default": 1, "company": doc.company, "disabled": 0}
+		)
+	return doc
+
+
+def load_doc(kind, name=None, source=None, project=None):
+	"""เอกสารร่างเดิม / เอกสารใหม่จาก mapper / เอกสารใหม่เปล่า ยังไม่บันทึก"""
+	config = config_of(kind)
+	doctype = config["doctype"]
+	if name:
+		doc = frappe.get_doc(doctype, name)
+		doc.check_permission("write")
+		if doc.docstatus != 0:
+			frappe.throw(_("{0} ส่งแล้ว แก้ไขไม่ได้").format(name))
+		return doc
+	frappe.has_permission(doctype, "create", throw=True)
+	if source:
+		doc = mapped_doc(kind, source)
+		if config["project"] and project and not doc.get(config["project"]):
+			doc.set(config["project"], project)
+		return doc
+	return new_doc(kind, project)
+
+
+def row_key(row, index):
+	"""ตัวจับคู่แถวระหว่างแอปกับเอกสาร: แถวที่บันทึกแล้วใช้ name, แถวจาก mapper ใช้ลำดับ"""
+	return row.name if row.get("name") and not row.is_new() else f"m{index}"
+
+
+def project_of(doc, kind):
+	field = DOCS[kind]["project"]
+	return doc.get(field) if field else None
+
+
+def apply_form(doc, kind, data):
+	"""ใส่ค่าจากแอปลงเอกสาร: ช่องหัวเอกสารตาม FORM, แถวเดิมจับคู่ด้วย key, แถวใหม่ตั้งค่าเริ่มจาก ERPNext"""
+	from erpnext.stock.get_item_details import get_conversion_factor
+
+	from consbiz.site_stock import project_warehouse
+
+	form = FORM[kind]
+	old_template = doc.get("taxes_and_charges")
+	for field in form["header"]:
+		if field in data and doc.meta.has_field(field):
+			value = data.get(field) or None
+			doc.set(field, value)
+	if kind in ("pi", "si") and data.get("posting_date"):
+		doc.set_posting_time = 1
+	if kind == "pi":
+		if doc.get("bill_no") and not doc.get("bill_date"):
+			doc.bill_date = doc.posting_date
+		if doc.get("tax_invoice_number") and not doc.get("tax_invoice_date"):
+			doc.tax_invoice_date = doc.get("bill_date") or doc.posting_date
+
+	project = project_of(doc, kind)
+	warehouse = project_warehouse(project) if kind in ("mr", "po") else None
+	if warehouse and doc.meta.has_field("set_warehouse") and not doc.get("set_warehouse"):
+		doc.set_warehouse = warehouse
+
+	existing = {row_key(row, i): row for i, row in enumerate(doc.get("items") or [])}
+	rows = []
+	for item in data.get("items") or []:
+		if not item.get("item_code") or flt(item.get("qty")) <= 0:
+			continue
+		row = existing.pop(item.get("key"), None)
+		if row and row.item_code != item["item_code"]:
+			row = None
+		values = {field: item.get(field) for field in form["item"] if field in item}
+		if row is None:
+			row = frappe.new_doc(doc.meta.get_field("items").options, parent_doc=doc, parentfield="items")
+			if warehouse and row.meta.has_field("warehouse"):
+				row.warehouse = warehouse
+			if project and row.meta.has_field("project"):
+				row.project = project
+		old_uom = row.get("uom")
+		row.update(values)
+		if not row.get("uom"):
+			row.uom = frappe.db.get_value("Item", row.item_code, "stock_uom")
+		if row.uom != old_uom or not row.get("conversion_factor"):
+			row.conversion_factor = flt(get_conversion_factor(row.item_code, row.uom).get("conversion_factor")) or 1
+		for field in ("schedule_date", "delivery_date"):
+			if row.meta.has_field(field) and not row.get(field):
+				row.set(field, doc.get(field) or doc.get("transaction_date"))
+		rows.append(row)
+	doc.set("items", rows)
+	for row in doc.items:
+		if row.meta.has_field("stock_qty"):
+			row.stock_qty = flt(row.qty) * flt(row.conversion_factor or 1)
+
+	# วันกำหนดส่งของหัวเอกสาร = วันแรกสุดของแถว (ERPNext ตั้งเองตอน validate ถ้าว่าง)
+	if kind in ("po", "so"):
+		field = "schedule_date" if kind == "po" else "delivery_date"
+		dates = [getdate(r.get(field)) for r in doc.items if r.get(field)]
+		if dates and not doc.get(field):
+			doc.set(field, min(dates))
+
+	# เปลี่ยนแม่แบบภาษี = แทนแถวภาษีด้วยแถวของแม่แบบใหม่
+	template = doc.get("taxes_and_charges")
+	if doc.meta.has_field("taxes") and (template != old_template or (template and not doc.get("taxes"))):
+		doc.set("taxes", [])
+		if doc.get("taxes_and_charges"):
+			doc.append_taxes_from_master()
+	doc.set_missing_values(for_validate=True)
+	if kind != "mr":
+		doc.calculate_taxes_and_totals()
+	return doc
+
+
+def tax_templates(doc):
+	if not doc.meta.has_field("taxes_and_charges"):
+		return []
+	doctype = doc.meta.get_field("taxes_and_charges").options
+	return frappe.get_all(
+		doctype,
+		filters={"company": doc.company, "disabled": 0},
+		fields=["name", "title", "is_default"],
+		order_by="is_default desc, title asc",
+	)
+
+
+def serialize_form(doc, kind):
+	config = DOCS[kind]
+	form = FORM[kind]
+	party_field = form["party"]
+	party_name = None
+	if party_field and doc.get(party_field):
+		party_doctype = PARTY_DOCTYPE[party_field]
+		party_name = frappe.db.get_value(
+			party_doctype, doc.get(party_field), "supplier_name" if party_doctype == "Supplier" else "customer_name"
+		)
+	items = []
+	for i, row in enumerate(doc.get("items") or []):
+		items.append(
+			{
+				"key": row_key(row, i),
+				"item_code": row.item_code,
+				"item_name": row.item_name,
+				"qty": flt(row.qty),
+				"uom": row.uom,
+				"stock_uom": row.get("stock_uom"),
+				"rate": flt(row.get("rate")),
+				"amount": flt(row.get("amount")),
+				"schedule_date": row.get("schedule_date"),
+				"delivery_date": row.get("delivery_date"),
+				"uoms": item_uoms(row.item_code),
+			}
+		)
+	header = {field: doc.get(field) for field in form["header"] if doc.meta.has_field(field)}
+	return {
+		"kind": kind,
+		"name": None if doc.is_new() else doc.name,
+		"company": doc.company,
+		"project": project_of(doc, kind),
+		"party_label": party_name,
+		**header,
+		"items": items,
+		"totals": totals_of(doc),
+		"taxes": [
+			{"description": t.description, "rate": flt(t.rate), "amount": flt(t.tax_amount)}
+			for t in doc.get("taxes") or []
+		],
+	}
+
+
+def totals_of(doc):
+	if not doc.meta.has_field("grand_total"):
+		return {}
+	return {
+		field: flt(doc.get(field))
+		for field in ("total", "discount_amount", "total_taxes_and_charges", "grand_total", "rounded_total")
+		if doc.meta.has_field(field)
+	}
+
+
+def item_uoms(item_code):
+	stock_uom = frappe.get_cached_value("Item", item_code, "stock_uom")
+	uoms = frappe.get_all("UOM Conversion Detail", filters={"parent": item_code, "parenttype": "Item"}, pluck="uom")
+	return list(dict.fromkeys([stock_uom, *uoms]))
+
+
+@frappe.whitelist()
+def get_form(kind, name=None, source=None, project=None):
+	"""ข้อมูลฟอร์มสร้าง/แก้ไข: เอกสาร (ยังไม่บันทึก) + ตัวเลือกภาษี"""
+	doc = load_doc(kind, name=name, source=source, project=project)
+	apply_form(doc, kind, {"items": serialize_form(doc, kind)["items"]})
+	out = serialize_form(doc, kind)
+	out["source"] = source
+	out["fields"] = [field for field in FORM[kind]["header"] if doc.meta.has_field(field)]
+	out["tax_templates"] = tax_templates(doc)
+	out["can_submit"] = frappe.has_permission(doc.doctype, "submit")
+	return out
+
+
+def parse(data):
+	return frappe.parse_json(data) if isinstance(data, str) else frappe._dict(data or {})
+
+
+@frappe.whitelist(methods=["POST"])
+def preview_doc(kind, data):
+	"""คำนวณยอด/ภาษีตามที่กรอก (ไม่บันทึก)"""
+	data = parse(data)
+	doc = load_doc(kind, name=data.get("name"), source=data.get("source"), project=data.get("project"))
+	try:
+		apply_form(doc, kind, data)
+		out = serialize_form(doc, kind)
+	finally:
+		# ERPNext อาจเขียนข้อมูลระหว่างเติมค่า (เช่น สร้าง Item Price อัตโนมัติ) ตัวอย่างยอดต้องไม่บันทึกอะไร
+		frappe.db.rollback()
+		frappe.local.message_log = []
+	return {"totals": out["totals"], "taxes": out["taxes"], "items": out["items"]}
+
+
+@frappe.whitelist(methods=["POST"])
+def save_doc(kind, data, submit=0):
+	"""บันทึกร่าง (submit=1 ส่งเอกสารต่อเลย) ตรวจสิทธิ์และเงื่อนไขของ ERPNext ตามปกติ"""
+	data = parse(data)
+	doc = load_doc(kind, name=data.get("name"), source=data.get("source"), project=data.get("project"))
+	apply_form(doc, kind, data)
+	if not doc.get("items"):
+		frappe.throw(_("เพิ่มรายการอย่างน้อย 1 รายการ"))
+	doc.save()
+	if cint(submit):
+		doc.submit()
+	return {"name": doc.name, "docstatus": doc.docstatus}
+
+
+@frappe.whitelist()
+def search_items(kind, txt=None, project=None):
+	"""สินค้า/บริการสำหรับเลือกในฟอร์ม พร้อมราคาแนะนำ (ซื้อ = ราคาซื้อล่าสุด, ขาย = ราคาขายมาตรฐาน)"""
+	config = config_of(kind)
+	buying = config["section"] == "buy"
+	filters = {"disabled": 0, "has_variants": 0}
+	filters["is_purchase_item" if buying else "is_sales_item"] = 1
+	if frappe.get_meta("Item").has_field("custom_base_item"):
+		filters["custom_base_item"] = ("is", "not set")
+	or_filters = None
+	if txt:
+		like = f"%{txt.strip()}%"
+		or_filters = {"name": ("like", like), "item_name": ("like", like), "item_group": ("like", like)}
+	rows = frappe.get_list(
+		"Item",
+		filters=filters,
+		or_filters=or_filters,
+		fields=["name as item_code", "item_name", "item_group", "stock_uom", "last_purchase_rate", "standard_rate"],
+		order_by="modified desc",
+		limit_page_length=40,
+	)
+	prices = {}
+	if rows and not buying:
+		price_list = frappe.db.get_single_value("Selling Settings", "selling_price_list") or "Standard Selling"
+		prices = dict(
+			frappe.get_all(
+				"Item Price",
+				filters={"price_list": price_list, "item_code": ("in", [r.item_code for r in rows])},
+				fields=["item_code", "price_list_rate"],
+				as_list=True,
+			)
+		)
+	for row in rows:
+		row.rate = flt(row.last_purchase_rate) if buying else flt(prices.get(row.item_code) or row.standard_rate)
+		row.uoms = item_uoms(row.item_code)
+		row.pop("last_purchase_rate")
+		row.pop("standard_rate")
+	return rows
+
+
+@frappe.whitelist()
+def search_parties(kind, txt=None, company=None):
+	"""ผู้ขาย (จัดซื้อ) / ลูกค้า (ขาย) ไม่รวมรายที่จำกัดให้ทำรายการกับบริษัทอื่นเท่านั้น (Allowed To Transact With)"""
+	config_of(kind)
+	field = FORM[kind]["party"]
+	if not field:
+		return []
+	doctype = PARTY_DOCTYPE[field]
+	label = "supplier_name" if doctype == "Supplier" else "customer_name"
+	filters = {"disabled": 0}
+	if company:
+		restricted = frappe.get_all(
+			"Allowed To Transact With", filters={"parenttype": doctype}, fields=["parent", "company"]
+		)
+		allowed = {r.parent for r in restricted if r.company == company}
+		blocked = {r.parent for r in restricted} - allowed
+		if blocked:
+			filters["name"] = ("not in", list(blocked))
+	or_filters = None
+	if txt:
+		like = f"%{txt.strip()}%"
+		or_filters = {"name": ("like", like), label: ("like", like)}
+	return frappe.get_list(
+		doctype,
+		filters=filters,
+		or_filters=or_filters,
+		fields=["name as value", f"{label} as label"],
+		order_by="modified desc",
+		limit_page_length=30,
+	)
+

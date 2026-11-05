@@ -5578,3 +5578,152 @@ a.ss-btn--soft {
 		opacity: 0.85;
 	}
 }
+
+/* ================================================================ จัดซื้อ/ขาย: ฟอร์มสร้าง/แก้ไขร่าง (DocForm.vue) */
+
+.ss-create-row {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+}
+.ss-create-row .ss-btn {
+	flex: 1 1 140px;
+}
+.ss-form-grid {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 12px 10px;
+}
+.ss-input--num {
+	text-align: right;
+	font-variant-numeric: tabular-nums;
+}
+select.ss-input {
+	appearance: none;
+	-webkit-appearance: none;
+	padding-right: 30px;
+	background-image: linear-gradient(45deg, transparent 50%, var(--ss-muted) 50%),
+		linear-gradient(135deg, var(--ss-muted) 50%, transparent 50%);
+	background-position: calc(100% - 16px) 50%, calc(100% - 11px) 50%;
+	background-size: 5px 5px;
+	background-repeat: no-repeat;
+}
+.ss-spinner--sm {
+	width: 14px;
+	height: 14px;
+	border-width: 2px;
+}
+.ss-totals {
+	transition: opacity 0.2s ease;
+}
+.ss-totals.is-stale {
+	opacity: 0.6;
+}
+.ss-docform-remarks {
+	margin-top: 4px;
+}
+.ss-docform-note {
+	margin: 0;
+	font-size: 12.5px;
+}
+.ss-bar-summary small {
+	color: var(--ss-muted);
+}
+.ss-bar-summary b {
+	color: var(--ss-text);
+	font-size: 17px;
+	font-variant-numeric: tabular-nums;
+}
+
+/* แถวรายการ: มือถือ = การ์ด (ชื่อ / ช่องกรอก 2 คอลัมน์) */
+.ss-line {
+	gap: 10px;
+}
+.ss-line-info {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	min-width: 0;
+	padding-right: 34px;
+}
+.ss-line-del {
+	position: absolute;
+	top: 10px;
+	right: 10px;
+}
+.ss-line-inputs {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+	gap: 10px;
+	align-items: end;
+}
+.ss-line-amount {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-end;
+	justify-content: center;
+	gap: 5px;
+	min-height: 46px;
+}
+.ss-line-amount b {
+	font-size: 16px;
+	font-variant-numeric: tabular-nums;
+}
+
+/* จอกว้าง: 1 รายการ = 1 แถว (ชื่อ | จำนวน | หน่วย | ราคา | เงิน | ลบ) หัวช่องซ่อน ยกเว้นแถวแรก */
+@container (min-width: 640px) {
+	.ss-lines {
+		grid-template-columns: minmax(0, 1fr) !important;
+		gap: 6px;
+	}
+	.ss-line {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) auto 34px;
+		align-items: center;
+		gap: 6px 14px;
+		padding: 10px 10px 10px 16px;
+		border-radius: 14px;
+	}
+	.ss-line-info {
+		grid-column: 1;
+		grid-row: 1;
+		padding-right: 0;
+	}
+	.ss-line-inputs {
+		grid-column: 2;
+		grid-row: 1;
+		grid-template-columns: 96px 110px 120px 130px;
+	}
+	.ss-line-inputs.is-qty-only {
+		grid-template-columns: 110px 120px;
+	}
+	.ss-line .ss-field-label {
+		display: none;
+	}
+	.ss-lines > .ss-line:first-child .ss-field-label {
+		display: block;
+		position: absolute;
+		top: -22px;
+	}
+	.ss-lines > .ss-line:first-child {
+		margin-top: 22px;
+	}
+	.ss-line-inputs .ss-field,
+	.ss-line-amount {
+		position: relative;
+	}
+	.ss-line-amount {
+		min-height: 0;
+	}
+	.ss-line-del {
+		grid-column: 3;
+		grid-row: 1;
+		position: static;
+	}
+	.ss-line > .ss-field-error {
+		grid-column: 1 / -1;
+	}
+}
+.ss-docform .ss-split-main {
+	container-type: inline-size;
+}

@@ -155,11 +155,14 @@ export const ROUTES = {
 	po: { section: "buy", params: ["filter"] },
 	pi: { section: "buy", params: ["filter"] },
 	"buy-doc": { section: "buy", params: ["kind", "name"] },
+	// สร้าง/แก้ไขร่าง: name = new (ใหม่) หรือเลขที่ร่าง, source = เอกสารต้นทาง (สร้างเอกสารถัดไป)
+	"buy-form": { section: "buy", params: ["kind", "name", "source"] },
 	sell: { section: "sell", params: [] },
 	qtn: { section: "sell", params: ["filter"] },
 	so: { section: "sell", params: ["filter"] },
 	si: { section: "sell", params: ["filter"] },
 	"sell-doc": { section: "sell", params: ["kind", "name"] },
+	"sell-form": { section: "sell", params: ["kind", "name", "source"] },
 };
 
 // หน้าย่อยนับเป็นเมนูไหน (ไฮไลต์ในแถบข้างของจอใหญ่)
