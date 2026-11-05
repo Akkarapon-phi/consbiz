@@ -562,7 +562,7 @@ def signature_name(name):
 
 def header_info(doc, kind):
 	"""ข้อมูลหัวเอกสารสำหรับหน้าดู: เรื่อง วัตถุประสงค์ ผู้ขอ/ผู้อนุมัติ (MR ใช้ Signature) ตัวเลือกภาษีของ MR"""
-	out = {"title": doc.get("title")}
+	out = {"title": doc.get("title"), "po_no": doc.get("po_no")}
 	if kind == "mr":
 		out.update(
 			{
@@ -598,7 +598,28 @@ def summary_of(doc, kind):
 			label = t.description + (f" {flt(t.rate):g}%" if flt(t.rate) else "")
 			rows.append({"label": label, "value": flt(t.tax_amount), "tax": 1})
 		grand = flt(doc.get("rounded_total")) or flt(doc.get("grand_total"))
-	return {"rows": rows, "grand": grand, "in_words": thai_baht_text(grand) if grand else ""}
+	out = {
+		"rows": rows,
+		"grand": grand,
+		"grand_label": _("รวมเป็นเงิน") if kind == "mr" else _("ยอดรวมทั้งสิ้น"),
+		"in_words": thai_baht_text(grand) if grand else "",
+		"deductions": [],
+	}
+	# หัก ณ ที่จ่าย / เงินประกัน → ยอดชำระสุทธิ (ช่องของ consbiz, คำนวณใน deductions.py / สคริปต์ระบบเต็ม)
+	if kind != "mr" and doc.meta.has_field("custom_subject_to_wht"):
+		for subject, percent, amount, label in (
+			("custom_subject_to_wht", "custom_wht_percent", "custom_wht_amount", "หัก ณ ที่จ่าย"),
+			("custom_subject_to_retention", "custom_retention_percent", "custom_retention_amount", "เงินประกันผลงาน"),
+		):
+			if cint(doc.get(subject)) and flt(doc.get(amount)):
+				out["deductions"].append(
+					{"label": _(label) + f" {flt(doc.get(percent)):g}%", "value": -flt(doc.get(amount))}
+				)
+		net_field = "custom_net_paid_amount" if doc.meta.has_field("custom_net_paid_amount") else "custom_paid_amount"
+		if out["deductions"] or flt(doc.get("total_advance")):
+			out["net"] = flt(doc.get(net_field))
+			out["net_label"] = _("ยอดชำระสุทธิ")
+	return out
 
 
 def steps_of(doc, kind):
@@ -723,6 +744,8 @@ def submit_doc(kind, name):
 
 # ส่วนลดท้ายบิล (%) ERPNext คำนวณยอดหลังส่วนลดเองใน calculate_taxes_and_totals
 DISCOUNT = "additional_discount_percentage"
+# หัก ณ ที่จ่าย / เงินประกันผลงาน (Custom Field) ยอดคำนวณใน consbiz/deductions.py
+DEDUCT = ("custom_subject_to_wht", "custom_wht_percent", "custom_subject_to_retention", "custom_retention_percent")
 
 # ช่องหัวเอกสารที่แอปส่งมาได้ (ช่องอื่นไม่รับ) และช่องของแถวรายการ
 FORM = {
@@ -745,7 +768,7 @@ FORM = {
 	},
 	"po": {
 		"party": "supplier",
-		"header": ("supplier", "transaction_date", "schedule_date", "taxes_and_charges", DISCOUNT),
+		"header": ("supplier", "transaction_date", "schedule_date", "taxes_and_charges", DISCOUNT, *DEDUCT),
 		"item": ("item_code", "qty", "uom", "rate", "schedule_date", "description"),
 	},
 	"pi": {
@@ -761,6 +784,7 @@ FORM = {
 			"due_date",
 			"taxes_and_charges",
 			DISCOUNT,
+			*DEDUCT,
 			"remarks",
 		),
 		"item": ("item_code", "qty", "uom", "rate", "description"),
@@ -768,17 +792,31 @@ FORM = {
 	},
 	"qtn": {
 		"party": "party_name",
-		"header": ("party_name", "transaction_date", "valid_till", "taxes_and_charges", DISCOUNT),
+		"header": ("party_name", "transaction_date", "valid_till", "taxes_and_charges", DISCOUNT, *DEDUCT),
 		"item": ("item_code", "qty", "uom", "rate", "description"),
 	},
 	"so": {
 		"party": "customer",
-		"header": ("customer", "transaction_date", "delivery_date", "taxes_and_charges", DISCOUNT),
+		"header": ("customer", "po_no", "transaction_date", "delivery_date", "taxes_and_charges", DISCOUNT, *DEDUCT),
 		"item": ("item_code", "qty", "uom", "rate", "delivery_date", "description"),
 	},
 	"si": {
 		"party": "customer",
-		"header": ("customer", "posting_date", "due_date", "taxes_and_charges", DISCOUNT, "remarks"),
+		"header": (
+			"customer",
+			"po_no",
+			"posting_date",
+			"due_date",
+			"taxes_and_charges",
+			DISCOUNT,
+			*DEDUCT,
+			# ติ๊กแก้ไขเอง = ใช้ยอดหักที่กรอก (แบบฟอร์มระบบเต็ม)
+			"custom_edit_wht",
+			"custom_wht_amount",
+			"custom_edit_retention",
+			"custom_retention_amount",
+			"remarks",
+		),
 		"item": ("item_code", "qty", "uom", "rate", "description"),
 		"remarks": "remarks",
 	},
@@ -951,7 +989,10 @@ def apply_form(doc, kind, data):
 
 		calculate(doc)
 	else:
+		from consbiz.deductions import calculate as calculate_deductions
+
 		doc.calculate_taxes_and_totals()
+		calculate_deductions(doc)
 	return doc
 
 

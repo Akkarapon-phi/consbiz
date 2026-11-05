@@ -162,8 +162,57 @@
 								<span>แก้ไขภาษี</span>
 							</label>
 						</div>
+						<!-- หัก ณ ที่จ่าย / เงินประกันผลงาน (% ของยอดก่อนภาษี) ใบแจ้งหนี้ขายติ๊ก "แก้ไขยอดเอง" ได้ -->
+						<div v-if="has_deduct" class="ss-deducts">
+							<div v-for="d in DEDUCTS" :key="d.subject" class="ss-deduct">
+								<label class="ss-checkline">
+									<input
+										v-model="form[d.subject]"
+										type="checkbox"
+										:true-value="1"
+										:false-value="0"
+									/>
+									<span>{{ d.label }}</span>
+								</label>
+								<template v-if="form[d.subject]">
+									<label class="ss-deduct-pct">
+										<input
+											v-model.number="form[d.percent]"
+											class="ss-cell ss-cell--num"
+											type="number"
+											inputmode="decimal"
+											min="0"
+											step="any"
+											:aria-label="`${d.label} (%)`"
+										/>
+										<span>%</span>
+									</label>
+									<template v-if="form.fields.includes(d.edit)">
+										<label class="ss-checkline ss-deduct-edit">
+											<input
+												v-model="form[d.edit]"
+												type="checkbox"
+												:true-value="1"
+												:false-value="0"
+											/>
+											<span>กรอกยอดเอง</span>
+										</label>
+										<input
+											v-if="form[d.edit]"
+											v-model.number="form[d.amount]"
+											class="ss-cell ss-cell--num ss-deduct-amount"
+											type="number"
+											inputmode="decimal"
+											min="0"
+											step="any"
+											:aria-label="`ยอด${d.label}`"
+										/>
+									</template>
+								</template>
+							</div>
+						</div>
 						<p v-if="!is_mr" class="ss-muted ss-docform-note">
-							<Icon name="info" :size="14" /> หัก ณ ที่จ่าย เงินประกันผลงาน และเงื่อนไขชำระเงิน
+							<Icon name="info" :size="14" /> เงื่อนไขชำระเงินและบัญชีอื่นๆ
 							แก้ต่อได้ในระบบเต็มหลังบันทึก
 						</p>
 					</div>
@@ -183,13 +232,24 @@
 						</div>
 						<div class="is-grand">
 							<span
-								>รวมเป็นเงิน <span v-if="previewing" class="ss-spinner ss-spinner--sm"></span
+								>{{ form.summary.grand_label }}
+								<span v-if="previewing" class="ss-spinner ss-spinner--sm"></span
 							></span>
 							<b>{{ money(grand_total) }}</b>
 						</div>
 						<div v-if="form.summary.in_words" class="ss-totals-words">
 							({{ form.summary.in_words }})
 						</div>
+						<template v-if="form.summary.net !== undefined">
+							<div v-for="d in form.summary.deductions" :key="d.label" class="is-deduct">
+								<span>{{ d.label }}</span
+								><b>{{ money(d.value) }}</b>
+							</div>
+							<div class="is-net">
+								<span>{{ form.summary.net_label }}</span
+								><b>{{ money(form.summary.net) }}</b>
+							</div>
+						</template>
 					</div>
 				</section>
 
@@ -449,24 +509,33 @@ const FIELDS = {
 		{ field: "valid_till", label: "ยืนราคาถึง", type: "date" },
 	],
 	so: [
+		{ field: "po_no", label: "เลขที่ใบสั่งซื้อลูกค้า", placeholder: "PO ของลูกค้า (ถ้ามี)" },
 		{ field: "transaction_date", label: "วันที่", type: "date", required: true },
 		{ field: "delivery_date", label: "กำหนดส่งมอบ", type: "date", required: true, rows: "delivery_date" },
 	],
 	si: [
+		{ field: "po_no", label: "เลขที่ใบสั่งซื้อลูกค้า", placeholder: "PO ของลูกค้า (ถ้ามี)" },
 		{ field: "posting_date", label: "วันที่", type: "date", required: true },
 		{ field: "due_date", label: "ครบกำหนดรับ", type: "date" },
 	],
 };
 const REMARKS = { mr: "custom_remark", pi: "remarks", si: "remarks" };
-// ช่องหัวใบขอซื้อเพิ่มเติม (ตรงกับ FORM["mr"] ใน site_docs.py)
-const MR_FIELDS = [
-	"material_request_type",
-	"title",
-	"custom_request_by",
-	"custom_approve_by",
-	"custom_included_vat",
-	"custom_vat_override",
-	"custom_vat",
+// หัก ณ ที่จ่าย / เงินประกันผลงาน (edit/amount = ใบแจ้งหนี้ขายกรอกยอดเอง)
+const DEDUCTS = [
+	{
+		label: "หัก ณ ที่จ่าย",
+		subject: "custom_subject_to_wht",
+		percent: "custom_wht_percent",
+		edit: "custom_edit_wht",
+		amount: "custom_wht_amount",
+	},
+	{
+		label: "เงินประกันผลงาน",
+		subject: "custom_subject_to_retention",
+		percent: "custom_retention_percent",
+		edit: "custom_edit_retention",
+		amount: "custom_retention_amount",
+	},
 ];
 const PURPOSES = [
 	{ value: "Purchase", label: "ซื้อ" },
@@ -506,6 +575,7 @@ const tax_value = computed({
 	get: () => form.value?.taxes_and_charges || "",
 	set: (value) => (form.value.taxes_and_charges = value || null),
 });
+const has_deduct = computed(() => !!form.value?.fields?.includes("custom_subject_to_wht"));
 const has_discount = computed(() => !!form.value?.fields?.includes("additional_discount_percentage"));
 // วันที่รายแถว (แก้ต่างจากหัวเอกสารได้)
 const row_date = computed(
@@ -566,14 +636,8 @@ function restore_draft(data) {
 function payload() {
 	const f = form.value;
 	const out = { name: f.name, source: f.source, project: state.project?.name || null };
-	for (const field of [
-		...fields.value.map((x) => x.field),
-		party_field,
-		remarks_field,
-		"taxes_and_charges",
-		has_discount.value && "additional_discount_percentage",
-		...(is_mr ? MR_FIELDS : []),
-	]) {
+	// ช่องหัวเอกสารที่ server รับ (FORM ใน site_docs.py ที่ DocType มีจริง)
+	for (const field of [...(f.fields || []), party_field, remarks_field]) {
 		if (field) out[field] = f[field] ?? null;
 	}
 	out.items = f.items.map((row) => ({

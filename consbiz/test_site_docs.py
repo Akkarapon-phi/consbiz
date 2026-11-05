@@ -197,3 +197,22 @@ class IntegrationTestSiteDocs(IntegrationTestCase):
 		self.assertEqual(view["steps"][0]["state"], "current")
 		self.assertEqual(view["summary"]["grand"], mr.custom_grand_total)
 
+	def test_withholding_and_retention_in_app_form(self):
+		data = {
+			"project": self.project,
+			"supplier": SUPPLIER,
+			"schedule_date": frappe.utils.add_days(frappe.utils.nowdate(), 3),
+			"taxes_and_charges": None,
+			"custom_subject_to_wht": 1,
+			"custom_wht_percent": 3,
+			"custom_subject_to_retention": 1,
+			"custom_retention_percent": 5,
+			"items": [{"key": None, "item_code": ITEM, "qty": 10, "rate": 100}],
+		}
+		preview = site_docs.preview_doc("po", json.dumps(data, default=str))
+		self.assertEqual([d["value"] for d in preview["summary"]["deductions"]], [-30, -50])
+		self.assertEqual(preview["summary"]["net"], 920)
+		saved = site_docs.save_doc("po", json.dumps(data, default=str))
+		po = frappe.get_doc("Purchase Order", saved["name"])
+		self.assertEqual((po.custom_wht_amount, po.custom_retention_amount, po.custom_paid_amount), (30, 50, 920))
+

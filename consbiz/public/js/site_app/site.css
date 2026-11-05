@@ -7411,3 +7411,55 @@ div.ss-line-del {
 	display: inline-grid;
 	vertical-align: middle;
 }
+
+/* หัก ณ ที่จ่าย / เงินประกันผลงาน (ฟอร์ม) และยอดชำระสุทธิ (สรุปยอด) */
+.ss-deducts {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	padding: 12px 14px;
+	border-radius: var(--ss-radius-sm);
+	background: var(--ss-surface);
+	box-shadow: var(--ss-shadow);
+}
+.ss-deduct {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 8px 14px;
+	min-height: 36px;
+}
+.ss-deduct > .ss-checkline:first-child {
+	min-width: 150px;
+}
+.ss-deduct-pct {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	font-size: 14px;
+	color: var(--ss-text-2);
+}
+.ss-deduct-pct .ss-cell,
+.ss-deduct-amount {
+	width: 90px;
+	border-color: var(--ss-border-strong);
+	background: var(--ss-surface);
+}
+.ss-deduct-amount {
+	width: 130px;
+}
+.ss-deduct-edit {
+	font-weight: 400;
+	color: var(--ss-text-2);
+}
+.ss-totals .is-deduct span {
+	color: var(--ss-text-2);
+}
+.ss-totals .is-net {
+	padding-top: 8px;
+	border-top: 1px dashed var(--ss-border-strong);
+}
+.ss-totals .is-net b {
+	font-size: 16px;
+	color: var(--ss-text);
+}

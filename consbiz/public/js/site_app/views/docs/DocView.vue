@@ -68,6 +68,10 @@
 							<dt>{{ config.due || "วันที่ต้องการ" }}</dt>
 							<dd :class="{ 'is-due': overdue }">{{ thai_date(doc.due, { year: true }) }}</dd>
 						</div>
+						<div v-if="doc.po_no">
+							<dt>เลขที่ใบสั่งซื้อลูกค้า</dt>
+							<dd>{{ doc.po_no }}</dd>
+						</div>
 						<div v-if="doc.bill_no">
 							<dt>เลขที่บิลผู้ขาย</dt>
 							<dd>{{ doc.bill_no }}</dd>
@@ -224,11 +228,22 @@
 									><b>{{ money(r.value) }}</b>
 								</div>
 								<div class="is-grand">
-									<span>รวมเป็นเงิน</span><b>{{ money(doc.summary.grand) }}</b>
+									<span>{{ doc.summary.grand_label }}</span
+									><b>{{ money(doc.summary.grand) }}</b>
 								</div>
 								<div v-if="doc.summary.in_words" class="ss-totals-words">
 									({{ doc.summary.in_words }})
 								</div>
+								<template v-if="doc.summary.net !== undefined">
+									<div v-for="d in doc.summary.deductions" :key="d.label" class="is-deduct">
+										<span>{{ d.label }}</span
+										><b>{{ money(d.value) }}</b>
+									</div>
+									<div class="is-net">
+										<span>{{ doc.summary.net_label }}</span
+										><b>{{ money(doc.summary.net) }}</b>
+									</div>
+								</template>
 								<div v-if="doc.totals.outstanding_amount" class="is-due">
 									<span>ค้าง{{ due_word }}</span
 									><b>{{ money(doc.totals.outstanding_amount) }}</b>

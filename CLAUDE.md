@@ -164,7 +164,9 @@ pre-commit run --all-files                               # ruff + prettier (ต�
   จัดซื้อ (MR ประเภท Purchase → PO → PI) / ขาย (Quotation → SO → SI): `views/docs/` ชุดเดียวกันทั้ง 6 ชนิด (`DOC_KINDS` ใน sections.js ตรงกับ `DOCS` ใน `consbiz/site_docs.py`)
   ดูรายการ/รายละเอียด/เอกสารต้นทาง-ปลายทาง, ส่งเอกสารร่าง, PDF ขอบเขต โครงการนี้/ทุกโครงการ (`state.doc_scope`)
   สร้าง/แก้ไขร่างในแอป (`DocForm.vue`, หน้า `buy-form` / `sell-form`): ช่องที่กรอกได้อยู่ใน `FORM` ของ site_docs.py (รวมส่วนลดท้ายบิล %)
-  หัก ณ ที่จ่าย/เงินประกันผลงานยังแก้ในระบบเต็ม (คำนวณฝั่ง client ของ desk พร้อมตาราง deduction เช่น `purchase_invoice.js`)
+  หัก ณ ที่จ่าย/เงินประกันผลงานในแอป: `consbiz/deductions.py` (เรียกจาก `apply_form` เท่านั้น ไม่ได้ผูก validate)
+  สูตรเดียวกับสคริปต์ฟอร์มระบบเต็ม (`purchase_order.js`, `quotation_cal.js`, `sales_order_cal.js`, `purchase_invoice.js`, `sales_invoice_cal.js`) แก้ที่หนึ่งต้องแก้อีกที่
+  PI/SI ลงตาราง `custom_payment_entry_deduction` (บัญชีจาก Company) SI ติ๊ก `custom_edit_wht`/`custom_edit_retention` = ใช้ยอดที่กรอกเอง
   รายการ: `LineEditor.vue` จอ ≥1000 = ตารางแก้ไขในช่อง + แถวค้นหาเพิ่ม (↑↓/Enter, Enter จำนวน → ราคา → ค้นหา), แคบกว่า = การ์ด
   ลากที่จับย้ายลำดับแถว (ส่ง idx ตามลำดับ), ติ๊กหลายแถวแล้วลบ, ปากกา = รายละเอียดแถว (คำอธิบาย, WBS, ไม่คิดภาษี)
   ใบขอซื้อ: วัตถุประสงค์ ซื้อ / ผู้ว่าจ้างจัดหา (ผู้ว่าจ้างจัดหาห้ามสร้าง PO ต่อ), ผู้จัดทำ/ผู้อนุมัติ = Signature
