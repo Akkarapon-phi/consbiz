@@ -18,6 +18,20 @@
 			</Transition>
 		</main>
 
+		<!-- จอใหญ่: Dock หมวดงานซ้ายสุด (แท็บเล็ตอยู่บนสุดของแถบไอคอน, มือถือใช้ตารางหมวดงาน) -->
+		<Transition name="ss-dock">
+			<aside v-if="state.project && boot.sections.length > 1" class="ss-dock" aria-label="หมวดงาน">
+				<span class="ss-dock-logo" title="ConsERP"
+					><Icon name="building" :size="20" :stroke="2.2"
+				/></span>
+				<SectionDock variant="dock" />
+				<a v-if="boot.desk" class="ss-sec ss-dock-desk" href="/app" title="เปิดระบบเต็ม">
+					<span class="ss-sec-icon"><Icon name="monitor" :size="20" /></span>
+					<span class="ss-sec-label">ระบบเต็ม</span>
+				</a>
+			</aside>
+		</Transition>
+
 		<!-- มือถือ: แถบล่าง (เฉพาะหน้าหลักของแต่ละเมนู) / แท็บเล็ต-จอใหญ่: แถบข้างซ้าย (ทุกหน้า) -->
 		<Transition name="ss-nav">
 			<nav
@@ -53,6 +67,7 @@
 						:size="16"
 					/>
 				</component>
+				<SectionDock v-if="boot.sections.length > 1" variant="rail" />
 				<button type="button" class="ss-nav-project" @click="picker = true">
 					<span class="ss-avatar" :class="`tone-${tone(state.project.name)}`">{{
 						initials(state.project.project_name || state.project.name)
@@ -169,6 +184,7 @@ import { computed, onMounted, provide, ref } from "vue";
 import Icon from "./components/Icon.vue";
 import Sheet from "./components/Sheet.vue";
 import SectionLauncher from "./components/SectionLauncher.vue";
+import SectionDock from "./components/SectionDock.vue";
 import { PARENT_TAB, SECTIONS, is_tab } from "./sections.js";
 import {
 	boot,
@@ -351,6 +367,7 @@ provide("open_project_picker", () => (picker.value = true));
 // ---------------------------------------------------------------- หมวดงาน
 
 const launcher = ref(false);
+if (boot.sections.length > 1) document.documentElement.dataset.dock = "1";
 provide("open_launcher", () => (launcher.value = true));
 // งานที่รอในหมวดอื่น (จุดแดงบนปุ่มหมวดงาน)
 const other_badges = computed(() =>

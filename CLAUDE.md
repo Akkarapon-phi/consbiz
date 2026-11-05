@@ -168,8 +168,9 @@ pre-commit run --all-files                               # ruff + prettier (ต�
   ทรัพยากร + แผนจัดซื้อวัสดุ (`resources.get_overview`), เอกสาร (`get_documents`) แก้แผนที่หน้า Gantt ในระบบเต็ม
   Look-ahead: มือถือ = การ์ดทีละสัปดาห์, แท็บเล็ต = ตาราง 2 สัปดาห์, จอใหญ่ = ตารางทั้งช่วง (matchMedia ใน `Lookahead.vue`)
   summary ของหมวดที่ `lazy` (บริหารโครงการ) โหลดเมื่อเปิดหมวดนั้นเท่านั้น
-  หมวดที่เห็นตามสิทธิ์ (`site_app.boot_data` → `sections`) สลับหมวดผ่านตารางไอคอน (`SectionLauncher.vue`, เพิ่มหมวดได้ไม่จำกัด)
-  เปิดจากชิปบน hero (มือถือ, `Hero.vue`) หรือชื่อหมวดบนแถบข้าง สลับแล้วไปเมนูล่าสุดของหมวดนั้น (`state.last_tab`)
+  หมวดที่เห็นตามสิทธิ์ (`site_app.boot_data` → `sections`) สลับหมวด: มือถือ = ตารางไอคอน (`SectionLauncher.vue`) เปิดจากชิปบน hero (`Hero.vue`)
+  แท็บเล็ต = ปุ่มหมวดบนสุดของแถบไอคอน, จอใหญ่ = Dock คอลัมน์ซ้ายสุด (`SectionDock.vue`, `html[data-dock]` รวมความกว้าง Dock ไว้ใน `--ss-side`)
+  สลับแล้วไปเมนูล่าสุดของหมวดนั้น (`state.last_tab`)
   สีหลักตามหมวด: `data-section` ที่ `<html>` (sheet ถูก Teleport ไป body) ทับ `--ss-brand*`
   ชื่อหน้า (view) ห้ามซ้ำข้ามหมวด (`go(view)` หาหมวดจาก `ROUTES`), summary แยกหมวดใน `state.summaries`
   ควบคุมงาน: หน้าหลัก % จริง/แผน + S-Curve (`SCurve.vue`, ข้อมูล `dashboard.progress_curve`), ปฏิทินรายงาน (`get_site_calendar`)

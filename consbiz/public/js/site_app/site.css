@@ -2607,7 +2607,8 @@ button.ss-card:active {
 		bottom: 0;
 		left: 0;
 		transform: none;
-		width: var(--ss-side);
+		left: var(--ss-dock, 0px);
+		width: calc(var(--ss-side) - var(--ss-dock, 0px));
 		max-width: none;
 		height: auto;
 		padding: calc(16px + var(--ss-top)) 10px calc(16px + var(--ss-bottom));
@@ -4912,5 +4913,169 @@ a.ss-btn--soft {
 @media (max-width: 400px) {
 	.ss-pdf-zoom span {
 		display: none;
+	}
+}
+
+/* ================================================================ Dock หมวดงาน (SectionDock.vue)
+   จอใหญ่: คอลัมน์ 64px ซ้ายสุด (html[data-dock] รวมความกว้างไว้ใน --ss-side ให้ sheet/toast/แถบล่างเลื่อนตาม)
+   แท็บเล็ต: ปุ่มหมวดอยู่บนสุดของแถบไอคอน แบ่งจากเมนูด้วยเส้น  มือถือ: ไม่แสดง */
+
+.ss-dock,
+.ss-sections--rail {
+	display: none;
+}
+.ss-sections {
+	flex-direction: column;
+	align-items: stretch;
+	gap: 4px;
+}
+.ss-sec {
+	position: relative;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 3px;
+	padding: 3px 0;
+	color: var(--ss-muted);
+	text-decoration: none;
+	transition: color 0.2s ease;
+}
+.ss-sec-icon {
+	position: relative;
+	width: 42px;
+	height: 42px;
+	display: grid;
+	place-items: center;
+	border-radius: 14px;
+	color: var(--sw, var(--ss-text-2));
+	background: color-mix(in srgb, var(--sw, var(--ss-muted)) 13%, transparent);
+	transition: background 0.25s ease, color 0.25s ease, border-radius 0.3s var(--ss-ease), box-shadow 0.25s ease,
+		transform 0.25s var(--ss-spring);
+}
+.ss-sec:active .ss-sec-icon {
+	transform: scale(0.92);
+}
+.ss-sec.is-active {
+	color: var(--ss-text);
+}
+.ss-sec.is-active .ss-sec-icon {
+	color: #fff;
+	border-radius: 13px;
+	background: linear-gradient(140deg, var(--sw), var(--sw2));
+	box-shadow: 0 10px 20px -10px var(--sw);
+}
+/* ชื่อหมวดยาวขึ้น 2 บรรทัด (แถบแคบ) */
+.ss-sec-label {
+	max-width: 100%;
+	font-size: 10.5px;
+	font-weight: 600;
+	line-height: 1.2;
+	text-align: center;
+	overflow: hidden;
+	display: -webkit-box;
+	-webkit-line-clamp: 2;
+	-webkit-box-orient: vertical;
+}
+.ss-sec-badge {
+	position: absolute;
+	top: -5px;
+	right: -7px;
+	min-width: 18px;
+	height: 18px;
+	padding: 0 4px;
+	border-radius: 99px;
+	font-size: 10.5px;
+	font-weight: 700;
+	line-height: 14px;
+	text-align: center;
+	color: #fff;
+	background: var(--ss-danger);
+	border: 2px solid var(--ss-surface);
+}
+@media (hover: hover) {
+	.ss-sec:not(.is-active):hover {
+		color: var(--ss-text);
+	}
+	.ss-sec:not(.is-active):hover .ss-sec-icon {
+		border-radius: 12px;
+		background: color-mix(in srgb, var(--sw, var(--ss-muted)) 22%, transparent);
+	}
+}
+
+@media (min-width: 768px) and (max-width: 1179px) {
+	/* ปุ่มหมวดอยู่บนสุดของแถบแล้ว ไม่ต้องมีโลโก้หมวด */
+	.ss-nav.has-sections .ss-nav-brand {
+		display: none;
+	}
+	.ss-sections--rail {
+		display: flex;
+		padding-bottom: 10px;
+		margin-bottom: 8px;
+		border-bottom: 1px solid var(--ss-border);
+	}
+}
+
+@media (min-width: 1180px) {
+	html[data-dock] {
+		--ss-dock: 72px;
+		--ss-side: 340px;
+	}
+	html[data-dock] .ss-dock {
+		position: fixed;
+		z-index: 31;
+		top: 0;
+		bottom: 0;
+		left: 0;
+		width: var(--ss-dock);
+		display: flex;
+		flex-direction: column;
+		align-items: stretch;
+		gap: 10px;
+		padding: calc(18px + var(--ss-top)) 8px calc(16px + var(--ss-bottom));
+		background: color-mix(in srgb, var(--ss-surface-2) 70%, var(--ss-bg));
+		border-right: 1px solid var(--ss-border);
+		overflow-y: auto;
+	}
+	.ss-dock .ss-sections {
+		display: flex;
+		gap: 8px;
+	}
+	.ss-dock .ss-sec-label {
+		font-size: 10px;
+	}
+	.ss-dock-logo {
+		align-self: center;
+		width: 36px;
+		height: 36px;
+		margin-bottom: 8px;
+		display: grid;
+		place-items: center;
+		border-radius: 11px;
+		color: #fff;
+		background: var(--ss-text);
+	}
+	.ss-dock-desk {
+		margin-top: auto;
+		--sw: var(--ss-text-2);
+	}
+	/* Dock เปลี่ยนหมวดแล้ว: ชื่อหมวดบน sidebar เป็นหัวข้อธรรมดา ไม่ใช่ปุ่ม และไม่มีปุ่มระบบเต็มซ้ำ */
+	html[data-dock] button.ss-nav-brand {
+		pointer-events: none;
+	}
+	html[data-dock] .ss-nav-brand small,
+	html[data-dock] .ss-nav-brand-more,
+	html[data-dock] .ss-nav-logo-grid,
+	html[data-dock] .ss-nav-logo-dot,
+	html[data-dock] .ss-nav-desk {
+		display: none !important;
+	}
+	.ss-dock-enter-active,
+	.ss-dock-leave-active {
+		transition: transform 0.4s var(--ss-ease), opacity 0.3s ease;
+	}
+	.ss-dock-enter-from,
+	.ss-dock-leave-to {
+		transform: translateX(-100%);
+		opacity: 0;
 	}
 }
