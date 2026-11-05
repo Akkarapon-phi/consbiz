@@ -7,22 +7,17 @@
 		:style="{ '--i': i }"
 		@click="go(`${config.section}-doc`, { kind, name: row.name })"
 	>
-		<div class="ss-card-head">
-			<span class="ss-avatar" :class="`tone-${row.party ? tone(row.party) : config.tone}`">
-				<template v-if="row.party">{{ initials(row.party) }}</template>
-				<Icon v-else :name="config.icon" :size="18" />
-			</span>
-			<span class="ss-card-main">
-				<span class="ss-card-title">{{ row.party || row.title || row.name }}</span>
-				<span class="ss-card-meta"
-					>{{ row.name }} · {{ thai_date(row.date, { year: true })
-					}}<template v-if="row.bill_no"> · บิล {{ row.bill_no }}</template></span
-				>
-			</span>
-			<span class="ss-doc-amount">
-				<b v-if="row.amount !== undefined">{{ money(row.amount) }}</b>
-				<span class="ss-tag" :class="`tone-${row.status_tone}`">{{ row.status_label }}</span>
-			</span>
+		<!-- 2 บรรทัดเต็มความกว้าง (มือถือไม่บีบชื่อคู่ค้า): ชื่อ + สถานะ / เลขที่ วันที่ + ยอดเงิน -->
+		<div class="ss-doc-row">
+			<span class="ss-doc-title">{{ row.party || row.title || row.name }}</span>
+			<span class="ss-tag" :class="`tone-${row.status_tone}`">{{ row.status_label }}</span>
+		</div>
+		<div class="ss-doc-row is-sub">
+			<span class="ss-doc-meta"
+				>{{ row.name }} · {{ thai_date(row.date, { year: true })
+				}}<template v-if="row.bill_no"> · บิล {{ row.bill_no }}</template></span
+			>
+			<b v-if="row.amount !== undefined" class="ss-doc-money">{{ money(row.amount) }}</b>
 		</div>
 		<div v-if="progress.length || show_due || row.outstanding" class="ss-chips ss-chips--wrap">
 			<span v-if="row.outstanding && row.outstanding !== row.amount" class="ss-chip"
@@ -44,7 +39,7 @@
 import { computed } from "vue";
 import Icon from "../../components/Icon.vue";
 import { DOC_KINDS } from "../../sections.js";
-import { go, initials, money, relative_date, thai_date, tone } from "../../api.js";
+import { go, money, relative_date, thai_date } from "../../api.js";
 
 const props = defineProps({ row: Object, kind: String, i: { type: Number, default: 0 } });
 const config = computed(() => DOC_KINDS[props.kind]);

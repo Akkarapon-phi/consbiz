@@ -39,28 +39,33 @@
 							<small>{{ config.party || "เรื่อง" }}</small>
 							<b>{{ doc.party || doc.title || doc.name }}</b>
 						</div>
-						<div class="ss-facts ss-facts--grid">
-							<div class="ss-fact">
-								<span>ยอดรวม</span><b>{{ money(doc.totals.grand_total) }}</b>
+						<div class="ss-doc-total">
+							<div>
+								<small>ยอดรวม</small>
+								<b>{{ money(doc.totals.grand_total) }}</b>
 							</div>
-							<div v-if="doc.totals.outstanding_amount" class="ss-fact">
-								<span>ค้าง{{ config.section === "buy" ? "จ่าย" : "รับ" }}</span
-								><b class="ss-text-danger">{{ money(doc.totals.outstanding_amount) }}</b>
-							</div>
-							<div v-if="doc.due" class="ss-fact">
-								<span>{{ config.due || "ต้องการภายใน" }}</span
-								><b>{{ thai_date(doc.due, { year: true }) }}</b>
-							</div>
-							<div v-if="doc.bill_no" class="ss-fact">
-								<span>เลขที่บิลผู้ขาย</span><b>{{ doc.bill_no }}</b>
-							</div>
-							<div v-if="doc.project" class="ss-fact">
-								<span>โครงการ</span><b>{{ doc.project }}</b>
-							</div>
-							<div class="ss-fact">
-								<span>ผู้ทำเอกสาร</span><b>{{ doc.owner_name }}</b>
+							<div v-if="doc.totals.outstanding_amount" class="is-due">
+								<small>ค้าง{{ config.section === "buy" ? "จ่าย" : "รับ" }}</small>
+								<b>{{ money(doc.totals.outstanding_amount) }}</b>
 							</div>
 						</div>
+						<!-- ป้าย-ค่า เรียงแถว (มือถือไม่หักตัวเลข/ชื่อกลางคำ) -->
+						<dl class="ss-kv">
+							<template v-if="doc.due">
+								<dt>{{ config.due || "ต้องการภายใน" }}</dt>
+								<dd>{{ thai_date(doc.due, { year: true }) }}</dd>
+							</template>
+							<template v-if="doc.bill_no">
+								<dt>เลขที่บิลผู้ขาย</dt>
+								<dd>{{ doc.bill_no }}</dd>
+							</template>
+							<template v-if="doc.project">
+								<dt>โครงการ</dt>
+								<dd>{{ doc.project }}</dd>
+							</template>
+							<dt>ผู้ทำเอกสาร</dt>
+							<dd>{{ doc.owner_name }}</dd>
+						</dl>
 						<div v-for="p in progress" :key="p.label" class="ss-doc-progress">
 							<span>{{ p.label }}</span>
 							<div class="ss-plan-bar ss-plan-bar--sm">
@@ -83,9 +88,12 @@
 							class="ss-card"
 							:style="{ '--i': Math.min(i, 12) }"
 						>
+							<div class="ss-doc-row">
+								<span class="ss-doc-title">{{ it.item_name || it.item_code }}</span>
+								<b class="ss-doc-money">{{ money(it.amount) }}</b>
+							</div>
 							<div class="ss-card-head">
 								<span class="ss-card-main">
-									<span class="ss-card-title">{{ it.item_name || it.item_code }}</span>
 									<span class="ss-card-meta"
 										>{{ num(it.qty) }} {{ it.uom }} × {{ money(it.rate)
 										}}<template v-if="it.schedule_date || it.delivery_date">
@@ -94,9 +102,6 @@
 										></span
 									>
 								</span>
-								<span class="ss-doc-amount"
-									><b>{{ money(it.amount) }}</b></span
-								>
 							</div>
 							<div v-if="item_progress(it)" class="ss-chips">
 								<span class="ss-chip">{{ item_progress(it) }}</span>
@@ -252,12 +257,17 @@ const LINK_LABELS = {
 const link_label = (doctype) => LINK_LABELS[doctype] || doctype;
 
 // ปริมาณที่ดำเนินการแล้วของแต่ละรายการ
-function item_progress(it) {
-	const pairs = [
+// ช่องปริมาณที่เกี่ยวกับเอกสารแต่ละชนิด (แถวของ SO มี ordered_qty ของการผลิต ไม่ใช่การสั่งซื้อ)
+const ITEM_PROGRESS = {
+	mr: [
 		["ordered_qty", "สั่งแล้ว"],
 		["received_qty", "รับแล้ว"],
-		["delivered_qty", "ส่งมอบแล้ว"],
-	];
+	],
+	po: [["received_qty", "รับแล้ว"]],
+	so: [["delivered_qty", "ส่งมอบแล้ว"]],
+};
+function item_progress(it) {
+	const pairs = ITEM_PROGRESS[params.kind] || [];
 	if (doc.value.docstatus !== 1) return "";
 	return pairs
 		.filter(([field]) => it[field] !== undefined && it[field] !== null)
