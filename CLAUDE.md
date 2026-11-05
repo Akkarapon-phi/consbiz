@@ -175,6 +175,9 @@ pre-commit run --all-files                               # ruff + prettier (ต�
   `html[data-dock]` + `html[data-side]` กำหนด `--ss-side` (ความกว้าง Dock + sidebar) ที่เนื้อหา/sheet/แถบล่างใช้ (data-peek ไม่เปลี่ยน --ss-side)
   รายการเอกสารจัดซื้อ/ขาย: มือถือ = การ์ด (`DocCard.vue`), แท็บเล็ต/จอใหญ่ = ตาราง (`DocTable.vue`) แท็บเล็ตย่อคอลัมน์ให้พอดีจอ
   สลับแล้วไปเมนูล่าสุดของหมวดนั้น (`state.last_tab`)
+  ฟอร์มบนแท็บเล็ต/จอใหญ่: เลย์เอาต์ในขั้นของฟอร์มใช้ container query (`.ss-step-body`) ตามความกว้างฟอร์ม ไม่ใช่ความกว้างจอ
+  ฟอร์มทีละขั้น ≥1180 = แถบขั้นตอนซ้าย (`.ss-wizard`) พร้อมสรุปของขั้น (`step_hint`), งานที่ทำ 1 งาน = 1 แถว, Ctrl/⌘+Enter = ถัดไป/ส่ง
+  จอใช้เมาส์ (`hover: hover` + `pointer: fine`) ช่องกรอกเตี้ยลงและมีเส้นขอบ จอสัมผัสคงขนาดใหญ่ แถบล่างปุ่มชิดขวา
   สีหลักตามหมวด: `data-section` ที่ `<html>` (sheet ถูก Teleport ไป body) ทับ `--ss-brand*`
   ชื่อหน้า (view) ห้ามซ้ำข้ามหมวด (`go(view)` หาหมวดจาก `ROUTES`), summary แยกหมวดใน `state.summaries`
   ควบคุมงาน: หน้าหลัก % จริง/แผน + S-Curve (`SCurve.vue`, ข้อมูล `dashboard.progress_curve`), ปฏิทินรายงาน (`get_site_calendar`)

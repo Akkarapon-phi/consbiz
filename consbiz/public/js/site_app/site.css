@@ -8,6 +8,7 @@
 	--ss-surface: #ffffff;
 	--ss-surface-2: #f6f8fc;
 	--ss-border: rgba(15, 23, 42, 0.08);
+	--ss-border-strong: rgba(15, 23, 42, 0.16);
 	--ss-text: #0f172a;
 	--ss-text-2: #475569;
 	--ss-muted: #8a94a6;
@@ -52,6 +53,7 @@
 		--ss-surface: #141a2c;
 		--ss-surface-2: #1b2236;
 		--ss-border: rgba(255, 255, 255, 0.08);
+		--ss-border-strong: rgba(255, 255, 255, 0.16);
 		--ss-text: #e8ecf5;
 		--ss-text-2: #b2bccd;
 		--ss-muted: #7d889c;
@@ -2748,9 +2750,13 @@ button.ss-card:active {
 	.ss-cart-summary {
 		flex: 1;
 	}
-	.ss-bottom-bar > .ss-btn--primary:last-child {
+	.ss-bottom-bar {
+		justify-content: flex-end;
+	}
+	.ss-bottom-bar > .ss-btn--primary:last-child,
+	.ss-bottom-bar > .ss-grow {
 		flex: 0 0 auto;
-		min-width: 260px;
+		min-width: 220px;
 	}
 	.ss-bar-enter-from,
 	.ss-bar-leave-to {
@@ -3212,7 +3218,6 @@ a.ss-option {
 	}
 }
 
-
 /* ================================================================ ควบคุมงาน: S-Curve */
 
 .ss-plan--curve {
@@ -3588,6 +3593,19 @@ a.ss-option {
 	box-shadow: 0 0 0 5px var(--ss-brand-soft);
 	transform: scale(1.08);
 }
+.ss-step-text {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	min-width: 0;
+	max-width: 100%;
+}
+/* สรุปใต้ชื่อขั้น / หมายเหตุร่าง: แสดงเฉพาะแถบซ้ายของจอกว้าง */
+.ss-step-hint,
+.ss-steps-note,
+.ss-kbd {
+	display: none;
+}
 .ss-step-label {
 	max-width: 100%;
 	font-size: 11.5px;
@@ -3675,6 +3693,27 @@ a.ss-option {
 }
 .ss-task-row {
 	gap: 10px;
+}
+/* ปุ่มลบมุมขวาบน (มือถือ) ข้อความชื่องานเว้นที่ให้ */
+.ss-task-info {
+	display: flex;
+	flex-direction: column;
+	gap: 3px;
+	min-width: 0;
+	padding-right: 34px;
+}
+.ss-task-info .ss-task-progress {
+	margin-top: 8px;
+}
+.ss-task-del {
+	position: absolute;
+	top: 10px;
+	right: 10px;
+}
+.ss-task-notes {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
 }
 .ss-task-progress {
 	display: flex;
@@ -3875,6 +3914,206 @@ a.ss-option {
 		width: 100%;
 		max-width: 980px;
 		margin-inline: auto;
+	}
+}
+
+/* ----- ฟอร์มบนแท็บเล็ต/จอใหญ่: ขนาดตามความกว้างของเนื้อหาฟอร์ม (container query) ไม่ใช่ความกว้างจอ */
+.ss-wizard {
+	display: flex;
+	flex-direction: column;
+	gap: 14px;
+	width: 100%;
+	min-width: 0;
+}
+.ss-step-body {
+	container-type: inline-size;
+	width: 100%;
+}
+.ss-cols {
+	display: grid;
+	gap: 14px;
+	align-items: start;
+}
+@container (min-width: 720px) {
+	.ss-cols {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+	.ss-cols--review {
+		grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+	}
+	.ss-cols--review .ss-section-title {
+		margin-top: 0;
+	}
+	.ss-cols--review .ss-facts--grid {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+	.ss-cols .ss-res-row {
+		grid-template-columns: minmax(0, 1fr) 140px 34px;
+	}
+	.ss-cols .ss-res-hours {
+		grid-column: 2 / span 2;
+		grid-row: auto;
+	}
+	.ss-cols .ss-res-row > .ss-icon-btn {
+		grid-column: 3;
+	}
+
+	/* งานที่ทำ: 1 งาน = 1 แถว เหมือนตารางกรอกข้อมูล */
+	.ss-list--tasks {
+		grid-template-columns: minmax(0, 1fr) !important;
+		gap: 8px;
+	}
+	.ss-task-row {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) 290px 34px;
+		grid-template-areas:
+			"info input del"
+			"notes notes notes"
+			"err err err";
+		align-items: center;
+		gap: 10px 16px;
+		padding: 12px 12px 12px 16px;
+		border-radius: 16px;
+	}
+	.ss-task-info {
+		grid-area: info;
+		padding-right: 0;
+	}
+	.ss-task-input {
+		grid-area: input;
+	}
+	.ss-task-del {
+		grid-area: del;
+		position: static;
+	}
+	.ss-task-notes {
+		grid-area: notes;
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
+	}
+	.ss-task-row > .ss-field-error {
+		grid-area: err;
+	}
+	.ss-task-row .ss-stepper {
+		height: 40px;
+	}
+}
+@container (min-width: 1000px) {
+	.ss-task-row {
+		grid-template-columns: minmax(0, 1fr) 280px minmax(0, 0.9fr) 34px;
+		grid-template-areas:
+			"info input notes del"
+			"err err err err";
+		align-items: start;
+	}
+	.ss-task-input {
+		align-self: center;
+	}
+	.ss-task-del {
+		align-self: center;
+	}
+	.ss-task-notes {
+		grid-template-columns: minmax(0, 1fr);
+		gap: 6px;
+	}
+	.ss-task-notes .ss-input--sm {
+		min-height: 36px;
+		padding: 6px 11px;
+		font-size: 14px;
+	}
+}
+
+/* ----- จอกว้าง: ขั้นตอนเป็นแถบซ้าย (ติดอยู่ระหว่างเลื่อน) + เนื้อหาขั้นด้านขวา */
+@media (min-width: 1180px) {
+	.ss-wizard {
+		display: grid;
+		grid-template-columns: 248px minmax(0, 1fr);
+		gap: 24px;
+		align-items: start;
+		max-width: 1320px;
+		margin-inline: auto;
+	}
+	.ss-wizard > .ss-steps {
+		position: sticky;
+		top: calc(84px + var(--ss-top));
+		display: flex;
+		flex-direction: column;
+		gap: 0;
+		max-width: none;
+		margin: 0;
+		padding: 12px;
+		border-radius: var(--ss-radius);
+		background: var(--ss-surface);
+		box-shadow: var(--ss-shadow);
+	}
+	/* เส้นเชื่อมแนวตั้ง: แต่ละขั้นสูง 64px จุดอยู่บนสุดของขั้น */
+	.ss-wizard > .ss-steps::before,
+	.ss-wizard > .ss-steps::after {
+		top: 39px;
+		left: 37px;
+		width: 3px;
+		height: calc(64px * (var(--count) - 1));
+	}
+	.ss-wizard > .ss-steps::after {
+		background: linear-gradient(180deg, var(--ss-brand), var(--ss-brand-2));
+		width: 3px;
+		height: calc(64px * var(--step));
+		transition: height 0.45s var(--ss-ease);
+	}
+	.ss-wizard .ss-step {
+		flex-direction: row;
+		align-items: flex-start;
+		gap: 12px;
+		height: 64px;
+		padding: 12px;
+		border-radius: 14px;
+		text-align: left;
+		transition: background 0.2s ease;
+	}
+	.ss-wizard .ss-step.is-active {
+		background: var(--ss-brand-soft);
+	}
+	.ss-wizard .ss-step-dot {
+		flex-shrink: 0;
+	}
+	.ss-wizard .ss-step.is-active .ss-step-dot {
+		background: var(--ss-surface);
+		transform: none;
+		box-shadow: none;
+	}
+	.ss-wizard .ss-step-text {
+		align-items: flex-start;
+		padding-top: 1px;
+	}
+	.ss-wizard .ss-step-label {
+		font-size: 14px;
+		text-align: left;
+	}
+	.ss-wizard .ss-step-hint {
+		display: block;
+		max-width: 100%;
+		margin-top: 2px;
+		font-size: 12px;
+		font-weight: 500;
+		color: var(--ss-muted);
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		font-variant-numeric: tabular-nums;
+	}
+	.ss-wizard .ss-steps-note {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		margin: 8px 0 0;
+		padding: 10px 12px 2px;
+		border-top: 1px solid var(--ss-border);
+		font-size: 12px;
+		color: var(--ss-muted);
+	}
+	.ss-wizard > .ss-step-body {
+		max-width: none;
+		margin: 0;
 	}
 }
 @media (min-width: 1180px) {
@@ -4792,8 +5031,8 @@ a.ss-btn--soft {
 	border-radius: 14px;
 	color: var(--sw, var(--ss-text-2));
 	background: color-mix(in srgb, var(--sw, var(--ss-muted)) 13%, transparent);
-	transition: background 0.25s ease, color 0.25s ease, border-radius 0.3s var(--ss-ease), box-shadow 0.25s ease,
-		transform 0.25s var(--ss-spring);
+	transition: background 0.25s ease, color 0.25s ease, border-radius 0.3s var(--ss-ease),
+		box-shadow 0.25s ease, transform 0.25s var(--ss-spring);
 }
 .ss-sec:active .ss-sec-icon {
 	transform: scale(0.92);
@@ -4844,7 +5083,6 @@ a.ss-btn--soft {
 		background: color-mix(in srgb, var(--sw, var(--ss-muted)) 22%, transparent);
 	}
 }
-
 
 @media (min-width: 768px) {
 	html[data-dock] .ss-dock {
@@ -4989,7 +5227,6 @@ a.ss-btn--soft {
 }
 
 @media (min-width: 768px) {
-
 	:is(html[data-side="expanded"], html[data-peek]) .ss-nav,
 	:is(html[data-side="expanded"], html[data-peek]) .ss-nav.is-sub {
 		padding: calc(20px + var(--ss-top)) 16px calc(20px + var(--ss-bottom));
@@ -5068,7 +5305,6 @@ a.ss-btn--soft {
 		top: calc(50% - 10px);
 		right: 12px;
 	}
-
 
 	:is(html[data-side="expanded"], html[data-peek]) .ss-nav-label {
 		display: block;
@@ -5268,5 +5504,77 @@ a.ss-btn--soft {
 	}
 	.ss-table .is-party {
 		min-width: 120px;
+	}
+}
+
+/* ================================================================ ฟอร์มบนจอใช้เมาส์/คีย์บอร์ด (แท็บเล็ตที่ต่อคีย์บอร์ด, คอมพิวเตอร์)
+   ช่องกรอกเตี้ยลง มีเส้นขอบให้เห็นช่องชัด และปุ่มลัดคีย์บอร์ด จอสัมผัสคงขนาดใหญ่ไว้กดง่าย */
+@media (min-width: 768px) {
+	.ss-form {
+		gap: 14px;
+		padding: 18px 20px;
+	}
+	.ss-field-label {
+		font-size: 13px;
+	}
+}
+@media (min-width: 768px) and (hover: hover) and (pointer: fine) {
+	.ss-input,
+	.ss-picker-value {
+		min-height: 42px;
+		padding: 9px 12px;
+		border-radius: 11px;
+		font-size: 15px;
+		border: 1px solid var(--ss-border-strong);
+		background: var(--ss-surface);
+	}
+	.ss-input--sm {
+		min-height: 38px;
+		padding: 7px 11px;
+		font-size: 14.5px;
+	}
+	.ss-input:hover:not(:focus):not(:disabled),
+	.ss-picker-value:hover {
+		border-color: color-mix(in srgb, var(--ss-brand) 45%, var(--ss-border-strong));
+	}
+	.ss-input:focus {
+		box-shadow: 0 0 0 3px var(--ss-brand-soft);
+	}
+	.ss-stepper {
+		height: 42px;
+		border-radius: 11px;
+		border: 1px solid var(--ss-border-strong);
+		background: var(--ss-surface);
+	}
+	.ss-stepper-btn {
+		width: 40px;
+	}
+	.ss-stepper-btn:hover:not(:disabled) {
+		background: color-mix(in srgb, var(--ss-brand) 8%, transparent);
+	}
+	.ss-choice {
+		padding: 7px 12px;
+		font-size: 13.5px;
+	}
+	.ss-choice:hover:not(.is-active) {
+		color: var(--ss-text);
+		background: var(--ss-border);
+	}
+	.ss-task-row:hover,
+	.ss-task-row:focus-within {
+		border-color: color-mix(in srgb, var(--ss-brand) 30%, transparent);
+	}
+	.ss-kbd {
+		display: inline-block;
+		margin-left: 4px;
+		padding: 1px 6px;
+		border-radius: 6px;
+		font-family: inherit;
+		font-size: 11px;
+		font-weight: 600;
+		line-height: 1.6;
+		background: rgba(255, 255, 255, 0.22);
+		color: inherit;
+		opacity: 0.85;
 	}
 }
