@@ -8007,3 +8007,222 @@ div.ss-line-del {
 	padding-top: 0;
 	border-top: 0;
 }
+
+/* ================================================================ หน้าดูเอกสาร: แผงขวา (DocActivity.vue) */
+@media (min-width: 1180px) {
+	.ss-dv-body {
+		grid-template-columns: minmax(0, 1fr) 360px;
+	}
+	.ss-dv-side {
+		position: sticky;
+		top: calc(84px + var(--ss-top));
+		max-height: calc(100vh - 110px);
+		overflow-y: auto;
+		scrollbar-width: thin;
+	}
+}
+.ss-activity {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+}
+.ss-act-block {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	padding: 14px;
+	border-radius: var(--ss-radius);
+	background: var(--ss-surface);
+	box-shadow: var(--ss-shadow);
+}
+.ss-act-block h3 {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	margin: 0;
+	font-size: 13px;
+	font-weight: 700;
+	color: var(--ss-text-2);
+}
+.ss-act-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+}
+.ss-act-head .ss-like {
+	width: auto;
+	gap: 4px;
+	padding: 0 8px;
+	border-radius: 99px;
+	opacity: 1;
+}
+.ss-act-head .ss-like small {
+	font-size: 12px;
+	font-weight: 600;
+}
+.ss-act-people {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+}
+.ss-act-person {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	padding: 3px 6px 3px 3px;
+	border-radius: 99px;
+	font-size: 13px;
+	background: var(--ss-surface-2);
+}
+.ss-act-person button {
+	display: grid;
+	place-items: center;
+	width: 18px;
+	height: 18px;
+	border-radius: 50%;
+	color: var(--ss-muted);
+}
+.ss-act-person button:hover {
+	color: var(--ss-text);
+	background: var(--ss-border);
+}
+.ss-act-muted {
+	margin: 0;
+	font-size: 13px;
+	color: var(--ss-muted);
+}
+.ss-act-assign .ss-field-label {
+	display: none;
+}
+.ss-act-assign .ss-picker-value {
+	min-height: 36px;
+	padding: 0 10px;
+	border-radius: 10px;
+	font-size: 13.5px;
+	border: 1px dashed var(--ss-border-strong);
+	background: transparent;
+}
+.ss-act-upload {
+	position: relative;
+	cursor: pointer;
+	font-size: 13px;
+}
+.ss-act-upload input {
+	position: absolute;
+	inset: 0;
+	opacity: 0;
+	cursor: pointer;
+}
+.ss-act-upload.is-busy {
+	pointer-events: none;
+}
+.ss-act-files {
+	display: flex;
+	flex-direction: column;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+.ss-act-files li {
+	display: grid;
+	grid-template-columns: 18px minmax(0, 1fr) auto 28px;
+	align-items: center;
+	gap: 8px;
+	padding: 5px 0;
+	font-size: 13px;
+	color: var(--ss-muted);
+}
+.ss-act-files a {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	color: var(--ss-text);
+	font-weight: 500;
+}
+.ss-act-files a:hover {
+	color: var(--ss-brand);
+	text-decoration: underline;
+}
+.ss-act-files small {
+	font-size: 11.5px;
+}
+.ss-act-compose {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-end;
+	gap: 6px;
+}
+.ss-act-compose textarea {
+	width: 100%;
+	min-height: 0;
+	font-size: 14px;
+	resize: vertical;
+}
+.ss-act-timeline {
+	position: relative;
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+	margin: 6px 0 0;
+	padding: 0;
+	list-style: none;
+}
+/* เส้นแนวตั้งของ timeline */
+.ss-act-timeline::before {
+	content: "";
+	position: absolute;
+	top: 8px;
+	bottom: 8px;
+	left: 12px;
+	width: 2px;
+	background: var(--ss-border);
+}
+.ss-act-timeline li {
+	position: relative;
+	display: grid;
+	grid-template-columns: 26px minmax(0, 1fr);
+	gap: 10px;
+}
+.ss-act-item {
+	min-width: 0;
+}
+.ss-act-meta {
+	display: flex;
+	align-items: baseline;
+	gap: 6px;
+	font-size: 12.5px;
+}
+.ss-act-meta b {
+	font-weight: 600;
+}
+.ss-act-meta small {
+	color: var(--ss-muted);
+	font-size: 11.5px;
+}
+.ss-act-del {
+	margin-left: auto;
+	padding: 0;
+	font-size: 12px;
+}
+.ss-act-text {
+	font-size: 13px;
+	color: var(--ss-text-2);
+}
+.ss-act-comment {
+	margin-top: 4px;
+	padding: 8px 10px;
+	border-radius: 4px 12px 12px 12px;
+	font-size: 13.5px;
+	color: var(--ss-text);
+	background: var(--ss-surface-2);
+}
+.ss-act-timeline li.is-comment .ss-avatar {
+	box-shadow: 0 0 0 2px var(--ss-surface);
+}
+@media (min-width: 1180px) {
+	/* เว้นแถบปุ่มล่างของหน้า (ss-bottom-bar) แผงไม่ถูกบัง */
+	.ss-has-bar .ss-dv-side {
+		max-height: calc(100vh - 190px - var(--ss-bottom));
+	}
+}

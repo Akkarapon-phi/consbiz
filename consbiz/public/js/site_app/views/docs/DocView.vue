@@ -257,29 +257,34 @@
 						</div>
 					</div>
 
-					<aside v-if="related.length" class="ss-dv-side">
-						<h2 class="ss-section-title ss-section-title--first">เอกสารที่เกี่ยวข้อง</h2>
-						<div class="ss-flow">
-							<button
-								v-for="l in related"
-								:key="l.doctype + l.name"
-								type="button"
-								class="ss-flow-item"
-								@click="open_link(l)"
-							>
-								<Icon
-									:name="l.dir === 'before' ? 'chevron-left' : 'chevron-right'"
-									:size="16"
-								/>
-								<span class="ss-flow-main">
-									<small>{{ link_label(l.doctype) }}</small>
-									<b>{{ l.name }}</b>
-								</span>
-								<span class="ss-tag" :class="`tone-${l.status_tone}`">{{
-									l.status_label
-								}}</span>
-							</button>
-						</div>
+					<!-- แผงขวา: มอบหมาย / ไฟล์แนบ / เอกสารที่เกี่ยวข้อง / ความคิดเห็น + ความเคลื่อนไหว -->
+					<aside class="ss-dv-side">
+						<DocActivity :kind="params.kind" :name="params.name" :doctype="config.doctype">
+							<section v-if="related.length" class="ss-act-block">
+								<h3>เอกสารที่เกี่ยวข้อง</h3>
+								<div class="ss-flow">
+									<button
+										v-for="l in related"
+										:key="l.doctype + l.name"
+										type="button"
+										class="ss-flow-item"
+										@click="open_link(l)"
+									>
+										<Icon
+											:name="l.dir === 'before' ? 'chevron-left' : 'chevron-right'"
+											:size="16"
+										/>
+										<span class="ss-flow-main">
+											<small>{{ link_label(l.doctype) }}</small>
+											<b>{{ l.name }}</b>
+										</span>
+										<span class="ss-tag" :class="`tone-${l.status_tone}`">{{
+											l.status_label
+										}}</span>
+									</button>
+								</div>
+							</section>
+						</DocActivity>
 					</aside>
 				</div>
 			</template>
@@ -369,6 +374,7 @@ import Skeleton from "../../components/Skeleton.vue";
 import Sheet from "../../components/Sheet.vue";
 import PdfViewer from "../../components/PdfViewer.vue";
 import RichText from "../../components/RichText.vue";
+import DocActivity from "./DocActivity.vue";
 import { DOC_KINDS } from "../../sections.js";
 import {
 	call,

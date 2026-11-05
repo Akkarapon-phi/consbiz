@@ -229,3 +229,31 @@ class IntegrationTestSiteDocs(IntegrationTestCase):
 		self.assertFalse(sell["buying"])
 		self.assertNotIn("open_orders", sell)
 
+	def test_activity_comments_and_attachments(self):
+		po = make_po(self.project)
+		activity = site_docs.get_activity("po", po.name)
+		self.assertEqual(activity["timeline"][-1]["type"], "created")
+		self.assertIn("ส่งเอกสาร", [t.get("text") for t in activity["timeline"]])
+
+		site_docs.add_comment("po", po.name, "<p>ตรวจแล้ว</p><script>alert(1)</script>")
+		comment = next(t for t in site_docs.get_activity("po", po.name)["timeline"] if t["type"] == "comment")
+		self.assertNotIn("script", comment["html"])
+		self.assertTrue(comment["mine"])
+		site_docs.delete_comment("po", po.name, comment["name"])
+		self.assertFalse(frappe.db.exists("Comment", comment["name"]))
+		self.assertRaises(frappe.ValidationError, site_docs.add_comment, "po", po.name, "<p> </p>")
+
+		file = frappe.get_doc(
+			{
+				"doctype": "File",
+				"file_name": "_test_site_docs.txt",
+				"content": b"test",
+				"is_private": 1,
+				"attached_to_doctype": "Purchase Order",
+				"attached_to_name": po.name,
+			}
+		).insert()
+		self.assertEqual([f.name for f in site_docs.get_activity("po", po.name)["files"]], [file.name])
+		site_docs.remove_attachment("po", po.name, file.name)
+		self.assertFalse(frappe.db.exists("File", file.name))
+

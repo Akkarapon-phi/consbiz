@@ -1341,3 +1341,184 @@ def get_item_insight(kind, item_code, project=None):
 			query = query.where((po.project == project) | (poi.project == project))
 		out["open_orders"] = query.run(as_dict=True)
 	return out
+
+
+# ---------------------------------------------------------------- แผงขวาของหน้าดูเอกสาร: ความเคลื่อนไหว / ความคิดเห็น / ไฟล์แนบ / มอบหมาย
+
+# Comment ที่แสดงในความเคลื่อนไหว (แบบ timeline ของระบบเต็ม)
+TIMELINE_COMMENTS = (
+	"Comment",
+	"Info",
+	"Workflow",
+	"Attachment",
+	"Attachment Removed",
+	"Assigned",
+	"Assignment Completed",
+	"Shared",
+	"Unshared",
+	"Like",
+)
+
+
+def person(user):
+	return {"user": user, "name": frappe.utils.get_fullname(user)} if user else None
+
+
+def version_text(doc, data):
+	"""สรุป Version เป็นข้อความสั้น: ส่ง/ยกเลิก หรือ แก้ช่อง ก, ข (+n) / เพิ่ม-ลบแถว"""
+	changed = data.get("changed") or []
+	for field, old, new in changed:
+		if field == "docstatus":
+			return _("ส่งเอกสาร") if new == 1 else _("ยกเลิกเอกสาร") if new == 2 else _("แก้สถานะเอกสาร")
+	labels = []
+	for field, _old, _new in changed:
+		label = doc.meta.get_label(field) if doc.meta.has_field(field) else None
+		if label and label not in labels:
+			labels.append(_(label))
+	if data.get("row_changed"):
+		labels.append(_("รายการ"))
+	parts = []
+	if labels:
+		more = f" +{len(labels) - 3}" if len(labels) > 3 else ""
+		parts.append(_("แก้ {0}").format(", ".join(labels[:3])) + more)
+	if data.get("added"):
+		parts.append(_("เพิ่ม {0} แถว").format(len(data["added"])))
+	if data.get("removed"):
+		parts.append(_("ลบ {0} แถว").format(len(data["removed"])))
+	return " · ".join(parts)
+
+
+def doc_for(kind, name, perm="read"):
+	doc = frappe.get_doc(config_of(kind)["doctype"], name)
+	doc.check_permission(perm)
+	return doc
+
+
+@frappe.whitelist()
+def get_activity(kind, name):
+	doc = doc_for(kind, name)
+	doctype = doc.doctype
+	timeline = [{"type": "created", "by": person(doc.owner), "at": doc.creation, "text": _("สร้างเอกสาร")}]
+
+	for v in frappe.get_all(
+		"Version",
+		filters={"ref_doctype": doctype, "docname": name},
+		fields=["owner", "creation", "data"],
+		order_by="creation desc",
+		limit_page_length=30,
+	):
+		try:
+			text = version_text(doc, frappe.parse_json(v.data or "{}"))
+		except Exception:
+			text = ""
+		if text:
+			timeline.append({"type": "edit", "by": person(v.owner), "at": v.creation, "text": text})
+
+	for c in frappe.get_all(
+		"Comment",
+		filters={"reference_doctype": doctype, "reference_name": name, "comment_type": ("in", TIMELINE_COMMENTS)},
+		fields=["name", "comment_type", "content", "owner", "creation"],
+		order_by="creation desc",
+		limit_page_length=50,
+	):
+		if c.comment_type == "Comment":
+			timeline.append(
+				{
+					"type": "comment",
+					"name": c.name,
+					"by": person(c.owner),
+					"at": c.creation,
+					"html": c.content,
+					"mine": c.owner == frappe.session.user,
+				}
+			)
+		else:
+			timeline.append(
+				{
+					"type": c.comment_type.lower().replace(" ", "_"),
+					"by": person(c.owner),
+					"at": c.creation,
+					"text": frappe.utils.strip_html(c.content or "")[:200],
+				}
+			)
+	timeline.sort(key=lambda t: str(t["at"]), reverse=True)
+
+	files = frappe.get_all(
+		"File",
+		filters={"attached_to_doctype": doctype, "attached_to_name": name, "is_folder": 0},
+		fields=["name", "file_name", "file_url", "file_size", "is_private", "owner", "creation"],
+		order_by="creation desc",
+	)
+	liked = user_list(doc.get("_liked_by"))
+	can_write = bool(frappe.has_permission(doctype, "write", doc))
+	return {
+		"timeline": timeline,
+		"files": files,
+		"assigned": people(user_list(doc.get("_assign"))),
+		"liked": frappe.session.user in liked,
+		"likes": len(liked),
+		"can": {
+			"comment": True,
+			"attach": bool(frappe.has_permission(doctype, "read", doc)),
+			"remove_file": can_write or doc.docstatus == 1,
+			"assign": bool(frappe.has_permission(doctype, "write", doc) or frappe.has_permission(doctype, "share", doc)),
+		},
+	}
+
+
+@frappe.whitelist(methods=["POST"])
+def add_comment(kind, name, text):
+	"""ความคิดเห็นในเอกสาร (Comment แบบเดียวกับกล่องความคิดเห็นของระบบเต็ม)"""
+	from frappe.utils.html_utils import clean_html
+
+	doc = doc_for(kind, name)
+	content = clean_html(text or "").strip()
+	if not frappe.utils.strip_html(content).strip():
+		frappe.throw(_("พิมพ์ความคิดเห็นก่อน"))
+	comment = doc.add_comment("Comment", content)
+	return {"name": comment.name}
+
+
+@frappe.whitelist(methods=["POST"])
+def delete_comment(kind, name, comment):
+	"""ลบความคิดเห็นของตัวเองเท่านั้น"""
+	doc = doc_for(kind, name)
+	row = frappe.db.get_value(
+		"Comment", comment, ["owner", "reference_doctype", "reference_name", "comment_type"], as_dict=True
+	)
+	if not row or (row.reference_doctype, row.reference_name) != (doc.doctype, doc.name) or row.comment_type != "Comment":
+		frappe.throw(_("ไม่พบความคิดเห็น"))
+	if row.owner != frappe.session.user:
+		frappe.throw(_("ลบได้เฉพาะความคิดเห็นของตัวเอง"), frappe.PermissionError)
+	frappe.delete_doc("Comment", comment, ignore_permissions=True)
+
+
+@frappe.whitelist(methods=["POST"])
+def remove_attachment(kind, name, file):
+	"""เอาไฟล์แนบออกจากเอกสาร (ต้องแก้เอกสารได้ และไฟล์ต้องแนบกับเอกสารนี้)"""
+	doc = doc_for(kind, name)
+	row = frappe.db.get_value("File", file, ["attached_to_doctype", "attached_to_name"], as_dict=True)
+	if not row or (row.attached_to_doctype, row.attached_to_name) != (doc.doctype, doc.name):
+		frappe.throw(_("ไม่พบไฟล์แนบ"))
+	doc.check_permission("write" if doc.docstatus == 0 else "read")
+	from frappe.utils.file_manager import remove_file
+
+	# แบบปุ่มลบไฟล์แนบของระบบเต็ม: ลบ File + บันทึก "Attachment Removed" ในความเคลื่อนไหว
+	remove_file(file, doc.doctype, doc.name)
+
+
+@frappe.whitelist()
+def search_users(txt=None):
+	"""ผู้ใช้ระบบสำหรับมอบหมายงาน"""
+	or_filters = None
+	if txt:
+		like = f"%{txt.strip()}%"
+		or_filters = {"name": ("like", like), "full_name": ("like", like)}
+	return frappe.get_all(
+		"User",
+		filters={"enabled": 1, "user_type": "System User", "name": ("not in", ("Administrator", "Guest"))},
+		or_filters=or_filters,
+		fields=["name as value", "full_name as label"],
+		order_by="full_name asc",
+		limit_page_length=30,
+	)

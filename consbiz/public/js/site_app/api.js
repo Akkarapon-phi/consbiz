@@ -139,12 +139,17 @@ export async function call(method, args = {}, { post = false } = {}) {
 export const post = (method, args) => call(method, args, { post: true });
 
 // อัปโหลดรูป (ยังไม่ผูกเอกสาร: server ผูกให้ทีหลัง หรือใช้ URL ในช่อง Attach Image)
-export async function upload(file) {
+// attach = { doctype, docname } แนบกับเอกสารทันที (แบบปุ่มแนบไฟล์ของระบบเต็ม) ไม่ระบุ = อัปโหลดไว้ก่อน
+export async function upload(file, attach = null) {
 	const blob = await shrink_image(file);
 	const form = new FormData();
 	form.append("file", blob, file.name || `photo-${Date.now()}.jpg`);
 	form.append("is_private", "1");
 	form.append("folder", "Home/Attachments");
+	if (attach) {
+		form.append("doctype", attach.doctype);
+		form.append("docname", attach.docname);
+	}
 	const response = await fetch("/api/method/upload_file", {
 		method: "POST",
 		body: form,
@@ -153,7 +158,7 @@ export async function upload(file) {
 	});
 	const data = await response.json().catch(() => ({}));
 	if (!response.ok || data.exc) {
-		throw new ApiError(server_messages(data).join("\n") || "อัปโหลดรูปไม่สำเร็จ");
+		throw new ApiError(server_messages(data).join("\n") || "อัปโหลดไฟล์ไม่สำเร็จ");
 	}
 	return data.message; // {name, file_url, ...}
 }
