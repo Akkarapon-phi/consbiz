@@ -59,7 +59,17 @@
 					<dl class="ss-dv-fields">
 						<div class="is-wide">
 							<dt>{{ config.party || "เรื่อง" }}</dt>
-							<dd>{{ doc.party || doc.title || doc.name }}</dd>
+							<dd>
+								<InlineEdit
+									v-if="!config.party && edit.title"
+									:model-value="doc.title"
+									:label="edit.title.label"
+									:display="doc.title || doc.name"
+									editable
+									:save="(v) => save_field('title', v)"
+								/>
+								<template v-else>{{ doc.party || doc.title || doc.name }}</template>
+							</dd>
 						</div>
 						<div>
 							<dt>สถานะ</dt>
@@ -77,11 +87,27 @@
 							<dt>วันที่</dt>
 							<dd>{{ thai_date(doc.date, { year: true }) }}</dd>
 						</div>
-						<div v-if="doc.due">
+						<div v-if="doc.due || edit[due_field]">
 							<dt>{{ config.due || "วันที่ต้องการ" }}</dt>
-							<dd :class="{ 'is-due': overdue }">{{ thai_date(doc.due, { year: true }) }}</dd>
+							<dd :class="{ 'is-due': overdue }">
+								<InlineEdit
+									v-if="edit[due_field]"
+									fieldtype="Date"
+									:model-value="doc.due"
+									:label="edit[due_field].label"
+									:display="thai_date(doc.due, { year: true })"
+									:min="doc.date"
+									:apply_label="
+										item_date_field === due_field ? 'ใช้วันนี้กับทุกรายการ' : null
+									"
+									required
+									editable
+									:save="(v, apply) => save_field(due_field, v, apply)"
+								/>
+								<template v-else>{{ thai_date(doc.due, { year: true }) }}</template>
+							</dd>
 						</div>
-						<div v-if="doc.po_no">
+						<div v-if="doc.po_no && !edit.po_no">
 							<dt>เลขที่ใบสั่งซื้อลูกค้า</dt>
 							<dd>{{ doc.po_no }}</dd>
 						</div>
@@ -96,6 +122,23 @@
 						<div v-if="params.kind === 'mr'">
 							<dt>ผู้อนุมัติ</dt>
 							<dd :class="{ 'is-empty': !doc.approve_by }">{{ doc.approve_by || "–" }}</dd>
+						</div>
+						<!-- ช่องที่แก้ได้หลังส่ง (เลขที่ใบกำกับภาษี, เลขที่ PO ลูกค้า ฯลฯ) ที่ไม่ได้แสดงที่อื่น -->
+						<div v-for="f in extra_fields" :key="f.fieldname">
+							<dt>{{ f.label }}</dt>
+							<dd>
+								<InlineEdit
+									:model-value="f.value"
+									:label="f.label"
+									add_label=""
+									:fieldtype="f.fieldtype"
+									:display="
+										f.fieldtype === 'Date' ? thai_date(f.value, { year: true }) : f.value
+									"
+									editable
+									:save="(v) => save_field(f.fieldname, v)"
+								/>
+							</dd>
 						</div>
 						<div v-if="doc.project" class="is-full">
 							<dt>โครงการ</dt>
@@ -151,11 +194,23 @@
 										<td class="is-num">{{ money(it.rate) }}</td>
 										<td class="is-num is-strong">{{ money(it.amount) }}</td>
 										<td v-if="has_item_date" class="is-date">
-											{{
+											<InlineEdit
+												v-if="item_date_field"
+												fieldtype="Date"
+												:model-value="it[item_date_field]"
+												:label="item_date_label"
+												:subtitle="it.item_name || it.item_code"
+												:display="thai_date(it[item_date_field], { year: true })"
+												:min="doc.date"
+												required
+												editable
+												:save="(v) => save_item(it, v)"
+											/>
+											<template v-else>{{
 												thai_date(it.schedule_date || it.delivery_date, {
 													year: true,
 												})
-											}}
+											}}</template>
 										</td>
 										<td v-if="is_mr" class="is-center">
 											<span
@@ -190,11 +245,26 @@
 								<span class="ss-card-meta ss-item-code">{{ it.item_code }}</span>
 								<span class="ss-card-meta"
 									>{{ num(it.qty) }} {{ it.uom }} × {{ money(it.rate)
-									}}<template v-if="it.schedule_date || it.delivery_date">
+									}}<template
+										v-if="!item_date_field && (it.schedule_date || it.delivery_date)"
+									>
 										· ต้องการ
 										{{ thai_date(it.schedule_date || it.delivery_date) }}</template
 									></span
 								>
+								<span v-if="item_date_field" class="ss-card-meta"
+									>{{ item_date_label }}
+									<InlineEdit
+										fieldtype="Date"
+										:model-value="it[item_date_field]"
+										:label="item_date_label"
+										:subtitle="it.item_name || it.item_code"
+										:display="thai_date(it[item_date_field])"
+										:min="doc.date"
+										required
+										editable
+										:save="(v) => save_item(it, v)"
+								/></span>
 								<RichText
 									v-if="has_desc(it)"
 									:html="it.description"
@@ -213,9 +283,19 @@
 						<!-- ท้ายเอกสาร: หมายเหตุ/ตัวอักษร (ซ้าย) + สรุปยอด (ขวา) แบบระบบเต็ม -->
 						<div class="ss-dv-foot">
 							<div class="ss-dv-notes">
-								<div v-if="doc.remarks">
+								<div v-if="doc.remarks || edit[remarks_field]">
 									<span class="ss-field-label">หมายเหตุ</span>
-									<div class="ss-text-block">{{ doc.remarks }}</div>
+									<InlineEdit
+										v-if="edit[remarks_field]"
+										:model-value="doc.remarks"
+										label="หมายเหตุ"
+										add_label=""
+										multiline
+										editable
+										:save="(v) => save_field(remarks_field, v)"
+										><div class="ss-text-block">{{ doc.remarks }}</div></InlineEdit
+									>
+									<div v-else class="ss-text-block">{{ doc.remarks }}</div>
 								</div>
 								<div v-if="is_mr" class="ss-dv-flags">
 									<span class="ss-flag" :class="{ 'is-on': doc.included_vat }">
@@ -297,7 +377,12 @@
 						</button>
 					</header>
 					<div class="ss-rside-body">
-						<DocActivity :kind="params.kind" :name="params.name" :doctype="config.doctype">
+						<DocActivity
+							ref="activity"
+							:kind="params.kind"
+							:name="params.name"
+							:doctype="config.doctype"
+						>
 							<section v-if="related.length" class="ss-act-block">
 								<h3>เอกสารที่เกี่ยวข้อง</h3>
 								<div class="ss-flow">
@@ -371,7 +456,10 @@
 		</Teleport>
 
 		<Sheet :open="confirm" :title="`ส่ง${config.label}`" :subtitle="params.name" @close="confirm = false">
-			<p class="ss-muted">ส่งแล้วแก้ไขไม่ได้ ต้องยกเลิกแล้วแก้ไขในระบบเต็ม</p>
+			<p class="ss-muted">
+				ส่งแล้วแก้ได้เฉพาะบางช่อง (มีรูปดินสอ) เช่น กำหนดส่ง เลขที่อ้างอิง
+				ที่เหลือต้องยกเลิกแล้วแก้ในระบบเต็ม
+			</p>
 			<div v-if="doc" class="ss-facts ss-facts--grid">
 				<div class="ss-fact">
 					<span>{{ config.party || "เรื่อง" }}</span
@@ -413,6 +501,7 @@ import Sheet from "../../components/Sheet.vue";
 import PdfViewer from "../../components/PdfViewer.vue";
 import RichText from "../../components/RichText.vue";
 import DocActivity from "./DocActivity.vue";
+import InlineEdit from "../../components/InlineEdit.vue";
 import { DOC_KINDS } from "../../sections.js";
 import {
 	call,
@@ -426,6 +515,7 @@ import {
 	show_error,
 	state,
 	thai_date,
+	toast,
 } from "../../api.js";
 
 const reload_summary = inject("reload_summary");
@@ -466,7 +556,48 @@ const related = computed(() =>
 		  ]
 		: []
 );
-const has_item_date = computed(() => doc.value?.items.some((it) => it.schedule_date || it.delivery_date));
+const has_item_date = computed(
+	() => !!item_date_field.value || doc.value?.items.some((it) => it.schedule_date || it.delivery_date)
+);
+
+// ---------------------------------------------------------------- แก้ไขหลังส่ง (ช่อง Allow on Submit, site_docs.AFTER_SUBMIT)
+const activity = ref(null);
+const after = computed(() => doc.value?.after_submit || null);
+const edit = computed(() => Object.fromEntries((after.value?.fields || []).map((f) => [f.fieldname, f])));
+const due_field = computed(() => after.value?.due_field);
+const remarks_field = computed(() => after.value?.remarks_field);
+// ช่องที่ไม่มีที่แสดงในหน้าดู: ต่อท้ายช่องข้อมูล
+const extra_fields = computed(() =>
+	(after.value?.fields || []).filter(
+		(f) =>
+			![due_field.value, remarks_field.value].includes(f.fieldname) &&
+			!(f.fieldname === "title" && !config.party)
+	)
+);
+const item_date_field = computed(
+	() => (after.value?.items || []).find((f) => ["schedule_date", "delivery_date"].includes(f)) || null
+);
+const item_date_label = computed(() => (item_date_field.value === "delivery_date" ? "กำหนดส่ง" : "ต้องการ"));
+
+async function save_after(values, items, apply) {
+	try {
+		doc.value = await post("consbiz.site_docs.save_after_submit", {
+			kind: params.kind,
+			name: params.name,
+			values,
+			items,
+			apply_items: apply ? 1 : 0,
+			modified: after.value?.modified,
+		});
+		toast("บันทึกแล้ว", "success");
+		activity.value?.reload();
+	} catch (error) {
+		show_error(error);
+		throw error;
+	}
+}
+const save_field = (field, value, apply) => save_after({ [field]: value }, null, apply);
+const save_item = (it, value) => save_after({}, [{ name: it.name, [item_date_field.value]: value }]);
 // ---------------------------------------------------------------- sidebar ขวา
 const SIDE_KEY = "consbiz.site.doc_side";
 const mq_xl = window.matchMedia("(min-width: 1480px)");

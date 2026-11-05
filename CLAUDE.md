@@ -164,7 +164,18 @@ pre-commit run --all-files                               # ruff + prettier (ต�
 - ยืม-คืนอุปกรณ์: `Equipment Borrowing` สโตร์บันทึก ผู้ยืม = พนักงาน / ผรม. / คนงาน (คนงานของ ผรม. ระบุ ผรม. เป็นผู้รับผิดชอบ)
   Submit = โอนเข้าคลังอุปกรณ์ระหว่างยืม รับคืนผ่าน `record_return` (dialog `consbiz.equipment_return_dialog` ใน utils.js)
   ปกติ/ชำรุด โอนกลับ, สูญหาย Material Issue แถวคืนที่บันทึกแล้วแก้/ลบไม่ได้ รายงาน `Borrowed Equipment Outstanding`
+- แผนหน้าแอป (ตกลง 2026-11-06): แยกตามกลุ่มคนใช้/อุปกรณ์ บนแอป Frappe `consbiz` ตัวเดียว เป็นหน้าจอครอบ DocType ของ ERPNext/HRMS ไม่เขียนระบบใหม่
+  | URL | คนใช้ | เนื้อหา |
+  |---|---|---|
+  | `/site` | หน้างาน (มือถือ) | ควบคุมงาน, สโตร์, บริหารโครงการ, ขอซื้อ/ขอเบิก + ติดตามสถานะ |
+  | `/office` | ออฟฟิศ (จอใหญ่) | ซื้อ, ขาย, บัญชี, ประกันผลงาน, แอดมิน (หนังสือเข้า-ออก, สัญญา ผรม., ใบนำส่ง, ใบปะหน้า, ค่าแรงรายวัน) |
+  | `/hr-app` | พนักงานทุกคน | ลงเวลา, ลา, เบิกล่วงหน้า, สลิป (หน้าจอครอบ HRMS) ชื่อไอคอน "ConsHR" |
+  | `/contractor` | ผู้รับเหมาช่วง (คนนอก) | อัปเดตผลงาน, ดูสัญญา/งวดของตัวเอง API แยกและตรวจสิทธิ์ทุกคำขอ |
+  ห้ามใช้ `/me` (หน้า My Account ของ Frappe), `/hr/...` (Roster ของ HRMS), `/hrms` (ESS ของ HRMS)
+  โค้ดหน้าจอที่ใช้ร่วมกัน (components, `api.js`, ธีม) ย้ายไป `public/js/shared/` ก่อนเริ่มแอปที่ 2 ตัวสลับแอปมุมซ้ายบนสำหรับคนที่ใช้หลายแอป
+  build ของ Frappe ไม่แบ่งโหลด (code splitting) จึงแยกเป็น bundle ต่อแอป ไม่ใช่ต่อหมวด
 - แอปหน้างาน `/site` (มือถือ, ติดตั้งลงหน้าจอได้) = หน้า www (`consbiz/www/site.html`) + Vue (`public/js/site_app/`) แอปเดียวแบ่งหมวดงาน
+  (ตอนนี้ยังมีหมวดจัดซื้อ/ขายอยู่ จะย้ายไป `/office` ตามแผนข้างบน)
   หมวด (`sections.js`): สโตร์ (`views/store/`, API `consbiz/store_app.py`) / ควบคุมงาน (`views/work/`, รวมคอนกรีต) / บริหารโครงการ (`views/pm/`) API 2 หมวดนี้อยู่ `consbiz/site_app.py`
   จัดซื้อ (MR ประเภท Purchase → PO → PI) / ขาย (Quotation → SO → SI): `views/docs/` ชุดเดียวกันทั้ง 6 ชนิด (`DOC_KINDS` ใน sections.js ตรงกับ `DOCS` ใน `consbiz/site_docs.py`)
   ดูรายการ/รายละเอียด/เอกสารต้นทาง-ปลายทาง, ส่งเอกสารร่าง, PDF ขอบเขต โครงการนี้/ทุกโครงการ (`state.doc_scope`)
@@ -178,6 +189,8 @@ pre-commit run --all-files                               # ruff + prettier (ต�
   ยอด/ภาษีของ MR = `consbiz/request_totals.py` (doc_events validate) สูตรเดียวกับ `material_request.js` แก้ที่หนึ่งต้องแก้อีกที่
   MR ใหม่: ERPNext `update_item_rates` ทับราคาด้วย Price List ตอนบันทึกครั้งแรก `save_doc` ใส่ราคาที่ผู้ใช้กรอกคืน (`keep_request_rates`)
   ดูเอกสาร: แถบขั้นตอน (`steps_of`), สรุปยอด (`summary_of`: แถว + ยอดสุทธิ + ตัวอักษร) ใช้ทั้งหน้าดูและฟอร์ม
+  แก้หลังส่ง: ดินสอข้างช่อง (`components/InlineEdit.vue`, จอใช้เมาส์แก้ตรงที่เดิม จอสัมผัสเป็น sheet) → `site_docs.save_after_submit`
+  ช่องที่แก้ได้ = `AFTER_SUBMIT` ใน site_docs.py ∩ ช่องที่ระบบตั้ง Allow on Submit (ไม่เปิดช่องบัญชี/ศูนย์ต้นทุน) วันที่ต้องการ/กำหนดส่งห้ามว่างและห้ามก่อนวันที่เอกสาร
   sidebar ขวาของหน้าดู แยกจากเนื้อหา เปิด-ปิดที่ปุ่มบน TopBar: จอ ≥1480 กางค้าง (`html[data-rside]` → `--ss-rside` ดันเนื้อหา/แถบล่าง จำในเครื่อง), เล็กกว่า = เลื่อนทับ (z-index ต่ำกว่า sheet)
   เนื้อหา sidebar (`DocActivity.vue`, `site_docs.get_activity`): ถูกใจ, มอบหมาย (`frappe.desk.form.assign_to`), ไฟล์แนบ (`upload(file, {doctype, docname})` / `remove_attachment`),
   เอกสารที่เกี่ยวข้อง, ความคิดเห็น (`add_comment` ผ่าน `clean_html`, ลบได้เฉพาะของตัวเอง) + ความเคลื่อนไหวจาก Version/Comment แบบ timeline ของระบบเต็ม
@@ -295,4 +308,5 @@ pre-commit run --all-files                               # ruff + prettier (ต�
 - Jinja ใน Print Format ใช้ `frappe.get_cached_value` ไม่ได้ ให้ใช้ `frappe.db.get_value`
 - ตั้งเครื่องให้สร้าง PDF ได้:
   - wkhtmltopdf โหลด CSS/ฟอนต์จาก URL ของไซต์ ชื่อไซต์ต้องอยู่ใน `/etc/hosts` (`127.0.0.1 <dev-site>`) ไม่งั้นได้ `HostNotFoundError`
-  - PDF Generator แบบ `chrome` ใช้ `frappe-bench/chromium` ต้องติดตั้ง `libnss3 libasound2t64` ไม่งั้นได้ "Chromium took too long to start"
+  - PDF Generator แบบ `chrome` ใช้ `frappe-bench/chromium` ต้องติดตั้ง `libnss3 libasound2t64 libatk1.0-0t64 libatk-bridge2.0-0t64 libatspi2.0-0t64 libxdamage1` (Ubuntu ก่อน 24.04 ไม่มี `t64` ต่อท้าย) ไม่งั้นได้ "Chromium took too long to start"
+    ตรวจตัวที่ขาดด้วย `ldd chromium/chrome-linux/headless_shell | grep "not found"` ติดตั้งแล้วต้อง restart bench

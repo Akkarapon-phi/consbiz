@@ -100,6 +100,10 @@ body {
 body.ss-locked {
 	overflow: hidden;
 }
+/* เว้นที่ scrollbar ไว้เสมอ: หน้าที่ยาว (เช่น ใบสั่งซื้อหลายรายการ) กับหน้าสั้น/ตอนเปิด sheet กว้างเท่ากัน ไม่ขยับ/ดูเล็กลง */
+html {
+	scrollbar-gutter: stable;
+}
 
 button,
 input,
@@ -5477,19 +5481,12 @@ a.ss-btn--soft {
 	height: 100%;
 	background: var(--ss-brand);
 }
-.ss-table .col-compact,
 .ss-table .col-compact-date {
 	display: none;
 }
 @media (max-width: 1179px) {
-	.ss-table .col-opt,
-	.ss-table .col-status {
+	.ss-table .col-opt {
 		display: none;
-	}
-	.ss-table .col-compact {
-		display: flex;
-		width: fit-content;
-		margin-top: 4px;
 	}
 	.ss-table th,
 	.ss-table td {
@@ -6169,6 +6166,10 @@ th[aria-sort] .ss-th-sort {
 	}
 	.ss-list-create {
 		padding: 0 16px 0 12px;
+	}
+	/* ปุ่มทึบชิดขอบเดียวกับเนื้อหา (ปุ่มไอคอนมีขอบใสในตัวจึงใช้ระยะ 20px) */
+	.ss-topbar:has(.ss-list-create) {
+		padding-right: 28px;
 	}
 	.ss-tabs {
 		margin: 0;
@@ -6947,10 +6948,6 @@ input[type="number"] {
 	letter-spacing: -0.01em;
 	font-variant-numeric: tabular-nums;
 }
-.ss-table--list .col-status {
-	width: 1%;
-	white-space: nowrap;
-}
 .ss-table--list .col-subject {
 	min-width: 180px;
 	max-width: 340px;
@@ -7047,6 +7044,43 @@ input[type="number"] {
 .ss-table--list td {
 	padding-left: 10px;
 	padding-right: 10px;
+}
+/* ตารางต้องพอดีกรอบ ไม่เลื่อนซ้าย-ขวา: ดูความกว้างกรอบตาราง (เปลี่ยนตาม sidebar ปักหมุด/แผงตัวอย่าง) ไม่ใช่ความกว้างจอ
+   ลดทีละขั้น: แถบ % เหลือตัวเลข → ซ่อนมอบหมาย/แก้ไขล่าสุด → ซ่อน % (สถานะบอกอยู่แล้ว) */
+.ss-table-wrap:has(> .ss-table--list) {
+	container: doclist / inline-size;
+}
+@container doclist (max-width: 1060px) {
+	.ss-table--list .col-pct .ss-table-pct i {
+		display: none;
+	}
+}
+@container doclist (max-width: 1000px) {
+	.ss-table--list .col-meta {
+		display: none;
+	}
+}
+@container doclist (max-width: 850px) {
+	.ss-table--list .col-pct {
+		display: none;
+	}
+	.ss-table--list th.col-subject,
+	.ss-table--list td.col-subject {
+		min-width: 120px;
+	}
+}
+/* ใต้เลขที่: ป้ายสถานะ + เลขบิลของผู้ขาย (ยาวได้มาก ตัดด้วย … ไม่ให้ดันคอลัมน์ ชี้ดูเลขเต็ม) */
+.ss-doc-meta {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	margin-top: 4px;
+}
+.ss-table--list .ss-doc-bill {
+	max-width: 120px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
 
 /* ---------------------------------------------------------------- ดูเอกสาร: ขั้นตอน / ช่องข้อมูล / ท้ายเอกสาร (DocView.vue) */
@@ -7764,15 +7798,9 @@ div.ss-line-del {
 	gap: 20px;
 	align-items: start;
 }
-/* ตารางคู่ตัวอย่าง: ซ่อนคอลัมน์รอง สถานะย้ายไปใต้เลขที่ */
-.ss-table--list.is-compact .col-wide,
-.ss-table--list.is-compact .col-status {
+/* ตารางคู่ตัวอย่าง: ซ่อนคอลัมน์รอง */
+.ss-table--list.is-compact .col-wide {
 	display: none;
-}
-.ss-table--list.is-compact .col-compact {
-	display: flex;
-	width: fit-content;
-	margin-top: 4px;
 }
 .ss-table tbody tr.is-active {
 	background: var(--ss-brand-soft);
@@ -8317,4 +8345,121 @@ div.ss-line-del {
 }
 .ss-rside-backdrop {
 	z-index: 45;
+}
+
+/* ---------------------------------------------------------------- แก้ไขทีละช่อง (InlineEdit.vue): ค่า + ดินสอเล็ก
+   ใช้กับช่องที่แก้ได้หลังส่งเอกสาร จอใช้เมาส์ดินสอจางจนชี้ที่ช่อง จอสัมผัสแสดงตลอด */
+.ss-ie {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	max-width: 100%;
+	min-width: 0;
+}
+.ss-ie.is-block {
+	display: flex;
+	align-items: flex-start;
+}
+.ss-ie.is-block .ss-ie-value {
+	flex: 1;
+	min-width: 0;
+}
+.ss-ie-value {
+	min-width: 0;
+	overflow-wrap: anywhere;
+}
+.ss-ie-pen {
+	display: inline-grid;
+	flex: none;
+	place-items: center;
+	width: 26px;
+	height: 26px;
+	border-radius: 8px;
+	color: var(--ss-muted);
+	transition: opacity 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+.ss-ie-pen:hover,
+.ss-ie-pen:focus-visible {
+	color: var(--ss-brand);
+	background: var(--ss-brand-soft);
+}
+@media (hover: hover) and (pointer: fine) {
+	.ss-ie-pen {
+		opacity: 0.35;
+	}
+	.ss-ie:hover .ss-ie-pen,
+	tr:hover .ss-ie-pen,
+	.ss-ie-pen:focus-visible {
+		opacity: 1;
+	}
+}
+.ss-ie-add {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	padding: 2px 8px 2px 6px;
+	border: 1px dashed var(--ss-border-strong);
+	border-radius: 8px;
+	color: var(--ss-brand);
+	font-size: 13px;
+	font-weight: 500;
+}
+.ss-ie-add:hover {
+	background: var(--ss-brand-soft);
+	border-color: var(--ss-brand);
+}
+/* ตัวแก้ตรงที่เดิม */
+.ss-ie.is-editing {
+	display: flex;
+	width: 100%;
+}
+.ss-ie-form {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 6px;
+	width: 100%;
+	font-weight: 400;
+}
+.ss-ie-form > .ss-input,
+.ss-ie-form > .ss-date {
+	flex: 1 1 0;
+	min-width: 0;
+	min-height: 34px;
+	padding-top: 4px;
+	padding-bottom: 4px;
+	font-size: 14px;
+}
+.ss-ie-form > textarea.ss-input {
+	flex-basis: 100%;
+}
+.ss-ie-actions {
+	display: inline-flex;
+	gap: 2px;
+}
+.ss-ie-actions .is-ok {
+	color: var(--ss-brand);
+}
+.ss-ie-apply {
+	display: inline-flex;
+	flex-basis: 100%;
+	order: 3;
+	align-items: center;
+	gap: 6px;
+	color: var(--ss-text-2);
+	font-size: 13px;
+	cursor: pointer;
+}
+.ss-ie-sheet {
+	display: grid;
+	gap: 14px;
+	padding-bottom: 4px;
+}
+.ss-ie-sheet .ss-ie-apply {
+	font-size: 14px;
+}
+/* ในตาราง: ตัวแก้วันที่ของแถวไม่ดันคอลัมน์จนล้น */
+.ss-table--doc td .ss-ie-form {
+	min-width: 190px;
+	flex-wrap: nowrap;
 }

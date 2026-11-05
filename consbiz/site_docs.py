@@ -719,7 +719,8 @@ def get_doc(kind, name):
 	label, tone = status_of(doc.status, doc.docstatus)
 	before, after = links_of(doc)
 	items = [
-		{field: row.get(field) for field in ITEM_FIELDS if row.meta.has_field(field)} for row in doc.items
+		{"name": row.name, **{field: row.get(field) for field in ITEM_FIELDS if row.meta.has_field(field)}}
+		for row in doc.items
 	]
 	project = doc.get(config["project"]) if config["project"] else None
 	return {
@@ -768,9 +769,156 @@ def get_doc(kind, name):
 		"after": after,
 		"can_submit": bool(doc.docstatus == 0 and frappe.has_permission(doc.doctype, "submit", doc)),
 		"can_edit": bool(doc.docstatus == 0 and frappe.has_permission(doc.doctype, "write", doc)),
+		"after_submit": after_submit_info(doc, kind),
 		"next_kind": next_of(doc, kind),
 		"pdf_url": pdf_url(doc.doctype, doc.name),
 	}
+
+
+# ---------------------------------------------------------------- แก้ไขหลังส่ง (Allow on Submit)
+
+# ช่องที่แอปให้แก้หลังส่งได้ (หัวเอกสาร, รายการ) ใช้ได้จริงเฉพาะช่องที่ระบบตั้ง Allow on Submit ไว้ด้วย
+# ช่องบัญชี/ศูนย์ต้นทุน/หัวกระดาษ ฯลฯ แก้ในระบบเต็ม ช่องที่เปิด Allow on Submit เพิ่มทีหลัง (Customize Form) เพิ่มชื่อที่นี่
+AFTER_SUBMIT = {
+	"mr": (("title", "schedule_date", "custom_remark"), ("schedule_date",)),
+	"po": (("schedule_date", "order_confirmation_no", "order_confirmation_date"), ("schedule_date",)),
+	"pi": (("tax_invoice_number", "tax_invoice_date"), ()),
+	"qtn": (("title",), ()),
+	"so": (("delivery_date", "po_no", "po_date"), ("delivery_date",)),
+	"si": (
+		(
+			"tax_invoice_number",
+			"tax_invoice_date",
+			"custom_wht_certificate_no",
+			"custom_wht_certificate_date",
+			"po_no",
+			"po_date",
+		),
+		(),
+	),
+}
+AFTER_SUBMIT_LABELS = {
+	"title": "เรื่อง",
+	"schedule_date": "วันที่ต้องการ",
+	"delivery_date": "กำหนดส่ง",
+	"custom_remark": "หมายเหตุ",
+	"order_confirmation_no": "เลขที่ผู้ขายยืนยัน",
+	"order_confirmation_date": "วันที่ผู้ขายยืนยัน",
+	"tax_invoice_number": "เลขที่ใบกำกับภาษี",
+	"tax_invoice_date": "วันที่ใบกำกับภาษี",
+	"custom_wht_certificate_no": "เลขที่หนังสือรับรองหัก ณ ที่จ่าย",
+	"custom_wht_certificate_date": "วันที่หนังสือรับรองหัก ณ ที่จ่าย",
+	"po_no": "เลขที่ใบสั่งซื้อลูกค้า",
+	"po_date": "วันที่ใบสั่งซื้อลูกค้า",
+}
+# ใบสั่งซื้อเรียก schedule_date ว่ากำหนดส่ง (ตรงกับคอลัมน์ในแอป)
+AFTER_SUBMIT_KIND_LABELS = {"po": {"schedule_date": "กำหนดส่ง"}}
+
+
+def field_label(kind, meta, field):
+	label = AFTER_SUBMIT_KIND_LABELS.get(kind, {}).get(field) or AFTER_SUBMIT_LABELS.get(field)
+	return _(label or meta.get_label(field))
+
+
+# วันที่ที่ต้องไม่ก่อนวันที่เอกสาร (ระบบเต็มตรวจตอน validate ซึ่งไม่รันหลังส่ง)
+NOT_BEFORE_DOC_DATE = ("schedule_date", "delivery_date")
+
+
+def after_submit_fields(doc, kind):
+	"""(ช่องหัวเอกสาร, ช่องรายการ) ที่ผู้ใช้คนนี้แก้ได้ตอนนี้: เอกสารส่งแล้ว + มีสิทธิ์เขียน + ระบบตั้ง Allow on Submit"""
+	if doc.docstatus != 1 or not frappe.has_permission(doc.doctype, "write", doc):
+		return (), ()
+	header, items = AFTER_SUBMIT.get(kind, ((), ()))
+
+	def allowed(meta, fieldname):
+		df = meta.get_field(fieldname)
+		return bool(df and df.allow_on_submit and not df.read_only and not df.hidden)
+
+	item_meta = frappe.get_meta(doc.meta.get_field("items").options)
+	return (
+		tuple(f for f in header if allowed(doc.meta, f)),
+		tuple(f for f in items if allowed(item_meta, f)),
+	)
+
+
+def after_submit_info(doc, kind):
+	header, items = after_submit_fields(doc, kind)
+	if not header and not items:
+		return None
+	return {
+		"fields": [
+			{
+				"fieldname": f,
+				"label": field_label(kind, doc.meta, f),
+				"fieldtype": doc.meta.get_field(f).fieldtype,
+				"value": doc.get(f),
+			}
+			for f in header
+		],
+		"items": list(items),
+		# ช่องที่หน้าดูแสดงอยู่แล้วในตำแหน่งของมันเอง (วันครบกำหนด/หมายเหตุ) ที่เหลือแสดงต่อท้ายช่องข้อมูล
+		"due_field": config_of(kind)["due"],
+		"remarks_field": FORM[kind].get("remarks") or "remarks",
+		"modified": str(doc.modified),
+	}
+
+
+def after_submit_value(df, value, doc):
+	value = None if value in ("", None) else value
+	if value is None:
+		if df.reqd or df.fieldname in NOT_BEFORE_DOC_DATE:
+			frappe.throw(_("กรอก {0}").format(field_label(KIND_OF.get(doc.doctype), doc.meta, df.fieldname)))
+		return None
+	if df.fieldtype == "Date":
+		value = str(getdate(value))
+		date_field = config_of(KIND_OF[doc.doctype])["date"]
+		if df.fieldname in NOT_BEFORE_DOC_DATE and getdate(value) < getdate(doc.get(date_field)):
+			frappe.throw(
+				_("{0} ต้องไม่ก่อนวันที่เอกสาร").format(field_label(KIND_OF[doc.doctype], doc.meta, df.fieldname))
+			)
+	elif df.fieldtype in ("Data", "Small Text", "Text"):
+		value = str(value).strip() or None
+	return value
+
+
+@frappe.whitelist(methods=["POST"])
+def save_after_submit(kind, name, values=None, items=None, apply_items=0, modified=None):
+	"""แก้ช่อง Allow on Submit ของเอกสารที่ส่งแล้ว (ดินสอในหน้าดู)
+	values = {fieldname: ค่า} ของหัวเอกสาร, items = [{name: แถว, fieldname: ค่า}]
+	apply_items = ใช้วันที่หัวเอกสารกับทุกรายการที่มีช่องชื่อเดียวกัน (กำหนดส่ง/วันที่ต้องการ)"""
+	config = config_of(kind)
+	doc = frappe.get_doc(config["doctype"], name)
+	if doc.docstatus != 1:
+		frappe.throw(_("แก้ได้เฉพาะเอกสารที่ส่งแล้ว เอกสารร่างใช้ปุ่มแก้ไข"))
+	doc.check_permission("write")
+	if modified and str(doc.modified) != str(modified):
+		frappe.throw(_("เอกสารนี้ถูกแก้โดยคนอื่นแล้ว โหลดใหม่แล้วลองอีกครั้ง"), frappe.TimestampMismatchError)
+	header, item_fields = after_submit_fields(doc, kind)
+	values = parse(values)
+	rows = frappe.parse_json(items) if isinstance(items, str) else items or []
+
+	for field, value in values.items():
+		if field not in header:
+			frappe.throw(_("แก้ช่อง {0} หลังส่งในแอปไม่ได้").format(field))
+		doc.set(field, after_submit_value(doc.meta.get_field(field), value, doc))
+		if cint(apply_items) and field in item_fields:
+			for row in doc.items:
+				row.set(field, doc.get(field))
+
+	by_name = {row.name: row for row in doc.items}
+	for change in rows:
+		row = by_name.get(change.get("name"))
+		if not row:
+			frappe.throw(_("ไม่พบรายการที่จะแก้"))
+		for field, value in change.items():
+			if field == "name":
+				continue
+			if field not in item_fields:
+				frappe.throw(_("แก้ช่อง {0} หลังส่งในแอปไม่ได้").format(field))
+			row.set(field, after_submit_value(row.meta.get_field(field), value, doc))
+
+	doc.save()
+	return get_doc(kind, name)
 
 
 @frappe.whitelist(methods=["POST"])
@@ -1416,14 +1564,19 @@ def get_item_insight(kind, item_code, project=None):
 				child.rate,
 				child.uom,
 				child.qty,
+				parent.creation,
 			)
 			.where((parent.docstatus == 1) & (child.item_code == item_code))
 			.orderby(parent[date_field], order=frappe.qb.desc)
+			.orderby(parent.creation, order=frappe.qb.desc)
 			.limit(5)
 			.run(as_dict=True)
 		)
-	prices.sort(key=lambda p: str(p.date), reverse=True)
-	out["prices"] = [{**p, "doctype_kind": None} for p in prices[:5]]
+	# วันที่เดียวกัน: ฉบับที่สร้างทีหลังก่อน
+	prices.sort(key=lambda p: (str(p.date), str(p.creation)), reverse=True)
+	out["prices"] = [
+		{**{k: v for k, v in p.items() if k != "creation"}, "doctype_kind": None} for p in prices[:5]
+	]
 
 	# PO ค้างรับของสินค้านี้ (โครงการนี้ก่อน ถ้าไม่ระบุ = ทุกโครงการ)
 	if buying and frappe.has_permission("Purchase Order", "read"):
@@ -1475,17 +1628,40 @@ def person(user):
 	return {"user": user, "name": frappe.utils.get_fullname(user)} if user else None
 
 
+def change_label(meta, field):
+	return field_label(KIND_OF.get(meta.name), meta, field)
+
+
+def change_value(meta, field, value):
+	from consbiz.utils import thai_date
+
+	if value in (None, ""):
+		return _("(ว่าง)")
+	if meta.get_field(field).fieldtype == "Date":
+		return thai_date(value)
+	return frappe.utils.strip_html(str(value))[:60]
+
+
 def version_text(doc, data):
 	"""สรุป Version เป็นข้อความสั้น: ส่ง/ยกเลิก หรือ แก้ช่อง ก, ข (+n) / เพิ่ม-ลบแถว"""
 	changed = data.get("changed") or []
 	for field, _old, new in changed:
 		if field == "docstatus":
 			return _("ส่งเอกสาร") if new == 1 else _("ยกเลิกเอกสาร") if new == 2 else _("แก้สถานะเอกสาร")
+	fields = [(field, old, new) for field, old, new in changed if doc.meta.has_field(field)]
+	# แก้ช่องเดียว (เช่น แก้หลังส่งด้วยดินสอ): บอกค่าเดิม → ค่าใหม่
+	if len(fields) == 1 and not (data.get("row_changed") or data.get("added") or data.get("removed")):
+		field, old, new = fields[0]
+		return _("แก้ {0}: {1} → {2}").format(
+			change_label(doc.meta, field),
+			change_value(doc.meta, field, old),
+			change_value(doc.meta, field, new),
+		)
 	labels = []
-	for field, _old, _new in changed:
-		label = doc.meta.get_label(field) if doc.meta.has_field(field) else None
+	for field, _old, _new in fields:
+		label = change_label(doc.meta, field)
 		if label and label not in labels:
-			labels.append(_(label))
+			labels.append(label)
 	if data.get("row_changed"):
 		labels.append(_("รายการ"))
 	parts = []

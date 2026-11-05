@@ -266,3 +266,82 @@ class IntegrationTestSiteDocs(IntegrationTestCase):
 		self.assertEqual([f.name for f in site_docs.get_activity("po", po.name)["files"]], [file.name])
 		site_docs.remove_attachment("po", po.name, file.name)
 		self.assertFalse(frappe.db.exists("File", file.name))
+
+	def test_edit_after_submit(self):
+		from frappe.utils import add_days, getdate, nowdate
+
+		po = make_po(self.project)
+		info = site_docs.get_doc("po", po.name)["after_submit"]
+		fields = {f["fieldname"]: f for f in info["fields"]}
+		self.assertIn("order_confirmation_no", fields)
+		self.assertEqual(fields["schedule_date"]["label"], "กำหนดส่ง")
+		self.assertEqual(info["items"], ["schedule_date"])
+		row = site_docs.get_doc("po", po.name)["items"][0]["name"]
+
+		# ช่องเดียว: เลขที่ผู้ขายยืนยัน (ค่าว่าง = ล้างค่า)
+		site_docs.save_after_submit("po", po.name, values={"order_confirmation_no": " CONF-1 "})
+		self.assertEqual(frappe.db.get_value("Purchase Order", po.name, "order_confirmation_no"), "CONF-1")
+
+		# กำหนดส่งหัวเอกสาร + ใช้กับทุกรายการ
+		new_date = add_days(nowdate(), 10)
+		detail = site_docs.save_after_submit("po", po.name, values={"schedule_date": new_date}, apply_items=1)
+		self.assertEqual(getdate(detail["due"]), getdate(new_date))
+		self.assertEqual(getdate(detail["items"][0]["schedule_date"]), getdate(new_date))
+
+		# รายแถว
+		site_docs.save_after_submit(
+			"po", po.name, items=json.dumps([{"name": row, "schedule_date": add_days(nowdate(), 5)}])
+		)
+		self.assertEqual(
+			getdate(frappe.db.get_value("Purchase Order Item", row, "schedule_date")),
+			getdate(add_days(nowdate(), 5)),
+		)
+
+		# ห้าม: ก่อนวันที่เอกสาร / ช่องที่ไม่อยู่ในรายการ / ค่าว่างของช่องบังคับ / เอกสารเปลี่ยนไปแล้ว
+		self.assertRaises(
+			frappe.ValidationError,
+			site_docs.save_after_submit,
+			"po",
+			po.name,
+			values={"schedule_date": add_days(nowdate(), -30)},
+		)
+		self.assertRaises(
+			frappe.ValidationError, site_docs.save_after_submit, "po", po.name, values={"supplier": "X"}
+		)
+		self.assertRaises(
+			frappe.ValidationError,
+			site_docs.save_after_submit,
+			"po",
+			po.name,
+			items=[{"name": row, "rate": 1}],
+		)
+		self.assertRaises(
+			frappe.ValidationError, site_docs.save_after_submit, "po", po.name, values={"schedule_date": ""}
+		)
+		self.assertRaises(
+			frappe.TimestampMismatchError,
+			site_docs.save_after_submit,
+			"po",
+			po.name,
+			values={"order_confirmation_no": "CONF-2"},
+			modified="2000-01-01 00:00:00",
+		)
+
+		# เอกสารร่างใช้ฟอร์มแก้ไข ไม่มีดินสอ
+		draft = frappe.copy_doc(po)
+		draft.docstatus = 0
+		draft.insert()
+		self.assertIsNone(site_docs.get_doc("po", draft.name)["after_submit"])
+		self.assertRaises(
+			frappe.ValidationError,
+			site_docs.save_after_submit,
+			"po",
+			draft.name,
+			values={"order_confirmation_no": "X"},
+		)
+
+		# ความเคลื่อนไหว: แก้ช่องเดียวบอกค่าเดิม → ค่าใหม่
+		self.assertEqual(
+			site_docs.version_text(po, {"changed": [["order_confirmation_no", None, "CONF-1"]]}),
+			"แก้ เลขที่ผู้ขายยืนยัน: (ว่าง) → CONF-1",
+		)
