@@ -450,3 +450,93 @@ export function time_ago(value) {
 	if (minutes < 60 * 24 * 30) return `${Math.round(minutes / 1440)} วัน`;
 	return thai_date(value, { year: then.getFullYear() !== new Date().getFullYear() });
 }
+
+// ---------------------------------------------------------------- ข้อความแบบ Text Editor ของระบบเต็ม (Quill 2)
+// เช่น description ของรายการ: <div class="ql-editor read-mode"><ol><li data-list="bullet"><span class="ql-ui"></span>…
+// เก็บเฉพาะแท็ก/แอตทริบิวต์ที่ปลอดภัย ตัด span.ql-ui และกรอบ ql-editor ออก (ใช้กับ v-html เท่านั้นผ่านฟังก์ชันนี้)
+const RICH_TAGS = new Set(
+	"P BR B STRONG I EM U S STRIKE SUB SUP OL UL LI SPAN DIV A H1 H2 H3 H4 BLOCKQUOTE PRE CODE TABLE THEAD TBODY TR TD TH".split(
+		" "
+	)
+);
+const DROP_TAGS = new Set("SCRIPT STYLE IFRAME OBJECT EMBED LINK META svg MATH TEMPLATE".split(" "));
+
+function clean_node(node) {
+	for (const child of [...node.childNodes]) {
+		if (child.nodeType === Node.COMMENT_NODE) {
+			child.remove();
+			continue;
+		}
+		if (child.nodeType !== Node.ELEMENT_NODE) continue;
+		const tag = child.tagName.toUpperCase();
+		if (DROP_TAGS.has(child.tagName) || DROP_TAGS.has(tag) || child.classList.contains("ql-ui")) {
+			child.remove();
+			continue;
+		}
+		clean_node(child);
+		if (!RICH_TAGS.has(tag)) {
+			child.replaceWith(...child.childNodes);
+			continue;
+		}
+		for (const attr of [...child.attributes]) {
+			const name = attr.name.toLowerCase();
+			const keep =
+				(name === "data-list" && tag === "LI") ||
+				(name === "class" && /^(ql-(align|indent)-[\w-]+\s*)+$/.test(attr.value)) ||
+				(name === "href" && tag === "A" && /^(https?:|mailto:|tel:)/i.test(attr.value.trim()));
+			if (!keep) child.removeAttribute(attr.name);
+		}
+		if (tag === "A") {
+			child.setAttribute("target", "_blank");
+			child.setAttribute("rel", "noopener noreferrer");
+		}
+	}
+}
+
+export function sanitize_html(html) {
+	if (!html) return "";
+	const text = String(html);
+	// ข้อความธรรมดา (ไม่มีแท็ก): แปลงขึ้นบรรทัดใหม่เป็น <br>
+	if (!/<[a-z][\s\S]*>/i.test(text)) {
+		const div = document.createElement("div");
+		div.textContent = text;
+		return div.innerHTML.replace(/\n/g, "<br>");
+	}
+	const doc = new DOMParser().parseFromString(text, "text/html");
+	const body = doc.body;
+	clean_node(body);
+	// ตัดกรอบ <div class="ql-editor"> ที่ห่อทั้งหมด (คลาสถูกลบแล้ว เหลือ div เปล่าชั้นเดียว)
+	let root = body;
+	while (
+		root.childNodes.length === 1 &&
+		root.firstChild.nodeType === 1 &&
+		root.firstChild.tagName === "DIV"
+	) {
+		root = root.firstChild;
+	}
+	return html_text(root.innerHTML) ? root.innerHTML : "";
+}
+
+// ข้อความล้วนของ HTML (ค้นหา / ตัดสั้น / เทียบกับชื่อรายการ)
+export function html_text(html) {
+	if (!html) return "";
+	const div = document.createElement("div");
+	div.innerHTML = String(html).replace(/<(br|\/p|\/li|\/div)[^>]*>/gi, " ");
+	return div.textContent.replace(/\s+/g, " ").trim();
+}
+
+// ตัวเลขเงิน 2 ตำแหน่งมีจุลภาค (ช่องกรอกเงิน)
+const money_input_format = new Intl.NumberFormat("en-US", {
+	minimumFractionDigits: 2,
+	maximumFractionDigits: 2,
+});
+export const format_money_input = (value) =>
+	value === null || value === undefined || value === ""
+		? ""
+		: money_input_format.format(Number(value) || 0);
+export function parse_money_input(text) {
+	const clean = String(text ?? "").replace(/[,\s฿]/g, "");
+	if (clean === "" || clean === "-" || clean === ".") return null;
+	const value = Number(clean);
+	return Number.isFinite(value) ? value : null;
+}

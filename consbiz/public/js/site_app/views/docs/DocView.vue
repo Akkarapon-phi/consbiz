@@ -127,13 +127,11 @@
 													· {{ item_progress(it) }}</template
 												></small
 											>
-											<small
-												v-if="
-													it.description && strip(it.description) !== it.item_name
-												"
-												class="is-desc"
-												>{{ strip(it.description) }}</small
-											>
+											<RichText
+												v-if="has_desc(it)"
+												:html="it.description"
+												class="ss-item-desc"
+											/>
 										</td>
 										<td class="is-num">{{ num(it.qty) }}</td>
 										<td>{{ it.uom }}</td>
@@ -176,6 +174,7 @@
 									<span class="ss-doc-title">{{ it.item_name || it.item_code }}</span>
 									<b class="ss-doc-money">{{ money(it.amount) }}</b>
 								</div>
+								<span class="ss-card-meta ss-item-code">{{ it.item_code }}</span>
 								<span class="ss-card-meta"
 									>{{ num(it.qty) }} {{ it.uom }} × {{ money(it.rate)
 									}}<template v-if="it.schedule_date || it.delivery_date">
@@ -183,6 +182,12 @@
 										{{ thai_date(it.schedule_date || it.delivery_date) }}</template
 									></span
 								>
+								<RichText
+									v-if="has_desc(it)"
+									:html="it.description"
+									:lines="4"
+									class="ss-item-desc"
+								/>
 								<div v-if="item_progress(it) || it.custom_vat_nocal" class="ss-chips">
 									<span v-if="item_progress(it)" class="ss-chip">{{
 										item_progress(it)
@@ -363,8 +368,21 @@ import TopBar from "../../components/TopBar.vue";
 import Skeleton from "../../components/Skeleton.vue";
 import Sheet from "../../components/Sheet.vue";
 import PdfViewer from "../../components/PdfViewer.vue";
+import RichText from "../../components/RichText.vue";
 import { DOC_KINDS } from "../../sections.js";
-import { call, celebrate, desk_url, go, money, num, post, show_error, state, thai_date } from "../../api.js";
+import {
+	call,
+	celebrate,
+	desk_url,
+	go,
+	html_text,
+	money,
+	num,
+	post,
+	show_error,
+	state,
+	thai_date,
+} from "../../api.js";
 
 const reload_summary = inject("reload_summary");
 const params = state.route.params;
@@ -383,11 +401,11 @@ mq_wide.addEventListener("change", on_media);
 onBeforeUnmount(() => mq_wide.removeEventListener("change", on_media));
 
 const is_mr = params.kind === "mr";
-const strip = (html) =>
-	String(html || "")
-		.replace(/<[^>]*>/g, " ")
-		.replace(/\s+/g, " ")
-		.trim();
+// รายละเอียดที่ต่างจากชื่อรายการ (ERPNext ตั้ง description = ชื่อรายการเป็นค่าเริ่มต้น)
+const has_desc = (it) => {
+	const text = html_text(it.description);
+	return !!text && text !== it.item_name;
+};
 const due_word = config.section === "buy" ? "จ่าย" : "รับ";
 const overdue = computed(
 	() =>

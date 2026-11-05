@@ -197,14 +197,10 @@
 											/>
 											<span>กรอกยอดเอง</span>
 										</label>
-										<input
+										<MoneyInput
 											v-if="form[d.edit]"
-											v-model.number="form[d.amount]"
+											v-model="form[d.amount]"
 											class="ss-cell ss-cell--num ss-deduct-amount"
-											type="number"
-											inputmode="decimal"
-											min="0"
-											step="any"
 											:aria-label="`ยอด${d.label}`"
 										/>
 									</template>
@@ -219,13 +215,10 @@
 					<div class="ss-totals" :class="{ 'is-stale': previewing }">
 						<div v-for="r in form.summary.rows" :key="r.label">
 							<span>{{ r.label }}</span>
-							<input
+							<MoneyInput
 								v-if="r.tax && is_mr && form.custom_vat_override"
-								v-model.number="form.custom_vat"
+								v-model="form.custom_vat"
 								class="ss-cell ss-cell--num ss-totals-input"
-								type="number"
-								inputmode="decimal"
-								step="any"
 								aria-label="ภาษีมูลค่าเพิ่ม"
 							/>
 							<b v-else>{{ money(r.value) }}</b>
@@ -265,10 +258,14 @@
 							<span class="ss-field-label">รายการ</span>
 							<b>{{ detail_row.item_name }}</b>
 						</div>
-						<label class="ss-field">
-							<span class="ss-field-label">คำอธิบาย</span>
-							<textarea v-model="detail_row.description" class="ss-input" rows="3"></textarea>
-						</label>
+						<div class="ss-field">
+							<span class="ss-field-label">รายละเอียด</span>
+							<RichEditor
+								v-model="detail_row.description"
+								label="รายละเอียด"
+								placeholder="รายละเอียด/สเปกของรายการ"
+							/>
+						</div>
 						<div class="ss-form-row">
 							<label class="ss-field">
 								<span class="ss-field-label">จำนวน</span>
@@ -292,12 +289,10 @@
 						<div class="ss-form-row">
 							<label class="ss-field">
 								<span class="ss-field-label">หน่วยละ</span>
-								<input
-									v-model.number="detail_row.rate"
+								<MoneyInput
+									v-model="detail_row.rate"
 									class="ss-input ss-input--num"
-									type="number"
-									inputmode="decimal"
-									step="any"
+									aria-label="หน่วยละ"
 								/>
 							</label>
 							<div class="ss-field">
@@ -461,6 +456,8 @@ import Empty from "../../components/Empty.vue";
 import Picker from "../../components/Picker.vue";
 import Sheet from "../../components/Sheet.vue";
 import LineEditor from "./LineEditor.vue";
+import MoneyInput from "../../components/MoneyInput.vue";
+import RichEditor from "../../components/RichEditor.vue";
 import SelectBox from "../../components/SelectBox.vue";
 import DateInput from "../../components/DateInput.vue";
 import { DOC_KINDS } from "../../sections.js";

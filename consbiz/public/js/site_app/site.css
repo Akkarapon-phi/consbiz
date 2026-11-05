@@ -7463,3 +7463,101 @@ div.ss-line-del {
 	font-size: 16px;
 	color: var(--ss-text);
 }
+
+/* ================================================================ ข้อความจาก Text Editor ของระบบเต็ม (RichText / RichEditor)
+   Quill 2 ใช้ <ol> ทั้งลำดับเลขและหัวข้อย่อย แยกด้วย li[data-list] */
+.ss-rich {
+	font-size: 13px;
+	line-height: 1.5;
+	color: var(--ss-text-2);
+	overflow-wrap: anywhere;
+}
+.ss-rich p {
+	margin: 0;
+}
+.ss-rich ol,
+.ss-rich ul {
+	margin: 2px 0;
+	padding-left: 1.4em;
+}
+.ss-rich ol > li[data-list="bullet"],
+.ss-rich ul > li {
+	list-style-type: disc;
+}
+.ss-rich ol > li[data-list="ordered"],
+.ss-rich ol > li:not([data-list]) {
+	list-style-type: decimal;
+}
+.ss-rich a {
+	color: var(--ss-brand);
+	text-decoration: underline;
+}
+.ss-rich .ql-align-center {
+	text-align: center;
+}
+.ss-rich .ql-align-right {
+	text-align: right;
+}
+.ss-rich.is-clamp {
+	display: -webkit-box;
+	-webkit-line-clamp: var(--lines);
+	-webkit-box-orient: vertical;
+	overflow: hidden;
+}
+/* ใน is-clamp รายการแบบ list ต้องไม่หลุดกรอบ */
+.ss-rich.is-clamp ol,
+.ss-rich.is-clamp ul {
+	margin: 0;
+}
+.ss-item-desc {
+	margin-top: 3px;
+	font-size: 12.5px;
+	font-weight: 400;
+	white-space: normal;
+}
+.ss-grid .is-item .ss-item-desc {
+	font-size: 12px;
+}
+
+.ss-rich-editor {
+	border-radius: 12px;
+	border: 1px solid var(--ss-border-strong);
+	background: var(--ss-surface);
+	transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.ss-rich-editor.is-focus {
+	border-color: var(--ss-brand);
+	box-shadow: 0 0 0 3px var(--ss-brand-soft);
+}
+.ss-rich-tools {
+	display: flex;
+	gap: 2px;
+	padding: 4px;
+	border-bottom: 1px solid var(--ss-border);
+}
+.ss-rich-tool {
+	display: grid;
+	place-items: center;
+	width: 32px;
+	height: 30px;
+	border-radius: 7px;
+	font-size: 14px;
+	color: var(--ss-text-2);
+}
+.ss-rich-tool:hover {
+	color: var(--ss-text);
+	background: var(--ss-surface-2);
+}
+.ss-rich-area {
+	min-height: 96px;
+	max-height: 260px;
+	overflow-y: auto;
+	padding: 10px 12px;
+	font-size: 15px;
+	color: var(--ss-text);
+	outline: none;
+}
+.ss-rich-area:empty::before {
+	content: attr(data-placeholder);
+	color: var(--ss-muted);
+}

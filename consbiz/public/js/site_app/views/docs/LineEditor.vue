@@ -99,6 +99,12 @@
 							>{{ row.item_code
 							}}<template v-if="row.custom_wbs"> · WBS {{ row.custom_wbs }}</template></small
 						>
+						<RichText
+							v-if="has_desc(row)"
+							:html="row.description"
+							:lines="2"
+							class="ss-item-desc"
+						/>
 						<small v-if="show_errors && error(row)" class="is-error-text">{{ error(row) }}</small>
 					</td>
 					<td>
@@ -124,16 +130,11 @@
 						/>
 					</td>
 					<td>
-						<input
-							v-model.number="row.rate"
+						<MoneyInput
+							v-model="row.rate"
 							class="ss-cell ss-cell--num"
-							type="number"
-							inputmode="decimal"
-							min="0"
-							step="any"
 							:aria-label="`หน่วยละ ${row.item_name}`"
 							data-col="rate"
-							@focus="$event.target.select()"
 							@keydown.enter.prevent="next($event, 'search')"
 						/>
 					</td>
@@ -248,6 +249,7 @@
 				<div class="ss-line-info">
 					<span class="ss-card-title">{{ row.item_name || row.item_code }}</span>
 					<span class="ss-card-meta">{{ row.item_code }}</span>
+					<RichText v-if="has_desc(row)" :html="row.description" :lines="3" class="ss-item-desc" />
 				</div>
 				<div class="ss-line-del">
 					<button
@@ -290,15 +292,7 @@
 					</div>
 					<label class="ss-field">
 						<span class="ss-field-label">หน่วยละ</span>
-						<input
-							v-model.number="row.rate"
-							class="ss-input ss-input--num"
-							type="number"
-							inputmode="decimal"
-							min="0"
-							step="any"
-							@focus="$event.target.select()"
-						/>
+						<MoneyInput v-model="row.rate" class="ss-input ss-input--num" aria-label="หน่วยละ" />
 					</label>
 					<div class="ss-line-amount">
 						<span class="ss-field-label">เป็นเงิน</span>
@@ -323,7 +317,9 @@ import { computed, nextTick, ref } from "vue";
 import Icon from "../../components/Icon.vue";
 import SelectBox from "../../components/SelectBox.vue";
 import DateInput from "../../components/DateInput.vue";
-import { money } from "../../api.js";
+import MoneyInput from "../../components/MoneyInput.vue";
+import RichText from "../../components/RichText.vue";
+import { html_text, money } from "../../api.js";
 
 const props = defineProps({
 	items: { type: Array, required: true },
@@ -351,6 +347,11 @@ let request = 0;
 // คอลัมน์ที่ช่องค้นหาคลุม (รายการ ถึง ก่อนปุ่มท้ายแถว)
 const span = computed(() => 5 + (props.date_field ? 1 : 0) + (props.is_mr ? 1 : 0) + 1);
 
+// รายละเอียดที่ต่างจากชื่อรายการ (ERPNext ตั้ง description = ชื่อรายการเป็นค่าเริ่มต้น)
+const has_desc = (row) => {
+	const text = html_text(row.description);
+	return !!text && text !== row.item_name;
+};
 const amount = (row) => (Number(row.qty) || 0) * (Number(row.rate) || 0);
 function error(row) {
 	return Number(row.qty) > 0 ? "" : "ใส่จำนวนมากกว่า 0";

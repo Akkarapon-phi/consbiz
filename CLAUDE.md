@@ -174,6 +174,8 @@ pre-commit run --all-files                               # ruff + prettier (ต�
   MR ใหม่: ERPNext `update_item_rates` ทับราคาด้วย Price List ตอนบันทึกครั้งแรก `save_doc` ใส่ราคาที่ผู้ใช้กรอกคืน (`keep_request_rates`)
   ดูเอกสาร: แถบขั้นตอน (`steps_of`), สรุปยอด (`summary_of`: แถว + ยอดสุทธิ + ตัวอักษร) ใช้ทั้งหน้าดูและฟอร์ม
   ช่องเลือก/วันที่ของแอปใช้ `components/SelectBox.vue` / `DateInput.vue` (ปฏิทิน พ.ศ.) ห้ามใช้ `<select>` / `<input type="date">` ของเบราว์เซอร์
+  ช่องเงินใช้ `MoneyInput.vue` (แสดง 1,234.50 / โฟกัสแล้วเป็นตัวเลขดิบ) รายละเอียดรายการ (HTML ของ Quill) แสดงด้วย `RichText.vue` แก้ด้วย `RichEditor.vue`
+  HTML จากระบบเต็มต้องผ่าน `sanitize_html` (api.js) ก่อน `v-html` ทุกครั้ง (ตัด `span.ql-ui`, Quill 2 ใช้ `li[data-list]` แยกลำดับเลข/หัวข้อย่อย)
   ดูเอกสาร (`DocView.vue`): หัวเอกสาร = คู่ค้า/สถานะ + ช่องข้อมูลเป็นตาราง, ≥768 = ตารางรายการ + สรุปยอดท้ายตาราง, ≥1180 = แผงข้าง (เอกสารที่เกี่ยวข้อง/หมายเหตุ)
   เอกสารถัดไป (`MAPPERS`: MR→PO, PO→PI, QTN→SO, SO→SI) ใช้ mapper ของ ERPNext ตอนบันทึกเรียก mapper ใหม่แล้วจับคู่แถวด้วย `key` (แถวบันทึกแล้ว = name, แถวจาก mapper = ลำดับ)
   ยอด/ภาษีคำนวณที่ server (`preview_doc`) แล้ว rollback เสมอ (ERPNext สร้าง Item Price อัตโนมัติระหว่างเติมค่า) PI มีเลขที่ใบกำกับภาษี (erpnext_thailand บังคับเมื่อมีภาษีซื้อ)
