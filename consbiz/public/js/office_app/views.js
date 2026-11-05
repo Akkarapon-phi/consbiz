@@ -1,0 +1,21 @@
+// หน้า (view) ของแอปออฟฟิศ → component (ชื่อตรงกับ ROUTES ใน sections.js)
+// จัดซื้อ / ขาย (ชุดเดียวกับแอปหน้างาน แยกตาม kind)
+import DocsHome from "../shared/docs/DocsHome.vue";
+import DocList from "../shared/docs/DocList.vue";
+import DocView from "../shared/docs/DocView.vue";
+import DocForm from "../shared/docs/DocForm.vue";
+
+export default {
+	buy: DocsHome,
+	sell: DocsHome,
+	mr: DocList,
+	po: DocList,
+	pi: DocList,
+	qtn: DocList,
+	so: DocList,
+	si: DocList,
+	"buy-doc": DocView,
+	"sell-doc": DocView,
+	"buy-form": DocForm,
+	"sell-form": DocForm,
+};

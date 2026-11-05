@@ -1,5 +1,7 @@
 // ชนิดเอกสารจัดซื้อ/ขาย ใช้ร่วมทุกแอป (ตรงกับ DOCS ใน consbiz/site_docs.py)
 // section = หมวดที่มีหน้า <section>-doc / <section>-form ของชนิดนั้น
+import { app } from "../app.js";
+import { boot, go } from "../api.js";
 export const DOC_KINDS = {
 	mr: {
 		doctype: "Material Request",
@@ -78,3 +80,24 @@ export const DOC_KINDS = {
 		due: "ครบกำหนดรับ",
 	},
 };
+
+// แอปที่ดูแลเอกสารทุกชนิด (สั่งซื้อ แจ้งหนี้ ขาย) แอปหน้างานดูแลเฉพาะใบขอซื้อ (app.doc_kinds)
+const DOC_APP = "office";
+
+// แอปนี้เปิด/สร้างเอกสารชนิดนี้เองได้ไหม
+export const in_app = (kind) => app.doc_kinds.includes(kind);
+
+// URL หน้าดูเอกสารในแอปที่ดูแล (ผู้ใช้ไม่มีแอปนั้น = ระบบเต็ม)
+export function doc_url(kind, name) {
+	const config = DOC_KINDS[kind];
+	const owner = (boot.apps || []).find((a) => a.key === DOC_APP);
+	if (owner)
+		return `${owner.url}/${config.section}/${config.section}-doc/${kind}/${encodeURIComponent(name)}`;
+	return `/app/${config.doctype.toLowerCase().replace(/ /g, "-")}/${encodeURIComponent(name)}`;
+}
+
+// เปิดเอกสาร: ชนิดที่แอปนี้ดูแลเปิดในแอป ที่เหลือไปแอปที่ดูแล
+export function open_doc(kind, name) {
+	if (in_app(kind)) go(`${DOC_KINDS[kind].section}-doc`, { kind, name });
+	else window.location.href = doc_url(kind, name);
+}

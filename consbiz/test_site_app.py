@@ -4,6 +4,7 @@
 # แอปหน้างาน (site_app.py): หมวดงานตามสิทธิ์, หน้าหลัก/รายการของหมวดควบคุมงาน
 
 import json
+from unittest.mock import patch
 
 import frappe
 from frappe.tests import IntegrationTestCase
@@ -38,9 +39,46 @@ class IntegrationTestSiteApp(IntegrationTestCase):
 			frappe.db.set_value("Construction Management", name, "project", None)
 
 	def test_sections_follow_permissions(self):
+		# หน้างาน: ขอซื้ออย่างเดียว (สั่งซื้อ/แจ้งหนี้/ขาย อยู่แอปออฟฟิศ)
 		boot = site_app.boot_data()
-		self.assertEqual(boot["sections"], ["store", "work", "pm", "buy", "sell"])
+		self.assertEqual(boot["sections"], ["store", "work", "pm", "buy"])
 		self.assertTrue(boot["can"]["daily_report"])
+		self.assertEqual([a["key"] for a in boot["apps"]], ["site", "office"])
+
+		office = site_app.office_boot_data()
+		self.assertEqual(office["sections"], ["buy", "sell"])
+		self.assertEqual([a["key"] for a in office["apps"]], ["site", "office"])
+
+	def test_apps_follow_permissions(self):
+		# ไม่มีสิทธิ์เอกสารซื้อ-ขายเลย = ไม่เห็นแอปออฟฟิศ / ไม่มีหมวดหน้างานเลย = ไม่เห็นแอปหน้างาน
+		with patch.dict(site_app.APP_SECTIONS, {"office": lambda: []}):
+			self.assertEqual([a["key"] for a in site_app.available_apps()], ["site"])
+		self.assertEqual([a["key"] for a in site_app.available_apps(("site", []))], ["office"])
+
+	def test_office_icon_in_saved_layouts(self):
+		from consbiz.patches import add_consoffice_to_desktop_layouts as patch_module
+
+		# ไซต์เทสต์บางไซต์ไม่มี Desktop Icon ของแอป (migrate ไม่ได้สร้าง): สร้างจากไฟล์เดียวกับที่ migrate ใช้
+		if not frappe.db.exists("Desktop Icon", "ConsOffice"):
+			path = frappe.get_app_path("consbiz", "desktop_icon", "consoffice.json")
+			frappe.get_doc(json.loads(frappe.read_file(path))).insert(ignore_permissions=True)
+		layout = frappe.get_doc(
+			{
+				"doctype": "Desktop Layout",
+				"user": "Administrator",
+				"layout": json.dumps([{"name": "ConsBiz"}, {"name": "ConsERP"}, {"name": "Home"}]),
+			}
+		)
+		if frappe.db.exists("Desktop Layout", "Administrator"):
+			layout = frappe.get_doc("Desktop Layout", "Administrator")
+			layout.layout = json.dumps([{"name": "ConsBiz"}, {"name": "ConsERP"}, {"name": "Home"}])
+			layout.save()
+		else:
+			layout.insert()
+		patch_module.execute()
+		patch_module.execute()  # รันซ้ำไม่ใส่ซ้ำ
+		names = [i["name"] for i in json.loads(frappe.db.get_value("Desktop Layout", layout.name, "layout"))]
+		self.assertEqual(names, ["ConsBiz", "ConsERP", "ConsOffice", "Home"])
 
 	def test_project_without_plan(self):
 		summary = site_app.get_work_summary(self.project)

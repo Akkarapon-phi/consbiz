@@ -1,5 +1,5 @@
+<!-- รายละเอียดเอกสารจัดซื้อ/ขาย: หัวเอกสาร, ความคืบหน้า, รายการ, ยอดรวม, เอกสารต้นทาง/ปลายทาง, PDF, ส่งเอกสาร -->
 <template>
-	<!-- รายละเอียดเอกสารจัดซื้อ/ขาย: หัวเอกสาร, ความคืบหน้า, รายการ, ยอดรวม, เอกสารต้นทาง/ปลายทาง, PDF, ส่งเอกสาร -->
 	<div :class="{ 'ss-has-bar': has_bar }">
 		<TopBar :title="config.label" :subtitle="params.name" :back_to="params.kind">
 			<template #actions>
@@ -436,20 +436,18 @@
 					</button>
 					<!-- เอกสารที่ส่งแล้ว: สร้างเอกสารถัดไป (ขอซื้อ → สั่งซื้อ → แจ้งหนี้, เสนอราคา → สั่งขาย → แจ้งหนี้) -->
 					<button
-						v-if="doc.next_kind"
+						v-if="next_kind"
 						type="button"
 						class="ss-btn ss-btn--primary ss-btn--lg ss-grow"
 						@click="
 							go(`${config.section}-form`, {
-								kind: doc.next_kind,
+								kind: next_kind,
 								name: 'new',
 								source: params.name,
 							})
 						"
 					>
-						<Icon name="plus" :size="18" :stroke="2.4" /> สร้าง{{
-							DOC_KINDS[doc.next_kind].label
-						}}
+						<Icon name="plus" :size="18" :stroke="2.4" /> สร้าง{{ DOC_KINDS[next_kind].label }}
 					</button>
 				</div>
 			</Transition>
@@ -502,7 +500,7 @@ import PdfViewer from "../components/PdfViewer.vue";
 import RichText from "../components/RichText.vue";
 import DocActivity from "./DocActivity.vue";
 import InlineEdit from "../components/InlineEdit.vue";
-import { DOC_KINDS } from "./kinds.js";
+import { DOC_KINDS, in_app, open_doc } from "./kinds.js";
 import {
 	call,
 	celebrate,
@@ -642,8 +640,13 @@ onBeforeUnmount(() => {
 	delete document.documentElement.dataset.rside;
 });
 
+// เอกสารถัดไปสร้างได้เฉพาะชนิดที่แอปนี้ดูแล (หน้างานขอซื้อได้ สั่งซื้อทำที่แอปออฟฟิศ)
+const next_kind = computed(() =>
+	doc.value?.next_kind && in_app(doc.value.next_kind) ? doc.value.next_kind : null
+);
+
 const has_bar = computed(
-	() => !!(doc.value && (doc.value.can_edit || doc.value.can_submit || doc.value.next_kind))
+	() => !!(doc.value && (doc.value.can_edit || doc.value.can_submit || next_kind.value))
 );
 
 const progress = computed(() =>
@@ -684,9 +687,9 @@ function item_progress(it) {
 		.join(" · ");
 }
 
-// เอกสารจัดซื้อ/ขายเปิดในแอป ที่เหลือ (ใบรับของ, ใบส่งของ, รับ/จ่ายเงิน) เปิดในระบบเต็ม
+// เอกสารจัดซื้อ/ขาย: ชนิดที่แอปนี้ดูแลเปิดในแอป ชนิดอื่นไปแอปที่ดูแล (open_doc) ที่เหลือ (ใบรับของ, ใบส่งของ, รับ/จ่ายเงิน) เปิดในระบบเต็ม
 function open_link(l) {
-	if (l.kind) go(`${DOC_KINDS[l.kind].section}-doc`, { kind: l.kind, name: l.name });
+	if (l.kind) open_doc(l.kind, l.name);
 	else window.location.href = desk_url(l.doctype, l.name);
 }
 

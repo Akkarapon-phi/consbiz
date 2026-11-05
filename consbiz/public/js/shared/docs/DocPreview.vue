@@ -1,6 +1,6 @@
+<!-- ตัวอย่างเอกสารข้างตารางรายการ (จอ ≥1480, DocList.vue) ดูได้โดยไม่เปลี่ยนหน้า
+     ข้อมูลเดียวกับหน้าดู (site_docs.get_doc) แบบย่อ + ปุ่ม PDF / แก้ไข / ส่ง / สร้างเอกสารถัดไป / เปิดเต็มหน้า -->
 <template>
-	<!-- ตัวอย่างเอกสารข้างตารางรายการ (จอ ≥1480, DocList.vue) ดูได้โดยไม่เปลี่ยนหน้า
-	     ข้อมูลเดียวกับหน้าดู (site_docs.get_doc) แบบย่อ + ปุ่ม PDF / แก้ไข / ส่ง / สร้างเอกสารถัดไป / เปิดเต็มหน้า -->
 	<aside class="ss-preview" :aria-label="`ตัวอย่าง ${name}`">
 		<header class="ss-preview-head">
 			<div class="ss-preview-title">
@@ -147,7 +147,7 @@
 					ส่ง{{ config.label }}
 				</button>
 				<button
-					v-else-if="doc.next_kind"
+					v-else-if="doc.next_kind && in_app(doc.next_kind)"
 					type="button"
 					class="ss-btn ss-btn--primary ss-btn--sm"
 					@click="go(`${config.section}-form`, { kind: doc.next_kind, name: 'new', source: name })"
@@ -169,7 +169,7 @@ import { computed, ref, watch } from "vue";
 import Icon from "../components/Icon.vue";
 import Skeleton from "../components/Skeleton.vue";
 import PdfViewer from "../components/PdfViewer.vue";
-import { DOC_KINDS } from "./kinds.js";
+import { DOC_KINDS, in_app } from "./kinds.js";
 import { call, celebrate, desk_url, go, money, num, post, show_error, thai_date } from "../api.js";
 
 const props = defineProps({ kind: String, name: String });

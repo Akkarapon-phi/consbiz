@@ -5127,6 +5127,21 @@ a.ss-btn--soft {
 		margin-top: auto;
 		--sw: var(--ss-text-2);
 	}
+	/* แอปอื่น (ตัวสลับแอป) ชิดล่างเหนือระบบเต็ม คั่นจากหมวดของแอปนี้ */
+	.ss-dock-apps {
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+		margin-top: auto;
+		padding-top: 10px;
+		border-top: 1px solid var(--ss-border);
+	}
+	.ss-dock-apps .ss-sec {
+		--sw: #0f766e;
+	}
+	.ss-dock-apps + .ss-dock-desk {
+		margin-top: 0;
+	}
 	/* ปุ่มระบบเต็มอยู่ที่ Dock แล้ว */
 	html[data-dock] .ss-nav-desk {
 		display: none !important;

@@ -12,6 +12,7 @@
 // kind_pages หน้าที่ไฮไลต์เมนูตาม params.kind (หน้าดู/ฟอร์มเอกสารจัดซื้อ/ขาย)
 // summary_api หมวด → () => [method, args] ตัวเลขบนเมนู (เรียกพร้อม project)
 // fallback   หมวดที่เปิดเมื่อผู้ใช้ไม่มีสิทธิ์หมวดไหนเลย (หน้าแจ้งสิทธิ์เอง)
+// doc_kinds  ชนิดเอกสารซื้อ-ขาย (shared/docs/kinds.js) ที่แอปนี้ดูแล ชนิดอื่นเปิดในแอปที่ดูแล (DOC_APP)
 
 export const app = {
 	key: "",
@@ -25,6 +26,7 @@ export const app = {
 	kind_pages: [],
 	summary_api: {},
 	fallback: null,
+	doc_kinds: [],
 };
 
 export function configure(config) {

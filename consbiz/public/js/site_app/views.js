@@ -23,7 +23,7 @@ import Plan from "./views/pm/Plan.vue";
 import Lookahead from "./views/pm/Lookahead.vue";
 import PmDocs from "./views/pm/PmDocs.vue";
 import Resources from "./views/pm/Resources.vue";
-// จัดซื้อ / ขาย (ชุดเดียวกันทุกแอป แยกตาม kind)
+// ขอซื้อ (ชุดเดียวกับแอปออฟฟิศ เฉพาะ kind = mr)
 import DocsHome from "../shared/docs/DocsHome.vue";
 import DocList from "../shared/docs/DocList.vue";
 import DocView from "../shared/docs/DocView.vue";
@@ -52,15 +52,7 @@ export default {
 	"pm-docs": PmDocs,
 	resources: Resources,
 	buy: DocsHome,
-	sell: DocsHome,
 	mr: DocList,
-	po: DocList,
-	pi: DocList,
-	qtn: DocList,
-	so: DocList,
-	si: DocList,
 	"buy-doc": DocView,
-	"sell-doc": DocView,
 	"buy-form": DocForm,
-	"sell-form": DocForm,
 };

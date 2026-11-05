@@ -25,6 +25,19 @@
 					><Icon name="building" :size="20" :stroke="2.2"
 				/></span>
 				<SectionDock variant="dock" />
+				<!-- แอปอื่น (ตัวสลับแอป) เหนือระบบเต็ม -->
+				<div v-if="apps.length" class="ss-dock-apps">
+					<a
+						v-for="a in apps"
+						:key="a.key"
+						class="ss-sec"
+						:href="a.url"
+						:title="`เปิดแอป${a.label} (${a.title})`"
+					>
+						<span class="ss-sec-icon"><Icon :name="a.icon" :size="20" /></span>
+						<span class="ss-sec-label">{{ a.label }}</span>
+					</a>
+				</div>
 				<a v-if="boot.desk" class="ss-sec ss-dock-desk" href="/app" title="เปิดระบบเต็ม">
 					<span class="ss-sec-icon"><Icon name="monitor" :size="20" /></span>
 					<span class="ss-sec-label">ระบบเต็ม</span>
@@ -94,6 +107,17 @@
 				</button>
 				<!-- ท้าย sidebar: ระบบเต็ม (ไม่มี Dock) + ปุ่มปักหมุด/พับ -->
 				<div class="ss-nav-foot">
+					<!-- ไม่มี Dock (หมวดเดียว): แอปอื่นอยู่ท้าย sidebar -->
+					<a
+						v-for="a in apps"
+						:key="a.key"
+						class="ss-nav-item ss-nav-desk"
+						:href="a.url"
+						:title="`เปิดแอป${a.label} (${a.title})`"
+					>
+						<span class="ss-nav-icon"><Icon :name="a.icon" :size="22" /></span>
+						<span class="ss-nav-label">{{ a.label }}</span>
+					</a>
 					<a v-if="boot.desk" class="ss-nav-item ss-nav-desk" href="/app" title="เปิดระบบเต็ม">
 						<span class="ss-nav-icon"><Icon name="monitor" :size="22" /></span>
 						<span class="ss-nav-label">ระบบเต็ม</span>
@@ -197,6 +221,7 @@ import {
 	go,
 	init_app,
 	initials,
+	other_apps,
 	remember_project,
 	remembered_project,
 	show_error,
@@ -210,6 +235,7 @@ import {
 init_app();
 const SECTIONS = app.sections;
 const VIEWS = app.views;
+const apps = other_apps();
 
 const section = computed(() => SECTIONS[state.section]);
 const view = computed(() => VIEWS[state.route.view] || VIEWS[section.value.home]);

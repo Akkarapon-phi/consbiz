@@ -278,6 +278,9 @@ export function switch_section(section) {
 	go(last.view, last.params, { replace: is_tab(state.route.view) });
 }
 
+// แอปอื่นที่ผู้ใช้เปิดได้ (ตัวสลับแอป: Dock / ท้าย sidebar / ตารางหมวดของมือถือ) จาก site_app.available_apps
+export const other_apps = () => (boot.apps || []).filter((a) => a.key !== app.key);
+
 // ---------------------------------------------------------------- เริ่มแอป
 
 // เรียกครั้งแรกใน setup ของ AppShell (หลัง configure ก่อนวาดหน้า)

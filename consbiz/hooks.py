@@ -40,14 +40,36 @@ app_include_js = [
 
 
 # แอปหน้างาน (www/site.html) ทุก path ใต้ /site ให้แอปจัดการเอง, /store เดิม (แอปสโตร์) เด้งไปหมวดสโตร์
-website_route_rules = [{"from_route": "/site/<path:app_path>", "to_route": "site"}]
+website_route_rules = [
+	{"from_route": "/site/<path:app_path>", "to_route": "site"},
+	{"from_route": "/office/<path:app_path>", "to_route": "office"},
+]
 website_redirects = [
 	{
 		"source": r"store(/.*)?",
 		"target": r"/site/store\1",
 		"redirect_http_status": 302,
 		"forward_query_parameters": True,
-	}
+	},
+	# จัดซื้อ (ยกเว้นใบขอซื้อ) และขาย ย้ายจากแอปหน้างานไปแอปออฟฟิศ: ลิงก์/ไอคอนเดิมยังใช้ได้
+	{
+		"source": r"site/sell(/.*)?",
+		"target": r"/office/sell\1",
+		"redirect_http_status": 302,
+		"forward_query_parameters": True,
+	},
+	{
+		"source": r"site/buy/(po|pi)(/.*)?",
+		"target": r"/office/buy/\1\2",
+		"redirect_http_status": 302,
+		"forward_query_parameters": True,
+	},
+	{
+		"source": r"site/buy/(buy-doc|buy-form)/(po|pi)(/.*)?",
+		"target": r"/office/buy/\1/\2\3",
+		"redirect_http_status": 302,
+		"forward_query_parameters": True,
+	},
 ]
 
 naming_series_variables = {

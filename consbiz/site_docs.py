@@ -440,6 +440,10 @@ def get_summary(section, project=None, scope="project"):
 	def scoped(kind, extra=None):
 		return {**scope_filters(DOCS[kind], project, scope), **(extra or {})}
 
+	def drafts(kinds):
+		# ร่างแยกชนิด: แอปหน้างานนับเฉพาะใบขอซื้อ แอปออฟฟิศนับทุกชนิด (doc_kinds ของแต่ละแอป)
+		return {k: count_and_sum(k, scoped(k, {"docstatus": 0}))["count"] for k in kinds}
+
 	if section == "buy":
 		return {
 			"mr_todo": count_and_sum("mr", scoped("mr", DOCS["mr"]["todo"])),
@@ -455,7 +459,7 @@ def get_summary(section, project=None, scope="project"):
 			"pi_overdue": count_and_sum(
 				"pi", scoped("pi", {**DOCS["pi"]["todo"], "due_date": ("<", today)}), "outstanding_amount"
 			),
-			"drafts": sum(count_and_sum(k, scoped(k, {"docstatus": 0}))["count"] for k in ("mr", "po", "pi")),
+			"drafts_by_kind": drafts(("mr", "po", "pi")),
 			"due_soon": top(
 				"po",
 				scoped(
@@ -480,9 +484,7 @@ def get_summary(section, project=None, scope="project"):
 			"si_overdue": count_and_sum(
 				"si", scoped("si", {**DOCS["si"]["todo"], "due_date": ("<", today)}), "outstanding_amount"
 			),
-			"drafts": sum(
-				count_and_sum(k, scoped(k, {"docstatus": 0}))["count"] for k in ("qtn", "so", "si")
-			),
+			"drafts_by_kind": drafts(("qtn", "so", "si")),
 			"expiring": top(
 				"qtn", scoped("qtn", {**DOCS["qtn"]["todo"], "valid_till": ("<=", soon)}), "valid_till asc"
 			),

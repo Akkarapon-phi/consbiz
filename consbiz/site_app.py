@@ -4,7 +4,7 @@
 """แอปหน้างาน (/site, www/site.html + public/js/site_app/) แอปเดียวแบ่งเป็นหมวดงาน สลับในแอป
 
 - store (สโตร์): รับของ / เบิก / ยืม-คืน / คลัง  API อยู่ที่ consbiz/store_app.py
-- buy (จัดซื้อ) / sell (ขาย): consbiz/site_docs.py
+- buy (ขอซื้อ): ใบขอซื้อ + ติดตามสถานะ (consbiz/site_docs.py) สั่งซื้อ/แจ้งหนี้/ขายอยู่แอปออฟฟิศ (/office)
 - pm (บริหารโครงการ): ภาพรวมสัญญา/ความล่าช้า, แผนงาน (Gantt ดูอย่างเดียว), Look-ahead, เอกสารโครงการ
   ข้อมูลชุดเดียวกับ Tab ของ Construction Management (dashboard.py / lookahead.py) แก้แผนที่หน้า Gantt ในระบบเต็ม
 - work (ควบคุมงาน): โฟร์แมน/วิศวกร ความคืบหน้า + S-Curve, ปฏิทินรายงานประจำวัน, บันทึกคอนกรีต (API ที่ store_app.py),
@@ -25,6 +25,72 @@ LATE_TASKS = 6
 WORK_DOCTYPES = ("Daily Report", "Daily Request", "Inspection Request", "Punch List")
 
 
+# แอปหน้าจอของ consbiz (ตัวสลับแอป) ลำดับตามที่แสดง เพิ่มแอปใหม่ที่นี่ + ฟังก์ชันหมวดของแอปนั้นใน APP_SECTIONS
+APPS = (
+	{"key": "site", "title": "ConsERP", "label": "หน้างาน", "url": "/site", "icon": "hardhat"},
+	{"key": "office", "title": "ConsOffice", "label": "ออฟฟิศ", "url": "/office", "icon": "briefcase"},
+)
+BUY_DOCTYPES = ("Material Request", "Purchase Order", "Purchase Invoice")
+SELL_DOCTYPES = ("Quotation", "Sales Order", "Sales Invoice")
+
+
+def readable_any(doctypes):
+	return any(frappe.has_permission(doctype, "read") for doctype in doctypes)
+
+
+def office_sections():
+	"""หมวดของแอปออฟฟิศ (/office) ที่ผู้ใช้มีสิทธิ์"""
+	sections = []
+	if readable_any(BUY_DOCTYPES):
+		sections.append("buy")
+	if readable_any(SELL_DOCTYPES):
+		sections.append("sell")
+	return sections
+
+
+def site_sections(can=None):
+	"""หมวดของแอปหน้างาน (/site) ที่ผู้ใช้มีสิทธิ์ can = สิทธิ์สโตร์จาก store_app.boot_data"""
+	can = can if can is not None else store_app.boot_data()["can"]
+	sections = []
+	if any(can.get(key) for key in ("receive", "receive_employer", "issue", "borrow")):
+		sections.append("store")
+	if readable_any(WORK_DOCTYPES) or can.get("concrete"):
+		sections.append("work")
+	if frappe.has_permission("Construction Management", "read"):
+		sections.append("pm")
+	# หน้างานขอซื้อได้อย่างเดียว (สั่งซื้อ/แจ้งหนี้/ขาย ทำที่แอปออฟฟิศ)
+	if frappe.has_permission("Material Request", "read"):
+		sections.append("buy")
+	return sections
+
+
+APP_SECTIONS = {"site": site_sections, "office": office_sections}
+
+
+def available_apps(current=None):
+	"""แอปที่ผู้ใช้เปิดได้ (มีอย่างน้อย 1 หมวด) current = แอปที่เปิดอยู่ (ไม่ต้องคำนวณหมวดซ้ำ)"""
+	apps = []
+	for config in APPS:
+		sections = current[1] if current and current[0] == config["key"] else APP_SECTIONS[config["key"]]()
+		if sections:
+			apps.append(dict(config))
+	return apps
+
+
+def office_boot_data():
+	"""ข้อมูลตั้งต้นของแอปออฟฟิศ (/office)"""
+	boot = store_app.boot_data()
+	sections = office_sections()
+	boot.update(
+		{
+			"sections": sections,
+			"apps": available_apps(("office", sections)),
+			"desk": bool(sections),
+		}
+	)
+	return boot
+
+
 def boot_data():
 	boot = store_app.boot_data()
 	can_work = {doctype: bool(frappe.has_permission(doctype, "read")) for doctype in WORK_DOCTYPES}
@@ -36,19 +102,9 @@ def boot_data():
 			"punch_list": can_work["Punch List"],
 		}
 	)
-	sections = []
-	if any(boot["can"].get(key) for key in ("receive", "receive_employer", "issue", "borrow")):
-		sections.append("store")
-	if any(can_work.values()) or boot["can"].get("concrete"):
-		sections.append("work")
-	if frappe.has_permission("Construction Management", "read"):
-		sections.append("pm")
-	# จัดซื้อ / ขาย (consbiz/site_docs.py)
-	if any(frappe.has_permission(d, "read") for d in ("Material Request", "Purchase Order", "Purchase Invoice")):
-		sections.append("buy")
-	if any(frappe.has_permission(d, "read") for d in ("Quotation", "Sales Order", "Sales Invoice")):
-		sections.append("sell")
+	sections = site_sections(boot["can"])
 	boot["sections"] = sections
+	boot["apps"] = available_apps(("site", sections))
 	boot["desk"] = boot["desk"] or any(can_work.values())
 	return boot
 
@@ -315,7 +371,13 @@ ITEM_FIELDS = {
 }
 # ค่าที่แสดงอย่างเดียว (คำนวณแล้ว)
 VIEW_FIELDS = {
-	"Daily Report": ("today_progress", "cumulative_progress", "baseline_progress", "progress_variance", "plan_basis"),
+	"Daily Report": (
+		"today_progress",
+		"cumulative_progress",
+		"baseline_progress",
+		"progress_variance",
+		"plan_basis",
+	),
 	"Daily Request": (
 		"status",
 		"approver_name",
@@ -330,7 +392,15 @@ VIEW_FIELDS = {
 		"plan_basis",
 	),
 }
-ROW_VIEW_FIELDS = ("item_name", "uom", "group_path", "boq_qty", "previous_qty", "previous_percent", "remaining_qty")
+ROW_VIEW_FIELDS = (
+	"item_name",
+	"uom",
+	"group_path",
+	"boq_qty",
+	"previous_qty",
+	"previous_percent",
+	"remaining_qty",
+)
 
 
 def pdf_url(doctype, name):
@@ -495,7 +565,9 @@ def get_report_form(project, doctype, name=None, date=None, from_request=None, v
 			"previous_percent": flt(t["previous_percent"]),
 			"in_plan": t["in_plan"],
 		}
-		for t in get_tasks(cm, doc.date, report=doc.name if doctype == "Daily Report" and not doc.is_new() else None)
+		for t in get_tasks(
+			cm, doc.date, report=doc.name if doctype == "Daily Report" and not doc.is_new() else None
+		)
 	]
 	result["weather_options"] = [
 		o for o in (frappe.get_meta("Daily Report").get_field("weather").options or "").split("\n") if o

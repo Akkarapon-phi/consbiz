@@ -1,5 +1,5 @@
+<!-- หน้าหลักของหมวดจัดซื้อ / ขาย (ชุดเดียวกัน ข้อมูลจาก site_docs.get_summary) -->
 <template>
-	<!-- หน้าหลักของหมวดจัดซื้อ / ขาย (ชุดเดียวกัน ข้อมูลจาก site_docs.get_summary) -->
 	<div>
 		<Hero @pick-project="$emit('pick-project')" />
 
@@ -42,14 +42,14 @@
 					<span class="ss-action-note">{{ k.todo }}</span>
 				</button>
 				<button
-					v-if="summary?.drafts"
+					v-if="drafts.count"
 					type="button"
 					class="ss-action tone-gray"
 					:style="{ '--i': kinds.length }"
-					@click="go(kinds[0].key, { filter: 'draft' })"
+					@click="go(drafts.kind, { filter: 'draft' })"
 				>
 					<span class="ss-action-icon"><Icon name="pen" :size="24" :stroke="2" /></span>
-					<span class="ss-action-label">ร่าง {{ summary.drafts }} ฉบับ</span>
+					<span class="ss-action-label">ร่าง {{ drafts.count }} ฉบับ</span>
 					<span class="ss-action-note">ยังไม่ได้ส่ง</span>
 				</button>
 			</div>
@@ -83,7 +83,7 @@ import Icon from "../components/Icon.vue";
 import Hero from "../components/Hero.vue";
 import DocCard from "./DocCard.vue";
 import ScopeSwitch from "./ScopeSwitch.vue";
-import { DOC_KINDS } from "./kinds.js";
+import { DOC_KINDS, in_app } from "./kinds.js";
 import { go, money, state } from "../api.js";
 
 defineEmits(["pick-project"]);
@@ -92,11 +92,20 @@ const reload_summary = inject("reload_summary");
 const section = state.section;
 const summary = computed(() => state.summaries[section]);
 const loading = computed(() => !summary.value);
+// เฉพาะชนิดที่แอปนี้ดูแล (หน้างาน = ใบขอซื้อ, ออฟฟิศ = ทุกชนิด)
 const kinds = Object.entries(DOC_KINDS)
-	.filter(([, k]) => k.section === section)
+	.filter(([key, k]) => k.section === section && in_app(key))
 	.map(([key, k]) => ({ key, ...k }));
 
-const stats = computed(() => {
+// ร่างของชนิดที่แอปนี้ดูแล กดแล้วไปรายการร่างของชนิดแรกที่มีร่าง
+const drafts = computed(() => {
+	const by_kind = summary.value?.drafts_by_kind || {};
+	const own = kinds.filter((k) => by_kind[k.key]);
+	return { count: own.reduce((sum, k) => sum + by_kind[k.key], 0), kind: own[0]?.key };
+});
+
+const stats = computed(() => all_stats().filter((stat) => in_app(stat.view)));
+function all_stats() {
 	const s = summary.value || {};
 	if (section === "buy") {
 		return [
@@ -177,9 +186,10 @@ const stats = computed(() => {
 			alert: s.si_overdue?.count ? `${s.si_overdue.count} ใบ` : "",
 		},
 	];
-});
+}
 
-const lists = computed(() => {
+const lists = computed(() => all_lists().filter((block) => in_app(block.view)));
+function all_lists() {
 	const s = summary.value || {};
 	return section === "buy"
 		? [
@@ -190,7 +200,7 @@ const lists = computed(() => {
 				{ title: "ใบเสนอราคาใกล้หมดอายุ", rows: s.expiring, view: "qtn" },
 				{ title: "ถึงกำหนดรับเงิน (7 วัน)", rows: s.to_collect, view: "si" },
 		  ];
-});
+}
 
 // เปลี่ยนขอบเขต โครงการนี้/ทุกโครงการ: โหลดตัวเลขใหม่
 watch(

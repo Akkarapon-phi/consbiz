@@ -178,7 +178,13 @@ pre-commit run --all-files                               # ruff + prettier (ต�
   แก้ไฟล์ใน `shared/` มีผลทุกแอป ตรวจทุกแอปทุกครั้ง ตัวสลับแอปมุมซ้ายบนสำหรับคนที่ใช้หลายแอป
   build ของ Frappe ไม่แบ่งโหลด (code splitting) จึงแยกเป็น bundle ต่อแอป ไม่ใช่ต่อหมวด
 - แอปหน้างาน `/site` (มือถือ, ติดตั้งลงหน้าจอได้) = หน้า www (`consbiz/www/site.html`) + Vue (`public/js/site_app/`) แอปเดียวแบ่งหมวดงาน
-  (ตอนนี้ยังมีหมวดจัดซื้อ/ขายอยู่ จะย้ายไป `/office` ตามแผนข้างบน)
+  หมวดขอซื้อของ `/site` = ใบขอซื้ออย่างเดียว (`doc_kinds: ["mr"]`) สั่งซื้อ/แจ้งหนี้/ขาย อยู่ `/office`
+- แอปออฟฟิศ `/office` (จอใหญ่) = `consbiz/www/office.html` + `public/js/office_app/` (sections/views/bundle) หมวดจัดซื้อ/ขายเต็ม (`doc_kinds` ทั้ง 6 ชนิด)
+  boot = `site_app.office_boot_data` หมวดตามสิทธิ์ `site_app.office_sections` / ของหน้างาน `site_app.site_sections`
+  ตัวสลับแอป: `site_app.APPS` + `available_apps` (แอปที่มีอย่างน้อย 1 หมวด) → `boot.apps` แสดงใน Dock / ท้าย sidebar / ตารางหมวดของมือถือ
+  เอกสารชนิดที่แอปไม่ได้ดูแล: `open_doc` / `doc_url` (`shared/docs/kinds.js`) เปิดในแอปออฟฟิศ (ไม่มีสิทธิ์ = ระบบเต็ม) ปุ่มสร้างเอกสารถัดไปซ่อน (`in_app`)
+  URL เดิม `/site/sell/...`, `/site/buy/(po|pi)...`, `/site/buy/(buy-doc|buy-form)/(po|pi)/...` เด้งไป `/office` (`website_redirects`)
+  `get_summary` คืน `drafts_by_kind` หน้าหลักนับร่างเฉพาะชนิดของแอปนั้น
   หมวด (`site_app/sections.js`, หน้า → component ใน `site_app/views.js`): สโตร์ (`views/store/`, API `consbiz/store_app.py`) / ควบคุมงาน (`views/work/`, รวมคอนกรีต) / บริหารโครงการ (`views/pm/`) API 2 หมวดนี้อยู่ `consbiz/site_app.py`
   จัดซื้อ (MR ประเภท Purchase → PO → PI) / ขาย (Quotation → SO → SI): `shared/docs/` ชุดเดียวกันทั้ง 6 ชนิด (`DOC_KINDS` ใน `shared/docs/kinds.js` ตรงกับ `DOCS` ใน `consbiz/site_docs.py`)
   ดูรายการ/รายละเอียด/เอกสารต้นทาง-ปลายทาง, ส่งเอกสารร่าง, PDF ขอบเขต โครงการนี้/ทุกโครงการ (`state.doc_scope`)
@@ -203,7 +209,7 @@ pre-commit run --all-files                               # ruff + prettier (ต�
   ดูเอกสาร (`DocView.vue`): หัวเอกสาร = คู่ค้า/สถานะ + ช่องข้อมูลเป็นตาราง, ≥768 = ตารางรายการ + สรุปยอดท้ายตาราง, ≥1180 = แผงข้าง (เอกสารที่เกี่ยวข้อง/หมายเหตุ)
   เอกสารถัดไป (`MAPPERS`: MR→PO, PO→PI, QTN→SO, SO→SI) ใช้ mapper ของ ERPNext ตอนบันทึกเรียก mapper ใหม่แล้วจับคู่แถวด้วย `key` (แถวบันทึกแล้ว = name, แถวจาก mapper = ลำดับ)
   ยอด/ภาษีคำนวณที่ server (`preview_doc`) แล้ว rollback เสมอ (ERPNext สร้าง Item Price อัตโนมัติระหว่างเติมค่า) PI มีเลขที่ใบกำกับภาษี (erpnext_thailand บังคับเมื่อมีภาษีซื้อ)
-  ทางเข้าจากระบบเต็ม: Desktop Icon "ConsERP" (`consbiz/desktop_icon/conserp.json`, External → /site) ผู้ใช้ที่มี Desktop Layout ของตัวเองเห็นไอคอนใหม่เฉพาะที่อยู่ใน layout (patch `add_conserp_to_desktop_layouts`)
+  ทางเข้าจากระบบเต็ม: Desktop Icon "ConsERP" (`consbiz/desktop_icon/conserp.json`, External → /site) และ "ConsOffice" (`consoffice.json` → /office, patch `add_consoffice_to_desktop_layouts`) ผู้ใช้ที่มี Desktop Layout ของตัวเองเห็นไอคอนใหม่เฉพาะที่อยู่ใน layout (patch `add_conserp_to_desktop_layouts`)
   บริหารโครงการ (สิทธิ์อ่าน CM) ดูอย่างเดียว: ภาพรวม (`dashboard.get_dashboard`), แผนงาน Gantt (`get_plan`), Look-ahead (`lookahead.get_lookahead` สถานะวันตรงกับ `LookAhead.vue`),
   ทรัพยากร + แผนจัดซื้อวัสดุ (`resources.get_overview`), เอกสาร (`get_documents`) แก้แผนที่หน้า Gantt ในระบบเต็ม
   Look-ahead: มือถือ = การ์ดทีละสัปดาห์, แท็บเล็ต = ตาราง 2 สัปดาห์, จอใหญ่ = ตารางทั้งช่วง (matchMedia ใน `Lookahead.vue`)
@@ -237,6 +243,9 @@ pre-commit run --all-files                               # ruff + prettier (ต�
   ไม่ใช้ desk: เรียก API ด้วย fetch เอง (`api.js`), router เอง (`<base>/<หมวด>/<view>/<params>`, `website_route_rules`), CSS อยู่ `shared/style.css` (class `ss-`)
   `/store/...` เดิมเด้งไป `/site/store/...` (`website_redirects` ใน hooks.py) ไอคอนที่ติดตั้งไว้แล้วยังใช้ได้
   CSS ต้อง `@import` ใน `<style>` ของ `AppShell.vue` (Frappe ฝัง CSS เข้า bundle เฉพาะที่มาจาก .vue ถ้า import .css ตรงๆ ไฟล์ JS ถูกลบตอน build)
+  ห้ามวาง comment ระดับ root ใน `<template>` (ข้าง root element) ให้วางเหนือ `<template>` หรือในตัว element:
+  build `--production` (เซิร์ฟเวอร์จริง) นับ comment เป็น root ด้วย class/attrs จากตัวแม่ (เช่น `ss-view`) จึงหาย dev build ไม่เป็น
+  เคยทำให้หน้าแรกซื้อ/ขายกว้างเกินจอเมื่อชื่อโครงการยาว ตรวจเลย์เอาต์ก่อนขึ้นระบบด้วย `bench build --app consbiz --production`
   Responsive 3 ขนาด: มือถือ = แถบเมนูล่าง, ≥768 = แถบไอคอนซ้าย + sheet เป็นหน้าต่างกลางจอ, ≥1180 = sidebar + ฟอร์มแบ่งซ้าย-ขวา (`.ss-split`) ใช้เต็มจอ: จอกว้างได้คอลัมน์เพิ่ม (auto-fill) ไม่ยืดการ์ด, การ์ดในรายการสูงเท่ากัน (`grid-auto-rows: 1fr`)
   แถบล่าง/ปุ่มลอยของหน้า ต้อง `<Teleport to="#ss-layer">` (ตอนเปลี่ยนหน้า view มี transform ทำให้ position: fixed เพี้ยน)
   ห้ามส่ง reactive object ของ Vue เข้า `history.pushState/replaceState` (clone ไม่ได้ แอปค้าง) `/app/site-store` เดิมเด้งไป `/site/store`

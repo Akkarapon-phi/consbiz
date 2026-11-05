@@ -1,11 +1,11 @@
+<!-- หัวหน้าหลักของทุกหมวด: หมวดงาน (มือถือ) / ทักทาย / ปุ่มระบบเต็ม / โครงการที่เลือก
+     แท็บเล็ต/จอใหญ่: แถบเตี้ยแถวเดียว (ชื่อหมวด + ทักทาย | โครงการ | ระบบเต็ม) ไม่กินพื้นที่เนื้อหา -->
 <template>
-	<!-- หัวหน้าหลักของทุกหมวด: หมวดงาน (มือถือ) / ทักทาย / ปุ่มระบบเต็ม / โครงการที่เลือก
-	     แท็บเล็ต/จอใหญ่: แถบเตี้ยแถวเดียว (ชื่อหมวด + ทักทาย | โครงการ | ระบบเต็ม) ไม่กินพื้นที่เนื้อหา -->
 	<section class="ss-hero">
 		<div class="ss-hero-glow"></div>
 		<div class="ss-hero-top">
 			<button
-				v-if="boot.sections.length > 1"
+				v-if="boot.sections.length > 1 || has_apps"
 				type="button"
 				class="ss-hero-section"
 				aria-label="เปลี่ยนหมวดงาน"
@@ -45,9 +45,11 @@
 import { computed, inject } from "vue";
 import Icon from "./Icon.vue";
 import { app } from "../app.js";
-import { boot, state } from "../api.js";
+import { boot, other_apps, state } from "../api.js";
 
 const SECTIONS = app.sections;
+// มีแอปอื่น: ปุ่มหมวดเปิดตารางหมวด + แอปได้แม้มีหมวดเดียว
+const has_apps = other_apps().length > 0;
 
 defineEmits(["pick-project"]);
 const open_launcher = inject("open_launcher");
