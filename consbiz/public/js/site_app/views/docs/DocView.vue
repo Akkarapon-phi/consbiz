@@ -21,6 +21,19 @@
 				>
 					<Icon name="external" :size="19" />
 				</a>
+				<!-- เปิด/ปิด sidebar ขวา (มอบหมาย ไฟล์แนบ ความคิดเห็น ความเคลื่อนไหว) -->
+				<button
+					v-if="doc"
+					type="button"
+					class="ss-icon-btn"
+					:class="{ 'is-on': side_open }"
+					:aria-pressed="side_open"
+					aria-label="แผงข้อมูลเอกสาร"
+					title="แผงข้อมูลเอกสาร (มอบหมาย ไฟล์แนบ ความคิดเห็น)"
+					@click="toggle_side"
+				>
+					<Icon name="panel-right" :size="19" />
+				</button>
 			</template>
 		</TopBar>
 
@@ -256,9 +269,34 @@
 							</div>
 						</div>
 					</div>
+				</div>
+			</template>
+		</div>
 
-					<!-- แผงขวา: มอบหมาย / ไฟล์แนบ / เอกสารที่เกี่ยวข้อง / ความคิดเห็น + ความเคลื่อนไหว -->
-					<aside class="ss-dv-side">
+		<!-- sidebar ขวาแยกจากเนื้อหา: จอ ≥1480 กางค้างและดันเนื้อหา (html[data-rside]) จอเล็กกว่าเลื่อนทับพร้อมพื้นหลังมืด -->
+		<Teleport to="#ss-layer">
+			<Transition name="ss-rside-fade">
+				<div v-if="side_open && !xl" class="ss-rside-backdrop" @click="side_open = false"></div>
+			</Transition>
+			<Transition name="ss-rside">
+				<aside
+					v-if="side_open && doc"
+					class="ss-rside"
+					:class="{ 'is-overlay': !xl }"
+					aria-label="ข้อมูลเอกสาร"
+				>
+					<header class="ss-rside-head">
+						<b>ข้อมูลเอกสาร</b>
+						<button
+							type="button"
+							class="ss-icon-btn ss-icon-btn--sm"
+							aria-label="ปิดแผง"
+							@click="toggle_side"
+						>
+							<Icon name="x" :size="18" />
+						</button>
+					</header>
+					<div class="ss-rside-body">
 						<DocActivity :kind="params.kind" :name="params.name" :doctype="config.doctype">
 							<section v-if="related.length" class="ss-act-block">
 								<h3>เอกสารที่เกี่ยวข้อง</h3>
@@ -285,10 +323,10 @@
 								</div>
 							</section>
 						</DocActivity>
-					</aside>
-				</div>
-			</template>
-		</div>
+					</div>
+				</aside>
+			</Transition>
+		</Teleport>
 
 		<Teleport to="#ss-layer">
 			<Transition name="ss-bar">
@@ -367,7 +405,7 @@
 </template>
 
 <script setup>
-import { computed, inject, onBeforeUnmount, ref } from "vue";
+import { computed, inject, onBeforeUnmount, ref, watch } from "vue";
 import Icon from "../../components/Icon.vue";
 import TopBar from "../../components/TopBar.vue";
 import Skeleton from "../../components/Skeleton.vue";
@@ -429,6 +467,50 @@ const related = computed(() =>
 		: []
 );
 const has_item_date = computed(() => doc.value?.items.some((it) => it.schedule_date || it.delivery_date));
+// ---------------------------------------------------------------- sidebar ขวา
+const SIDE_KEY = "consbiz.site.doc_side";
+const mq_xl = window.matchMedia("(min-width: 1480px)");
+const xl = ref(mq_xl.matches);
+const saved_side = (() => {
+	try {
+		return localStorage.getItem(SIDE_KEY);
+	} catch {
+		return null;
+	}
+})();
+// จอใหญ่: ค่าเริ่มต้นเปิด (จำในเครื่อง) จอเล็ก: ปิดจนกดปุ่ม
+const side_open = ref(xl.value && saved_side !== "closed");
+function toggle_side() {
+	side_open.value = !side_open.value;
+	if (xl.value) {
+		try {
+			localStorage.setItem(SIDE_KEY, side_open.value ? "open" : "closed");
+		} catch {
+			/* เก็บไม่ได้: ใช้ค่าเริ่มต้น */
+		}
+	}
+}
+const on_xl = () => {
+	xl.value = mq_xl.matches;
+	side_open.value = xl.value && saved_side !== "closed";
+};
+mq_xl.addEventListener("change", on_xl);
+const on_key = (e) => e.key === "Escape" && !xl.value && (side_open.value = false);
+window.addEventListener("keydown", on_key);
+watch(
+	() => side_open.value && xl.value,
+	(push) => {
+		if (push) document.documentElement.dataset.rside = "open";
+		else delete document.documentElement.dataset.rside;
+	},
+	{ immediate: true }
+);
+onBeforeUnmount(() => {
+	mq_xl.removeEventListener("change", on_xl);
+	window.removeEventListener("keydown", on_key);
+	delete document.documentElement.dataset.rside;
+});
+
 const has_bar = computed(
 	() => !!(doc.value && (doc.value.can_edit || doc.value.can_submit || doc.value.next_kind))
 );

@@ -173,7 +173,8 @@ pre-commit run --all-files                               # ruff + prettier (ต�
   ยอด/ภาษีของ MR = `consbiz/request_totals.py` (doc_events validate) สูตรเดียวกับ `material_request.js` แก้ที่หนึ่งต้องแก้อีกที่
   MR ใหม่: ERPNext `update_item_rates` ทับราคาด้วย Price List ตอนบันทึกครั้งแรก `save_doc` ใส่ราคาที่ผู้ใช้กรอกคืน (`keep_request_rates`)
   ดูเอกสาร: แถบขั้นตอน (`steps_of`), สรุปยอด (`summary_of`: แถว + ยอดสุทธิ + ตัวอักษร) ใช้ทั้งหน้าดูและฟอร์ม
-  แผงขวาของหน้าดู (`DocActivity.vue`, `site_docs.get_activity`): ถูกใจ, มอบหมาย (`frappe.desk.form.assign_to`), ไฟล์แนบ (`upload(file, {doctype, docname})` / `remove_attachment`),
+  sidebar ขวาของหน้าดู แยกจากเนื้อหา เปิด-ปิดที่ปุ่มบน TopBar: จอ ≥1480 กางค้าง (`html[data-rside]` → `--ss-rside` ดันเนื้อหา/แถบล่าง จำในเครื่อง), เล็กกว่า = เลื่อนทับ (z-index ต่ำกว่า sheet)
+  เนื้อหา sidebar (`DocActivity.vue`, `site_docs.get_activity`): ถูกใจ, มอบหมาย (`frappe.desk.form.assign_to`), ไฟล์แนบ (`upload(file, {doctype, docname})` / `remove_attachment`),
   เอกสารที่เกี่ยวข้อง, ความคิดเห็น (`add_comment` ผ่าน `clean_html`, ลบได้เฉพาะของตัวเอง) + ความเคลื่อนไหวจาก Version/Comment แบบ timeline ของระบบเต็ม
   ช่องเลือก/วันที่ของแอปใช้ `components/SelectBox.vue` / `DateInput.vue` (ปฏิทิน พ.ศ.) ห้ามใช้ `<select>` / `<input type="date">` ของเบราว์เซอร์
   ช่องเงินใช้ `MoneyInput.vue` (แสดง 1,234.50 / โฟกัสแล้วเป็นตัวเลขดิบ) รายละเอียดรายการ (HTML ของ Quill) แสดงด้วย `RichText.vue` แก้ด้วย `RichEditor.vue`

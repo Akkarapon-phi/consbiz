@@ -8226,3 +8226,95 @@ div.ss-line-del {
 		max-height: calc(100vh - 190px - var(--ss-bottom));
 	}
 }
+
+/* ================================================================ sidebar ขวาของหน้าดูเอกสาร (แยกจากเนื้อหา, ปุ่มเปิด-ปิดบน TopBar)
+   จอ ≥1480 + เปิด: html[data-rside] = กางค้าง ดันเนื้อหา/แถบล่างด้วย --ss-rside  จอเล็กกว่า: เลื่อนทับ (is-overlay) */
+:root {
+	--ss-rside: 0px;
+}
+@media (min-width: 1480px) {
+	html[data-rside] {
+		--ss-rside: 380px;
+	}
+}
+.ss-app {
+	padding-right: var(--ss-rside);
+	transition: padding-right 0.3s var(--ss-ease);
+}
+@media (min-width: 768px) {
+	.ss-bottom-bar {
+		right: var(--ss-rside);
+		transition: right 0.3s var(--ss-ease);
+	}
+}
+.ss-icon-btn.is-on {
+	color: var(--ss-brand);
+	background: var(--ss-brand-soft);
+}
+.ss-rside {
+	position: fixed;
+	z-index: 34;
+	top: 0;
+	right: 0;
+	bottom: 0;
+	width: 380px;
+	max-width: 100vw;
+	display: flex;
+	flex-direction: column;
+	background: var(--ss-bg);
+	border-left: 1px solid var(--ss-border);
+}
+.ss-rside.is-overlay {
+	z-index: 60;
+	width: min(400px, 100vw);
+	box-shadow: -18px 0 40px -18px rgba(15, 23, 42, 0.4);
+}
+.ss-rside-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+	min-height: calc(72px + var(--ss-top));
+	padding: var(--ss-top) 12px 0 18px;
+	border-bottom: 1px solid var(--ss-border);
+	background: var(--ss-surface);
+}
+.ss-rside-head b {
+	font-size: 16px;
+}
+.ss-rside-body {
+	flex: 1;
+	min-height: 0;
+	overflow-y: auto;
+	padding: 14px 14px calc(14px + var(--ss-bottom));
+	scrollbar-width: thin;
+}
+.ss-rside-backdrop {
+	position: fixed;
+	inset: 0;
+	z-index: 59;
+	background: rgba(15, 23, 42, 0.35);
+}
+.ss-rside-enter-active,
+.ss-rside-leave-active {
+	transition: transform 0.3s var(--ss-ease);
+}
+.ss-rside-enter-from,
+.ss-rside-leave-to {
+	transform: translateX(100%);
+}
+.ss-rside-fade-enter-active,
+.ss-rside-fade-leave-active {
+	transition: opacity 0.25s ease;
+}
+.ss-rside-fade-enter-from,
+.ss-rside-fade-leave-to {
+	opacity: 0;
+}
+/* ต่ำกว่า sheet (50/51) ให้ตัวเลือกผู้ใช้ (Picker) เปิดทับแผงได้ สูงกว่าเมนู (30/32) และแถบล่าง (26) */
+.ss-rside.is-overlay {
+	z-index: 46;
+}
+.ss-rside-backdrop {
+	z-index: 45;
+}
