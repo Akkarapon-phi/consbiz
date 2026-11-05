@@ -4,7 +4,7 @@
 	     หัวคอลัมน์กดเรียงได้ (emit sort) ช่องเลือกหลายแถว (toggle / toggle-all)
 	     แท็บเล็ต (<1180): ซ่อน .col-wide และย้ายสถานะไปใต้เลขที่ -->
 	<div class="ss-table-wrap">
-		<table class="ss-table ss-table--list">
+		<table class="ss-table ss-table--list" :class="{ 'is-compact': preview }">
 			<thead>
 				<tr>
 					<th class="col-check">
@@ -41,11 +41,18 @@
 				<tr
 					v-for="(row, i) in rows"
 					:key="row.name"
-					:class="{ 'is-late': row.overdue, 'is-selected': selected.has(row.name) }"
+					:class="{
+						'is-late': row.overdue,
+						'is-selected': selected.has(row.name),
+						'is-active': preview && row.name === active,
+					}"
 					:style="{ '--i': Math.min(i, 20) }"
 					tabindex="0"
-					@click="open(row)"
+					@click="preview ? $emit('select', row) : open(row)"
+					@dblclick="open(row)"
 					@keydown.enter="open(row)"
+					@keydown.down.prevent="step($event, 1)"
+					@keydown.up.prevent="step($event, -1)"
 				>
 					<td class="col-check" @click.stop>
 						<input
@@ -151,8 +158,11 @@ const props = defineProps({
 	sort: String,
 	order: String,
 	selected: { type: Set, default: () => new Set() },
+	// จอ ≥1480: คลิก = เลือกดูตัวอย่างข้างตาราง (emit select) ดับเบิลคลิก/Enter = เปิดเต็มหน้า
+	preview: Boolean,
+	active: String,
 });
-defineEmits(["sort", "toggle", "toggle-all"]);
+const emit = defineEmits(["sort", "toggle", "toggle-all", "select"]);
 
 const config = computed(() => DOC_KINDS[props.kind]);
 
@@ -224,6 +234,18 @@ async function like(row) {
 		row.likes = Math.max(0, row.likes + (on ? -1 : 1));
 		show_error(error);
 	}
+}
+
+// ↑↓ เลื่อนแถว (โหมดตัวอย่าง: เลือกแถวใหม่ด้วย)
+function step(event, delta) {
+	const tr =
+		delta > 0
+			? event.target.closest("tr").nextElementSibling
+			: event.target.closest("tr").previousElementSibling;
+	if (!tr) return;
+	tr.focus();
+	const index = [...tr.parentElement.children].indexOf(tr);
+	if (props.preview && props.rows[index]) emit("select", props.rows[index]);
 }
 
 const open = (row) => go(`${config.value.section}-doc`, { kind: props.kind, name: row.name });

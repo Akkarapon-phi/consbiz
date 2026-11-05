@@ -7561,3 +7561,395 @@ div.ss-line-del {
 	content: attr(data-placeholder);
 	color: var(--ss-muted);
 }
+
+/* ================================================================ ฟอร์ม: แผงข้อมูลประกอบรายการ (ItemInsight.vue, จอ ≥1480) */
+.ss-docform-body,
+.ss-docform-main {
+	display: flex;
+	flex-direction: column;
+	gap: 16px;
+	min-width: 0;
+}
+.ss-docform:has(.has-insight) {
+	max-width: 1760px;
+}
+.ss-docform-body.has-insight {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) 340px;
+	gap: 24px;
+	align-items: start;
+}
+.ss-insight {
+	position: sticky;
+	top: calc(84px + var(--ss-top));
+	display: flex;
+	flex-direction: column;
+	gap: 14px;
+	max-height: calc(100vh - 190px);
+	overflow-y: auto;
+	padding: 16px;
+	border-radius: var(--ss-radius);
+	background: var(--ss-surface);
+	box-shadow: var(--ss-shadow);
+}
+.ss-insight-empty {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 8px;
+	padding: 28px 12px;
+	text-align: center;
+	font-size: 13.5px;
+	color: var(--ss-muted);
+}
+.ss-insight-empty b {
+	color: var(--ss-text);
+	font-size: 15px;
+}
+.ss-insight-head {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	padding-bottom: 12px;
+	border-bottom: 1px solid var(--ss-border);
+}
+.ss-insight-head small {
+	font-size: 12px;
+	color: var(--ss-muted);
+}
+.ss-insight-head b {
+	font-size: 16px;
+	line-height: 1.35;
+}
+.ss-insight-block h3 {
+	margin: 0 0 8px;
+	font-size: 12.5px;
+	font-weight: 700;
+	color: var(--ss-text-2);
+}
+.ss-insight-stats {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 8px;
+}
+.ss-insight-stats > div {
+	display: flex;
+	flex-direction: column;
+	padding: 8px 10px;
+	border-radius: 10px;
+	background: var(--ss-surface-2);
+}
+.ss-insight-stats small,
+.ss-insight-unit {
+	font-size: 11.5px;
+	color: var(--ss-muted);
+}
+.ss-insight-stats b {
+	font-size: 18px;
+	font-variant-numeric: tabular-nums;
+}
+.ss-insight-unit {
+	margin: 4px 0 0;
+}
+.ss-insight-bars {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+}
+.ss-insight-bar {
+	display: grid;
+	grid-template-columns: 52px minmax(0, 1fr) 64px;
+	align-items: center;
+	gap: 8px;
+	font-size: 12.5px;
+	color: var(--ss-text-2);
+}
+.ss-insight-bar i {
+	height: 8px;
+	border-radius: 99px;
+	background: var(--ss-surface-2);
+	overflow: hidden;
+}
+.ss-insight-bar i b {
+	display: block;
+	height: 100%;
+	border-radius: 99px;
+	background: var(--ss-brand);
+}
+.ss-insight-bar i b.is-plan {
+	background: var(--ss-muted);
+}
+.ss-insight-bar i b.is-done {
+	background: var(--tone-green);
+}
+.ss-insight-bar em {
+	font-style: normal;
+	font-weight: 600;
+	text-align: right;
+	color: var(--ss-text);
+	font-variant-numeric: tabular-nums;
+}
+.ss-insight-list {
+	display: flex;
+	flex-direction: column;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+.ss-insight-list li {
+	display: flex;
+	justify-content: space-between;
+	gap: 10px;
+	padding: 7px 0;
+	border-bottom: 1px solid var(--ss-border);
+	font-size: 13px;
+}
+.ss-insight-list li:last-child {
+	border-bottom: 0;
+}
+.ss-insight-list span {
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+}
+.ss-insight-list span b {
+	font-weight: 600;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.ss-insight-list small {
+	font-size: 11.5px;
+	color: var(--ss-muted);
+}
+.ss-insight-list .is-num {
+	flex: none;
+	align-items: flex-end;
+	font-variant-numeric: tabular-nums;
+}
+.ss-insight-note,
+.ss-insight-muted {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	margin: 8px 0 0;
+	font-size: 12.5px;
+	color: var(--ss-muted);
+}
+.ss-insight-note.is-warn {
+	color: var(--tone-amber);
+	font-weight: 600;
+}
+.ss-grid tr.is-active td {
+	background: color-mix(in srgb, var(--ss-brand-soft) 55%, transparent);
+}
+.ss-grid tr.is-active td:first-child {
+	box-shadow: inset 3px 0 0 var(--ss-brand);
+}
+
+/* ================================================================ รายการ + ตัวอย่างเอกสาร (DocPreview.vue, จอ ≥1480) */
+.ss-list-body,
+.ss-list-main {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+	min-width: 0;
+}
+.ss-list-page .ss-list-main .ss-table-wrap + .ss-list-foot {
+	margin-top: -12px;
+}
+.ss-list-body.has-preview {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) 440px;
+	gap: 20px;
+	align-items: start;
+}
+/* ตารางคู่ตัวอย่าง: ซ่อนคอลัมน์รอง สถานะย้ายไปใต้เลขที่ */
+.ss-table--list.is-compact .col-wide,
+.ss-table--list.is-compact .col-status {
+	display: none;
+}
+.ss-table--list.is-compact .col-compact {
+	display: flex;
+	width: fit-content;
+	margin-top: 4px;
+}
+.ss-table tbody tr.is-active {
+	background: var(--ss-brand-soft);
+}
+.ss-table tbody tr.is-active td:first-child {
+	box-shadow: inset 3px 0 0 var(--ss-brand);
+}
+
+.ss-preview {
+	position: sticky;
+	top: calc(84px + var(--ss-top));
+	display: flex;
+	flex-direction: column;
+	max-height: calc(100vh - 110px);
+	border-radius: var(--ss-radius);
+	background: var(--ss-surface);
+	box-shadow: var(--ss-shadow);
+	overflow: hidden;
+	animation: ss-rise 0.3s var(--ss-ease) both;
+}
+.ss-preview-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 10px;
+	padding: 14px 16px 10px;
+	border-bottom: 1px solid var(--ss-border);
+}
+.ss-preview-title {
+	display: flex;
+	flex-direction: column;
+}
+.ss-preview-title small {
+	font-size: 12px;
+	color: var(--ss-muted);
+}
+.ss-preview-title b {
+	font-size: 16px;
+	font-variant-numeric: tabular-nums;
+}
+.ss-preview-body {
+	flex: 1;
+	min-height: 0;
+	overflow-y: auto;
+	display: flex;
+	flex-direction: column;
+	gap: 14px;
+	padding: 14px 16px;
+}
+.ss-preview > .ss-sk,
+.ss-preview > div:not(.ss-preview-body):not(.ss-pdf) {
+	padding: 14px 16px;
+}
+.ss-preview-party {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 10px;
+}
+.ss-preview-party b {
+	font-size: 17px;
+	line-height: 1.35;
+}
+.ss-preview-party .ss-tag {
+	flex: none;
+}
+/* ขั้นตอนแบบย่อ: แถบต่อกัน */
+.ss-preview-steps {
+	display: flex;
+	gap: 4px;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+.ss-preview-steps li {
+	flex: 1;
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	min-width: 0;
+	font-size: 11px;
+	color: var(--ss-muted);
+}
+.ss-preview-steps i {
+	height: 5px;
+	border-radius: 99px;
+	background: var(--ss-border-strong);
+}
+.ss-preview-steps li.is-done i {
+	background: var(--ss-brand);
+}
+.ss-preview-steps li.is-current i {
+	background: linear-gradient(90deg, var(--ss-brand) 50%, var(--ss-border-strong) 50%);
+}
+.ss-preview-steps li.is-error i {
+	background: var(--tone-rose);
+}
+.ss-preview-steps li.is-current span,
+.ss-preview-steps li.is-done span {
+	color: var(--ss-text-2);
+	font-weight: 600;
+}
+.ss-preview-steps span {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.ss-preview-kv {
+	margin: 0;
+}
+.ss-preview-kv dd.is-line {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.ss-preview-h {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	margin: 0 0 6px;
+	font-size: 13px;
+	font-weight: 700;
+	color: var(--ss-text-2);
+}
+.ss-preview-items {
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+.ss-preview-items li {
+	display: flex;
+	justify-content: space-between;
+	align-items: flex-start;
+	gap: 10px;
+	padding: 7px 0;
+	border-bottom: 1px solid var(--ss-border);
+	font-size: 13.5px;
+}
+.ss-preview-items li:last-child {
+	border-bottom: 0;
+}
+.ss-preview-item {
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+}
+.ss-preview-item b {
+	font-weight: 600;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.ss-preview-item small {
+	font-size: 11.5px;
+	color: var(--ss-muted);
+	font-variant-numeric: tabular-nums;
+}
+.ss-preview-items .is-num {
+	flex: none;
+	font-variant-numeric: tabular-nums;
+}
+.ss-preview-totals {
+	padding: 10px 12px;
+	box-shadow: none;
+	background: var(--ss-surface-2);
+	font-size: 13.5px;
+}
+.ss-preview-foot {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	padding: 10px 12px;
+	border-top: 1px solid var(--ss-border);
+}
+.ss-preview-confirm {
+	flex: 1;
+	font-size: 13px;
+	font-weight: 600;
+	color: var(--tone-amber);
+}

@@ -137,77 +137,96 @@
 				:title="`ไม่มี${config.label}`"
 				:text="empty_text"
 			/>
-			<template v-else>
-				<DocTable
-					v-if="wide"
-					:rows="rows"
-					:kind="kind"
-					:sort="sort"
-					:order="order"
-					:selected="selected"
-					@sort="set_sort"
-					@toggle="toggle"
-					@toggle-all="toggle_all"
-					@pdf="open_pdf"
-				/>
-				<TransitionGroup v-else tag="div" class="ss-list" name="ss-list" appear>
-					<DocCard v-for="(row, i) in rows" :key="row.name" :row="row" :kind="kind" :i="i % 30" />
-				</TransitionGroup>
-
-				<!-- ท้ายรายการ: ยอดรวมทั้งชุด + แบ่งหน้า (มือถือ = โหลดเพิ่ม) -->
-				<footer v-if="wide" class="ss-list-foot">
-					<span class="ss-list-range">
-						แสดง <b>{{ start + 1 }}–{{ start + rows.length }}</b> จาก <b>{{ total }}</b>
-					</span>
-					<span v-if="sums.amount != null" class="ss-list-sum">
-						ยอดรวม <b>{{ money(sums.amount) }}</b>
-					</span>
-					<span v-if="sums.outstanding" class="ss-list-sum is-due">
-						ค้าง <b>{{ money(sums.outstanding) }}</b>
-					</span>
-					<span class="ss-toolbar-gap"></span>
-					<label class="ss-list-size">
-						แถวต่อหน้า
-						<SelectBox
-							v-model="page_size"
-							variant="tool"
-							label="แถวต่อหน้า"
-							:options="[30, 50, 100].map((n) => ({ value: n, label: String(n) }))"
+			<div v-else class="ss-list-body" :class="{ 'has-preview': preview_on }">
+				<div class="ss-list-main">
+					<DocTable
+						v-if="wide"
+						:rows="rows"
+						:kind="kind"
+						:sort="sort"
+						:order="order"
+						:selected="selected"
+						:preview="preview_on"
+						:active="active"
+						@sort="set_sort"
+						@toggle="toggle"
+						@toggle-all="toggle_all"
+						@select="(row) => (active = row.name)"
+					/>
+					<TransitionGroup v-else tag="div" class="ss-list" name="ss-list" appear>
+						<DocCard
+							v-for="(row, i) in rows"
+							:key="row.name"
+							:row="row"
+							:kind="kind"
+							:i="i % 30"
 						/>
-					</label>
-					<div class="ss-pager">
-						<button
-							type="button"
-							class="ss-icon-btn ss-icon-btn--sm"
-							aria-label="หน้าก่อน"
-							:disabled="!start || loading"
-							@click="page(-1)"
-						>
-							<Icon name="chevron-left" :size="18" />
-						</button>
-						<span>{{ page_no }} / {{ page_count }}</span>
-						<button
-							type="button"
-							class="ss-icon-btn ss-icon-btn--sm"
-							aria-label="หน้าถัดไป"
-							:disabled="!more || loading"
-							@click="page(1)"
-						>
-							<Icon name="chevron-right" :size="18" />
-						</button>
-					</div>
-				</footer>
-				<button
-					v-else-if="more"
-					type="button"
-					class="ss-btn ss-btn--ghost ss-btn--block"
-					:disabled="loading"
-					@click="load(true)"
-				>
-					<span v-if="loading" class="ss-spinner"></span>
-					<template v-else>โหลดเพิ่ม ({{ rows.length }} จาก {{ total }})</template>
-				</button>
-			</template>
+					</TransitionGroup>
+
+					<!-- ท้ายรายการ: ยอดรวมทั้งชุด + แบ่งหน้า (มือถือ = โหลดเพิ่ม) -->
+					<footer v-if="wide" class="ss-list-foot">
+						<span class="ss-list-range">
+							แสดง <b>{{ start + 1 }}–{{ start + rows.length }}</b> จาก <b>{{ total }}</b>
+						</span>
+						<span v-if="sums.amount != null" class="ss-list-sum">
+							ยอดรวม <b>{{ money(sums.amount) }}</b>
+						</span>
+						<span v-if="sums.outstanding" class="ss-list-sum is-due">
+							ค้าง <b>{{ money(sums.outstanding) }}</b>
+						</span>
+						<span class="ss-toolbar-gap"></span>
+						<label class="ss-list-size">
+							แถวต่อหน้า
+							<SelectBox
+								v-model="page_size"
+								variant="tool"
+								label="แถวต่อหน้า"
+								:options="[30, 50, 100].map((n) => ({ value: n, label: String(n) }))"
+							/>
+						</label>
+						<div class="ss-pager">
+							<button
+								type="button"
+								class="ss-icon-btn ss-icon-btn--sm"
+								aria-label="หน้าก่อน"
+								:disabled="!start || loading"
+								@click="page(-1)"
+							>
+								<Icon name="chevron-left" :size="18" />
+							</button>
+							<span>{{ page_no }} / {{ page_count }}</span>
+							<button
+								type="button"
+								class="ss-icon-btn ss-icon-btn--sm"
+								aria-label="หน้าถัดไป"
+								:disabled="!more || loading"
+								@click="page(1)"
+							>
+								<Icon name="chevron-right" :size="18" />
+							</button>
+						</div>
+					</footer>
+					<button
+						v-else-if="more"
+						type="button"
+						class="ss-btn ss-btn--ghost ss-btn--block"
+						:disabled="loading"
+						@click="load(true)"
+					>
+						<span v-if="loading" class="ss-spinner"></span>
+						<template v-else>โหลดเพิ่ม ({{ rows.length }} จาก {{ total }})</template>
+					</button>
+				</div>
+				<!-- จอ ≥1480: ตัวอย่างเอกสารข้างตาราง -->
+				<DocPreview
+					v-if="preview_on"
+					:key="active"
+					:kind="kind"
+					:name="active"
+					@close="active = null"
+					@changed="load()"
+				/>
+			</div>
 		</div>
 
 		<!-- เลือกหลายแถว: ส่งเอกสารร่าง / ส่งออกที่เลือก -->
@@ -374,6 +393,7 @@ import SelectBox from "../../components/SelectBox.vue";
 import DateInput from "../../components/DateInput.vue";
 import DocCard from "./DocCard.vue";
 import DocTable from "./DocTable.vue";
+import DocPreview from "./DocPreview.vue";
 import ScopeSwitch from "./ScopeSwitch.vue";
 import { DOC_KINDS } from "../../sections.js";
 import {
@@ -456,6 +476,20 @@ const bulk_sheet = ref(false);
 const bulk_results = ref(null);
 const busy = ref(false);
 const pdf_row = ref(null);
+
+// จอใหญ่มาก (≥1480): ตารางคู่กับตัวอย่างเอกสาร คลิกแถว = ดูตัวอย่าง
+const mq_xl = window.matchMedia("(min-width: 1480px)");
+const xl = ref(mq_xl.matches);
+const on_xl = () => (xl.value = mq_xl.matches);
+mq_xl.addEventListener("change", on_xl);
+onBeforeUnmount(() => mq_xl.removeEventListener("change", on_xl));
+const active = ref(null);
+const preview_on = computed(() => xl.value && !!active.value && !!rows.value?.length);
+// โหลดรายการใหม่: แถวที่ดูอยู่ไม่อยู่ในหน้านี้ = ดูแถวแรกแทน
+watch(rows, (list) => {
+	if (!xl.value || !list) return;
+	if (!list.some((r) => r.name === active.value)) active.value = list[0]?.name || null;
+});
 
 const mq_wide = window.matchMedia("(min-width: 768px)");
 const wide = ref(mq_wide.matches);

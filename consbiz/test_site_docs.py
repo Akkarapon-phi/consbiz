@@ -216,3 +216,16 @@ class IntegrationTestSiteDocs(IntegrationTestCase):
 		po = frappe.get_doc("Purchase Order", saved["name"])
 		self.assertEqual((po.custom_wht_amount, po.custom_retention_amount, po.custom_paid_amount), (30, 50, 920))
 
+	def test_item_insight(self):
+		po = make_po(self.project, qty=4)
+		info = site_docs.get_item_insight("po", ITEM, self.project)
+		self.assertEqual(info["item_code"], ITEM)
+		self.assertTrue(info["buying"])
+		self.assertIn(po.name, [p.name for p in info["prices"]])
+		pending = {o.name: o.pending for o in info["open_orders"]}
+		self.assertEqual(pending.get(po.name), 4)
+		self.assertIn("stock", info)
+		sell = site_docs.get_item_insight("si", ITEM, self.project)
+		self.assertFalse(sell["buying"])
+		self.assertNotIn("open_orders", sell)
+

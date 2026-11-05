@@ -6,335 +6,353 @@
 
 		<div class="ss-content ss-docform">
 			<Skeleton v-if="!form" :rows="3" />
-			<template v-else>
-				<div v-if="form.source" class="ss-banner tone-blue">
-					<Icon name="info" :size="22" />
-					<div>
-						<div class="ss-banner-title">สร้างจาก {{ source_label }} {{ form.source }}</div>
-						<div class="ss-banner-text">
-							ดึงรายการที่ยังค้างมาให้แล้ว ลบหรือแก้จำนวนได้ เอกสารจะอ้างถึงต้นทางให้เอง
+			<div v-else class="ss-docform-body" :class="{ 'has-insight': xl }">
+				<div class="ss-docform-main">
+					<div v-if="form.source" class="ss-banner tone-blue">
+						<Icon name="info" :size="22" />
+						<div>
+							<div class="ss-banner-title">สร้างจาก {{ source_label }} {{ form.source }}</div>
+							<div class="ss-banner-text">
+								ดึงรายการที่ยังค้างมาให้แล้ว ลบหรือแก้จำนวนได้ เอกสารจะอ้างถึงต้นทางให้เอง
+							</div>
 						</div>
 					</div>
-				</div>
 
-				<!-- หัวเอกสาร: แท็บเล็ต/จอใหญ่ = ตาราง 3-4 คอลัมน์ -->
-				<section class="ss-form ss-docform-head">
-					<Picker
-						v-if="party_field"
-						v-model="form[party_field]"
-						class="ss-docform-party"
-						:label="config.party"
-						:display_value="form.party_label"
-						:remote_fn="search_parties"
-						required
-						@select="(o) => (form.party_label = o.label)"
-					/>
-					<template v-if="is_mr">
-						<label class="ss-field ss-docform-party">
-							<span class="ss-field-label">เรื่อง</span>
+					<!-- หัวเอกสาร: แท็บเล็ต/จอใหญ่ = ตาราง 3-4 คอลัมน์ -->
+					<section class="ss-form ss-docform-head">
+						<Picker
+							v-if="party_field"
+							v-model="form[party_field]"
+							class="ss-docform-party"
+							:label="config.party"
+							:display_value="form.party_label"
+							:remote_fn="search_parties"
+							required
+							@select="(o) => (form.party_label = o.label)"
+						/>
+						<template v-if="is_mr">
+							<label class="ss-field ss-docform-party">
+								<span class="ss-field-label">เรื่อง</span>
+								<input
+									v-model="form.title"
+									class="ss-input"
+									placeholder="เช่น ขอซื้อวัสดุงานโครงสร้าง ชั้น 2"
+								/>
+							</label>
+							<div class="ss-field">
+								<span class="ss-field-label">วัตถุประสงค์<em>*</em></span>
+								<SelectBox
+									v-model="form.material_request_type"
+									label="วัตถุประสงค์"
+									:options="PURPOSES"
+								/>
+							</div>
+						</template>
+						<div v-for="f in fields" :key="f.field" class="ss-field">
+							<span class="ss-field-label">{{ f.label }}<em v-if="f.required">*</em></span>
+							<DateInput
+								v-if="f.type === 'date'"
+								v-model="form[f.field]"
+								:label="f.label"
+								:clearable="!f.required"
+								@change="(v) => f.rows && fill_rows(f.rows, v)"
+							/>
 							<input
-								v-model="form.title"
+								v-else
+								v-model="form[f.field]"
 								class="ss-input"
-								placeholder="เช่น ขอซื้อวัสดุงานโครงสร้าง ชั้น 2"
-							/>
-						</label>
-						<div class="ss-field">
-							<span class="ss-field-label">วัตถุประสงค์<em>*</em></span>
-							<SelectBox
-								v-model="form.material_request_type"
-								label="วัตถุประสงค์"
-								:options="PURPOSES"
+								:placeholder="f.placeholder"
 							/>
 						</div>
-					</template>
-					<div v-for="f in fields" :key="f.field" class="ss-field">
-						<span class="ss-field-label">{{ f.label }}<em v-if="f.required">*</em></span>
-						<DateInput
-							v-if="f.type === 'date'"
-							v-model="form[f.field]"
-							:label="f.label"
-							:clearable="!f.required"
-							@change="(v) => f.rows && fill_rows(f.rows, v)"
-						/>
-						<input v-else v-model="form[f.field]" class="ss-input" :placeholder="f.placeholder" />
-					</div>
-					<template v-if="is_mr">
-						<Picker
-							v-model="form.custom_request_by"
-							label="ผู้จัดทำ"
-							:display_value="form.request_by_label"
-							:remote_fn="search_signatures"
-							clearable
-							@select="(o) => (form.request_by_label = o.label)"
-						/>
-						<Picker
-							v-model="form.custom_approve_by"
-							label="ผู้อนุมัติ"
-							:display_value="form.approve_by_label"
-							:remote_fn="search_signatures"
-							clearable
-							@select="(o) => (form.approve_by_label = o.label)"
-						/>
-					</template>
-					<div v-if="form.tax_templates.length" class="ss-field">
-						<span class="ss-field-label">ภาษี</span>
-						<SelectBox v-model="tax_value" label="ภาษี" :options="tax_options" />
-					</div>
-					<label v-if="has_discount" class="ss-field">
-						<span class="ss-field-label">ส่วนลดท้ายบิล (%)</span>
-						<input
-							v-model.number="form.additional_discount_percentage"
-							class="ss-input ss-input--num"
-							type="number"
-							inputmode="decimal"
-							min="0"
-							max="100"
-							step="any"
-							placeholder="0"
-						/>
-					</label>
-					<div v-if="form.project" class="ss-field ss-docform-project">
-						<span class="ss-field-label">โครงการ</span>
-						<span class="ss-docform-project-name" :title="form.project_name"
-							>{{ form.project_name || form.project }} <small>{{ form.project }}</small></span
-						>
-					</div>
-				</section>
-
-				<section class="ss-docform-items">
-					<h2 class="ss-section-title ss-section-title--first">
-						<span
-							>รายการ <span class="ss-count">{{ form.items.length }}</span></span
-						>
-						<span v-if="form.items.length" class="ss-section-total">{{
-							money(lines_total)
-						}}</span>
-					</h2>
-					<Empty
-						v-if="!form.items.length && !wide"
-						:icon="config.icon"
-						title="ยังไม่มีรายการ"
-						text="เลือกสินค้า/บริการ แล้วใส่จำนวนและราคา"
-					/>
-					<LineEditor
-						:items="form.items"
-						:wide="wide"
-						:is_mr="is_mr"
-						:date_field="row_date.field"
-						:date_label="row_date.label"
-						:show_errors="show_errors"
-						:search_fn="find_items"
-						@add="add_item"
-						@remove="remove_rows"
-						@reorder="(items) => (form.items = items)"
-						@detail="(row) => (detail_row = row)"
-						@browse="item_sheet = true"
-					/>
-				</section>
-
-				<!-- ท้ายเอกสาร: หมายเหตุ/ตัวเลือกภาษี (ซ้าย) + สรุปยอด (ขวา) แบบระบบเต็ม -->
-				<section class="ss-docform-foot">
-					<div class="ss-docform-notes">
-						<label v-if="remarks_field" class="ss-field">
-							<span class="ss-field-label">หมายเหตุ</span>
-							<textarea v-model="form[remarks_field]" class="ss-input" rows="3"></textarea>
-						</label>
-						<div
-							v-if="is_mr && form.material_request_type !== 'Customer Provided'"
-							class="ss-dv-flags"
-						>
-							<label class="ss-checkline">
-								<input
-									v-model="form.custom_included_vat"
-									type="checkbox"
-									:true-value="1"
-									:false-value="0"
-								/>
-								<span>มูลค่ารวมภาษี</span>
-							</label>
-							<label class="ss-checkline">
-								<input
-									v-model="form.custom_vat_override"
-									type="checkbox"
-									:true-value="1"
-									:false-value="0"
-								/>
-								<span>แก้ไขภาษี</span>
-							</label>
+						<template v-if="is_mr">
+							<Picker
+								v-model="form.custom_request_by"
+								label="ผู้จัดทำ"
+								:display_value="form.request_by_label"
+								:remote_fn="search_signatures"
+								clearable
+								@select="(o) => (form.request_by_label = o.label)"
+							/>
+							<Picker
+								v-model="form.custom_approve_by"
+								label="ผู้อนุมัติ"
+								:display_value="form.approve_by_label"
+								:remote_fn="search_signatures"
+								clearable
+								@select="(o) => (form.approve_by_label = o.label)"
+							/>
+						</template>
+						<div v-if="form.tax_templates.length" class="ss-field">
+							<span class="ss-field-label">ภาษี</span>
+							<SelectBox v-model="tax_value" label="ภาษี" :options="tax_options" />
 						</div>
-						<!-- หัก ณ ที่จ่าย / เงินประกันผลงาน (% ของยอดก่อนภาษี) ใบแจ้งหนี้ขายติ๊ก "แก้ไขยอดเอง" ได้ -->
-						<div v-if="has_deduct" class="ss-deducts">
-							<div v-for="d in DEDUCTS" :key="d.subject" class="ss-deduct">
+						<label v-if="has_discount" class="ss-field">
+							<span class="ss-field-label">ส่วนลดท้ายบิล (%)</span>
+							<input
+								v-model.number="form.additional_discount_percentage"
+								class="ss-input ss-input--num"
+								type="number"
+								inputmode="decimal"
+								min="0"
+								max="100"
+								step="any"
+								placeholder="0"
+							/>
+						</label>
+						<div v-if="form.project" class="ss-field ss-docform-project">
+							<span class="ss-field-label">โครงการ</span>
+							<span class="ss-docform-project-name" :title="form.project_name"
+								>{{ form.project_name || form.project }}
+								<small>{{ form.project }}</small></span
+							>
+						</div>
+					</section>
+
+					<section class="ss-docform-items">
+						<h2 class="ss-section-title ss-section-title--first">
+							<span
+								>รายการ <span class="ss-count">{{ form.items.length }}</span></span
+							>
+							<span v-if="form.items.length" class="ss-section-total">{{
+								money(lines_total)
+							}}</span>
+						</h2>
+						<Empty
+							v-if="!form.items.length && !wide"
+							:icon="config.icon"
+							title="ยังไม่มีรายการ"
+							text="เลือกสินค้า/บริการ แล้วใส่จำนวนและราคา"
+						/>
+						<LineEditor
+							:items="form.items"
+							:wide="wide"
+							:is_mr="is_mr"
+							:date_field="row_date.field"
+							:date_label="row_date.label"
+							:show_errors="show_errors"
+							:search_fn="find_items"
+							@add="add_item"
+							@remove="remove_rows"
+							@reorder="(items) => (form.items = items)"
+							@detail="(row) => (detail_row = row)"
+							@focus-row="(row) => (insight_row = row)"
+							:active_row="xl ? insight_row : null"
+							@browse="item_sheet = true"
+						/>
+					</section>
+
+					<!-- ท้ายเอกสาร: หมายเหตุ/ตัวเลือกภาษี (ซ้าย) + สรุปยอด (ขวา) แบบระบบเต็ม -->
+					<section class="ss-docform-foot">
+						<div class="ss-docform-notes">
+							<label v-if="remarks_field" class="ss-field">
+								<span class="ss-field-label">หมายเหตุ</span>
+								<textarea v-model="form[remarks_field]" class="ss-input" rows="3"></textarea>
+							</label>
+							<div
+								v-if="is_mr && form.material_request_type !== 'Customer Provided'"
+								class="ss-dv-flags"
+							>
 								<label class="ss-checkline">
 									<input
-										v-model="form[d.subject]"
+										v-model="form.custom_included_vat"
 										type="checkbox"
 										:true-value="1"
 										:false-value="0"
 									/>
-									<span>{{ d.label }}</span>
+									<span>มูลค่ารวมภาษี</span>
 								</label>
-								<template v-if="form[d.subject]">
-									<label class="ss-deduct-pct">
+								<label class="ss-checkline">
+									<input
+										v-model="form.custom_vat_override"
+										type="checkbox"
+										:true-value="1"
+										:false-value="0"
+									/>
+									<span>แก้ไขภาษี</span>
+								</label>
+							</div>
+							<!-- หัก ณ ที่จ่าย / เงินประกันผลงาน (% ของยอดก่อนภาษี) ใบแจ้งหนี้ขายติ๊ก "แก้ไขยอดเอง" ได้ -->
+							<div v-if="has_deduct" class="ss-deducts">
+								<div v-for="d in DEDUCTS" :key="d.subject" class="ss-deduct">
+									<label class="ss-checkline">
 										<input
-											v-model.number="form[d.percent]"
-											class="ss-cell ss-cell--num"
-											type="number"
-											inputmode="decimal"
-											min="0"
-											step="any"
-											:aria-label="`${d.label} (%)`"
+											v-model="form[d.subject]"
+											type="checkbox"
+											:true-value="1"
+											:false-value="0"
 										/>
-										<span>%</span>
+										<span>{{ d.label }}</span>
 									</label>
-									<template v-if="form.fields.includes(d.edit)">
-										<label class="ss-checkline ss-deduct-edit">
+									<template v-if="form[d.subject]">
+										<label class="ss-deduct-pct">
 											<input
-												v-model="form[d.edit]"
-												type="checkbox"
-												:true-value="1"
-												:false-value="0"
+												v-model.number="form[d.percent]"
+												class="ss-cell ss-cell--num"
+												type="number"
+												inputmode="decimal"
+												min="0"
+												step="any"
+												:aria-label="`${d.label} (%)`"
 											/>
-											<span>กรอกยอดเอง</span>
+											<span>%</span>
 										</label>
-										<MoneyInput
-											v-if="form[d.edit]"
-											v-model="form[d.amount]"
-											class="ss-cell ss-cell--num ss-deduct-amount"
-											:aria-label="`ยอด${d.label}`"
-										/>
+										<template v-if="form.fields.includes(d.edit)">
+											<label class="ss-checkline ss-deduct-edit">
+												<input
+													v-model="form[d.edit]"
+													type="checkbox"
+													:true-value="1"
+													:false-value="0"
+												/>
+												<span>กรอกยอดเอง</span>
+											</label>
+											<MoneyInput
+												v-if="form[d.edit]"
+												v-model="form[d.amount]"
+												class="ss-cell ss-cell--num ss-deduct-amount"
+												:aria-label="`ยอด${d.label}`"
+											/>
+										</template>
 									</template>
-								</template>
+								</div>
 							</div>
+							<p v-if="!is_mr" class="ss-muted ss-docform-note">
+								<Icon name="info" :size="14" /> เงื่อนไขชำระเงินและบัญชีอื่นๆ
+								แก้ต่อได้ในระบบเต็มหลังบันทึก
+							</p>
 						</div>
-						<p v-if="!is_mr" class="ss-muted ss-docform-note">
-							<Icon name="info" :size="14" /> เงื่อนไขชำระเงินและบัญชีอื่นๆ
-							แก้ต่อได้ในระบบเต็มหลังบันทึก
-						</p>
-					</div>
-					<div class="ss-totals" :class="{ 'is-stale': previewing }">
-						<div v-for="r in form.summary.rows" :key="r.label">
-							<span>{{ r.label }}</span>
-							<MoneyInput
-								v-if="r.tax && is_mr && form.custom_vat_override"
-								v-model="form.custom_vat"
-								class="ss-cell ss-cell--num ss-totals-input"
-								aria-label="ภาษีมูลค่าเพิ่ม"
-							/>
-							<b v-else>{{ money(r.value) }}</b>
-						</div>
-						<div class="is-grand">
-							<span
-								>{{ form.summary.grand_label }}
-								<span v-if="previewing" class="ss-spinner ss-spinner--sm"></span
-							></span>
-							<b>{{ money(grand_total) }}</b>
-						</div>
-						<div v-if="form.summary.in_words" class="ss-totals-words">
-							({{ form.summary.in_words }})
-						</div>
-						<template v-if="form.summary.net !== undefined">
-							<div v-for="d in form.summary.deductions" :key="d.label" class="is-deduct">
-								<span>{{ d.label }}</span
-								><b>{{ money(d.value) }}</b>
-							</div>
-							<div class="is-net">
-								<span>{{ form.summary.net_label }}</span
-								><b>{{ money(form.summary.net) }}</b>
-							</div>
-						</template>
-					</div>
-				</section>
-
-				<!-- รายละเอียดของแถว (ปุ่มปากกา) แบบฟอร์มแถวของระบบเต็ม -->
-				<Sheet
-					:open="!!detail_row"
-					title="รายละเอียดรายการ"
-					:subtitle="detail_row?.item_code"
-					@close="detail_row = null"
-				>
-					<div v-if="detail_row" class="ss-form ss-row-detail">
-						<div class="ss-field">
-							<span class="ss-field-label">รายการ</span>
-							<b>{{ detail_row.item_name }}</b>
-						</div>
-						<div class="ss-field">
-							<span class="ss-field-label">รายละเอียด</span>
-							<RichEditor
-								v-model="detail_row.description"
-								label="รายละเอียด"
-								placeholder="รายละเอียด/สเปกของรายการ"
-							/>
-						</div>
-						<div class="ss-form-row">
-							<label class="ss-field">
-								<span class="ss-field-label">จำนวน</span>
-								<input
-									v-model.number="detail_row.qty"
-									class="ss-input ss-input--num"
-									type="number"
-									inputmode="decimal"
-									step="any"
-								/>
-							</label>
-							<div class="ss-field">
-								<span class="ss-field-label">หน่วย</span>
-								<SelectBox
-									v-model="detail_row.uom"
-									label="หน่วย"
-									:options="(detail_row.uoms || []).map((u) => ({ value: u, label: u }))"
-								/>
-							</div>
-						</div>
-						<div class="ss-form-row">
-							<label class="ss-field">
-								<span class="ss-field-label">หน่วยละ</span>
+						<div class="ss-totals" :class="{ 'is-stale': previewing }">
+							<div v-for="r in form.summary.rows" :key="r.label">
+								<span>{{ r.label }}</span>
 								<MoneyInput
-									v-model="detail_row.rate"
-									class="ss-input ss-input--num"
-									aria-label="หน่วยละ"
+									v-if="r.tax && is_mr && form.custom_vat_override"
+									v-model="form.custom_vat"
+									class="ss-cell ss-cell--num ss-totals-input"
+									aria-label="ภาษีมูลค่าเพิ่ม"
+								/>
+								<b v-else>{{ money(r.value) }}</b>
+							</div>
+							<div class="is-grand">
+								<span
+									>{{ form.summary.grand_label }}
+									<span v-if="previewing" class="ss-spinner ss-spinner--sm"></span
+								></span>
+								<b>{{ money(grand_total) }}</b>
+							</div>
+							<div v-if="form.summary.in_words" class="ss-totals-words">
+								({{ form.summary.in_words }})
+							</div>
+							<template v-if="form.summary.net !== undefined">
+								<div v-for="d in form.summary.deductions" :key="d.label" class="is-deduct">
+									<span>{{ d.label }}</span
+									><b>{{ money(d.value) }}</b>
+								</div>
+								<div class="is-net">
+									<span>{{ form.summary.net_label }}</span
+									><b>{{ money(form.summary.net) }}</b>
+								</div>
+							</template>
+						</div>
+					</section>
+
+					<!-- รายละเอียดของแถว (ปุ่มปากกา) แบบฟอร์มแถวของระบบเต็ม -->
+					<Sheet
+						:open="!!detail_row"
+						title="รายละเอียดรายการ"
+						:subtitle="detail_row?.item_code"
+						@close="detail_row = null"
+					>
+						<div v-if="detail_row" class="ss-form ss-row-detail">
+							<div class="ss-field">
+								<span class="ss-field-label">รายการ</span>
+								<b>{{ detail_row.item_name }}</b>
+							</div>
+							<div class="ss-field">
+								<span class="ss-field-label">รายละเอียด</span>
+								<RichEditor
+									v-model="detail_row.description"
+									label="รายละเอียด"
+									placeholder="รายละเอียด/สเปกของรายการ"
+								/>
+							</div>
+							<div class="ss-form-row">
+								<label class="ss-field">
+									<span class="ss-field-label">จำนวน</span>
+									<input
+										v-model.number="detail_row.qty"
+										class="ss-input ss-input--num"
+										type="number"
+										inputmode="decimal"
+										step="any"
+									/>
+								</label>
+								<div class="ss-field">
+									<span class="ss-field-label">หน่วย</span>
+									<SelectBox
+										v-model="detail_row.uom"
+										label="หน่วย"
+										:options="
+											(detail_row.uoms || []).map((u) => ({ value: u, label: u }))
+										"
+									/>
+								</div>
+							</div>
+							<div class="ss-form-row">
+								<label class="ss-field">
+									<span class="ss-field-label">หน่วยละ</span>
+									<MoneyInput
+										v-model="detail_row.rate"
+										class="ss-input ss-input--num"
+										aria-label="หน่วยละ"
+									/>
+								</label>
+								<div class="ss-field">
+									<span class="ss-field-label">เป็นเงิน</span>
+									<b class="ss-row-detail-amount">{{
+										money((Number(detail_row.qty) || 0) * (Number(detail_row.rate) || 0))
+									}}</b>
+								</div>
+							</div>
+							<div v-if="row_date.field" class="ss-field">
+								<span class="ss-field-label">{{ row_date.label }}</span>
+								<DateInput v-model="detail_row[row_date.field]" :label="row_date.label" />
+							</div>
+							<label v-if="is_mr" class="ss-field">
+								<span class="ss-field-label">WBS (งานในแผน)</span>
+								<input
+									v-model="detail_row.custom_wbs"
+									class="ss-input"
+									placeholder="เช่น 4.1.2"
 								/>
 							</label>
-							<div class="ss-field">
-								<span class="ss-field-label">เป็นเงิน</span>
-								<b class="ss-row-detail-amount">{{
-									money((Number(detail_row.qty) || 0) * (Number(detail_row.rate) || 0))
-								}}</b>
-							</div>
+							<label v-if="is_mr" class="ss-checkline">
+								<input
+									v-model="detail_row.custom_vat_nocal"
+									type="checkbox"
+									:true-value="1"
+									:false-value="0"
+								/>
+								<span>ไม่คิดภาษี</span>
+							</label>
 						</div>
-						<div v-if="row_date.field" class="ss-field">
-							<span class="ss-field-label">{{ row_date.label }}</span>
-							<DateInput v-model="detail_row[row_date.field]" :label="row_date.label" />
-						</div>
-						<label v-if="is_mr" class="ss-field">
-							<span class="ss-field-label">WBS (งานในแผน)</span>
-							<input
-								v-model="detail_row.custom_wbs"
-								class="ss-input"
-								placeholder="เช่น 4.1.2"
-							/>
-						</label>
-						<label v-if="is_mr" class="ss-checkline">
-							<input
-								v-model="detail_row.custom_vat_nocal"
-								type="checkbox"
-								:true-value="1"
-								:false-value="0"
-							/>
-							<span>ไม่คิดภาษี</span>
-						</label>
-					</div>
-					<template #footer>
-						<button
-							type="button"
-							class="ss-btn ss-btn--primary ss-btn--block"
-							@click="detail_row = null"
-						>
-							เสร็จ
-						</button>
-					</template>
-				</Sheet>
-			</template>
+						<template #footer>
+							<button
+								type="button"
+								class="ss-btn ss-btn--primary ss-btn--block"
+								@click="detail_row = null"
+							>
+								เสร็จ
+							</button>
+						</template>
+					</Sheet>
+				</div>
+				<ItemInsight
+					v-if="xl"
+					:kind="kind"
+					:project="form.project || state.project?.name"
+					:row="insight_row"
+				/>
+			</div>
 		</div>
 
 		<Teleport to="#ss-layer">
@@ -456,6 +474,7 @@ import Empty from "../../components/Empty.vue";
 import Picker from "../../components/Picker.vue";
 import Sheet from "../../components/Sheet.vue";
 import LineEditor from "./LineEditor.vue";
+import ItemInsight from "./ItemInsight.vue";
 import MoneyInput from "../../components/MoneyInput.vue";
 import RichEditor from "../../components/RichEditor.vue";
 import SelectBox from "../../components/SelectBox.vue";
@@ -758,6 +777,20 @@ function remove_rows(rows) {
 	const gone = new Set(Array.isArray(rows) ? rows : [rows]);
 	form.value.items = form.value.items.filter((r) => !gone.has(r));
 }
+
+// จอใหญ่มาก (≥1480): แผงข้อมูลประกอบของแถวที่เลือก (ItemInsight)
+const mq_xl = window.matchMedia("(min-width: 1480px)");
+const xl = ref(mq_xl.matches);
+const on_xl = () => (xl.value = mq_xl.matches);
+mq_xl.addEventListener("change", on_xl);
+onBeforeUnmount(() => mq_xl.removeEventListener("change", on_xl));
+const insight_row = ref(null);
+watch(
+	() => form.value?.items.length,
+	() => {
+		if (insight_row.value && !form.value.items.includes(insight_row.value)) insight_row.value = null;
+	}
+);
 
 // แถวที่เปิดรายละเอียด (ปุ่มปากกา)
 const detail_row = ref(null);

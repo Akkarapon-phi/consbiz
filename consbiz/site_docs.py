@@ -1228,3 +1228,116 @@ def search_signatures(txt=None):
 		limit_page_length=30,
 	)
 
+
+
+# ---------------------------------------------------------------- ข้อมูลช่วยตัดสินใจของรายการ (แผงขวาของฟอร์ม จอ ≥1480)
+
+
+@frappe.whitelist()
+def get_item_insight(kind, item_code, project=None):
+	"""ข้อมูลของสินค้าที่กำลังกรอกในฟอร์ม: คงเหลือ / แผนวัสดุเทียบที่ขอ-สั่ง-รับ / ราคาล่าสุด / PO ค้างรับ
+	หน่วยสต็อกทั้งหมด แต่ละส่วนแสดงเฉพาะเมื่อผู้ใช้มีสิทธิ์อ่านเอกสารต้นทาง"""
+	from erpnext.stock.get_item_details import get_conversion_factor
+
+	config = config_of(kind)
+	frappe.has_permission("Item", "read", throw=True)
+	item = frappe.db.get_value("Item", item_code, ["item_name", "stock_uom", "item_group"], as_dict=True)
+	if not item:
+		frappe.throw(_("ไม่พบสินค้า {0}").format(item_code))
+	buying = config["section"] == "buy"
+	out = {"item_code": item_code, **item, "buying": buying}
+
+	# คงเหลือ: คลังของโครงการ / ทั้งบริษัท
+	if frappe.has_permission("Bin", "read") or frappe.has_permission("Stock Ledger Entry", "read"):
+		bins = frappe.get_all("Bin", filters={"item_code": item_code}, fields=["warehouse", "actual_qty", "projected_qty"])
+		project_whs = (
+			set(frappe.get_all("Warehouse", filters={"custom_project": project}, pluck="name")) if project else set()
+		)
+		out["stock"] = {
+			"project": flt(sum(b.actual_qty for b in bins if b.warehouse in project_whs)) if project else None,
+			"all": flt(sum(b.actual_qty for b in bins)),
+			"projected": flt(sum(b.projected_qty for b in bins)),
+		}
+
+	# แผนวัสดุของโครงการ เทียบยอดขอ/สั่ง/รับ (construction_material_plan.get_supply)
+	if buying and project and frappe.has_permission("Construction Material Plan", "read"):
+		from consbiz.consbiz.doctype.construction_material_plan.construction_material_plan import get_supply
+
+		plan = frappe.db.get_value("Construction Material Plan", {"project": project}, "name")
+		if plan:
+			rows = frappe.get_all(
+				"Construction Material Plan Item",
+				filters={"parent": plan, "item_code": item_code},
+				fields=["qty", "uom"],
+			)
+			planned = sum(
+				flt(r.qty) * (flt(get_conversion_factor(item_code, r.uom).get("conversion_factor")) or 1)
+				if r.uom and r.uom != item.stock_uom
+				else flt(r.qty)
+				for r in rows
+			)
+			supply = get_supply(project, [item_code])[item_code]["total"]
+			out["plan"] = {"planned": planned, **{k: flt(v) for k, v in supply.items()}, "in_plan": bool(rows)}
+
+	# ราคาล่าสุด: ซื้อ = PO ที่ส่งแล้ว, ขาย = ใบแจ้งหนี้ขาย/ใบเสนอราคาที่ส่งแล้ว
+	sources = (
+		[("Purchase Order", "Purchase Order Item", "supplier_name", "transaction_date")]
+		if buying
+		else [
+			("Sales Invoice", "Sales Invoice Item", "customer_name", "posting_date"),
+			("Quotation", "Quotation Item", "customer_name", "transaction_date"),
+		]
+	)
+	prices = []
+	for parent_type, child_type, party_field, date_field in sources:
+		if not frappe.has_permission(parent_type, "read"):
+			continue
+		parent = frappe.qb.DocType(parent_type)
+		child = frappe.qb.DocType(child_type)
+		prices += (
+			frappe.qb.from_(child)
+			.join(parent)
+			.on(child.parent == parent.name)
+			.select(
+				parent.name,
+				parent[party_field].as_("party"),
+				parent[date_field].as_("date"),
+				child.rate,
+				child.uom,
+				child.qty,
+			)
+			.where((parent.docstatus == 1) & (child.item_code == item_code))
+			.orderby(parent[date_field], order=frappe.qb.desc)
+			.limit(5)
+			.run(as_dict=True)
+		)
+	prices.sort(key=lambda p: str(p.date), reverse=True)
+	out["prices"] = [{**p, "doctype_kind": None} for p in prices[:5]]
+
+	# PO ค้างรับของสินค้านี้ (โครงการนี้ก่อน ถ้าไม่ระบุ = ทุกโครงการ)
+	if buying and frappe.has_permission("Purchase Order", "read"):
+		po = frappe.qb.DocType("Purchase Order")
+		poi = frappe.qb.DocType("Purchase Order Item")
+		query = (
+			frappe.qb.from_(poi)
+			.join(po)
+			.on(poi.parent == po.name)
+			.select(
+				po.name,
+				po.supplier_name.as_("party"),
+				poi.schedule_date.as_("due"),
+				((poi.qty - poi.received_qty) * poi.conversion_factor).as_("pending"),
+			)
+			.where(
+				(po.docstatus == 1)
+				& po.status.isin(("To Receive and Bill", "To Receive"))
+				& (poi.item_code == item_code)
+				& (poi.qty > poi.received_qty)
+			)
+			.orderby(poi.schedule_date)
+			.limit(5)
+		)
+		if project:
+			query = query.where((po.project == project) | (poi.project == project))
+		out["open_orders"] = query.run(as_dict=True)
+	return out

@@ -62,11 +62,14 @@
 					:class="{
 						'is-error': show_errors && error(row),
 						'is-picked': picked.has(row),
+						'is-active': row === active_row,
 						'is-dragging': drag_from === i,
 						'is-drop-before': drop_at === i && drag_from !== null && drag_from > i,
 						'is-drop-after': drop_at === i && drag_from !== null && drag_from < i,
 					}"
 					:draggable="drag_ready === i"
+					@focusin="$emit('focus-row', row)"
+					@click="$emit('focus-row', row)"
 					@dragstart="drag_start($event, i)"
 					@dragover.prevent="drop_at = i"
 					@drop.prevent="drop(i)"
@@ -329,10 +332,12 @@ const props = defineProps({
 	date_field: String,
 	date_label: String,
 	show_errors: Boolean,
+	// แถวที่แสดงในแผงข้อมูลประกอบ (ไฮไลต์)
+	active_row: Object,
 	// (txt) => Promise<items> จาก site_docs.search_items
 	search_fn: { type: Function, required: true },
 });
-const emit = defineEmits(["add", "remove", "reorder", "detail", "browse"]);
+const emit = defineEmits(["add", "remove", "reorder", "detail", "browse", "focus-row"]);
 
 const root = ref(null);
 const search_input = ref(null);
