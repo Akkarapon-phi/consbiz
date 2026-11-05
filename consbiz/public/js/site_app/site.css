@@ -7953,3 +7953,57 @@ div.ss-line-del {
 	font-weight: 600;
 	color: var(--tone-amber);
 }
+/* แผงตัวอย่างแบบกระชับ: พอดีจอโน้ตบุ๊ก (~760px) โดยไม่ต้องเลื่อน */
+.ss-preview-body {
+	gap: 12px;
+	padding-top: 12px;
+	padding-bottom: 12px;
+}
+.ss-preview-kv {
+	gap: 4px 14px;
+	font-size: 13px;
+}
+.ss-preview-items li {
+	padding: 5px 0;
+}
+.ss-preview-totals {
+	gap: 4px;
+	padding: 8px 12px;
+	font-size: 13px;
+}
+.ss-preview-totals .is-grand b {
+	font-size: 16px;
+}
+.ss-preview-body .ss-link {
+	padding: 4px 0 0;
+	font-size: 13px;
+}
+/* สูงไม่เกินพื้นที่ใต้แถบเครื่องมือ (แผงเริ่มที่ ~190px) ปุ่มล่างเห็นเสมอ เนื้อหาเลื่อนในแผงเมื่อจอเตี้ย */
+.ss-preview {
+	max-height: calc(100vh - 206px - var(--ss-bottom));
+}
+.ss-preview-head {
+	padding: 10px 12px 10px 16px;
+}
+.ss-preview-title {
+	flex-direction: row;
+	align-items: baseline;
+	gap: 8px;
+}
+.ss-preview-title b {
+	font-size: 15px;
+}
+.ss-preview-body {
+	gap: 10px;
+}
+.ss-preview-totals .is-net {
+	padding-top: 4px;
+}
+.ss-preview-body {
+	padding-top: 10px;
+	padding-bottom: 10px;
+}
+.ss-preview-totals .is-grand:first-child {
+	padding-top: 0;
+	border-top: 0;
+}

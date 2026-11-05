@@ -4,8 +4,8 @@
 	<aside class="ss-preview" :aria-label="`ตัวอย่าง ${name}`">
 		<header class="ss-preview-head">
 			<div class="ss-preview-title">
-				<small>{{ config.label }}</small>
 				<b>{{ name }}</b>
+				<small>{{ config.label }}</small>
 			</div>
 			<button
 				type="button"
@@ -62,7 +62,7 @@
 					รายการ <span class="ss-count">{{ doc.items.length }}</span>
 				</h3>
 				<ul class="ss-preview-items">
-					<li v-for="(it, i) in doc.items.slice(0, 8)" :key="i">
+					<li v-for="(it, i) in doc.items.slice(0, SHOW)" :key="i">
 						<span class="ss-preview-item">
 							<b>{{ it.item_name || it.item_code }}</b>
 							<small
@@ -73,30 +73,21 @@
 						<b class="is-num">{{ money(it.amount) }}</b>
 					</li>
 				</ul>
-				<button v-if="doc.items.length > 8" type="button" class="ss-link" @click="open_full">
-					ดูอีก {{ doc.items.length - 8 }} รายการ
+				<button v-if="doc.items.length > SHOW" type="button" class="ss-link" @click="open_full">
+					ดูอีก {{ doc.items.length - SHOW }} รายการ
 				</button>
 			</section>
 
+			<!-- ยอดสำคัญเท่านั้น (รายละเอียดภาษี/ยอดหักดูในหน้าเต็ม) แผงต้องพอดีจอโดยไม่เลื่อน -->
 			<div class="ss-totals ss-preview-totals">
-				<div v-for="r in doc.summary.rows" :key="r.label">
-					<span>{{ r.label }}</span
-					><b>{{ money(r.value) }}</b>
-				</div>
 				<div class="is-grand">
 					<span>{{ doc.summary.grand_label }}</span
 					><b>{{ money(doc.summary.grand) }}</b>
 				</div>
-				<template v-if="doc.summary.net !== undefined">
-					<div v-for="d in doc.summary.deductions" :key="d.label" class="is-deduct">
-						<span>{{ d.label }}</span
-						><b>{{ money(d.value) }}</b>
-					</div>
-					<div class="is-net">
-						<span>{{ doc.summary.net_label }}</span
-						><b>{{ money(doc.summary.net) }}</b>
-					</div>
-				</template>
+				<div v-if="doc.summary.net !== undefined" class="is-net">
+					<span>{{ doc.summary.net_label }}</span
+					><b>{{ money(doc.summary.net) }}</b>
+				</div>
 				<div v-if="doc.totals.outstanding_amount" class="is-due">
 					<span>ค้าง{{ config.section === "buy" ? "จ่าย" : "รับ" }}</span
 					><b>{{ money(doc.totals.outstanding_amount) }}</b>
@@ -182,6 +173,8 @@ import { DOC_KINDS } from "../../sections.js";
 import { call, celebrate, desk_url, go, money, num, post, show_error, thai_date } from "../../api.js";
 
 const props = defineProps({ kind: String, name: String });
+// แสดงรายการแค่ 3 แถวแรก (แผงต้องพอดีจอโน้ตบุ๊กโดยไม่ต้องเลื่อน) ที่เหลือดูในหน้าเต็ม
+const SHOW = 3;
 const emit = defineEmits(["close", "changed"]);
 
 const config = computed(() => DOC_KINDS[props.kind]);
