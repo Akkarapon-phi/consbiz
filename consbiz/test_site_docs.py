@@ -3,13 +3,13 @@
 
 # หมวดจัดซื้อ/ขายของแอปหน้างาน (site_docs.py): รายการ ตัวกรอง ขอบเขตโครงการ รายละเอียด และส่งเอกสาร
 
+import json
+
 import frappe
 from frappe.tests import IntegrationTestCase
 
-from consbiz import site_docs
-from consbiz.test_store_app import make_po, setup_store
-
-IGNORE_TEST_RECORD_DEPENDENCIES = ["Company", "Customer", "Supplier", "Project", "Account", "Mode of Payment"]
+from consbiz import site_docs, store_app
+from consbiz.test_store_app import ITEM, ITEM_2, SUPPLIER, make_po, setup_store
 
 
 class IntegrationTestSiteDocs(IntegrationTestCase):
@@ -43,10 +43,13 @@ class IntegrationTestSiteDocs(IntegrationTestCase):
 		po = make_po(self.project)
 		po.cancel()
 		draft = frappe.copy_doc(po)
+		draft.docstatus = 0  # copy_doc ของ v16 คง docstatus ของต้นฉบับ (ยกเลิกแล้ว = 2)
 		draft.insert()
 		self.assertIn(draft.name, self.names(filter="draft"))
 		# อีกโครงการ: ไม่เห็นเมื่อเลือกขอบเขตโครงการ เห็นเมื่อทุกโครงการ
-		other = frappe.get_doc({"doctype": "Project", "project_name": "_Test Site Docs Other", "company": po.company})
+		other = frappe.get_doc(
+			{"doctype": "Project", "project_name": "_Test Site Docs Other", "company": po.company}
+		)
 		other.insert(ignore_permissions=True)
 		rows = site_docs.get_docs("po", project=other.name, filter="draft")["rows"]
 		self.assertNotIn(draft.name, [r.name for r in rows])
@@ -61,3 +64,205 @@ class IntegrationTestSiteDocs(IntegrationTestCase):
 		self.assertEqual(site_docs.status_of("Overdue", 1), ("เกินกำหนด", "rose"))
 		self.assertEqual(site_docs.status_of("Unpaid", 0), ("ร่าง", "gray"))
 		self.assertRaises(frappe.ValidationError, site_docs.get_docs, "xx")
+
+	def test_create_and_edit_purchase_order(self):
+		form = site_docs.get_form("po", project=self.project)
+		self.assertEqual(form["project"], self.project)
+		self.assertIsNone(form["name"])
+		data = {
+			"project": self.project,
+			"supplier": SUPPLIER,
+			"transaction_date": form["transaction_date"],
+			"schedule_date": form["schedule_date"],
+			"taxes_and_charges": None,
+			"items": [{"key": None, "item_code": ITEM, "qty": 4, "rate": 25}],
+		}
+		preview = site_docs.preview_doc("po", json.dumps(data, default=str))
+		self.assertEqual(preview["totals"]["grand_total"], 100)
+
+		saved = site_docs.save_doc("po", json.dumps(data, default=str))
+		po = frappe.get_doc("Purchase Order", saved["name"])
+		self.assertEqual((po.docstatus, po.project, po.items[0].qty), (0, self.project, 4))
+		self.assertEqual(po.items[0].warehouse, store_app.project_warehouse(self.project))
+
+		# แก้ร่าง: แถวเดิมจับคู่ด้วย key (name ของแถว) แล้วส่ง
+		form = site_docs.get_form("po", name=po.name)
+		row = form["items"][0]
+		self.assertEqual(row["key"], po.items[0].name)
+		data["name"] = po.name
+		data["items"] = [{**row, "qty": 6}]
+		site_docs.save_doc("po", json.dumps(data, default=str), submit=1)
+		po.reload()
+		self.assertEqual((po.docstatus, len(po.items), po.items[0].qty, po.grand_total), (1, 1, 6, 150))
+
+	def test_next_document_from_purchase_order(self):
+		po = make_po(self.project)
+		self.assertEqual(site_docs.get_doc("po", po.name)["next_kind"], "pi")
+		form = site_docs.get_form("pi", source=po.name)
+		self.assertEqual(form["supplier"], po.supplier)
+		data = {**form, "items": [{**form["items"][0], "qty": 3}]}
+		saved = site_docs.save_doc("pi", json.dumps(data, default=str))
+		pi = frappe.get_doc("Purchase Invoice", saved["name"])
+		self.assertEqual((pi.items[0].purchase_order, pi.items[0].qty), (po.name, 3))
+
+	def test_form_rejects_submitted_and_unknown(self):
+		po = make_po(self.project)
+		self.assertRaises(frappe.ValidationError, site_docs.get_form, "po", name=po.name)
+		self.assertRaises(frappe.ValidationError, site_docs.get_form, "qtn", source=po.name)
+
+	def test_list_counts_sums_sort_and_filters(self):
+		first = make_po(self.project, qty=2)
+		second = make_po(self.project, qty=5)
+		result = site_docs.get_docs("po", project=self.project, filter="todo", sort="amount", order="asc")
+		names = [r.name for r in result["rows"]]
+		self.assertLess(names.index(first.name), names.index(second.name))
+		self.assertEqual(result["total"], result["counts"]["todo"])
+		self.assertGreaterEqual(result["sums"]["amount"], first.grand_total + second.grand_total)
+		self.assertIn("download_pdf", result["rows"][0].pdf_url)
+
+		# ช่วงวันที่ในอนาคต = ไม่พบ, คู่ค้า = ผู้ขายของใบ
+		empty = site_docs.get_docs("po", project=self.project, filter="all", date_from="2999-01-01")
+		self.assertEqual(empty["total"], 0)
+		by_party = site_docs.get_docs("po", project=self.project, filter="all", party=SUPPLIER)
+		self.assertIn(first.name, [r.name for r in by_party["rows"]])
+		exported = site_docs.get_docs("po", project=self.project, filter="all", export=1)
+		self.assertNotIn("total", exported)
+
+	def test_bulk_submit_reports_each_document(self):
+		po = make_po(self.project)
+		po.cancel()
+		draft = frappe.copy_doc(po)
+		draft.docstatus = 0  # copy_doc ของ v16 คง docstatus ของต้นฉบับ (ยกเลิกแล้ว = 2)
+		draft.insert()
+		results = site_docs.submit_docs("po", json.dumps([draft.name, po.name]))
+		self.assertEqual([r["ok"] for r in results], [True, False])
+		self.assertEqual(frappe.db.get_value("Purchase Order", draft.name, "docstatus"), 1)
+
+	def test_header_discount(self):
+		data = {
+			"project": self.project,
+			"supplier": SUPPLIER,
+			"schedule_date": frappe.utils.add_days(frappe.utils.nowdate(), 3),
+			"additional_discount_percentage": 10,
+			"items": [{"key": None, "item_code": ITEM, "qty": 2, "rate": 500}],
+		}
+		preview = site_docs.preview_doc("po", json.dumps(data, default=str))
+		self.assertEqual((preview["totals"]["discount_amount"], preview["totals"]["grand_total"]), (100, 900))
+		saved = site_docs.save_doc("po", json.dumps(data, default=str))
+		self.assertEqual(frappe.db.get_value("Purchase Order", saved["name"], "grand_total"), 900)
+		self.assertIn(
+			"additional_discount_percentage", site_docs.get_form("po", name=saved["name"])["fields"]
+		)
+
+	def test_request_totals_match_desk_formula(self):
+		from consbiz.request_totals import calculate
+
+		doc = frappe._dict(
+			material_request_type="Purchase",
+			custom_included_vat=0,
+			custom_vat_override=0,
+			items=[
+				frappe._dict(qty=2, rate=100, custom_vat_nocal=0),
+				frappe._dict(qty=1, rate=50, custom_vat_nocal=1),
+			],
+		)
+		calculate(doc)
+		self.assertEqual((doc.custom_net_total, doc.custom_vat, doc.custom_grand_total), (200, 14, 264))
+		doc.custom_included_vat = 1
+		calculate(doc)
+		self.assertEqual((doc.custom_net_total, doc.custom_vat, doc.custom_grand_total), (186.92, 13.08, 250))
+		doc.custom_vat_override, doc.custom_vat = 1, 10
+		calculate(doc)
+		self.assertEqual((doc.custom_net_total, doc.custom_vat, doc.custom_grand_total), (190, 10, 250))
+
+	def test_material_request_form_keeps_rates_and_order(self):
+		data = {
+			"project": self.project,
+			"material_request_type": "Purchase",
+			"title": "_Test ขอซื้อ",
+			"custom_included_vat": 0,
+			"items": [
+				{"key": None, "item_code": ITEM, "qty": 2, "rate": 123, "custom_vat_nocal": 0},
+				{"key": None, "item_code": ITEM_2, "qty": 1, "rate": 50, "custom_vat_nocal": 1},
+			],
+		}
+		saved = site_docs.save_doc("mr", json.dumps(data, default=str))
+		mr = frappe.get_doc("Material Request", saved["name"])
+		self.assertEqual([r.rate for r in mr.items], [123, 50])
+		self.assertEqual(mr.custom_grand_total, round(246 * 1.07, 2) + 50)
+
+		form = site_docs.get_form("mr", name=mr.name)
+		data.update({"name": mr.name, "items": list(reversed(form["items"]))})
+		site_docs.save_doc("mr", json.dumps(data, default=str))
+		mr.reload()
+		self.assertEqual([r.rate for r in mr.items], [50, 123])
+		view = site_docs.get_doc("mr", mr.name)
+		self.assertEqual(view["purpose"], "ซื้อ")
+		self.assertEqual(view["steps"][0]["state"], "current")
+		self.assertEqual(view["summary"]["grand"], mr.custom_grand_total)
+
+	def test_withholding_and_retention_in_app_form(self):
+		data = {
+			"project": self.project,
+			"supplier": SUPPLIER,
+			"schedule_date": frappe.utils.add_days(frappe.utils.nowdate(), 3),
+			"taxes_and_charges": None,
+			"custom_subject_to_wht": 1,
+			"custom_wht_percent": 3,
+			"custom_subject_to_retention": 1,
+			"custom_retention_percent": 5,
+			"items": [{"key": None, "item_code": ITEM, "qty": 10, "rate": 100}],
+		}
+		preview = site_docs.preview_doc("po", json.dumps(data, default=str))
+		self.assertEqual([d["value"] for d in preview["summary"]["deductions"]], [-30, -50])
+		self.assertEqual(preview["summary"]["net"], 920)
+		saved = site_docs.save_doc("po", json.dumps(data, default=str))
+		po = frappe.get_doc("Purchase Order", saved["name"])
+		self.assertEqual(
+			(po.custom_wht_amount, po.custom_retention_amount, po.custom_paid_amount), (30, 50, 920)
+		)
+
+	def test_item_insight(self):
+		po = make_po(self.project, qty=4)
+		info = site_docs.get_item_insight("po", ITEM, self.project)
+		self.assertEqual(info["item_code"], ITEM)
+		self.assertTrue(info["buying"])
+		self.assertIn(po.name, [p["name"] for p in info["prices"]])
+		pending = {o.name: o.pending for o in info["open_orders"]}
+		self.assertEqual(pending.get(po.name), 4)
+		self.assertIn("stock", info)
+		sell = site_docs.get_item_insight("si", ITEM, self.project)
+		self.assertFalse(sell["buying"])
+		self.assertNotIn("open_orders", sell)
+
+	def test_activity_comments_and_attachments(self):
+		po = make_po(self.project)
+		activity = site_docs.get_activity("po", po.name)
+		self.assertEqual(activity["timeline"][-1]["type"], "created")
+		# ระหว่างเทสต์ Frappe ไม่สร้าง Version (ignore_version = in_test) จึงเทสต์ข้อความจาก Version ตรงๆ
+		self.assertEqual(site_docs.version_text(po, {"changed": [["docstatus", 0, 1]]}), "ส่งเอกสาร")
+		self.assertIn(
+			"แก้", site_docs.version_text(po, {"changed": [["schedule_date", "2026-01-01", "2026-01-02"]]})
+		)
+
+		site_docs.add_comment("po", po.name, "<p>ตรวจแล้ว</p><script>alert(1)</script>")
+		comment = next(t for t in site_docs.get_activity("po", po.name)["timeline"] if t["type"] == "comment")
+		self.assertNotIn("script", comment["html"])
+		self.assertTrue(comment["mine"])
+		site_docs.delete_comment("po", po.name, comment["name"])
+		self.assertFalse(frappe.db.exists("Comment", comment["name"]))
+		self.assertRaises(frappe.ValidationError, site_docs.add_comment, "po", po.name, "<p> </p>")
+
+		file = frappe.get_doc(
+			{
+				"doctype": "File",
+				"file_name": "_test_site_docs.txt",
+				"content": b"test",
+				"is_private": 1,
+				"attached_to_doctype": "Purchase Order",
+				"attached_to_name": po.name,
+			}
+		).insert()
+		self.assertEqual([f.name for f in site_docs.get_activity("po", po.name)["files"]], [file.name])
+		site_docs.remove_attachment("po", po.name, file.name)
+		self.assertFalse(frappe.db.exists("File", file.name))

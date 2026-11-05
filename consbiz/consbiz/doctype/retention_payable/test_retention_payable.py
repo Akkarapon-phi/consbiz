@@ -15,7 +15,15 @@ from consbiz.consbiz.doctype.retention_receivable.test_retention_receivable impo
 	setup_retention_masters,
 )
 
-IGNORE_TEST_RECORD_DEPENDENCIES = ["Company", "Supplier", "Project", "Account", "Purchase Order"]
+IGNORE_TEST_RECORD_DEPENDENCIES = [
+	"Company",
+	"Supplier",
+	"Project",
+	"Account",
+	"Purchase Order",
+	"Purchase Invoice",
+	"Sales Invoice",
+]
 
 
 class IntegrationTestRetentionPayable(IntegrationTestCase):
@@ -41,7 +49,9 @@ class IntegrationTestRetentionPayable(IntegrationTestCase):
 		self.assertEqual((doc.doctype, doc.supplier, doc.po), ("Retention Payable", SUPPLIER, "PO-0001"))
 		self.assertEqual(doc.project, "_Test Retention Project")
 		row = doc.retention_items[0]
-		self.assertEqual((row.purchase_invoice_no, row.reference_no, row.amount), ("PINV-TEST-1", "INV-889", 1000))
+		self.assertEqual(
+			(row.purchase_invoice_no, row.reference_no, row.amount), ("PINV-TEST-1", "INV-889", 1000)
+		)
 
 	def test_status_flow(self):
 		doc = make_source("Retention Payable", amounts=(500,))

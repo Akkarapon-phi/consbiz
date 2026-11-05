@@ -14,6 +14,7 @@ from consbiz.consbiz.doctype.construction_management.construction_management imp
 	target_progress,
 	total_float,
 )
+from consbiz.tests.utils import insert_boq
 
 EXTRA_TEST_RECORD_DEPENDENCIES = []
 IGNORE_TEST_RECORD_DEPENDENCIES = ["BOQ", "Customer", "Company", "Holiday List", "UOM", "Project"]
@@ -250,13 +251,22 @@ class IntegrationTestConstructionManagement(IntegrationTestCase):
 
 	def test_total_float(self):
 		# ตัวอย่างเดียวกับที่ใช้เทียบ total_float ใน schedule.js: ทุกชนิดความสัมพันธ์ + วันหยุดเสาร์-อาทิตย์
+		# ทุกงานมีวันเริ่ม (แถวไม่มีวันเริ่มถูกตั้ง duration = 0 ใน set_task_dates) งานก่อนหน้าดึงวันเริ่มไปวันเร็วสุดที่ยอม (ASAP)
 		weekend = ["2026-11-07", "2026-11-08", "2026-11-14", "2026-11-15", "2026-11-21", "2026-11-22"]
 		rows = self.make_linked(
 			[
 				{"name": "a", "wbs": "1", "amount": 1, "start_date": "2026-11-02", "duration": 5},
-				{"name": "b", "wbs": "2", "amount": 1, "duration": 8, "predecessors": [{"task": "a"}]},
+				{
+					"name": "b",
+					"start_date": "2026-11-02",
+					"wbs": "2",
+					"amount": 1,
+					"duration": 8,
+					"predecessors": [{"task": "a"}],
+				},
 				{
 					"name": "c",
+					"start_date": "2026-11-02",
 					"wbs": "3",
 					"amount": 1,
 					"duration": 3,
@@ -264,6 +274,7 @@ class IntegrationTestConstructionManagement(IntegrationTestCase):
 				},
 				{
 					"name": "d",
+					"start_date": "2026-11-02",
 					"wbs": "4",
 					"amount": 1,
 					"duration": 3,
@@ -271,6 +282,7 @@ class IntegrationTestConstructionManagement(IntegrationTestCase):
 				},
 				{
 					"name": "e",
+					"start_date": "2026-11-02",
 					"wbs": "5",
 					"amount": 1,
 					"duration": 2,
@@ -278,6 +290,7 @@ class IntegrationTestConstructionManagement(IntegrationTestCase):
 				},
 				{
 					"name": "f",
+					"start_date": "2026-11-02",
 					"wbs": "6",
 					"amount": 1,
 					"duration": 3,
@@ -499,7 +512,7 @@ class IntegrationTestConstructionProgress(IntegrationTestCase):
 			{"wbs": "1.2", "item_name": "งานเหมา", "quantity": 0, "total_amount": 1000},
 		):
 			boq.append("boq_details", row)
-		boq.insert()
+		insert_boq(boq)
 		self.doc = frappe.get_doc("Construction Management", create_from_boq(boq.name))
 		self.group, self.qty_task, self.lump_task = self.doc.tasks
 
@@ -567,8 +580,12 @@ class IntegrationTestConstructionProgress(IntegrationTestCase):
 		months = {str(row["month"]): row for row in data["months"]}
 		self.assertAlmostEqual(months["2026-11-01"]["actual_cum"], 1500)
 		self.assertAlmostEqual(data["summary"]["actual"], 1500)
-		self.assertAlmostEqual(data["months"][-1]["plan_cum"], self.doc.revised_amount or self.doc.total_amount)
-		self.assertTrue(all(row["actual"] is None for row in data["months"] if str(row["month"]) > "2026-11-30"))
+		self.assertAlmostEqual(
+			data["months"][-1]["plan_cum"], self.doc.revised_amount or self.doc.total_amount
+		)
+		self.assertTrue(
+			all(row["actual"] is None for row in data["months"] if str(row["month"]) > "2026-11-30")
+		)
 
 	def test_lookahead(self):
 		from consbiz.consbiz.doctype.construction_management.construction_management import save_tasks
@@ -617,7 +634,9 @@ class IntegrationTestConstructionProgress(IntegrationTestCase):
 		report.submit()
 		self.make_report([{"wbs": "1.2", "percent": 10}], date="2026-11-04")
 
-		with patch("consbiz.consbiz.doctype.construction_management.dashboard.nowdate", return_value="2026-11-05"):
+		with patch(
+			"consbiz.consbiz.doctype.construction_management.dashboard.nowdate", return_value="2026-11-05"
+		):
 			data = get_site_calendar(self.doc.name, "2026-11-20")
 		self.assertEqual((str(data["start"]), str(data["end"])), ("2026-11-01", "2026-11-30"))
 		self.assertEqual([r.docstatus for r in data["reports"]], [1, 0])
@@ -664,7 +683,9 @@ class IntegrationTestConstructionProgress(IntegrationTestCase):
 		self.assertTrue(self.doc.baseline_date)
 
 		# เลื่อนงาน 1.1 ไป 10 พ.ย. แล้วบันทึกชุดที่ 2 โดยยังไม่ใช้เทียบ: ช่อง baseline_* ยังเป็นชุดแรก
-		self.save([], tasks=[{"name": self.qty_task.name, "start_date": "2026-11-10", "end_date": "2026-11-10"}])
+		self.save(
+			[], tasks=[{"name": self.qty_task.name, "start_date": "2026-11-10", "end_date": "2026-11-10"}]
+		)
 		second = self.save_baseline("ขยายเวลา EOT-1", activate=0)
 		self.assertEqual(self.doc.active_baseline, first)
 		self.assertEqual(str(self.doc.tasks[1].baseline_start_date), "2026-11-02")
@@ -773,9 +794,9 @@ class IntegrationTestConstructionProgress(IntegrationTestCase):
 			)
 
 		# Baseline เก็บ % ที่กำหนดเองไปด้วย
-		from consbiz.consbiz.doctype.construction_management.construction_management import set_baseline
+		from consbiz.consbiz.doctype.construction_management.construction_management import save_baseline
 
-		set_baseline(self.doc.name, str(self.doc.modified))
+		save_baseline(self.doc.name, str(self.doc.modified), "_Test Baseline")
 		self.doc.reload()
 		self.assertEqual(self.doc.tasks[1].baseline_distribution, self.doc.tasks[1].plan_distribution)
 
@@ -789,7 +810,12 @@ class IntegrationTestCostControl(IntegrationTestCase):
 
 		execute()
 		parent = frappe.get_doc(
-			{"doctype": "Item Group", "item_group_name": "_Test Cost Parent", "is_group": 1, "custom_cost_category": "วัสดุ"}
+			{
+				"doctype": "Item Group",
+				"item_group_name": "_Test Cost Parent",
+				"is_group": 1,
+				"custom_cost_category": "วัสดุ",
+			}
 		).insert()
 		child = frappe.get_doc(
 			{"doctype": "Item Group", "item_group_name": "_Test Cost Child", "parent_item_group": parent.name}
@@ -843,7 +869,9 @@ class IntegrationTestCostControl(IntegrationTestCase):
 		from consbiz.consbiz.doctype.construction_management.cost import material_budget
 
 		items = {
-			"A": frappe._dict(name="A", item_group="เหล็ก", last_purchase_rate=20, is_customer_provided_item=0),
+			"A": frappe._dict(
+				name="A", item_group="เหล็ก", last_purchase_rate=20, is_customer_provided_item=0
+			),
 			"B": frappe._dict(name="B", item_group="สี", valuation_rate=5, is_customer_provided_item=0),
 			"C": frappe._dict(name="C", item_group="เหล็ก", last_purchase_rate=9, is_customer_provided_item=1),
 			"D": frappe._dict(name="D", item_group="เหล็ก", is_customer_provided_item=0),

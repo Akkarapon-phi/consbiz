@@ -17,13 +17,27 @@ from consbiz.consbiz.doctype.retention_receivable.test_retention_receivable impo
 	setup_retention_masters,
 )
 
-IGNORE_TEST_RECORD_DEPENDENCIES = ["Company", "Customer", "Supplier", "Project", "Account", "Mode of Payment"]
 PROJECT_NAME = "_Test Store Project"
+BUYING_PRICE_LIST = "_Test THB Buying"
 ITEM = "_Test Store Item"
+ITEM_2 = "_Test Store Item 2"
 
 
 def setup_store():
 	setup_retention_masters()
+	ensure_master(
+		"Price List",
+		BUYING_PRICE_LIST,
+		price_list_name=BUYING_PRICE_LIST,
+		currency="THB",
+		buying=1,
+		enabled=1,
+	)
+	# ผู้จัดทำใบขอซื้อตั้งค่าเริ่มต้นเป็น Signature ของผู้ใช้ (__user)
+	if not frappe.db.exists("Signature", frappe.session.user):
+		frappe.get_doc(
+			{"doctype": "Signature", "user": frappe.session.user, "full_name": frappe.session.user}
+		).insert(ignore_permissions=True)
 	project = frappe.db.get_value("Project", {"project_name": PROJECT_NAME})
 	if not project:
 		project = (
@@ -42,6 +56,9 @@ def setup_store():
 	ensure_master(
 		"Item", ITEM, item_code=ITEM, item_name=ITEM, item_group=group, stock_uom="Nos", is_stock_item=1
 	)
+	ensure_master(
+		"Item", ITEM_2, item_code=ITEM_2, item_name=ITEM_2, item_group=group, stock_uom="Nos", is_stock_item=1
+	)
 	return project
 
 
@@ -54,6 +71,10 @@ def make_po(project, qty=10):
 			"transaction_date": nowdate(),
 			"schedule_date": add_days(nowdate(), 3),
 			"project": project,
+			# สกุลเงินบริษัทเทสต์ (THB) ไซต์ที่ตั้งค่าเริ่มต้นเป็น INR จะได้ PO สกุลอื่นที่ทำใบแจ้งหนี้ต่อไม่ได้
+			"currency": "THB",
+			"conversion_rate": 1,
+			"buying_price_list": BUYING_PRICE_LIST,
 		}
 	)
 	po.append(
@@ -127,14 +148,17 @@ class IntegrationTestStoreApp(IntegrationTestCase):
 		self.assertTrue(result["rejected_only"])
 		self.assertTrue(
 			frappe.db.exists(
-				"Comment", {"reference_doctype": "Purchase Order", "reference_name": po.name, "comment_type": "Comment"}
+				"Comment",
+				{"reference_doctype": "Purchase Order", "reference_name": po.name, "comment_type": "Comment"},
 			)
 		)
 
 		# เบิกจากคลังของโครงการ
 		stock = {i["item_code"]: i for i in store_app.get_stock(self.project)["items"]}
 		self.assertEqual(stock[ITEM]["balance"], 6)
-		issue = store_app.submit_issue(self.project, json.dumps([{"item_code": ITEM, "qty": 2}]), issued_to="ผรม. ก")
+		issue = store_app.submit_issue(
+			self.project, json.dumps([{"item_code": ITEM, "qty": 2}]), issued_to="ผรม. ก"
+		)
 		self.assertIn(issue["name"], [h["name"] for h in store_app.get_issue_history(self.project)])
 		stock = {i["item_code"]: i for i in store_app.get_stock(self.project)["items"]}
 		self.assertEqual(stock[ITEM]["balance"], 4)

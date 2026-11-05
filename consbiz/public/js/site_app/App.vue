@@ -18,6 +18,20 @@
 			</Transition>
 		</main>
 
+		<!-- จอใหญ่: Dock หมวดงานซ้ายสุด (แท็บเล็ตอยู่บนสุดของแถบไอคอน, มือถือใช้ตารางหมวดงาน) -->
+		<Transition name="ss-dock">
+			<aside v-if="state.project && boot.sections.length > 1" class="ss-dock" aria-label="หมวดงาน">
+				<span class="ss-dock-logo" title="ConsERP"
+					><Icon name="building" :size="20" :stroke="2.2"
+				/></span>
+				<SectionDock variant="dock" />
+				<a v-if="boot.desk" class="ss-sec ss-dock-desk" href="/app" title="เปิดระบบเต็ม">
+					<span class="ss-sec-icon"><Icon name="monitor" :size="20" /></span>
+					<span class="ss-sec-label">ระบบเต็ม</span>
+				</a>
+			</aside>
+		</Transition>
+
 		<!-- มือถือ: แถบล่าง (เฉพาะหน้าหลักของแต่ละเมนู) / แท็บเล็ต-จอใหญ่: แถบข้างซ้าย (ทุกหน้า) -->
 		<Transition name="ss-nav">
 			<nav
@@ -26,34 +40,24 @@
 				:class="{ 'is-sub': !show_nav, 'has-sections': boot.sections.length > 1 }"
 				:style="{ '--count': mobile_tabs.length }"
 				aria-label="เมนูหลัก"
+				@mouseenter="hover_side(true)"
+				@mouseleave="hover_side(false)"
 			>
-				<!-- ชื่อหมวด = ปุ่มเปิดตารางหมวดงาน (แท็บเล็ตเห็นแค่ไอคอน) -->
-				<component
-					:is="boot.sections.length > 1 ? 'button' : 'div'"
-					:type="boot.sections.length > 1 ? 'button' : undefined"
-					class="ss-nav-brand"
-					:title="boot.sections.length > 1 ? 'เปลี่ยนหมวดงาน' : undefined"
-					@click="boot.sections.length > 1 && (launcher = true)"
-				>
-					<span class="ss-nav-logo">
-						<Icon :name="section.icon" :size="20" :stroke="2.2" />
-						<span v-if="boot.sections.length > 1" class="ss-nav-logo-grid"
-							><Icon name="grid" :size="11" :stroke="2.6"
+				<!-- หัว sidebar: ชื่อหมวด (แสดงเมื่อกาง) เปลี่ยนหมวดที่ Dock -->
+				<div class="ss-nav-head">
+					<div class="ss-nav-brand">
+						<span class="ss-nav-logo"
+							><Icon :name="section.icon" :size="20" :stroke="2.2"
 						/></span>
-						<span v-if="other_badges" class="ss-nav-logo-dot">{{ other_badges }}</span>
-					</span>
-					<span class="ss-nav-brand-text">
-						<span>{{ section.title }}</span>
-						<small v-if="boot.sections.length > 1">เปลี่ยนหมวดงาน</small>
-					</span>
-					<Icon
-						v-if="boot.sections.length > 1"
-						class="ss-nav-brand-more"
-						name="chevron-down"
-						:size="16"
-					/>
-				</component>
-				<button type="button" class="ss-nav-project" @click="picker = true">
+						<span class="ss-nav-brand-text">{{ section.title }}</span>
+					</div>
+				</div>
+				<button
+					type="button"
+					class="ss-nav-project"
+					:title="`โครงการ: ${state.project.project_name || state.project.name}`"
+					@click="picker = true"
+				>
 					<span class="ss-avatar" :class="`tone-${tone(state.project.name)}`">{{
 						initials(state.project.project_name || state.project.name)
 					}}</span>
@@ -88,10 +92,26 @@
 					</span>
 					<span class="ss-nav-label">{{ tab.label }}</span>
 				</button>
-				<a v-if="boot.desk" class="ss-nav-item ss-nav-desk" href="/app" title="เปิดระบบเต็ม">
-					<span class="ss-nav-icon"><Icon name="monitor" :size="22" /></span>
-					<span class="ss-nav-label">ระบบเต็ม</span>
-				</a>
+				<!-- ท้าย sidebar: ระบบเต็ม (ไม่มี Dock) + ปุ่มปักหมุด/พับ -->
+				<div class="ss-nav-foot">
+					<a v-if="boot.desk" class="ss-nav-item ss-nav-desk" href="/app" title="เปิดระบบเต็ม">
+						<span class="ss-nav-icon"><Icon name="monitor" :size="22" /></span>
+						<span class="ss-nav-label">ระบบเต็ม</span>
+					</a>
+					<button
+						type="button"
+						class="ss-nav-item ss-nav-pin"
+						:title="pin_label"
+						:aria-label="pin_label"
+						:aria-pressed="side === 'expanded'"
+						@click="toggle_side"
+					>
+						<span class="ss-nav-icon"
+							><Icon :name="side === 'expanded' ? 'chevrons-left' : 'panel'" :size="20"
+						/></span>
+						<span class="ss-nav-label">{{ pin_label }}</span>
+					</button>
+				</div>
 			</nav>
 		</Transition>
 
@@ -165,10 +185,11 @@
 </template>
 
 <script setup>
-import { computed, onMounted, provide, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, provide, ref, watch } from "vue";
 import Icon from "./components/Icon.vue";
 import Sheet from "./components/Sheet.vue";
 import SectionLauncher from "./components/SectionLauncher.vue";
+import SectionDock from "./components/SectionDock.vue";
 import { PARENT_TAB, SECTIONS, is_tab } from "./sections.js";
 import {
 	boot,
@@ -210,6 +231,7 @@ import ConcreteForm from "./views/work/ConcreteForm.vue";
 import DocsHome from "./views/docs/DocsHome.vue";
 import DocList from "./views/docs/DocList.vue";
 import DocView from "./views/docs/DocView.vue";
+import DocForm from "./views/docs/DocForm.vue";
 
 const VIEWS = {
 	home: Home,
@@ -243,6 +265,8 @@ const VIEWS = {
 	si: DocList,
 	"buy-doc": DocView,
 	"sell-doc": DocView,
+	"buy-form": DocForm,
+	"sell-form": DocForm,
 };
 
 const section = computed(() => SECTIONS[state.section]);
@@ -261,7 +285,14 @@ const tabs = computed(() => {
 	}));
 });
 const mobile_tabs = computed(() => tabs.value.filter((t) => !t.wide_only));
-const active_view = computed(() => PARENT_TAB[state.route.view] || state.route.view);
+// หน้าเอกสารจัดซื้อ/ขาย (ดู/ฟอร์ม) ไฮไลต์เมนูของชนิดเอกสาร (params.kind)
+const DOC_PAGES = ["buy-doc", "sell-doc", "buy-form", "sell-form"];
+const active_view = computed(
+	() =>
+		PARENT_TAB[state.route.view] ||
+		(DOC_PAGES.includes(state.route.view) && state.route.params.kind) ||
+		state.route.view
+);
 // ตำแหน่งแถบไฮไลต์ของแถบล่าง (มือถือไม่มีเมนู wide_only)
 const tab_index = computed(() =>
 	Math.max(
@@ -351,13 +382,69 @@ provide("open_project_picker", () => (picker.value = true));
 // ---------------------------------------------------------------- หมวดงาน
 
 const launcher = ref(false);
-provide("open_launcher", () => (launcher.value = true));
-// งานที่รอในหมวดอื่น (จุดแดงบนปุ่มหมวดงาน)
-const other_badges = computed(() =>
-	boot.sections
-		.filter((key) => key !== state.section)
-		.reduce((sum, key) => sum + (SECTIONS[key].badge?.(state.summaries[key]) || 0), 0)
+// แท็บเล็ต/จอใหญ่: Dock หมวดงานซ้ายสุด (มีมากกว่า 1 หมวด) ความกว้างรวมใน --ss-side (ดู site.css)
+if (boot.sections.length > 1) document.documentElement.dataset.dock = "1";
+
+// sidebar แท็บเล็ต/จอใหญ่
+// - พับ (ค่าเริ่มต้น): ไอคอนอย่างเดียว กางชั่วคราวทับเนื้อหาเอง (html[data-peek])
+//   ใช้เมาส์ = ชี้แล้วกาง เอาออกแล้วพับ, จอสัมผัส = กดปุ่มล่างสุดแล้วกาง เลือกเมนู/แตะนอกแถบแล้วพับ
+// - ปักหมุด (expanded): กางค้างและดันเนื้อหา (ปุ่มล่างสุด) จำในเครื่อง
+const SIDE_KEY = "consbiz.site.sidebar";
+const can_hover = window.matchMedia("(hover: hover) and (pointer: fine)").matches;
+function saved_side() {
+	try {
+		return localStorage.getItem(SIDE_KEY);
+	} catch {
+		return null;
+	}
+}
+const side = ref(saved_side() === "expanded" ? "expanded" : "collapsed");
+const peek = ref(false);
+document.documentElement.dataset.side = side.value;
+
+watch(peek, (value) => {
+	if (value) document.documentElement.dataset.peek = "1";
+	else delete document.documentElement.dataset.peek;
+});
+const pin_label = computed(() => {
+	if (side.value === "expanded") return "พับแถบเมนู";
+	return can_hover ? "ปักหมุดแถบเมนู" : peek.value ? "ซ่อนชื่อเมนู" : "แสดงชื่อเมนู";
+});
+
+function toggle_side() {
+	// จอสัมผัสตอนพับ: กาง/ซ่อนชั่วคราว (ไม่ปักหมุด เพื่อไม่บังเนื้อหาถาวรบนจอแท็บเล็ต)
+	if (!can_hover && side.value === "collapsed") {
+		peek.value = !peek.value;
+		return;
+	}
+	side.value = side.value === "expanded" ? "collapsed" : "expanded";
+	peek.value = false;
+	document.documentElement.dataset.side = side.value;
+	try {
+		localStorage.setItem(SIDE_KEY, side.value);
+	} catch {
+		// private mode
+	}
+}
+
+let peek_timer = null;
+function hover_side(inside) {
+	if (!can_hover || side.value === "expanded" || window.innerWidth < 768) return;
+	clearTimeout(peek_timer);
+	// หน่วงเล็กน้อย: เมาส์ผ่านเฉยๆ ไม่กาง, ออกแล้วไม่พับทันที
+	peek_timer = setTimeout(() => (peek.value = inside), inside ? 150 : 250);
+}
+// เปลี่ยนหน้า / แตะนอกแถบ: พับกลับ
+watch(
+	() => state.route,
+	() => (peek.value = false)
 );
+function close_peek(event) {
+	if (peek.value && !event.target.closest?.(".ss-nav")) peek.value = false;
+}
+document.addEventListener("pointerdown", close_peek);
+onBeforeUnmount(() => document.removeEventListener("pointerdown", close_peek));
+provide("open_launcher", () => (launcher.value = true));
 
 onMounted(async () => {
 	// ?project=<รหัส> เลือกโครงการให้เลย (ลิงก์จากฟอร์ม Project / CM)

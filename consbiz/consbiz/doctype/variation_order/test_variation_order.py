@@ -9,6 +9,7 @@ from consbiz.consbiz.doctype.construction_management.construction_management imp
 	create_from_boq,
 	get_schedule_data,
 )
+from consbiz.tests.utils import insert_boq
 
 EXTRA_TEST_RECORD_DEPENDENCIES = []
 IGNORE_TEST_RECORD_DEPENDENCIES = [
@@ -34,7 +35,7 @@ class IntegrationTestVariationOrder(IntegrationTestCase):
 			{"wbs": "1.2", "item_name": "งานเหล็ก", "quantity": 4, "material_rate": 250},
 		):
 			boq.append("boq_details", row)
-		boq.insert()
+		insert_boq(boq)
 		# สัญญาเดิม 4000: 1.1 = 3000 (75%), 1.2 = 1000 (25%)
 		self.plan = create_from_boq(boq.name)
 

@@ -29,12 +29,21 @@ class ExtensionofTime(Document):
 
 	def before_update_after_submit(self):
 		self.set_approval()
-		self.set_finish_dates()
 
 	def on_submit(self):
 		update_plan(self.construction_management)
 
 	def on_update_after_submit(self):
+		# วันสิ้นสุดที่คำนวณได้ไม่ใช่ช่อง allow_on_submit: แก้ก่อนบันทึกได้ UpdateAfterSubmitError จึงตั้งหลังบันทึกด้วย db_set
+		self.set_finish_dates()
+		self.db_set(
+			{
+				"contract_finish_date": self.contract_finish_date,
+				"previous_extension_days": self.previous_extension_days,
+				"revised_finish_date": self.revised_finish_date,
+			},
+			update_modified=False,
+		)
 		update_plan(self.construction_management)
 
 	def on_cancel(self):
@@ -46,7 +55,10 @@ class ExtensionofTime(Document):
 		self.notice_deadline = add_days(self.event_end, NOTICE_DAYS) if self.event_end else None
 		if self.cause != "Variation Order":
 			self.variation_order = None
-		elif self.variation_order:
+		elif not self.variation_order:
+			# ตรงกับ mandatory_depends_on ของช่อง (ฟอร์มระบบเต็มบังคับฝั่งหน้าเว็บเท่านั้น)
+			frappe.throw(_("สาเหตุเป็นงานเพิ่ม-ลด ต้องเลือก Variation Order"))
+		else:
 			plan, docstatus = frappe.db.get_value(
 				VARIATION_ORDER, self.variation_order, ["construction_management", "docstatus"]
 			)
@@ -98,4 +110,3 @@ def update_plan(construction_management):
 	plan = frappe.get_doc("Construction Management", construction_management)
 	plan.flags.ignore_permissions = True
 	plan.save()
-

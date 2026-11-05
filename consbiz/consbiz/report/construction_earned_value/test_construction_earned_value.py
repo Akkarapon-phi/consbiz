@@ -12,18 +12,9 @@ from consbiz.consbiz.doctype.construction_management.construction_management imp
 )
 from consbiz.consbiz.doctype.construction_management.evm import evm_at, indices
 from consbiz.consbiz.report.construction_earned_value.construction_earned_value import execute
+from consbiz.tests.utils import insert_boq
 
 EXTRA_TEST_RECORD_DEPENDENCIES = []
-IGNORE_TEST_RECORD_DEPENDENCIES = [
-	"Construction Management",
-	"BOQ",
-	"Customer",
-	"Company",
-	"Holiday List",
-	"UOM",
-	"Project",
-]
-
 EVM = "consbiz.consbiz.doctype.construction_management.evm"
 
 
@@ -38,7 +29,7 @@ class IntegrationTestConstructionEarnedValue(IntegrationTestCase):
 			{"wbs": "1.2", "item_name": "งานเหมา", "quantity": 0, "total_amount": 1000},
 		):
 			boq.append("boq_details", row)
-		boq.insert()
+		insert_boq(boq)
 		self.plan = create_from_boq(boq.name)
 		doc = frappe.get_doc("Construction Management", self.plan)
 		doc.start_date = "2026-11-02"

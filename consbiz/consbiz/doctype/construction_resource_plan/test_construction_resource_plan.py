@@ -16,6 +16,7 @@ from consbiz.consbiz.doctype.construction_resource_plan.construction_resource_pl
 	planned_resources,
 )
 from consbiz.consbiz.report.construction_resource_histogram.construction_resource_histogram import execute
+from consbiz.tests.utils import insert_boq
 
 EXTRA_TEST_RECORD_DEPENDENCIES = []
 IGNORE_TEST_RECORD_DEPENDENCIES = [
@@ -41,7 +42,7 @@ class IntegrationTestConstructionResourcePlan(IntegrationTestCase):
 			{"wbs": "1.2", "item_name": "งานคอนกรีต", "quantity": 0, "total_amount": 1000},
 		):
 			boq.append("boq_details", row)
-		boq.insert()
+		insert_boq(boq)
 		self.plan = create_from_boq(boq.name)
 		_group, a, b = frappe.get_doc("Construction Management", self.plan).tasks
 		save_tasks(
@@ -125,18 +126,36 @@ class IntegrationTestConstructionResourcePlan(IntegrationTestCase):
 		# ยังไม่มีแผน: สร้างให้
 		data = self.save_from_gantt(
 			[
-				{"task": tasks["1.1"], "wbs": "1.1", "resource_type": "Labour", "resource": "คนงาน", "qty_per_day": 4, "lead_time_days": 3},
-				{"task": tasks["1.2"], "wbs": "1.2", "resource_type": "Equipment", "resource": "รถขุด", "qty_per_day": 1},
+				{
+					"task": tasks["1.1"],
+					"wbs": "1.1",
+					"resource_type": "Labour",
+					"resource": "คนงาน",
+					"qty_per_day": 4,
+					"lead_time_days": 3,
+				},
+				{
+					"task": tasks["1.2"],
+					"wbs": "1.2",
+					"resource_type": "Equipment",
+					"resource": "รถขุด",
+					"qty_per_day": 1,
+				},
 			]
 		)
 		plan = data["resource_plan"]
 		self.assertTrue(plan["exists"])
-		self.assertEqual([(r["wbs"], r["resource"], r["lead_time_days"]) for r in plan["items"]], [("1.1", "คนงาน", 3), ("1.2", "รถขุด", 0)])
+		self.assertEqual(
+			[(r["wbs"], r["resource"], r["lead_time_days"]) for r in plan["items"]],
+			[("1.1", "คนงาน", 3), ("1.2", "รถขุด", 0)],
+		)
 
 		# แก้แถวเดิม (name เดิม) และลบแถวที่ไม่ส่งมา
 		first = {**plan["items"][0], "qty_per_day": 5}
 		data = self.save_from_gantt([first], plan["modified"])
-		self.assertEqual([(r["name"], r["qty_per_day"]) for r in data["resource_plan"]["items"]], [(first["name"], 5)])
+		self.assertEqual(
+			[(r["name"], r["qty_per_day"]) for r in data["resource_plan"]["items"]], [(first["name"], 5)]
+		)
 
 		# แผนถูกแก้จากที่อื่นหลังเปิดหน้า Gantt
 		with self.assertRaises(frappe.TimestampMismatchError):
@@ -149,8 +168,20 @@ class IntegrationTestConstructionResourcePlan(IntegrationTestCase):
 	def test_overview(self):
 		self.make_plan(
 			[
-				{"wbs": "1.1", "resource_type": "Labour", "resource": "คนงาน", "qty_per_day": 4, "lead_time_days": 7},
-				{"wbs": "1.2", "resource_type": "Labour", "resource": "คนงาน", "qty_per_day": 6, "lead_time_days": 2},
+				{
+					"wbs": "1.1",
+					"resource_type": "Labour",
+					"resource": "คนงาน",
+					"qty_per_day": 4,
+					"lead_time_days": 7,
+				},
+				{
+					"wbs": "1.2",
+					"resource_type": "Labour",
+					"resource": "คนงาน",
+					"qty_per_day": 6,
+					"lead_time_days": 2,
+				},
 			]
 		)
 		overview = get_overview(self.plan, day="2026-10-25")
@@ -160,7 +191,10 @@ class IntegrationTestConstructionResourcePlan(IntegrationTestCase):
 		self.assertEqual((labour["next_task"], labour["days_left"], labour["status"]), ("1.1", 1, "due"))
 		# 2-3 พ.ย. 4 คน, 4 พ.ย. 4 + 6, 5 พ.ย. 6 คน
 		self.assertEqual((labour["peak"], labour["total"]), (10, 24))
-		self.assertEqual((getdate(labour["start_date"]), getdate(labour["end_date"])), (getdate("2026-11-02"), getdate("2026-11-05")))
+		self.assertEqual(
+			(getdate(labour["start_date"]), getdate(labour["end_date"])),
+			(getdate("2026-11-02"), getdate("2026-11-05")),
+		)
 		self.assertTrue(overview["chart"]["datasets"])
 
 		# งานที่เริ่มแล้วไม่ต้องจอง

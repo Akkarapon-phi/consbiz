@@ -11,17 +11,9 @@ from consbiz.consbiz.doctype.construction_management.construction_management imp
 	save_tasks,
 )
 from consbiz.consbiz.report.construction_delay_analysis.construction_delay_analysis import execute
+from consbiz.tests.utils import insert_boq
 
 EXTRA_TEST_RECORD_DEPENDENCIES = []
-IGNORE_TEST_RECORD_DEPENDENCIES = [
-	"Construction Management",
-	"BOQ",
-	"Customer",
-	"Company",
-	"Holiday List",
-	"UOM",
-	"Project",
-]
 
 
 class IntegrationTestConstructionDelayAnalysis(IntegrationTestCase):
@@ -36,7 +28,7 @@ class IntegrationTestConstructionDelayAnalysis(IntegrationTestCase):
 			{"wbs": "1.3", "item_name": "งานต่อจาก 1.2", "quantity": 0, "total_amount": 1000},
 		):
 			boq.append("boq_details", row)
-		boq.insert()
+		insert_boq(boq)
 		self.plan = create_from_boq(boq.name)
 		doc = frappe.get_doc("Construction Management", self.plan)
 		doc.start_date = "2026-11-02"
@@ -94,10 +86,13 @@ class IntegrationTestConstructionDelayAnalysis(IntegrationTestCase):
 		self.assertEqual(values["เกินกำหนด (วัน)"], 3)
 		self.assertEqual(values["ค่าปรับคาดการณ์"], 300)
 		self.assertIsNone(message)
-		self.assertEqual(getdate(get_schedule_data(self.plan)["forecast_finish"]) >= getdate("2026-11-13"), True)
+		self.assertEqual(
+			getdate(get_schedule_data(self.plan)["forecast_finish"]) >= getdate("2026-11-13"), True
+		)
 
 	def test_only_issues_and_extension(self):
-		rows, _message, _summary = self.report()
+		# ค่าเริ่มต้น "เฉพาะงานที่มีปัญหา" อยู่ที่ตัวกรองของหน้ารายงาน (JS) จึงส่งเองในเทสต์
+		rows, _message, _summary = self.report(only_issues=1)
 		self.assertEqual(sorted(rows), ["1.2", "1.3"])
 
 		# EOT 3 วัน: เสร็จตามที่คาดพอดี ไม่มีค่าปรับ

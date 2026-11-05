@@ -41,6 +41,11 @@ pre-commit run --all-files                               # ruff + prettier (ต�
 - เพิ่มฟีเจอร์หรือแก้ logic ต้องมีเทสต์ใน `test_<doctype>.py` ของ DocType นั้น และ `run-tests` ต้องผ่าน
 - DocType ที่ Link ไป DocType ของ ERPNext (เช่น Project) ต้องใส่ชื่อนั้นใน `IGNORE_TEST_RECORD_DEPENDENCIES`
   ไม่งั้นเทสต์จะสร้าง test record ของ ERPNext ทั้งชุดแล้วชนข้อมูลเดิม
+  (ไล่ไปถึง DocType ของแอปที่ไม่ได้ติดตั้ง เช่น `Payment Gateway` แล้วพัง) รวม Link ในตารางลูกด้วย
+  ใส่ได้เฉพาะเทสต์ในโฟลเดอร์ DocType: ไฟล์เทสต์นอกโฟลเดอร์ DocType (รายงาน, `consbiz/test_*.py`, `consbiz/tests/`) ห้ามใส่ Frappe v16 ขึ้น `NotImplementedError`
+- เทสต์ที่ต้องใช้ BOQ ใช้ `consbiz.tests.utils.insert_boq` (BOQ คำนวณ `total_amount` = ปริมาณ x ราคา เองทุกครั้ง)
+- Frappe v16: `frappe.copy_doc` คง `docstatus` ต้นฉบับ ทำฉบับแก้ไข (amend) ในเทสต์ต้องตั้ง `docstatus = 0` เอง
+  ระหว่างเทสต์ไม่มี Version (`ignore_version = in_test`) และ `cancel` ที่ไม่ผ่านเขียน docstatus ไปแล้ว ต้องย้อนด้วย savepoint เอง
 - งานที่เปลี่ยน DocType, fixtures, Sidebar หรือ Dock: restore backup ล่าสุดของเซิร์ฟเวอร์จริงลงไซต์ทดสอบ แล้ว migrate
   ตรวจ log ว่าไม่มีบรรทัด "Orphaned ... found" และข้อมูลไม่หาย
 
@@ -162,14 +167,49 @@ pre-commit run --all-files                               # ruff + prettier (ต�
 - แอปหน้างาน `/site` (มือถือ, ติดตั้งลงหน้าจอได้) = หน้า www (`consbiz/www/site.html`) + Vue (`public/js/site_app/`) แอปเดียวแบ่งหมวดงาน
   หมวด (`sections.js`): สโตร์ (`views/store/`, API `consbiz/store_app.py`) / ควบคุมงาน (`views/work/`, รวมคอนกรีต) / บริหารโครงการ (`views/pm/`) API 2 หมวดนี้อยู่ `consbiz/site_app.py`
   จัดซื้อ (MR ประเภท Purchase → PO → PI) / ขาย (Quotation → SO → SI): `views/docs/` ชุดเดียวกันทั้ง 6 ชนิด (`DOC_KINDS` ใน sections.js ตรงกับ `DOCS` ใน `consbiz/site_docs.py`)
-  ดูรายการ/รายละเอียด/เอกสารต้นทาง-ปลายทาง, ส่งเอกสารร่าง, PDF ขอบเขต โครงการนี้/ทุกโครงการ (`state.doc_scope`) สร้างเอกสารใหม่ในระบบเต็ม
-  ทางเข้าจากระบบเต็ม: Desktop Icon "Site App" (`consbiz/desktop_icon/site_app.json`, External → /site) ผู้ใช้ที่มี Desktop Layout ของตัวเองเห็นไอคอนใหม่เฉพาะที่อยู่ใน layout (patch `add_site_app_to_desktop_layouts`)
+  ดูรายการ/รายละเอียด/เอกสารต้นทาง-ปลายทาง, ส่งเอกสารร่าง, PDF ขอบเขต โครงการนี้/ทุกโครงการ (`state.doc_scope`)
+  สร้าง/แก้ไขร่างในแอป (`DocForm.vue`, หน้า `buy-form` / `sell-form`): ช่องที่กรอกได้อยู่ใน `FORM` ของ site_docs.py (รวมส่วนลดท้ายบิล %)
+  หัก ณ ที่จ่าย/เงินประกันผลงานในแอป: `consbiz/deductions.py` (เรียกจาก `apply_form` เท่านั้น ไม่ได้ผูก validate)
+  สูตรเดียวกับสคริปต์ฟอร์มระบบเต็ม (`purchase_order.js`, `quotation_cal.js`, `sales_order_cal.js`, `purchase_invoice.js`, `sales_invoice_cal.js`) แก้ที่หนึ่งต้องแก้อีกที่
+  PI/SI ลงตาราง `custom_payment_entry_deduction` (บัญชีจาก Company) SI ติ๊ก `custom_edit_wht`/`custom_edit_retention` = ใช้ยอดที่กรอกเอง
+  รายการ: `LineEditor.vue` จอ ≥1000 = ตารางแก้ไขในช่อง + แถวค้นหาเพิ่ม (↑↓/Enter, Enter จำนวน → ราคา → ค้นหา), แคบกว่า = การ์ด
+  ลากที่จับย้ายลำดับแถว (ส่ง idx ตามลำดับ), ติ๊กหลายแถวแล้วลบ, ปากกา = รายละเอียดแถว (คำอธิบาย, WBS, ไม่คิดภาษี)
+  ใบขอซื้อ: วัตถุประสงค์ ซื้อ / ผู้ว่าจ้างจัดหา (ผู้ว่าจ้างจัดหาห้ามสร้าง PO ต่อ), ผู้จัดทำ/ผู้อนุมัติ = Signature
+  ยอด/ภาษีของ MR = `consbiz/request_totals.py` (doc_events validate) สูตรเดียวกับ `material_request.js` แก้ที่หนึ่งต้องแก้อีกที่
+  MR ใหม่: ERPNext `update_item_rates` ทับราคาด้วย Price List ตอนบันทึกครั้งแรก `save_doc` ใส่ราคาที่ผู้ใช้กรอกคืน (`keep_request_rates`)
+  ดูเอกสาร: แถบขั้นตอน (`steps_of`), สรุปยอด (`summary_of`: แถว + ยอดสุทธิ + ตัวอักษร) ใช้ทั้งหน้าดูและฟอร์ม
+  sidebar ขวาของหน้าดู แยกจากเนื้อหา เปิด-ปิดที่ปุ่มบน TopBar: จอ ≥1480 กางค้าง (`html[data-rside]` → `--ss-rside` ดันเนื้อหา/แถบล่าง จำในเครื่อง), เล็กกว่า = เลื่อนทับ (z-index ต่ำกว่า sheet)
+  เนื้อหา sidebar (`DocActivity.vue`, `site_docs.get_activity`): ถูกใจ, มอบหมาย (`frappe.desk.form.assign_to`), ไฟล์แนบ (`upload(file, {doctype, docname})` / `remove_attachment`),
+  เอกสารที่เกี่ยวข้อง, ความคิดเห็น (`add_comment` ผ่าน `clean_html`, ลบได้เฉพาะของตัวเอง) + ความเคลื่อนไหวจาก Version/Comment แบบ timeline ของระบบเต็ม
+  ช่องเลือก/วันที่ของแอปใช้ `components/SelectBox.vue` / `DateInput.vue` (ปฏิทิน พ.ศ.) ห้ามใช้ `<select>` / `<input type="date">` ของเบราว์เซอร์
+  ช่องเงินใช้ `MoneyInput.vue` (แสดง 1,234.50 / โฟกัสแล้วเป็นตัวเลขดิบ) รายละเอียดรายการ (HTML ของ Quill) แสดงด้วย `RichText.vue` แก้ด้วย `RichEditor.vue`
+  HTML จากระบบเต็มต้องผ่าน `sanitize_html` (api.js) ก่อน `v-html` ทุกครั้ง (ตัด `span.ql-ui`, Quill 2 ใช้ `li[data-list]` แยกลำดับเลข/หัวข้อย่อย)
+  ดูเอกสาร (`DocView.vue`): หัวเอกสาร = คู่ค้า/สถานะ + ช่องข้อมูลเป็นตาราง, ≥768 = ตารางรายการ + สรุปยอดท้ายตาราง, ≥1180 = แผงข้าง (เอกสารที่เกี่ยวข้อง/หมายเหตุ)
+  เอกสารถัดไป (`MAPPERS`: MR→PO, PO→PI, QTN→SO, SO→SI) ใช้ mapper ของ ERPNext ตอนบันทึกเรียก mapper ใหม่แล้วจับคู่แถวด้วย `key` (แถวบันทึกแล้ว = name, แถวจาก mapper = ลำดับ)
+  ยอด/ภาษีคำนวณที่ server (`preview_doc`) แล้ว rollback เสมอ (ERPNext สร้าง Item Price อัตโนมัติระหว่างเติมค่า) PI มีเลขที่ใบกำกับภาษี (erpnext_thailand บังคับเมื่อมีภาษีซื้อ)
+  ทางเข้าจากระบบเต็ม: Desktop Icon "ConsERP" (`consbiz/desktop_icon/conserp.json`, External → /site) ผู้ใช้ที่มี Desktop Layout ของตัวเองเห็นไอคอนใหม่เฉพาะที่อยู่ใน layout (patch `add_conserp_to_desktop_layouts`)
   บริหารโครงการ (สิทธิ์อ่าน CM) ดูอย่างเดียว: ภาพรวม (`dashboard.get_dashboard`), แผนงาน Gantt (`get_plan`), Look-ahead (`lookahead.get_lookahead` สถานะวันตรงกับ `LookAhead.vue`),
   ทรัพยากร + แผนจัดซื้อวัสดุ (`resources.get_overview`), เอกสาร (`get_documents`) แก้แผนที่หน้า Gantt ในระบบเต็ม
   Look-ahead: มือถือ = การ์ดทีละสัปดาห์, แท็บเล็ต = ตาราง 2 สัปดาห์, จอใหญ่ = ตารางทั้งช่วง (matchMedia ใน `Lookahead.vue`)
   summary ของหมวดที่ `lazy` (บริหารโครงการ) โหลดเมื่อเปิดหมวดนั้นเท่านั้น
-  หมวดที่เห็นตามสิทธิ์ (`site_app.boot_data` → `sections`) สลับหมวดผ่านตารางไอคอน (`SectionLauncher.vue`, เพิ่มหมวดได้ไม่จำกัด)
-  เปิดจากชิปบน hero (มือถือ, `Hero.vue`) หรือชื่อหมวดบนแถบข้าง สลับแล้วไปเมนูล่าสุดของหมวดนั้น (`state.last_tab`)
+  หมวดที่เห็นตามสิทธิ์ (`site_app.boot_data` → `sections`) สลับหมวด: มือถือ = ตารางไอคอน (`SectionLauncher.vue`) เปิดจากชิปบน hero (`Hero.vue`)
+  แท็บเล็ต/จอใหญ่ = Dock คอลัมน์ซ้ายสุด (`SectionDock.vue`) + sidebar เมนูของหมวด ค่าเริ่มต้นพับ (ไอคอน)
+  กางชั่วคราวทับเนื้อหา (`html[data-peek]`): ใช้เมาส์ = ชี้แล้วกาง, จอสัมผัส = ปุ่มล่างสุด เลือกเมนู/แตะนอกแถบแล้วพับ
+  ปักหมุด (`html[data-side="expanded"]`, ปุ่มล่างสุดบนจอใช้เมาส์) = กางค้างและดันเนื้อหา จำในเครื่อง
+  `html[data-dock]` + `html[data-side]` กำหนด `--ss-side` (ความกว้าง Dock + sidebar) ที่เนื้อหา/sheet/แถบล่างใช้ (data-peek ไม่เปลี่ยน --ss-side)
+  รายการเอกสารจัดซื้อ/ขาย (`DocList.vue`): แท็บสถานะมีจำนวน, ค้นหา/ช่วงวันที่/คู่ค้า/เกินกำหนด/ขอบเขต, เรียงคอลัมน์, เลือกหลายแถวแล้วส่ง (`submit_docs` ใช้ savepoint ต่อใบ), ส่งออก CSV
+  คอลัมน์ต่อชนิดเอกสารใน `DocTable.vue` (ท้ายตาราง: มอบหมาย `_assign` / แก้ไขล่าสุด / ถูกใจ `frappe.desk.like.toggle_like`)
+  `get_docs` คืน rows + total + sums (ยอดรวมทั้งชุด) + counts (ของแต่ละแท็บ) มือถือ = การ์ด (`DocCard.vue`) + ตัวกรองใน sheet, แท็บเล็ต/จอใหญ่ = ตาราง (`DocTable.vue`) + แบ่งหน้า
+  sidebar พับ/กางใช้โครงแนวตั้งเดียวกัน (หัว/โครงการ 52px, เมนู 48px) ห้ามให้ความสูงต่างกันตามสถานะ ไม่งั้นเมนูขยับตอนเปิด-ปิด
+  หน้าหลักทุกหมวด (`Hero.vue`): มือถือ = hero เต็ม, ≥768 = แถบเตี้ยแถวเดียว
+  จอ ≥1480: รายการ = ตาราง + ตัวอย่างเอกสารขวา (`DocPreview.vue`, คลิก = ดูตัวอย่าง, ↑↓ เลื่อน, ดับเบิลคลิก/Enter = เปิดเต็มหน้า)
+  แผงตัวอย่างต้องพอดีจอโน้ตบุ๊ก (สูง ~760px) โดยไม่เลื่อน: รายการ 3 แถวแรก + ยอดสำคัญ (ยอดรวม/ยอดสุทธิ/ค้าง) รายละเอียดอื่นดูในหน้าเต็ม
+  ฟอร์ม = แผงข้อมูลประกอบของแถวที่เลือก (`ItemInsight.vue`, `site_docs.get_item_insight`: คงเหลือ / แผนวัสดุเทียบขอ-สั่ง-รับ / ราคาล่าสุด / PO ค้างรับ)
+  เทสต์แบบ rollback บน dev: คำสั่งที่ทำ DDL (เช่น frappe เพิ่มคอลัมน์ `_liked_by` ครั้งแรก) commit ทันที ข้อมูลทดสอบจะค้าง ตรวจและลบเองทุกครั้ง
+  สลับแล้วไปเมนูล่าสุดของหมวดนั้น (`state.last_tab`)
+  ฟอร์มบนแท็บเล็ต/จอใหญ่: เลย์เอาต์ในขั้นของฟอร์มใช้ container query (`.ss-step-body`) ตามความกว้างฟอร์ม ไม่ใช่ความกว้างจอ
+  ฟอร์มทีละขั้น ≥1180 = แถบขั้นตอนซ้าย (`.ss-wizard`) พร้อมสรุปของขั้น (`step_hint`), งานที่ทำ 1 งาน = 1 แถว, Ctrl/⌘+Enter = ถัดไป/ส่ง
+  จอใช้เมาส์ (`hover: hover` + `pointer: fine`) ช่องกรอกเตี้ยลงและมีเส้นขอบ จอสัมผัสคงขนาดใหญ่ แถบล่างปุ่มชิดขวา
   สีหลักตามหมวด: `data-section` ที่ `<html>` (sheet ถูก Teleport ไป body) ทับ `--ss-brand*`
   ชื่อหน้า (view) ห้ามซ้ำข้ามหมวด (`go(view)` หาหมวดจาก `ROUTES`), summary แยกหมวดใน `state.summaries`
   ควบคุมงาน: หน้าหลัก % จริง/แผน + S-Curve (`SCurve.vue`, ข้อมูล `dashboard.progress_curve`), ปฏิทินรายงาน (`get_site_calendar`)
@@ -177,6 +217,7 @@ pre-commit run --all-files                               # ruff + prettier (ต�
   แอปส่งเฉพาะช่องใน `FORM_FIELDS` / `ITEM_FIELDS` ค่าอื่นคำนวณใน validate ของเอกสารเหมือนกรอกในระบบเต็ม
   ฟอร์มใหม่เก็บร่างใน localStorage ระหว่างกรอก (สัญญาณหลุดไม่หาย) ขอตรวจงาน / Punch List ยังสร้างในระบบเต็ม
   ขออนุมัติได้ทุกวัน (ย้อนหลังได้) PDF/แชร์ไฟล์: `site_app.pdf_url` เลือกตัวสร้าง PDF แบบหน้าพิมพ์ของระบบเต็ม (Print Format → Print Settings)
+  ดู PDF ในแอป (`PdfViewer.vue`) วาดด้วย PDF.js ที่ `public/js/lib/pdfjs/` (มือถือแสดง PDF ใน iframe ไม่ได้) โหลดเมื่อเปิดครั้งแรก
   ไม่ใช้ desk: เรียก API ด้วย fetch เอง (`api.js`), router เอง (`/site/<หมวด>/<view>/<params>`, `website_route_rules`), CSS อยู่ `site.css` (class `ss-`)
   `/store/...` เดิมเด้งไป `/site/store/...` (`website_redirects` ใน hooks.py) ไอคอนที่ติดตั้งไว้แล้วยังใช้ได้
   CSS ต้อง `@import` ใน `<style>` ของ `App.vue` (Frappe ฝัง CSS เข้า bundle เฉพาะที่มาจาก .vue ถ้า import .css ตรงๆ ไฟล์ JS ถูกลบตอน build)

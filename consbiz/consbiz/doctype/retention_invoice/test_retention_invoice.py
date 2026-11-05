@@ -15,7 +15,16 @@ from consbiz.consbiz.doctype.retention_receivable.test_retention_receivable impo
 	setup_retention_masters,
 )
 
-IGNORE_TEST_RECORD_DEPENDENCIES = ["Company", "Customer", "Supplier", "Project", "Account", "Mode of Payment"]
+IGNORE_TEST_RECORD_DEPENDENCIES = [
+	"Company",
+	"Customer",
+	"Supplier",
+	"Project",
+	"Account",
+	"Mode of Payment",
+	"DocType",
+	"Journal Entry",
+]
 
 
 def make_claim(source, amount=None, submit=True):
@@ -55,7 +64,9 @@ class IntegrationTestRetentionInvoice(IntegrationTestCase):
 		self.assertEqual(first.grand_total, 400)
 		self.assertEqual(status(first), "Unpaid")
 		source.reload()
-		self.assertEqual((source.status, source.billed_amount, source.outstanding_amount), ("Partly Billed", 400, 600))
+		self.assertEqual(
+			(source.status, source.billed_amount, source.outstanding_amount), ("Partly Billed", 400, 600)
+		)
 
 		# ค่าเริ่มต้นของใบถัดไป = ยอดคงเหลือ
 		second = make_claim(source)

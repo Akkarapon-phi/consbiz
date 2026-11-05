@@ -9,6 +9,7 @@ from consbiz.consbiz.doctype.construction_management.construction_management imp
 	create_from_boq,
 	get_schedule_data,
 )
+from consbiz.tests.utils import insert_boq
 
 EXTRA_TEST_RECORD_DEPENDENCIES = []
 IGNORE_TEST_RECORD_DEPENDENCIES = [
@@ -33,7 +34,7 @@ class IntegrationTestExtensionofTime(IntegrationTestCase):
 			{"wbs": "1.1", "item_name": "งานคอนกรีต", "quantity": 10, "material_rate": 300},
 		):
 			boq.append("boq_details", row)
-		boq.insert()
+		insert_boq(boq)
 		self.plan = create_from_boq(boq.name)
 		plan = self.get_plan()
 		plan.start_date = "2026-11-01"
@@ -70,7 +71,7 @@ class IntegrationTestExtensionofTime(IntegrationTestCase):
 		plan = self.get_plan()
 		self.assertEqual(plan.extension_days, 0)
 		self.assertEqual(getdate(plan.revised_finish_date), getdate("2026-11-30"))
-		self.assertEqual(doc.notice_deadline, getdate("2026-11-23"))
+		self.assertEqual(getdate(doc.notice_deadline), getdate("2026-11-23"))
 
 		# อนุมัติไม่ระบุจำนวนวัน = เท่าที่ขอ นับวันปฏิทิน
 		doc = self.approve(doc)
@@ -119,7 +120,9 @@ class IntegrationTestExtensionofTime(IntegrationTestCase):
 		order.construction_management = self.plan
 		order.title = "งานเพิ่ม"
 		order.extension_days = 7
-		order.append("items", {"variation_type": "Addition", "item_name": "รางระบายน้ำ", "qty": 1, "rate": 100})
+		order.append(
+			"items", {"variation_type": "Addition", "item_name": "รางระบายน้ำ", "qty": 1, "rate": 100}
+		)
 		order.insert()
 		order.submit()
 

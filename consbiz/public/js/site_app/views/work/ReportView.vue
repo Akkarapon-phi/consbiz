@@ -185,7 +185,7 @@
 			</Transition>
 		</Teleport>
 
-		<PdfSheet
+		<PdfViewer
 			:open="pdf_sheet"
 			:url="setup?.pdf_url"
 			:name="params.name"
@@ -228,7 +228,7 @@ import Icon from "../../components/Icon.vue";
 import TopBar from "../../components/TopBar.vue";
 import Skeleton from "../../components/Skeleton.vue";
 import Sheet from "../../components/Sheet.vue";
-import PdfSheet from "../../components/PdfSheet.vue";
+import PdfViewer from "../../components/PdfViewer.vue";
 import { REPORT_KINDS } from "../../sections.js";
 import { call, celebrate, desk_url, go, num, post, show_error, state } from "../../api.js";
 

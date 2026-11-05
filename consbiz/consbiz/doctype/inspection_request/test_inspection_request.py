@@ -6,6 +6,7 @@ from frappe.tests import IntegrationTestCase
 
 from consbiz.consbiz.doctype.construction_management.construction_management import create_from_boq
 from consbiz.consbiz.doctype.inspection_request.inspection_request import make_reinspection
+from consbiz.tests.utils import insert_boq
 
 EXTRA_TEST_RECORD_DEPENDENCIES = []
 IGNORE_TEST_RECORD_DEPENDENCIES = [
@@ -28,7 +29,7 @@ def make_plan():
 		{"wbs": "1.1", "item_name": "งานฐานราก", "quantity": 10, "total_amount": 3000},
 	):
 		boq.append("boq_details", row)
-	boq.insert()
+	insert_boq(boq)
 	return create_from_boq(boq.name)
 
 

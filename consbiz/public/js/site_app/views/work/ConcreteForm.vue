@@ -42,12 +42,7 @@
 								</label>
 								<label class="ss-field">
 									<span class="ss-field-label">วันที่เท<em>*</em></span>
-									<input
-										v-model="doc.date"
-										class="ss-input"
-										type="date"
-										:disabled="readonly"
-									/>
+									<DateInput v-model="doc.date" label="วันที่เท" :disabled="readonly" />
 								</label>
 							</div>
 							<Picker
@@ -319,6 +314,7 @@
 
 <script setup>
 import { computed, inject, nextTick, reactive, ref } from "vue";
+import DateInput from "../../components/DateInput.vue";
 import Icon from "../../components/Icon.vue";
 import TopBar from "../../components/TopBar.vue";
 import Skeleton from "../../components/Skeleton.vue";

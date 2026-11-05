@@ -15,8 +15,6 @@ from consbiz.employer_supplied import (
 	swap_request_items,
 )
 
-IGNORE_TEST_RECORD_DEPENDENCIES = ["Item", "Item Group", "UOM", "Company", "Customer"]
-
 ITEM_GROUP = "_Test Employer Supplied Group"
 
 
@@ -51,7 +49,9 @@ class IntegrationTestEmployerSupplied(IntegrationTestCase):
 		twin = frappe.get_doc("Item", code)
 		self.assertEqual(twin.custom_base_item, base.name)
 		self.assertEqual(twin.item_name, base.item_name + SUFFIX)
-		self.assertEqual((twin.is_customer_provided_item, twin.is_purchase_item, twin.is_sales_item), (1, 0, 0))
+		self.assertEqual(
+			(twin.is_customer_provided_item, twin.is_purchase_item, twin.is_sales_item), (1, 0, 0)
+		)
 		self.assertEqual((twin.item_group, twin.stock_uom), (base.item_group, base.stock_uom))
 		self.assertIn(("_Test Bundle", 10), [(r.uom, r.conversion_factor) for r in twin.uoms])
 
@@ -90,7 +90,9 @@ class IntegrationTestEmployerSupplied(IntegrationTestCase):
 		frappe.rename_doc("Item", gone.name, keep.name, merge=True, show_alert=False)
 
 		self.assertFalse(frappe.db.exists("Item", gone_twin))
-		self.assertEqual(frappe.get_all("Item", filters={"custom_base_item": keep.name}, pluck="name"), [keep_twin])
+		self.assertEqual(
+			frappe.get_all("Item", filters={"custom_base_item": keep.name}, pluck="name"), [keep_twin]
+		)
 
 	def test_request_swaps_to_employer_item(self):
 		base = make_item()

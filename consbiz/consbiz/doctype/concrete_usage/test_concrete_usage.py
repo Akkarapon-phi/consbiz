@@ -7,6 +7,7 @@ from frappe.tests import IntegrationTestCase
 from consbiz.consbiz.doctype.construction_management.construction_management import create_from_boq
 from consbiz.employer_supplied import employer_item
 from consbiz.tests.test_employer_supplied import make_item
+from consbiz.tests.utils import insert_boq
 
 IGNORE_TEST_RECORD_DEPENDENCIES = [
 	"Construction Management",
@@ -32,13 +33,21 @@ class IntegrationTestConcreteUsage(IntegrationTestCase):
 			{"wbs": "1.1", "item_name": "เทคอนกรีตฐานราก", "quantity": 10, "total_amount": 3000},
 		):
 			boq.append("boq_details", row)
-		boq.insert()
+		insert_boq(boq)
 		self.plan = create_from_boq(boq.name)
 		self.concrete = make_item("_Test Concrete 240")
 
 	def make_usage(self, tickets, **values):
 		doc = frappe.new_doc("Concrete Usage")
-		doc.update({"construction_management": self.plan, "wbs": "1.1", "date": "2026-11-04", "concrete_item": self.concrete.name, **values})
+		doc.update(
+			{
+				"construction_management": self.plan,
+				"wbs": "1.1",
+				"date": "2026-11-04",
+				"concrete_item": self.concrete.name,
+				**values,
+			}
+		)
 		for ticket in tickets:
 			doc.append("tickets", ticket)
 		doc.flags.ignore_links = True
@@ -54,11 +63,15 @@ class IntegrationTestConcreteUsage(IntegrationTestCase):
 			planned_qty=12,
 		)
 		self.assertEqual(doc.task_name, "เทคอนกรีตฐานราก")
-		self.assertEqual((doc.total_qty, doc.employer_qty, doc.company_qty, doc.ticket_count), (13.5, 5.5, 8, 3))
+		self.assertEqual(
+			(doc.total_qty, doc.employer_qty, doc.company_qty, doc.ticket_count), (13.5, 5.5, 8, 3)
+		)
 		self.assertEqual(doc.variance, 1.5)
 
 	def test_keeps_base_item(self):
-		doc = self.make_usage([{"ticket_no": "T1", "qty": 1}], concrete_item=employer_item(self.concrete.name))
+		doc = self.make_usage(
+			[{"ticket_no": "T1", "qty": 1}], concrete_item=employer_item(self.concrete.name)
+		)
 		self.assertEqual(doc.concrete_item, self.concrete.name)
 
 	def test_validation(self):

@@ -78,6 +78,8 @@ const props = defineProps({
 	placeholder: String,
 	options: { type: Array, default: () => [] },
 	remote: String,
+	// ค้นหาเอง: (txt) => Promise<[{ value, label, description }]>
+	remote_fn: Function,
 	display_value: String,
 	required: Boolean,
 	clearable: Boolean,
@@ -92,9 +94,10 @@ const results = ref([]);
 const input = ref(null);
 const chosen = ref(null);
 
-const source = computed(() => (props.remote ? results.value : props.options));
+const is_remote = computed(() => !!(props.remote || props.remote_fn));
+const source = computed(() => (is_remote.value ? results.value : props.options));
 const shown = computed(() => {
-	if (props.remote) return results.value;
+	if (is_remote.value) return results.value;
 	const q = txt.value.trim().toLowerCase();
 	const list = q
 		? props.options.filter((o) =>
@@ -112,12 +115,14 @@ const display = computed(() => {
 
 let timer = null;
 function search_remote() {
-	if (!props.remote) return;
+	if (!is_remote.value) return;
 	clearTimeout(timer);
 	timer = setTimeout(async () => {
 		loading.value = true;
 		try {
-			results.value = await call("search", { doctype: props.remote, txt: txt.value });
+			results.value = props.remote_fn
+				? await props.remote_fn(txt.value)
+				: await call("search", { doctype: props.remote, txt: txt.value });
 		} finally {
 			loading.value = false;
 		}
@@ -127,7 +132,7 @@ function search_remote() {
 watch(open, async (value) => {
 	if (!value) return;
 	txt.value = "";
-	if (props.remote) search_remote();
+	if (is_remote.value) search_remote();
 	await nextTick();
 	// มือถือ: โฟกัสหลัง sheet เลื่อนขึ้นเสร็จ ไม่งั้นคีย์บอร์ดดันหน้ากระตุก
 	setTimeout(() => input.value?.focus(), 320);

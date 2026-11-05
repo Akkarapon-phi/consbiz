@@ -8,8 +8,8 @@
 
 		<div class="ss-content">
 			<Skeleton v-if="!setup" :rows="3" />
-			<template v-else>
-				<!-- ขั้นตอน: แตะย้อนไปขั้นที่ผ่านมาได้ -->
+			<div v-else class="ss-wizard">
+				<!-- ขั้นตอน: แตะย้อนไปขั้นที่ผ่านมาได้ จอกว้าง (≥1180) เป็นแถบซ้ายพร้อมสรุปของแต่ละขั้น -->
 				<nav
 					class="ss-steps"
 					:style="{ '--count': steps.length, '--step': step }"
@@ -28,8 +28,14 @@
 							<Icon v-if="i < step" name="check" :size="13" :stroke="3" />
 							<template v-else>{{ i + 1 }}</template>
 						</span>
-						<span class="ss-step-label">{{ s.label }}</span>
+						<span class="ss-step-text">
+							<span class="ss-step-label">{{ s.label }}</span>
+							<small class="ss-step-hint">{{ step_hint(s.key) }}</small>
+						</span>
 					</button>
+					<p v-if="is_new" class="ss-steps-note">
+						<Icon name="check" :size="13" :stroke="2.6" /> ร่างเก็บไว้ในเครื่องนี้ระหว่างกรอก
+					</p>
 				</nav>
 
 				<Transition :name="`ss-step-${direction}`" mode="out-in">
@@ -58,12 +64,7 @@
 							<div class="ss-form-row">
 								<label class="ss-field">
 									<span class="ss-field-label">วันที่<em>*</em></span>
-									<input
-										v-model="doc.date"
-										class="ss-input"
-										type="date"
-										@change="date_changed"
-									/>
+									<DateInput v-model="doc.date" label="วันที่" @change="date_changed" />
 								</label>
 								<label v-if="is_report" class="ss-field">
 									<span class="ss-field-label">ผู้ควบคุมงาน</span>
@@ -157,7 +158,11 @@
 							:title="is_report ? 'วันนี้ทำงานอะไรบ้าง' : 'จะทำงานอะไรบ้าง'"
 							text="เพิ่มงานตามแผนของวันนี้ หรือเลือกงานจากแผนงาน"
 						/>
-						<TransitionGroup tag="div" class="ss-list ss-list--form" name="ss-list">
+						<TransitionGroup
+							tag="div"
+							class="ss-list ss-list--form ss-list--tasks"
+							name="ss-list"
+						>
 							<div
 								v-for="(row, i) in doc.items"
 								:key="row.wbs"
@@ -165,45 +170,46 @@
 								:class="{ 'is-late': show_errors && row_error(row) }"
 								:style="{ '--i': i }"
 							>
-								<div class="ss-card-head">
-									<span class="ss-card-main">
-										<span class="ss-card-title">{{
-											task_of(row).item_name || row.item_name
-										}}</span>
-										<span class="ss-card-meta"
-											><i class="ss-wbs">{{ row.wbs }}</i>
-											{{ task_of(row).group_path || row.group_path }}</span
-										>
-									</span>
-									<button
-										type="button"
-										class="ss-icon-btn ss-icon-btn--sm"
-										aria-label="ลบงาน"
-										@click="remove_row(row)"
+								<div class="ss-task-info">
+									<span class="ss-card-title">{{
+										task_of(row).item_name || row.item_name
+									}}</span>
+									<span class="ss-card-meta"
+										><i class="ss-wbs">{{ row.wbs }}</i>
+										{{ task_of(row).group_path || row.group_path }}</span
 									>
-										<Icon name="trash" :size="17" />
-									</button>
-								</div>
-
-								<div class="ss-task-progress">
-									<div class="ss-plan-bar ss-plan-bar--sm">
-										<span
-											class="ss-plan-bar-plan"
-											:style="{ width: `${clamp(prev_pct(row) + row_percent(row))}%` }"
-										></span>
-										<span
-											class="ss-plan-bar-actual"
-											:style="{ width: `${clamp(prev_pct(row))}%` }"
-										></span>
+									<div class="ss-task-progress">
+										<div class="ss-plan-bar ss-plan-bar--sm">
+											<span
+												class="ss-plan-bar-plan"
+												:style="{
+													width: `${clamp(prev_pct(row) + row_percent(row))}%`,
+												}"
+											></span>
+											<span
+												class="ss-plan-bar-actual"
+												:style="{ width: `${clamp(prev_pct(row))}%` }"
+											></span>
+										</div>
+										<div class="ss-late-foot">
+											<span>ทำแล้ว {{ pct(prev_pct(row)) }}%</span>
+											<span v-if="is_qty(row)"
+												>คงเหลือ {{ num(remaining(row)) }}
+												{{ task_of(row).uom }}</span
+											>
+											<span v-else>คงเหลือ {{ pct(100 - prev_pct(row)) }}%</span>
+										</div>
 									</div>
-									<div class="ss-late-foot">
-										<span>ทำแล้ว {{ pct(prev_pct(row)) }}%</span>
-										<span v-if="is_qty(row)"
-											>คงเหลือ {{ num(remaining(row)) }} {{ task_of(row).uom }}</span
-										>
-										<span v-else>คงเหลือ {{ pct(100 - prev_pct(row)) }}%</span>
-									</div>
 								</div>
+								<button
+									type="button"
+									class="ss-icon-btn ss-icon-btn--sm ss-task-del"
+									aria-label="ลบงาน"
+									title="ลบงาน"
+									@click="remove_row(row)"
+								>
+									<Icon name="trash" :size="17" />
+								</button>
 
 								<div class="ss-task-input">
 									<Stepper
@@ -229,18 +235,22 @@
 								<div v-if="show_errors && row_error(row)" class="ss-field-error">
 									{{ row_error(row) }}
 								</div>
-								<input
-									v-model="row.location"
-									class="ss-input ss-input--sm"
-									placeholder="ตำแหน่ง เช่น ชั้น 2 โซน B"
-								/>
-								<input
-									v-model="row.remarks"
-									class="ss-input ss-input--sm"
-									:placeholder="
-										is_report ? 'หมายเหตุของงานนี้ (ถ้ามี)' : 'หมายเหตุ (ถ้ามี)'
-									"
-								/>
+								<div class="ss-task-notes">
+									<input
+										v-model="row.location"
+										class="ss-input ss-input--sm"
+										aria-label="ตำแหน่ง"
+										placeholder="ตำแหน่ง เช่น ชั้น 2 โซน B"
+									/>
+									<input
+										v-model="row.remarks"
+										class="ss-input ss-input--sm"
+										aria-label="หมายเหตุ"
+										:placeholder="
+											is_report ? 'หมายเหตุของงานนี้ (ถ้ามี)' : 'หมายเหตุ (ถ้ามี)'
+										"
+									/>
+								</div>
 							</div>
 						</TransitionGroup>
 						<button type="button" class="ss-add-row" @click="task_sheet = true">
@@ -250,163 +260,171 @@
 
 					<!-- 3. บุคลากร / เครื่องจักร -->
 					<div v-else-if="current === 'resources'" key="resources" class="ss-step-body">
-						<div class="ss-form">
-							<h2 class="ss-section-title ss-section-title--first">
-								<span><Icon name="users" :size="16" /> บุคลากร</span>
-								<span class="ss-section-total">{{ labour_total }} คน</span>
-							</h2>
-							<div
-								v-for="r in doc.labour"
-								:key="r.role"
-								class="ss-res-row"
-								:class="{ 'is-zero': !r.qty }"
-							>
-								<span class="ss-res-name">{{ r.role }}</span>
-								<Stepper v-model="r.qty" />
-								<button
-									type="button"
-									class="ss-icon-btn ss-icon-btn--sm"
-									:aria-label="`ลบ ${r.role}`"
-									@click="doc.labour = doc.labour.filter((x) => x !== r)"
+						<div class="ss-cols">
+							<div class="ss-form">
+								<h2 class="ss-section-title ss-section-title--first">
+									<span><Icon name="users" :size="16" /> บุคลากร</span>
+									<span class="ss-section-total">{{ labour_total }} คน</span>
+								</h2>
+								<div
+									v-for="r in doc.labour"
+									:key="r.role"
+									class="ss-res-row"
+									:class="{ 'is-zero': !r.qty }"
 								>
-									<Icon name="x" :size="17" />
-								</button>
-							</div>
-							<div class="ss-res-add">
-								<input
-									v-model="new_role"
-									class="ss-input ss-input--sm"
-									placeholder="ตำแหน่งอื่น เช่น ช่างไม้"
-									@keydown.enter.prevent="add_role"
-								/>
-								<button
-									type="button"
-									class="ss-btn ss-btn--soft ss-btn--sm"
-									:disabled="!new_role.trim()"
-									@click="add_role"
-								>
-									เพิ่ม
-								</button>
-							</div>
-						</div>
-						<div class="ss-form">
-							<h2 class="ss-section-title ss-section-title--first">
-								<span><Icon name="truck" :size="16" /> เครื่องจักร</span>
-								<span class="ss-section-total">{{ equipment_total }} คัน/เครื่อง</span>
-							</h2>
-							<div
-								v-for="r in doc.equipment"
-								:key="r.equipment"
-								class="ss-res-row"
-								:class="{ 'is-zero': !r.qty }"
-							>
-								<span class="ss-res-name">{{ r.equipment }}</span>
-								<Stepper v-model="r.qty" />
-								<button
-									type="button"
-									class="ss-icon-btn ss-icon-btn--sm"
-									:aria-label="`ลบ ${r.equipment}`"
-									@click="doc.equipment = doc.equipment.filter((x) => x !== r)"
-								>
-									<Icon name="x" :size="17" />
-								</button>
-								<label v-if="r.qty" class="ss-res-hours">
+									<span class="ss-res-name">{{ r.role }}</span>
+									<Stepper v-model="r.qty" />
+									<button
+										type="button"
+										class="ss-icon-btn ss-icon-btn--sm"
+										:aria-label="`ลบ ${r.role}`"
+										@click="doc.labour = doc.labour.filter((x) => x !== r)"
+									>
+										<Icon name="x" :size="17" />
+									</button>
+								</div>
+								<div class="ss-res-add">
 									<input
-										v-model.number="r.hours"
+										v-model="new_role"
 										class="ss-input ss-input--sm"
-										type="number"
-										inputmode="decimal"
-										min="0"
+										placeholder="ตำแหน่งอื่น เช่น ช่างไม้"
+										@keydown.enter.prevent="add_role"
 									/>
-									<small>ชม.</small>
-								</label>
+									<button
+										type="button"
+										class="ss-btn ss-btn--soft ss-btn--sm"
+										:disabled="!new_role.trim()"
+										@click="add_role"
+									>
+										เพิ่ม
+									</button>
+								</div>
 							</div>
-							<div class="ss-res-add">
-								<input
-									v-model="new_equipment"
-									class="ss-input ss-input--sm"
-									placeholder="เครื่องจักรอื่น"
-									@keydown.enter.prevent="add_equipment"
-								/>
-								<button
-									type="button"
-									class="ss-btn ss-btn--soft ss-btn--sm"
-									:disabled="!new_equipment.trim()"
-									@click="add_equipment"
+							<div class="ss-form">
+								<h2 class="ss-section-title ss-section-title--first">
+									<span><Icon name="truck" :size="16" /> เครื่องจักร</span>
+									<span class="ss-section-total">{{ equipment_total }} คัน/เครื่อง</span>
+								</h2>
+								<div
+									v-for="r in doc.equipment"
+									:key="r.equipment"
+									class="ss-res-row"
+									:class="{ 'is-zero': !r.qty }"
 								>
-									เพิ่ม
-								</button>
+									<span class="ss-res-name">{{ r.equipment }}</span>
+									<Stepper v-model="r.qty" />
+									<button
+										type="button"
+										class="ss-icon-btn ss-icon-btn--sm"
+										:aria-label="`ลบ ${r.equipment}`"
+										@click="doc.equipment = doc.equipment.filter((x) => x !== r)"
+									>
+										<Icon name="x" :size="17" />
+									</button>
+									<label v-if="r.qty" class="ss-res-hours">
+										<input
+											v-model.number="r.hours"
+											class="ss-input ss-input--sm"
+											type="number"
+											inputmode="decimal"
+											min="0"
+										/>
+										<small>ชม.</small>
+									</label>
+								</div>
+								<div class="ss-res-add">
+									<input
+										v-model="new_equipment"
+										class="ss-input ss-input--sm"
+										placeholder="เครื่องจักรอื่น"
+										@keydown.enter.prevent="add_equipment"
+									/>
+									<button
+										type="button"
+										class="ss-btn ss-btn--soft ss-btn--sm"
+										:disabled="!new_equipment.trim()"
+										@click="add_equipment"
+									>
+										เพิ่ม
+									</button>
+								</div>
 							</div>
 						</div>
 					</div>
 
 					<!-- 4. ปัญหา / หมายเหตุ + สรุป -->
 					<div v-else key="notes" class="ss-step-body">
-						<div class="ss-form">
-							<template v-if="is_report">
+						<div class="ss-cols ss-cols--review">
+							<div class="ss-form">
+								<template v-if="is_report">
+									<label class="ss-field">
+										<span class="ss-field-label">ปัญหา / อุปสรรค</span>
+										<textarea
+											v-model="doc.problems"
+											class="ss-input"
+											rows="3"
+											placeholder="เช่น วัสดุมาส่งล่าช้า เครื่องจักรเสีย"
+										></textarea>
+									</label>
+								</template>
+								<template v-else>
+									<label class="ss-field">
+										<span class="ss-field-label">วัสดุที่ต้องใช้ / ต้องเตรียม</span>
+										<textarea
+											v-model="doc.materials"
+											class="ss-input"
+											rows="2"
+											placeholder="เช่น คอนกรีต 240 ksc 12 ม³ เข้าหน้างาน 9.00 น."
+										></textarea>
+									</label>
+									<label class="ss-field">
+										<span class="ss-field-label">มาตรการความปลอดภัย</span>
+										<textarea
+											v-model="doc.safety_measures"
+											class="ss-input"
+											rows="2"
+											placeholder="เช่น งานบนที่สูง ใช้ Full body harness"
+										></textarea>
+									</label>
+								</template>
 								<label class="ss-field">
-									<span class="ss-field-label">ปัญหา / อุปสรรค</span>
-									<textarea
-										v-model="doc.problems"
-										class="ss-input"
-										rows="3"
-										placeholder="เช่น วัสดุมาส่งล่าช้า เครื่องจักรเสีย"
-									></textarea>
+									<span class="ss-field-label">หมายเหตุ</span>
+									<textarea v-model="doc.remarks" class="ss-input" rows="2"></textarea>
 								</label>
-							</template>
-							<template v-else>
-								<label class="ss-field">
-									<span class="ss-field-label">วัสดุที่ต้องใช้ / ต้องเตรียม</span>
-									<textarea
-										v-model="doc.materials"
-										class="ss-input"
-										rows="2"
-										placeholder="เช่น คอนกรีต 240 ksc 12 ม³ เข้าหน้างาน 9.00 น."
-									></textarea>
-								</label>
-								<label class="ss-field">
-									<span class="ss-field-label">มาตรการความปลอดภัย</span>
-									<textarea
-										v-model="doc.safety_measures"
-										class="ss-input"
-										rows="2"
-										placeholder="เช่น งานบนที่สูง ใช้ Full body harness"
-									></textarea>
-								</label>
-							</template>
-							<label class="ss-field">
-								<span class="ss-field-label">หมายเหตุ</span>
-								<textarea v-model="doc.remarks" class="ss-input" rows="2"></textarea>
-							</label>
-						</div>
+							</div>
 
-						<h2 class="ss-section-title">สรุปก่อน{{ is_report ? "ส่ง" : "ขออนุมัติ" }}</h2>
-						<div class="ss-facts ss-facts--grid ss-review">
-							<div class="ss-fact">
-								<span>วันที่</span><b>{{ thai_date(doc.date, { year: true }) }}</b>
-							</div>
-							<div v-if="is_report" class="ss-fact">
-								<span>สภาพอากาศ</span><b>{{ doc.weather || "–" }}</b>
-							</div>
-							<div v-else class="ss-fact">
-								<span>ผู้อนุมัติ</span><b>{{ approver_label || "–" }}</b>
-							</div>
-							<div class="ss-fact">
-								<span>งาน</span><b>{{ doc.items.length }} รายการ</b>
-							</div>
-							<div class="ss-fact">
-								<span>ความคืบหน้า</span><b>+{{ pct(project_percent) }}%</b>
-							</div>
-							<div class="ss-fact">
-								<span>บุคลากร</span><b>{{ labour_total }} คน</b>
-							</div>
-							<div class="ss-fact">
-								<span>เครื่องจักร</span><b>{{ equipment_total }}</b>
+							<div>
+								<h2 class="ss-section-title">
+									สรุปก่อน{{ is_report ? "ส่ง" : "ขออนุมัติ" }}
+								</h2>
+								<div class="ss-facts ss-facts--grid ss-review">
+									<div class="ss-fact">
+										<span>วันที่</span><b>{{ thai_date(doc.date, { year: true }) }}</b>
+									</div>
+									<div v-if="is_report" class="ss-fact">
+										<span>สภาพอากาศ</span><b>{{ doc.weather || "–" }}</b>
+									</div>
+									<div v-else class="ss-fact">
+										<span>ผู้อนุมัติ</span><b>{{ approver_label || "–" }}</b>
+									</div>
+									<div class="ss-fact">
+										<span>งาน</span><b>{{ doc.items.length }} รายการ</b>
+									</div>
+									<div class="ss-fact">
+										<span>ความคืบหน้า</span><b>+{{ pct(project_percent) }}%</b>
+									</div>
+									<div class="ss-fact">
+										<span>บุคลากร</span><b>{{ labour_total }} คน</b>
+									</div>
+									<div class="ss-fact">
+										<span>เครื่องจักร</span><b>{{ equipment_total }}</b>
+									</div>
+								</div>
 							</div>
 						</div>
 					</div>
 				</Transition>
-			</template>
+			</div>
 		</div>
 
 		<Teleport to="#ss-layer">
@@ -429,6 +447,7 @@
 						>
 							ถัดไป: {{ steps[step + 1].label }}
 							<Icon name="chevron-right" :size="18" :stroke="2.4" />
+							<kbd class="ss-kbd">Ctrl ↵</kbd>
 						</button>
 					</template>
 					<template v-else-if="is_report">
@@ -536,7 +555,8 @@
 </template>
 
 <script setup>
-import { computed, inject, ref, watch } from "vue";
+import { computed, inject, onBeforeUnmount, ref, watch } from "vue";
+import DateInput from "../../components/DateInput.vue";
 import Icon from "../../components/Icon.vue";
 import TopBar from "../../components/TopBar.vue";
 import Skeleton from "../../components/Skeleton.vue";
@@ -855,6 +875,33 @@ const approver_options = computed(() =>
 const approver_label = computed(
 	() => approver_options.value.find((a) => a.value === doc.value?.approver)?.label || doc.value?.approver
 );
+
+// สรุปสั้นๆ ใต้ชื่อขั้น (แถบขั้นตอนด้านซ้ายบนจอกว้าง)
+function step_hint(key) {
+	const d = doc.value;
+	if (!d) return "";
+	if (key === "general") {
+		const day = thai_date(d.date);
+		return is_report ? [day, d.weather].filter(Boolean).join(" · ") : day;
+	}
+	if (key === "items")
+		return d.items.length
+			? `${d.items.length} งาน · +${pct(project_percent.value)}%`
+			: "ยังไม่ได้เลือกงาน";
+	if (key === "resources") return `${labour_total.value} คน · ${equipment_total.value} เครื่อง`;
+	return `ตรวจทานแล้ว${is_report ? "ส่ง" : "ขออนุมัติ"}`;
+}
+
+// Ctrl/⌘ + Enter = ถัดไป (ขั้นสุดท้าย = ส่ง/ขออนุมัติ) สำหรับคีย์บอร์ดบนจอใหญ่
+function on_shortcut(event) {
+	if (!(event.ctrlKey || event.metaKey) || event.key !== "Enter" || !setup.value || saving.value) return;
+	if (task_sheet.value) return;
+	event.preventDefault();
+	if (step.value < steps.length - 1) move(1);
+	else save(is_report && setup.value.can_submit ? 1 : 0);
+}
+window.addEventListener("keydown", on_shortcut);
+onBeforeUnmount(() => window.removeEventListener("keydown", on_shortcut));
 
 function weather_icon(text) {
 	if (/พายุ/.test(text)) return "storm";

@@ -197,8 +197,12 @@ def validate_source(doc):
 					_(side.invoice), invoice, frappe.utils.get_link_to_form(doc.doctype, other[0])
 				)
 			)
-		values = frappe.db.get_value(side.invoice, invoice, ["company", side.party_field, "docstatus"], as_dict=True)
-		if values and (values.company != doc.company or values[side.party_field] != doc.get(side.party_field)):
+		values = frappe.db.get_value(
+			side.invoice, invoice, ["company", side.party_field, "docstatus"], as_dict=True
+		)
+		if values and (
+			values.company != doc.company or values[side.party_field] != doc.get(side.party_field)
+		):
 			frappe.throw(_("แถวที่ {0}: {1} เป็นของบริษัทหรือคู่ค้าอื่น").format(row.idx, invoice))
 
 	set_totals(doc)
@@ -233,7 +237,8 @@ def before_cancel_source(doc):
 	if claims:
 		frappe.throw(
 			_("ยกเลิก {0} ไม่ได้ เพราะถูกนำไปเบิกคืนในเอกสาร {1} กรุณายกเลิกหรือลบเอกสารนั้นก่อน").format(
-				doc.name, ", ".join(frappe.utils.get_link_to_form(SIDES[doc.doctype].claim, c) for c in claims)
+				doc.name,
+				", ".join(frappe.utils.get_link_to_form(SIDES[doc.doctype].claim, c) for c in claims),
 			)
 		)
 
@@ -250,11 +255,13 @@ def make_source_from_invoice(invoice):
 	doc.company = invoice.company
 	doc.set(side.party_field, invoice.get(side.party_field))
 	doc.posting_date = invoice.posting_date
-	doc.project = invoice.project or next((i.project for i in invoice.items if i.get("project")), None)
+	doc.project = invoice.project or next(
+		(i.project for i in invoice.get("items") or [] if i.get("project")), None
+	)
 	if source == "Retention Receivable":
 		doc.customer_po = invoice.get("po_no")
 	else:
-		doc.po = next((i.purchase_order for i in invoice.items if i.get("purchase_order")), None)
+		doc.po = next((i.purchase_order for i in invoice.get("items") or [] if i.get("purchase_order")), None)
 
 	row = {
 		side.invoice_field: invoice.name,
@@ -271,7 +278,9 @@ def make_source_from_invoice(invoice):
 
 
 def has_retention(invoice):
-	return bool(invoice.get("custom_subject_to_retention")) and flt(invoice.get("custom_retention_amount")) > 0
+	return (
+		bool(invoice.get("custom_subject_to_retention")) and flt(invoice.get("custom_retention_amount")) > 0
+	)
 
 
 def create_from_invoice(doc, method=None):
@@ -345,7 +354,16 @@ def source_details(source, name):
 	doc = frappe.db.get_value(
 		source,
 		name,
-		["name", "docstatus", "company", side.party_field, "project", "grand_total", "posting_date", "due_date"],
+		[
+			"name",
+			"docstatus",
+			"company",
+			side.party_field,
+			"project",
+			"grand_total",
+			"posting_date",
+			"due_date",
+		],
 		as_dict=True,
 	)
 	if doc:
@@ -612,7 +630,9 @@ def on_journal_entry_trash(doc, method=None):
 def update_overdue():
 	"""scheduler รายวัน: Active → Overdue เมื่อเลยวันครบกำหนด (RR / RP / RI / Release)"""
 	for source in SIDES:
-		for name in frappe.get_all(source, filters={"docstatus": 1, "status": ("in", OPEN_STATUSES)}, pluck="name"):
+		for name in frappe.get_all(
+			source, filters={"docstatus": 1, "status": ("in", OPEN_STATUSES)}, pluck="name"
+		):
 			update_source(source, name)
 	for doctype in SOURCE_OF_CLAIM:
 		for name in frappe.get_all(

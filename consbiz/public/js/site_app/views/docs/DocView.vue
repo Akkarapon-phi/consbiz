@@ -1,6 +1,6 @@
 <template>
 	<!-- รายละเอียดเอกสารจัดซื้อ/ขาย: หัวเอกสาร, ความคืบหน้า, รายการ, ยอดรวม, เอกสารต้นทาง/ปลายทาง, PDF, ส่งเอกสาร -->
-	<div :class="{ 'ss-has-bar': doc?.can_submit }">
+	<div :class="{ 'ss-has-bar': has_bar }">
 		<TopBar :title="config.label" :subtitle="params.name" :back_to="params.kind">
 			<template #actions>
 				<button
@@ -21,159 +21,350 @@
 				>
 					<Icon name="external" :size="19" />
 				</a>
+				<!-- เปิด/ปิด sidebar ขวา (มอบหมาย ไฟล์แนบ ความคิดเห็น ความเคลื่อนไหว) -->
+				<button
+					v-if="doc"
+					type="button"
+					class="ss-icon-btn"
+					:class="{ 'is-on': side_open }"
+					:aria-pressed="side_open"
+					aria-label="แผงข้อมูลเอกสาร"
+					title="แผงข้อมูลเอกสาร (มอบหมาย ไฟล์แนบ ความคิดเห็น)"
+					@click="toggle_side"
+				>
+					<Icon name="panel-right" :size="19" />
+				</button>
 			</template>
 		</TopBar>
 
-		<div class="ss-content">
+		<div class="ss-content ss-docview">
 			<Skeleton v-if="!doc" :rows="3" />
-			<div v-else class="ss-split">
-				<div class="ss-split-main">
-					<div class="ss-doc-head">
-						<div class="ss-doc-head-top">
-							<span class="ss-tag" :class="`tone-${doc.status_tone}`">{{
-								doc.status_label
-							}}</span>
-							<span class="ss-doc-date">{{ thai_date(doc.date, { year: true }) }}</span>
-						</div>
-						<div class="ss-doc-party">
-							<small>{{ config.party || "เรื่อง" }}</small>
-							<b>{{ doc.party || doc.title || doc.name }}</b>
-						</div>
-						<div class="ss-facts ss-facts--grid">
-							<div class="ss-fact">
-								<span>ยอดรวม</span><b>{{ money(doc.totals.grand_total) }}</b>
-							</div>
-							<div v-if="doc.totals.outstanding_amount" class="ss-fact">
-								<span>ค้าง{{ config.section === "buy" ? "จ่าย" : "รับ" }}</span
-								><b class="ss-text-danger">{{ money(doc.totals.outstanding_amount) }}</b>
-							</div>
-							<div v-if="doc.due" class="ss-fact">
-								<span>{{ config.due || "ต้องการภายใน" }}</span
-								><b>{{ thai_date(doc.due, { year: true }) }}</b>
-							</div>
-							<div v-if="doc.bill_no" class="ss-fact">
-								<span>เลขที่บิลผู้ขาย</span><b>{{ doc.bill_no }}</b>
-							</div>
-							<div v-if="doc.project" class="ss-fact">
-								<span>โครงการ</span><b>{{ doc.project }}</b>
-							</div>
-							<div class="ss-fact">
-								<span>ผู้ทำเอกสาร</span><b>{{ doc.owner_name }}</b>
-							</div>
-						</div>
-						<div v-for="p in progress" :key="p.label" class="ss-doc-progress">
-							<span>{{ p.label }}</span>
-							<div class="ss-plan-bar ss-plan-bar--sm">
-								<span
-									class="ss-plan-bar-actual"
-									:style="{ width: `${Math.min(100, p.value)}%` }"
-								></span>
-							</div>
-							<b>{{ Math.round(p.value) }}%</b>
-						</div>
-					</div>
+			<template v-else>
+				<section class="ss-dv-head">
+					<!-- ขั้นตอนของเอกสาร: ผ่านแล้ว / ขั้นปัจจุบัน (มี %) / ยังไม่ถึง -->
+					<ol class="ss-dv-steps" :aria-label="`ขั้นตอน: ${doc.status_label}`">
+						<li v-for="(st, i) in doc.steps" :key="i" :class="`is-${st.state}`">
+							<span class="ss-dv-step-dot">
+								<Icon v-if="st.state === 'done'" name="check" :size="13" :stroke="3" />
+								<Icon v-else-if="st.state === 'error'" name="x" :size="13" :stroke="3" />
+								<template v-else>{{ i + 1 }}</template>
+							</span>
+							<span class="ss-dv-step-text">
+								<b>{{ st.label }}</b>
+								<small v-if="st.note && st.state !== 'todo'">{{ st.note }}</small>
+							</span>
+						</li>
+					</ol>
 
-					<h2 class="ss-section-title">
-						รายการ <span class="ss-count">{{ doc.items.length }}</span>
-					</h2>
-					<div class="ss-list ss-list--form">
-						<div
-							v-for="(it, i) in doc.items"
-							:key="i"
-							class="ss-card"
-							:style="{ '--i': Math.min(i, 12) }"
-						>
-							<div class="ss-card-head">
-								<span class="ss-card-main">
-									<span class="ss-card-title">{{ it.item_name || it.item_code }}</span>
-									<span class="ss-card-meta"
-										>{{ num(it.qty) }} {{ it.uom }} × {{ money(it.rate)
-										}}<template v-if="it.schedule_date || it.delivery_date">
-											· ส่ง
-											{{ thai_date(it.schedule_date || it.delivery_date) }}</template
-										></span
-									>
-								</span>
-								<span class="ss-doc-amount"
-									><b>{{ money(it.amount) }}</b></span
+					<dl class="ss-dv-fields">
+						<div class="is-wide">
+							<dt>{{ config.party || "เรื่อง" }}</dt>
+							<dd>{{ doc.party || doc.title || doc.name }}</dd>
+						</div>
+						<div>
+							<dt>สถานะ</dt>
+							<dd>
+								<span class="ss-tag" :class="`tone-${doc.status_tone}`">{{
+									doc.status_label
+								}}</span>
+							</dd>
+						</div>
+						<div v-if="doc.purpose">
+							<dt>วัตถุประสงค์</dt>
+							<dd>{{ doc.purpose }}</dd>
+						</div>
+						<div>
+							<dt>วันที่</dt>
+							<dd>{{ thai_date(doc.date, { year: true }) }}</dd>
+						</div>
+						<div v-if="doc.due">
+							<dt>{{ config.due || "วันที่ต้องการ" }}</dt>
+							<dd :class="{ 'is-due': overdue }">{{ thai_date(doc.due, { year: true }) }}</dd>
+						</div>
+						<div v-if="doc.po_no">
+							<dt>เลขที่ใบสั่งซื้อลูกค้า</dt>
+							<dd>{{ doc.po_no }}</dd>
+						</div>
+						<div v-if="doc.bill_no">
+							<dt>เลขที่บิลผู้ขาย</dt>
+							<dd>{{ doc.bill_no }}</dd>
+						</div>
+						<div>
+							<dt>ผู้จัดทำ</dt>
+							<dd>{{ doc.request_by || doc.owner_name }}</dd>
+						</div>
+						<div v-if="params.kind === 'mr'">
+							<dt>ผู้อนุมัติ</dt>
+							<dd :class="{ 'is-empty': !doc.approve_by }">{{ doc.approve_by || "–" }}</dd>
+						</div>
+						<div v-if="doc.project" class="is-full">
+							<dt>โครงการ</dt>
+							<dd class="is-line" :title="doc.project_name">
+								{{ doc.project_name || doc.project }} <small>{{ doc.project }}</small>
+							</dd>
+						</div>
+					</dl>
+				</section>
+
+				<div class="ss-dv-body">
+					<div class="ss-dv-main">
+						<h2 class="ss-section-title ss-section-title--first">
+							<span
+								>รายการ <span class="ss-count">{{ doc.items.length }}</span></span
+							>
+						</h2>
+
+						<!-- จอกว้าง: ตารางรายการ -->
+						<div v-if="wide" class="ss-table-wrap">
+							<table class="ss-table ss-table--doc">
+								<thead>
+									<tr>
+										<th class="is-idx">#</th>
+										<th>รายการ</th>
+										<th class="is-num">จำนวน</th>
+										<th>หน่วย</th>
+										<th class="is-num">หน่วยละ</th>
+										<th class="is-num">เป็นเงิน</th>
+										<th v-if="has_item_date">วันที่ต้องการ</th>
+										<th v-if="is_mr" class="is-center">ไม่คิดภาษี</th>
+									</tr>
+								</thead>
+								<tbody>
+									<tr v-for="(it, i) in doc.items" :key="i" class="is-static">
+										<td class="is-idx">{{ i + 1 }}</td>
+										<td class="is-item">
+											<b>{{ it.item_name || it.item_code }}</b>
+											<small
+												>{{ it.item_code
+												}}<template v-if="item_progress(it)">
+													· {{ item_progress(it) }}</template
+												></small
+											>
+											<RichText
+												v-if="has_desc(it)"
+												:html="it.description"
+												class="ss-item-desc"
+											/>
+										</td>
+										<td class="is-num">{{ num(it.qty) }}</td>
+										<td>{{ it.uom }}</td>
+										<td class="is-num">{{ money(it.rate) }}</td>
+										<td class="is-num is-strong">{{ money(it.amount) }}</td>
+										<td v-if="has_item_date" class="is-date">
+											{{
+												thai_date(it.schedule_date || it.delivery_date, {
+													year: true,
+												})
+											}}
+										</td>
+										<td v-if="is_mr" class="is-center">
+											<span
+												class="ss-checkmark"
+												:class="{ 'is-on': it.custom_vat_nocal }"
+											>
+												<Icon
+													v-if="it.custom_vat_nocal"
+													name="check"
+													:size="12"
+													:stroke="3.2"
+												/>
+											</span>
+										</td>
+									</tr>
+								</tbody>
+							</table>
+						</div>
+
+						<!-- มือถือ: การ์ดรายการ -->
+						<div v-else class="ss-list ss-list--form">
+							<div
+								v-for="(it, i) in doc.items"
+								:key="i"
+								class="ss-card"
+								:style="{ '--i': Math.min(i, 12) }"
+							>
+								<div class="ss-doc-row">
+									<span class="ss-doc-title">{{ it.item_name || it.item_code }}</span>
+									<b class="ss-doc-money">{{ money(it.amount) }}</b>
+								</div>
+								<span class="ss-card-meta ss-item-code">{{ it.item_code }}</span>
+								<span class="ss-card-meta"
+									>{{ num(it.qty) }} {{ it.uom }} × {{ money(it.rate)
+									}}<template v-if="it.schedule_date || it.delivery_date">
+										· ต้องการ
+										{{ thai_date(it.schedule_date || it.delivery_date) }}</template
+									></span
 								>
+								<RichText
+									v-if="has_desc(it)"
+									:html="it.description"
+									:lines="4"
+									class="ss-item-desc"
+								/>
+								<div v-if="item_progress(it) || it.custom_vat_nocal" class="ss-chips">
+									<span v-if="item_progress(it)" class="ss-chip">{{
+										item_progress(it)
+									}}</span>
+									<span v-if="it.custom_vat_nocal" class="ss-chip">ไม่คิดภาษี</span>
+								</div>
 							</div>
-							<div v-if="item_progress(it)" class="ss-chips">
-								<span class="ss-chip">{{ item_progress(it) }}</span>
+						</div>
+
+						<!-- ท้ายเอกสาร: หมายเหตุ/ตัวอักษร (ซ้าย) + สรุปยอด (ขวา) แบบระบบเต็ม -->
+						<div class="ss-dv-foot">
+							<div class="ss-dv-notes">
+								<div v-if="doc.remarks">
+									<span class="ss-field-label">หมายเหตุ</span>
+									<div class="ss-text-block">{{ doc.remarks }}</div>
+								</div>
+								<div v-if="is_mr" class="ss-dv-flags">
+									<span class="ss-flag" :class="{ 'is-on': doc.included_vat }">
+										<span class="ss-checkmark" :class="{ 'is-on': doc.included_vat }"
+											><Icon
+												v-if="doc.included_vat"
+												name="check"
+												:size="12"
+												:stroke="3.2"
+										/></span>
+										มูลค่ารวมภาษี
+									</span>
+									<span class="ss-flag" :class="{ 'is-on': doc.vat_override }">
+										<span class="ss-checkmark" :class="{ 'is-on': doc.vat_override }"
+											><Icon
+												v-if="doc.vat_override"
+												name="check"
+												:size="12"
+												:stroke="3.2"
+										/></span>
+										แก้ไขภาษี
+									</span>
+								</div>
+							</div>
+							<div class="ss-totals">
+								<div v-for="r in doc.summary.rows" :key="r.label">
+									<span>{{ r.label }}</span
+									><b>{{ money(r.value) }}</b>
+								</div>
+								<div class="is-grand">
+									<span>{{ doc.summary.grand_label }}</span
+									><b>{{ money(doc.summary.grand) }}</b>
+								</div>
+								<div v-if="doc.summary.in_words" class="ss-totals-words">
+									({{ doc.summary.in_words }})
+								</div>
+								<template v-if="doc.summary.net !== undefined">
+									<div v-for="d in doc.summary.deductions" :key="d.label" class="is-deduct">
+										<span>{{ d.label }}</span
+										><b>{{ money(d.value) }}</b>
+									</div>
+									<div class="is-net">
+										<span>{{ doc.summary.net_label }}</span
+										><b>{{ money(doc.summary.net) }}</b>
+									</div>
+								</template>
+								<div v-if="doc.totals.outstanding_amount" class="is-due">
+									<span>ค้าง{{ due_word }}</span
+									><b>{{ money(doc.totals.outstanding_amount) }}</b>
+								</div>
 							</div>
 						</div>
 					</div>
 				</div>
-
-				<aside class="ss-split-side">
-					<h2 class="ss-section-title ss-section-title--first">ยอดเงิน</h2>
-					<div class="ss-totals">
-						<div v-if="doc.totals.total !== undefined">
-							<span>รวมเป็นเงิน</span><b>{{ money(doc.totals.total) }}</b>
-						</div>
-						<div v-if="doc.totals.discount_amount">
-							<span>ส่วนลด</span><b>−{{ money(doc.totals.discount_amount) }}</b>
-						</div>
-						<div v-for="t in doc.taxes" :key="t.description">
-							<span
-								>{{ t.description }}<template v-if="t.rate"> {{ t.rate }}%</template></span
-							><b>{{ money(t.amount) }}</b>
-						</div>
-						<div class="is-grand">
-							<span>ยอดรวมทั้งสิ้น</span
-							><b>{{ money(doc.totals.rounded_total || doc.totals.grand_total) }}</b>
-						</div>
-					</div>
-
-					<template v-if="doc.before.length || doc.after.length">
-						<h2 class="ss-section-title">เอกสารที่เกี่ยวข้อง</h2>
-						<div class="ss-flow">
-							<button
-								v-for="l in [
-									...doc.before.map((x) => ({ ...x, dir: 'before' })),
-									...doc.after.map((x) => ({ ...x, dir: 'after' })),
-								]"
-								:key="l.doctype + l.name"
-								type="button"
-								class="ss-flow-item"
-								@click="open_link(l)"
-							>
-								<Icon
-									:name="l.dir === 'before' ? 'chevron-left' : 'chevron-right'"
-									:size="16"
-								/>
-								<span class="ss-flow-main">
-									<small>{{ link_label(l.doctype) }}</small>
-									<b>{{ l.name }}</b>
-								</span>
-								<span class="ss-tag" :class="`tone-${l.status_tone}`">{{
-									l.status_label
-								}}</span>
-							</button>
-						</div>
-					</template>
-
-					<template v-if="doc.remarks">
-						<h2 class="ss-section-title">หมายเหตุ</h2>
-						<div class="ss-text-block">{{ doc.remarks }}</div>
-					</template>
-				</aside>
-			</div>
+			</template>
 		</div>
+
+		<!-- sidebar ขวาแยกจากเนื้อหา: จอ ≥1480 กางค้างและดันเนื้อหา (html[data-rside]) จอเล็กกว่าเลื่อนทับพร้อมพื้นหลังมืด -->
+		<Teleport to="#ss-layer">
+			<Transition name="ss-rside-fade">
+				<div v-if="side_open && !xl" class="ss-rside-backdrop" @click="side_open = false"></div>
+			</Transition>
+			<Transition name="ss-rside">
+				<aside
+					v-if="side_open && doc"
+					class="ss-rside"
+					:class="{ 'is-overlay': !xl }"
+					aria-label="ข้อมูลเอกสาร"
+				>
+					<header class="ss-rside-head">
+						<b>ข้อมูลเอกสาร</b>
+						<button
+							type="button"
+							class="ss-icon-btn ss-icon-btn--sm"
+							aria-label="ปิดแผง"
+							@click="toggle_side"
+						>
+							<Icon name="x" :size="18" />
+						</button>
+					</header>
+					<div class="ss-rside-body">
+						<DocActivity :kind="params.kind" :name="params.name" :doctype="config.doctype">
+							<section v-if="related.length" class="ss-act-block">
+								<h3>เอกสารที่เกี่ยวข้อง</h3>
+								<div class="ss-flow">
+									<button
+										v-for="l in related"
+										:key="l.doctype + l.name"
+										type="button"
+										class="ss-flow-item"
+										@click="open_link(l)"
+									>
+										<Icon
+											:name="l.dir === 'before' ? 'chevron-left' : 'chevron-right'"
+											:size="16"
+										/>
+										<span class="ss-flow-main">
+											<small>{{ link_label(l.doctype) }}</small>
+											<b>{{ l.name }}</b>
+										</span>
+										<span class="ss-tag" :class="`tone-${l.status_tone}`">{{
+											l.status_label
+										}}</span>
+									</button>
+								</div>
+							</section>
+						</DocActivity>
+					</div>
+				</aside>
+			</Transition>
+		</Teleport>
 
 		<Teleport to="#ss-layer">
 			<Transition name="ss-bar">
-				<div v-if="doc?.can_submit" class="ss-bottom-bar">
-					<a class="ss-btn ss-btn--ghost ss-btn--lg" :href="desk_url(config.doctype, params.name)"
-						>แก้ไข</a
-					>
+				<div v-if="has_bar" class="ss-bottom-bar">
 					<button
+						v-if="doc.can_edit"
+						type="button"
+						class="ss-btn ss-btn--ghost ss-btn--lg"
+						:class="{ 'ss-grow': !doc.can_submit }"
+						@click="go(`${config.section}-form`, { kind: params.kind, name: params.name })"
+					>
+						<Icon name="pen" :size="17" /> แก้ไข
+					</button>
+					<button
+						v-if="doc.can_submit"
 						type="button"
 						class="ss-btn ss-btn--primary ss-btn--lg ss-grow"
 						:disabled="busy"
 						@click="confirm = true"
 					>
 						ส่ง{{ config.label }}
+					</button>
+					<!-- เอกสารที่ส่งแล้ว: สร้างเอกสารถัดไป (ขอซื้อ → สั่งซื้อ → แจ้งหนี้, เสนอราคา → สั่งขาย → แจ้งหนี้) -->
+					<button
+						v-if="doc.next_kind"
+						type="button"
+						class="ss-btn ss-btn--primary ss-btn--lg ss-grow"
+						@click="
+							go(`${config.section}-form`, {
+								kind: doc.next_kind,
+								name: 'new',
+								source: params.name,
+							})
+						"
+					>
+						<Icon name="plus" :size="18" :stroke="2.4" /> สร้าง{{
+							DOC_KINDS[doc.next_kind].label
+						}}
 					</button>
 				</div>
 			</Transition>
@@ -187,7 +378,7 @@
 					><b>{{ doc.party || doc.title }}</b>
 				</div>
 				<div class="ss-fact">
-					<span>ยอดรวม</span><b>{{ money(doc.totals.grand_total) }}</b>
+					<span>ยอดรวม</span><b>{{ money(doc.summary.grand) }}</b>
 				</div>
 			</div>
 			<template #footer>
@@ -203,7 +394,7 @@
 			</template>
 		</Sheet>
 
-		<PdfSheet
+		<PdfViewer
 			:open="pdf"
 			:url="doc?.pdf_url"
 			:name="params.name"
@@ -214,14 +405,28 @@
 </template>
 
 <script setup>
-import { computed, inject, ref } from "vue";
+import { computed, inject, onBeforeUnmount, ref, watch } from "vue";
 import Icon from "../../components/Icon.vue";
 import TopBar from "../../components/TopBar.vue";
 import Skeleton from "../../components/Skeleton.vue";
 import Sheet from "../../components/Sheet.vue";
-import PdfSheet from "../../components/PdfSheet.vue";
+import PdfViewer from "../../components/PdfViewer.vue";
+import RichText from "../../components/RichText.vue";
+import DocActivity from "./DocActivity.vue";
 import { DOC_KINDS } from "../../sections.js";
-import { call, celebrate, desk_url, go, money, num, post, show_error, state, thai_date } from "../../api.js";
+import {
+	call,
+	celebrate,
+	desk_url,
+	go,
+	html_text,
+	money,
+	num,
+	post,
+	show_error,
+	state,
+	thai_date,
+} from "../../api.js";
 
 const reload_summary = inject("reload_summary");
 const params = state.route.params;
@@ -231,6 +436,84 @@ const doc = ref(null);
 const busy = ref(false);
 const confirm = ref(false);
 const pdf = ref(false);
+
+// แท็บเล็ต/จอใหญ่: ตารางรายการ + ช่องข้อมูลหลายคอลัมน์, มือถือ: การ์ด
+const mq_wide = window.matchMedia("(min-width: 768px)");
+const wide = ref(mq_wide.matches);
+const on_media = () => (wide.value = mq_wide.matches);
+mq_wide.addEventListener("change", on_media);
+onBeforeUnmount(() => mq_wide.removeEventListener("change", on_media));
+
+const is_mr = params.kind === "mr";
+// รายละเอียดที่ต่างจากชื่อรายการ (ERPNext ตั้ง description = ชื่อรายการเป็นค่าเริ่มต้น)
+const has_desc = (it) => {
+	const text = html_text(it.description);
+	return !!text && text !== it.item_name;
+};
+const due_word = config.section === "buy" ? "จ่าย" : "รับ";
+const overdue = computed(
+	() =>
+		doc.value?.docstatus === 1 &&
+		doc.value.due &&
+		new Date(doc.value.due) < new Date(new Date().toDateString()) &&
+		(doc.value.totals.outstanding_amount > 0 || doc.value.status_tone === "amber")
+);
+const related = computed(() =>
+	doc.value
+		? [
+				...doc.value.before.map((x) => ({ ...x, dir: "before" })),
+				...doc.value.after.map((x) => ({ ...x, dir: "after" })),
+		  ]
+		: []
+);
+const has_item_date = computed(() => doc.value?.items.some((it) => it.schedule_date || it.delivery_date));
+// ---------------------------------------------------------------- sidebar ขวา
+const SIDE_KEY = "consbiz.site.doc_side";
+const mq_xl = window.matchMedia("(min-width: 1480px)");
+const xl = ref(mq_xl.matches);
+const saved_side = (() => {
+	try {
+		return localStorage.getItem(SIDE_KEY);
+	} catch {
+		return null;
+	}
+})();
+// จอใหญ่: ค่าเริ่มต้นเปิด (จำในเครื่อง) จอเล็ก: ปิดจนกดปุ่ม
+const side_open = ref(xl.value && saved_side !== "closed");
+function toggle_side() {
+	side_open.value = !side_open.value;
+	if (xl.value) {
+		try {
+			localStorage.setItem(SIDE_KEY, side_open.value ? "open" : "closed");
+		} catch {
+			/* เก็บไม่ได้: ใช้ค่าเริ่มต้น */
+		}
+	}
+}
+const on_xl = () => {
+	xl.value = mq_xl.matches;
+	side_open.value = xl.value && saved_side !== "closed";
+};
+mq_xl.addEventListener("change", on_xl);
+const on_key = (e) => e.key === "Escape" && !xl.value && (side_open.value = false);
+window.addEventListener("keydown", on_key);
+watch(
+	() => side_open.value && xl.value,
+	(push) => {
+		if (push) document.documentElement.dataset.rside = "open";
+		else delete document.documentElement.dataset.rside;
+	},
+	{ immediate: true }
+);
+onBeforeUnmount(() => {
+	mq_xl.removeEventListener("change", on_xl);
+	window.removeEventListener("keydown", on_key);
+	delete document.documentElement.dataset.rside;
+});
+
+const has_bar = computed(
+	() => !!(doc.value && (doc.value.can_edit || doc.value.can_submit || doc.value.next_kind))
+);
 
 const progress = computed(() =>
 	doc.value?.docstatus === 1
@@ -252,12 +535,17 @@ const LINK_LABELS = {
 const link_label = (doctype) => LINK_LABELS[doctype] || doctype;
 
 // ปริมาณที่ดำเนินการแล้วของแต่ละรายการ
-function item_progress(it) {
-	const pairs = [
+// ช่องปริมาณที่เกี่ยวกับเอกสารแต่ละชนิด (แถวของ SO มี ordered_qty ของการผลิต ไม่ใช่การสั่งซื้อ)
+const ITEM_PROGRESS = {
+	mr: [
 		["ordered_qty", "สั่งแล้ว"],
 		["received_qty", "รับแล้ว"],
-		["delivered_qty", "ส่งมอบแล้ว"],
-	];
+	],
+	po: [["received_qty", "รับแล้ว"]],
+	so: [["delivered_qty", "ส่งมอบแล้ว"]],
+};
+function item_progress(it) {
+	const pairs = ITEM_PROGRESS[params.kind] || [];
 	if (doc.value.docstatus !== 1) return "";
 	return pairs
 		.filter(([field]) => it[field] !== undefined && it[field] !== null)
