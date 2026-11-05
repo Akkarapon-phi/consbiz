@@ -208,7 +208,7 @@
 			</template>
 		</Sheet>
 
-		<PdfSheet
+		<PdfViewer
 			:open="pdf"
 			:url="doc?.pdf_url"
 			:name="params.name"
@@ -224,7 +224,7 @@ import Icon from "../../components/Icon.vue";
 import TopBar from "../../components/TopBar.vue";
 import Skeleton from "../../components/Skeleton.vue";
 import Sheet from "../../components/Sheet.vue";
-import PdfSheet from "../../components/PdfSheet.vue";
+import PdfViewer from "../../components/PdfViewer.vue";
 import { DOC_KINDS } from "../../sections.js";
 import { call, celebrate, desk_url, go, money, num, post, show_error, state, thai_date } from "../../api.js";
 
