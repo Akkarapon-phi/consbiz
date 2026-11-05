@@ -295,4 +295,5 @@ pre-commit run --all-files                               # ruff + prettier (ต�
 - Jinja ใน Print Format ใช้ `frappe.get_cached_value` ไม่ได้ ให้ใช้ `frappe.db.get_value`
 - ตั้งเครื่องให้สร้าง PDF ได้:
   - wkhtmltopdf โหลด CSS/ฟอนต์จาก URL ของไซต์ ชื่อไซต์ต้องอยู่ใน `/etc/hosts` (`127.0.0.1 <dev-site>`) ไม่งั้นได้ `HostNotFoundError`
-  - PDF Generator แบบ `chrome` ใช้ `frappe-bench/chromium` ต้องติดตั้ง `libnss3 libasound2t64` ไม่งั้นได้ "Chromium took too long to start"
+  - PDF Generator แบบ `chrome` ใช้ `frappe-bench/chromium` ต้องติดตั้ง `libnss3 libasound2t64 libatk1.0-0t64 libatk-bridge2.0-0t64 libatspi2.0-0t64 libxdamage1` (Ubuntu ก่อน 24.04 ไม่มี `t64` ต่อท้าย) ไม่งั้นได้ "Chromium took too long to start"
+    ตรวจตัวที่ขาดด้วย `ldd chromium/chrome-linux/headless_shell | grep "not found"` ติดตั้งแล้วต้อง restart bench
