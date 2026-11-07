@@ -25,6 +25,13 @@ class IntegrationTestSiteDocs(IntegrationTestCase):
 		self.assertNotIn(po.name, self.names(filter="draft"))
 		self.assertNotIn(po.name, self.names(filter="done"))
 		self.assertIn(po.name, self.names(filter="all", search=po.name))
+		# ค้นจากรหัส/ชื่อสินค้าในรายการ (คำบางส่วนได้) สินค้าที่ไม่มีในใบไม่เจอ
+		self.assertIn(po.name, self.names(filter="all", search=ITEM))
+		self.assertIn(po.name, self.names(filter="all", search="Store Ite"))
+		self.assertNotIn(po.name, self.names(filter="all", search=ITEM_2))
+		# ใบแจ้งหนี้ซื้อค้นเลขที่บิลผู้ขายได้ด้วย
+		self.assertIn(["bill_no", "like", "%INV-9%"], site_docs.search_filters(site_docs.config_of("pi"), "INV-9"))
+		self.assertNotIn(["bill_no", "like", "%INV-9%"], site_docs.search_filters(site_docs.config_of("po"), "INV-9"))
 
 		row = next(r for r in site_docs.get_docs("po", project=self.project)["rows"] if r.name == po.name)
 		self.assertEqual((row.status_label, row.status_tone), ("รอรับของ/วางบิล", "amber"))
@@ -59,6 +66,29 @@ class IntegrationTestSiteDocs(IntegrationTestCase):
 		self.assertTrue(site_docs.get_doc("po", draft.name)["can_submit"])
 		site_docs.submit_doc("po", draft.name)
 		self.assertEqual(frappe.db.get_value("Purchase Order", draft.name, "docstatus"), 1)
+
+	def test_employer_supplied_progress(self):
+		# ใบขอซื้อผู้ว่าจ้างจัดหา: ERPNext นับของที่รับเข้าใน per_ordered/ordered_qty แอปต้องแสดงเป็นรับของ ไม่มีขั้นสั่งซื้อ
+		config = site_docs.config_of("mr")
+		doc = frappe._dict(
+			material_request_type="Customer Provided",
+			status="Partially Received",
+			docstatus=1,
+			per_ordered=80,
+			per_received=0,
+		)
+		steps = site_docs.steps_of(doc, "mr")
+		self.assertEqual([s["label"] for s in steps], ["ร่าง", "ส่งแล้ว", "รับของ", "เสร็จสิ้น"])
+		self.assertEqual((steps[2]["state"], steps[2]["note"]), ("current", "80%"))
+		self.assertEqual(site_docs.progress_of(doc, config), {"per_ordered": None, "per_received": 80})
+		self.assertEqual(
+			site_docs.received_as_received({"ordered_qty": 4, "received_qty": 0}),
+			{"ordered_qty": None, "received_qty": 4},
+		)
+		# ใบขอซื้อปกติไม่เปลี่ยน
+		doc.material_request_type = "Purchase"
+		self.assertEqual(site_docs.progress_of(doc, config), {"per_ordered": 80, "per_received": 0})
+		self.assertEqual([s["label"] for s in site_docs.steps_of(doc, "mr")][2:4], ["สั่งซื้อ", "รับของ"])
 
 	def test_status_and_kind(self):
 		self.assertEqual(site_docs.status_of("Overdue", 1), ("เกินกำหนด", "rose"))
@@ -345,3 +375,65 @@ class IntegrationTestSiteDocs(IntegrationTestCase):
 			site_docs.version_text(po, {"changed": [["order_confirmation_no", None, "CONF-1"]]}),
 			"แก้ เลขที่ผู้ขายยืนยัน: (ว่าง) → CONF-1",
 		)
+
+	def test_office_company_filter_and_project_change(self):
+		from consbiz.test_store_app import COMPANY
+
+		po = make_po(self.project)
+		other_company = frappe.db.get_value("Company", {"name": ("!=", COMPANY)}, "name")
+		# แอปออฟฟิศ: กรองบริษัท (ทุกโครงการ)
+		names = [r.name for r in site_docs.get_docs("po", scope="all", filter="all", company=COMPANY)["rows"]]
+		self.assertIn(po.name, names)
+		if other_company:
+			names = [
+				r.name
+				for r in site_docs.get_docs("po", scope="all", filter="all", company=other_company)["rows"]
+			]
+			self.assertNotIn(po.name, names)
+			self.assertGreaterEqual(
+				site_docs.get_summary("buy", scope="all", company=COMPANY)["po_receive"]["count"], 1
+			)
+
+		# เอกสารใหม่ไม่ระบุโครงการ ใช้บริษัทที่เลือก แล้วเลือกโครงการในฟอร์ม
+		form = site_docs.get_form("po", company=COMPANY)
+		self.assertEqual((form["company"], form["project"]), (COMPANY, None))
+		second = frappe.db.get_value("Project", {"project_name": "_Test Office Project"})
+		if not second:
+			second = (
+				frappe.get_doc(
+					{
+						"doctype": "Project",
+						"project_name": "_Test Office Project",
+						"company": COMPANY,
+						"custom_warehouse_name": "_Test Office Site",
+					}
+				)
+				.insert(ignore_permissions=True)
+				.name
+			)
+		data = {
+			"company": COMPANY,
+			"project": self.project,
+			"supplier": SUPPLIER,
+			"transaction_date": form["transaction_date"],
+			"schedule_date": form["schedule_date"],
+			"taxes_and_charges": None,
+			"items": [{"key": None, "item_code": ITEM, "qty": 2, "rate": 10}],
+		}
+		saved = site_docs.save_doc("po", json.dumps(data, default=str))
+		form = site_docs.get_form("po", name=saved["name"])
+		data.update({"name": saved["name"], "project": second, "items": form["items"]})
+		site_docs.save_doc("po", json.dumps(data, default=str))
+		draft = frappe.get_doc("Purchase Order", saved["name"])
+		self.assertEqual((draft.project, draft.items[0].project), (second, second))
+		self.assertEqual(draft.items[0].warehouse, store_app.project_warehouse(second))
+
+		# โครงการของบริษัทอื่นเลือกไม่ได้ (ย้ายโครงการที่สองไปอีกบริษัทชั่วคราว: ไม่ต้องสร้างคลังของบริษัทนั้น)
+		frappe.db.set_value("Project", second, "company", other_company or "_Test Company 1")
+		data["project"] = second
+		data["items"] = site_docs.get_form("po", name=saved["name"])["items"]
+		data["project"] = self.project
+		site_docs.save_doc("po", json.dumps(data, default=str))
+		data["project"] = second
+		self.assertRaises(frappe.ValidationError, site_docs.save_doc, "po", json.dumps(data, default=str))
+		frappe.db.set_value("Project", second, "company", COMPANY)

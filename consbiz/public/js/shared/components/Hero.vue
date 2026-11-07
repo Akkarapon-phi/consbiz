@@ -5,7 +5,7 @@
 		<div class="ss-hero-glow"></div>
 		<div class="ss-hero-top">
 			<button
-				v-if="boot.sections.length > 1 || has_apps"
+				v-if="has_more"
 				type="button"
 				class="ss-hero-section"
 				aria-label="เปลี่ยนหมวดงาน"
@@ -28,6 +28,8 @@
 			<div class="ss-hero-hello">{{ greeting }}</div>
 			<div class="ss-hero-name">{{ boot.full_name }}</div>
 		</div>
+		<!-- จอ ≥768: เมนูของหมวด -->
+		<SectionTabs variant="hero" />
 		<button type="button" class="ss-project-chip" @click="$emit('pick-project')">
 			<span class="ss-project-chip-icon"><Icon name="building" :size="20" /></span>
 			<span class="ss-project-chip-text">
@@ -44,12 +46,14 @@
 <script setup>
 import { computed, inject } from "vue";
 import Icon from "./Icon.vue";
+import SectionTabs from "./SectionTabs.vue";
 import { app } from "../app.js";
-import { boot, other_apps, state } from "../api.js";
+import { boot, state } from "../api.js";
+import { module_list } from "../modules.js";
 
 const SECTIONS = app.sections;
-// มีแอปอื่น: ปุ่มหมวดเปิดตารางหมวด + แอปได้แม้มีหมวดเดียว
-const has_apps = other_apps().length > 0;
+// มีหมวดอื่น (รวมของแอปอื่น) หรือระบบเต็ม: ปุ่มหมวดเปิดตารางหมวด
+const has_more = module_list().length > 1 || boot.desk;
 
 defineEmits(["pick-project"]);
 const open_launcher = inject("open_launcher");

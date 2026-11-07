@@ -3,8 +3,24 @@
      ท้ายตาราง: ยอดรวมทั้งชุดตามตัวกรอง + แบ่งหน้า  มือถือ: การ์ด + ตัวกรองใน sheet + โหลดเพิ่ม -->
 <template>
 	<div :class="{ 'ss-has-bar': selected.size }">
-		<TopBar :title="config.label" :subtitle="subtitle">
+		<TopBar :title="config.label" :subtitle="subtitle" no_project>
 			<template #actions>
+				<!-- จอ ≥768: ค้นหาอยู่ขวาของแถบบน (มือถืออยู่ในแถบเครื่องมือ) -->
+				<label v-if="wide" class="ss-toolbar-search ss-topbar-search">
+					<Icon name="search" :size="17" />
+					<input ref="search_input" v-model="search" type="search" :placeholder="search_placeholder" />
+				</label>
+				<button
+					v-if="wide"
+					type="button"
+					class="ss-icon-btn"
+					:disabled="exporting"
+					aria-label="ส่งออก CSV"
+					title="ส่งออก CSV (ตามตัวกรอง)"
+					@click="export_csv()"
+				>
+					<Icon name="receive" :size="19" />
+				</button>
 				<button
 					type="button"
 					class="ss-icon-btn"
@@ -29,7 +45,8 @@
 
 		<div class="ss-content ss-list-page">
 			<!-- แท็บสถานะ พร้อมจำนวนตามตัวกรองปัจจุบัน -->
-			<nav class="ss-tabs" aria-label="สถานะ">
+			<!-- มือถือ: แท็บสถานะ / จอ ≥768: ปุ่มสถานะอยู่ต้นแถวตัวกรอง -->
+			<nav v-if="!wide" class="ss-tabs" aria-label="สถานะ">
 				<button
 					v-for="f in tabs"
 					:key="f.value"
@@ -45,15 +62,26 @@
 
 			<!-- แถบเครื่องมือ -->
 			<div class="ss-toolbar">
-				<label class="ss-toolbar-search">
+				<label v-if="!wide" class="ss-toolbar-search">
 					<Icon name="search" :size="17" />
-					<input
-						v-model="search"
-						type="search"
-						:placeholder="`ค้นหาเลขที่${config.party ? ` / ${config.party}` : ''}`"
-					/>
+					<input ref="search_input" v-model="search" type="search" :placeholder="search_placeholder" />
 				</label>
 				<template v-if="wide">
+					<div class="ss-status-pills" role="tablist" aria-label="สถานะ">
+						<button
+							v-for="f in tabs"
+							:key="f.value"
+							type="button"
+							role="tab"
+							class="ss-status-pill"
+							:class="{ 'is-active': filter === f.value }"
+							:aria-selected="filter === f.value"
+							@click="filter = f.value"
+						>
+							{{ f.label }}
+							<span v-if="counts" class="ss-tab-count">{{ counts[f.value] ?? 0 }}</span>
+						</button>
+					</div>
 					<SelectBox
 						v-model="range"
 						variant="tool"
@@ -94,18 +122,15 @@
 					>
 						<Icon name="alert" :size="15" /> เกินกำหนด
 					</button>
+					<ProjectFilter v-if="app.project_filter && config.project" />
 					<SelectBox
-						v-if="config.project"
+						v-else-if="config.project"
 						:model-value="state.doc_scope"
 						variant="tool"
 						label="ขอบเขต"
 						:options="SCOPES"
 						@update:model-value="set_doc_scope"
 					/>
-					<span class="ss-toolbar-gap"></span>
-					<button type="button" class="ss-tool" :disabled="exporting" @click="export_csv()">
-						<Icon name="receive" :size="16" /> ส่งออก CSV
-					</button>
 				</template>
 				<button
 					v-else
@@ -360,7 +385,8 @@
 					<span class="ss-toggle-track"><span></span></span>
 					<span><b>เฉพาะที่เกินกำหนด</b></span>
 				</label>
-				<ScopeSwitch v-if="config.project" />
+				<ProjectFilter v-if="app.project_filter && config.project" />
+				<ScopeSwitch v-else-if="config.project" />
 			</div>
 			<template #footer>
 				<button type="button" class="ss-btn ss-btn--ghost" @click="clear_filters">ล้าง</button>
@@ -395,6 +421,9 @@ import DocCard from "./DocCard.vue";
 import DocTable from "./DocTable.vue";
 import DocPreview from "./DocPreview.vue";
 import ScopeSwitch from "./ScopeSwitch.vue";
+import ProjectFilter from "./ProjectFilter.vue";
+import { use_shortcuts } from "../shortcuts.js";
+import { app } from "../app.js";
 import { DOC_KINDS } from "./kinds.js";
 import {
 	call,
@@ -403,6 +432,8 @@ import {
 	money,
 	post,
 	replace_params,
+	scope_args,
+	scope_key,
 	set_doc_scope,
 	show_error,
 	state,
@@ -497,15 +528,17 @@ const on_media = () => (wide.value = mq_wide.matches);
 mq_wide.addEventListener("change", on_media);
 onBeforeUnmount(() => mq_wide.removeEventListener("change", on_media));
 
-const subtitle = computed(() =>
-	config.project && state.doc_scope === "project" ? state.project?.project_name : "ทุกโครงการ"
-);
+const subtitle = computed(() => {
+	const { scope, company } = scope_args();
+	const project = config.project && scope === "project" ? state.project?.project_name : "ทุกโครงการ";
+	return company ? `${project} · ${company}` : project;
+});
 const page_no = computed(() => Math.floor(start.value / page_size.value) + 1);
 const page_count = computed(() => Math.max(1, Math.ceil((total.value || 0) / page_size.value)));
 const empty_text = computed(() =>
 	search.value || active_filters.value.length
 		? "ลองเปลี่ยนคำค้นหรือล้างตัวกรอง"
-		: state.doc_scope === "project" && config.project
+		: scope_args().scope === "project" && config.project
 		? "ลองดูทุกโครงการ"
 		: ""
 );
@@ -559,8 +592,7 @@ function args(extra = {}) {
 	const [from, to] = dates.value;
 	return {
 		kind,
-		project: state.project?.name,
-		scope: state.doc_scope,
+		...scope_args(),
 		filter: filter.value,
 		search: search.value.trim() || undefined,
 		sort: sort.value,
@@ -638,7 +670,7 @@ watch(filter, (value) => {
 	replace_params(kind, { filter: value });
 	reload();
 });
-watch([() => state.doc_scope, dates, party, overdue], reload);
+watch([scope_key, dates, party, overdue], reload);
 watch([sort, order, page_size], () => {
 	save_prefs();
 	reload();
@@ -735,4 +767,15 @@ onMounted(async () => {
 });
 
 load();
+
+// คีย์ลัด (แอปออฟฟิศ): / ค้นหา, n สร้างใหม่, j/k เลื่อนแถว (Enter เปิด)
+const search_input = ref(null);
+// ค้นได้: เลขที่ / คู่ค้า / เลขที่บิลผู้ขาย (PI) / ชื่อหรือรหัสสินค้า (site_docs.search_filters)
+const search_placeholder = `ค้นหาเลขที่${config.party ? ` / ${config.party}` : ""}${kind === "pi" ? " / เลขที่บิล" : ""} / สินค้า`;
+use_shortcuts({
+	"/": () => search_input.value?.focus(),
+	n: () => go(`${config.section}-form`, { kind, name: "new" }),
+	j: () => document.querySelector(".ss-table--list tbody tr")?.focus(),
+	k: () => document.querySelector(".ss-table--list tbody tr:last-child")?.focus(),
+});
 </script>

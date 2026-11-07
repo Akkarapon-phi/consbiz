@@ -11,11 +11,11 @@
 					v-if="setup?.pdf_url"
 					type="button"
 					class="ss-icon-btn"
-					aria-label="PDF / แชร์"
-					title="PDF / แชร์"
+					aria-label="PDF / พิมพ์ / แชร์"
+					title="PDF / พิมพ์ / แชร์"
 					@click="pdf_sheet = true"
 				>
-					<Icon name="file" :size="19" />
+					<Icon name="printer" :size="19" />
 				</button>
 				<a
 					class="ss-icon-btn"

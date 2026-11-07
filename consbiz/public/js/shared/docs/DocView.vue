@@ -7,11 +7,11 @@
 					v-if="doc"
 					type="button"
 					class="ss-icon-btn"
-					aria-label="PDF / แชร์"
-					title="PDF / แชร์"
+					aria-label="PDF / พิมพ์ / แชร์"
+					title="PDF / พิมพ์ / แชร์"
 					@click="pdf = true"
 				>
-					<Icon name="file" :size="19" />
+					<Icon name="printer" :size="19" />
 				</button>
 				<a
 					class="ss-icon-btn"
@@ -500,6 +500,7 @@ import PdfViewer from "../components/PdfViewer.vue";
 import RichText from "../components/RichText.vue";
 import DocActivity from "./DocActivity.vue";
 import InlineEdit from "../components/InlineEdit.vue";
+import { use_shortcuts } from "../shortcuts.js";
 import { DOC_KINDS, in_app, open_doc } from "./kinds.js";
 import {
 	call,
@@ -651,7 +652,10 @@ const has_bar = computed(
 
 const progress = computed(() =>
 	doc.value?.docstatus === 1
-		? (config.progress || []).map(([field, label]) => ({ label, value: doc.value.progress[field] || 0 }))
+		? (config.progress || [])
+				// null = ไม่มีขั้นนี้ (สั่งซื้อของใบขอซื้อผู้ว่าจ้างจัดหา)
+				.filter(([field]) => doc.value.progress[field] != null)
+				.map(([field, label]) => ({ label, value: doc.value.progress[field] || 0 }))
 		: []
 );
 
@@ -717,4 +721,11 @@ async function submit() {
 }
 
 load();
+
+// คีย์ลัด (แอปออฟฟิศ): e แก้ไขร่าง, p PDF, i แผงข้อมูลเอกสาร
+use_shortcuts({
+	e: () => doc.value?.can_edit && go(`${config.section}-form`, { kind: params.kind, name: params.name }),
+	p: () => doc.value && (pdf.value = true),
+	i: () => doc.value && toggle_side(),
+});
 </script>

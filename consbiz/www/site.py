@@ -2,7 +2,7 @@
 # For license information, please see license.txt
 
 # แอปหน้างาน (/site): หน้าเปล่าที่โหลด Vue (public/js/site_app/) ข้อมูลจาก consbiz/site_app.py + consbiz/store_app.py
-# /store เดิมเด้งมาที่ /site/store (website_redirects ใน hooks.py)
+# อยู่ที่ /conserp (website_route_rules), /site และ /store เดิมเด้งมาที่นี่ (website_redirects ใน hooks.py)
 
 import json
 from urllib.parse import quote

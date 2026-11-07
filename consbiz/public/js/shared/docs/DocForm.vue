@@ -99,7 +99,28 @@
 								placeholder="0"
 							/>
 						</label>
-						<div v-if="form.project" class="ss-field ss-docform-project">
+						<!-- ออฟฟิศ: บริษัทของเอกสารใหม่ (มีหลายบริษัท) และโครงการเลือกในฟอร์ม -->
+						<div v-if="company_choice" class="ss-field">
+							<span class="ss-field-label">บริษัท<em>*</em></span>
+							<SelectBox
+								:model-value="form.company"
+								label="บริษัท"
+								:options="company_options"
+								@update:model-value="change_company"
+							/>
+						</div>
+						<Picker
+							v-if="editable_project"
+							v-model="form.project"
+							class="ss-docform-project"
+							label="โครงการ"
+							placeholder="ไม่ระบุโครงการ"
+							:display_value="form.project_name"
+							:remote_fn="search_projects"
+							clearable
+							@select="(o) => (form.project_name = o?.label || '')"
+						/>
+						<div v-else-if="form.project" class="ss-field ss-docform-project">
 							<span class="ss-field-label">โครงการ</span>
 							<span class="ss-docform-project-name" :title="form.project_name"
 								>{{ form.project_name || form.project }}
@@ -346,12 +367,7 @@
 						</template>
 					</Sheet>
 				</div>
-				<ItemInsight
-					v-if="xl"
-					:kind="kind"
-					:project="form.project || state.project?.name"
-					:row="insight_row"
-				/>
+				<ItemInsight v-if="xl" :kind="kind" :project="form.project || null" :row="insight_row" />
 			</div>
 		</div>
 
@@ -480,7 +496,8 @@ import RichEditor from "../components/RichEditor.vue";
 import SelectBox from "../components/SelectBox.vue";
 import DateInput from "../components/DateInput.vue";
 import { DOC_KINDS } from "./kinds.js";
-import { call, celebrate, go, money, post, show_error, state, toast } from "../api.js";
+import { app } from "../app.js";
+import { boot, call, celebrate, go, money, post, show_error, state, toast } from "../api.js";
 
 const reload_summary = inject("reload_summary");
 
@@ -496,6 +513,37 @@ const kind = DOC_KINDS[params.kind] ? params.kind : "po";
 const config = DOC_KINDS[kind];
 const is_mr = kind === "mr";
 const is_new = !params.name || params.name === "new";
+
+// ---------------------------------------------------------------- โครงการ / บริษัท (แอปออฟฟิศ)
+const editable_project = computed(() => app.project_filter && !!config.project);
+const company_choice = computed(
+	() => app.project_filter && is_new && !params.source && (boot.companies || []).length > 1
+);
+const company_options = (boot.companies || []).map((c) => ({ value: c.name, label: c.name }));
+const company_override = ref(null);
+let project_list = null;
+async function search_projects(txt) {
+	project_list = project_list || (await call("get_projects"));
+	const q = (txt || "").trim().toLowerCase();
+	return project_list
+		.filter((p) => !form.value?.company || p.company === form.value.company)
+		.filter((p) => !q || `${p.name} ${p.project_name}`.toLowerCase().includes(q))
+		.slice(0, 80)
+		.map((p) => ({ value: p.name, label: p.project_name || p.name, description: p.name }));
+}
+// เปลี่ยนบริษัทของเอกสารใหม่ = เริ่มฟอร์มใหม่ (ภาษี/ราคา/คู่ค้าขึ้นกับบริษัท)
+async function change_company(company) {
+	if (!company || company === form.value?.company) return;
+	if (form.value?.items.length && !window.confirm("เปลี่ยนบริษัทจะล้างรายการที่กรอกไว้ ทำต่อไหม?")) return;
+	company_override.value = company;
+	try {
+		localStorage.removeItem(draft_key);
+	} catch {
+		/* เข้าถึงไม่ได้ */
+	}
+	form.value = null;
+	await load();
+}
 
 // ช่องหัวเอกสาร (ตรงกับ FORM ใน site_docs.py) rows = ช่องของแถวที่ตามค่านี้เมื่อแก้
 const PARTY = { po: "supplier", pi: "supplier", qtn: "party_name", so: "customer", si: "customer" };
@@ -573,7 +621,9 @@ const fields = computed(() =>
 	FIELDS[kind].filter((f) => !form.value?.fields || form.value.fields.includes(f.field))
 );
 const title = computed(() => (is_new ? `${config.label}ใหม่` : `แก้ไข${config.label}`));
-const subtitle = computed(() => (is_new ? state.project?.project_name || "" : params.name));
+const subtitle = computed(() =>
+	is_new ? form.value?.project_name || state.project?.project_name || "" : params.name
+);
 const source_label = computed(() => DOC_KINDS[SOURCE_KIND[kind]]?.label || "");
 const back_view = computed(() => (is_new && !params.source ? kind : `${config.section}-doc`));
 const back_params = computed(() =>
@@ -606,7 +656,7 @@ const lines_total = computed(() =>
 	(form.value?.items || []).reduce((s, r) => s + (Number(r.qty) || 0) * (Number(r.rate) || 0), 0)
 );
 const find_items = (txt) =>
-	call("consbiz.site_docs.search_items", { kind, txt, project: state.project?.name || null });
+	call("consbiz.site_docs.search_items", { kind, txt, project: form.value?.project || null });
 
 const in_form = computed(() => new Set(form.value?.items.map((r) => r.item_code)));
 
@@ -624,7 +674,9 @@ async function load() {
 			kind,
 			name: is_new ? null : params.name,
 			source: params.source || null,
+			// เอกสารใหม่: โครงการ (หน้างาน = ที่ทำงานอยู่, ออฟฟิศ = ตัวกรอง) / บริษัท (ออฟฟิศ)
 			project: state.project?.name || null,
+			company: company_override.value || state.company || null,
 		});
 		data.items = with_uid(data.items);
 		const restored = is_new && restore_draft(data);
@@ -651,7 +703,8 @@ function restore_draft(data) {
 // ค่าที่ส่งให้ server (ช่องที่กรอกได้เท่านั้น)
 function payload() {
 	const f = form.value;
-	const out = { name: f.name, source: f.source, project: state.project?.name || null };
+	// โครงการ/บริษัทของเอกสาร (ออฟฟิศแก้โครงการได้ในฟอร์ม บริษัทเลือกได้เฉพาะเอกสารใหม่)
+	const out = { name: f.name, source: f.source, project: f.project || null, company: f.company || null };
 	// ช่องหัวเอกสารที่ server รับ (FORM ใน site_docs.py ที่ DocType มีจริง)
 	for (const field of [...(f.fields || []), party_field, remarks_field]) {
 		if (field) out[field] = f[field] ?? null;
@@ -737,7 +790,7 @@ function search_items() {
 			item_results.value = await call("consbiz.site_docs.search_items", {
 				kind,
 				txt: item_txt.value,
-				project: state.project?.name || null,
+				project: form.value?.project || null,
 			});
 		} catch (error) {
 			show_error(error);

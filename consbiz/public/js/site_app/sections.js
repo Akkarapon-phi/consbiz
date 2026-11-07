@@ -1,18 +1,15 @@
-// หมวดงานของแอปหน้างาน (/site/<หมวด>/<หน้า>/<params...>) ตั้งค่าแอปที่ site_app.bundle.js (configure)
+// หมวดงานของแอปหน้างาน (/conserp/<หมวด>/<หน้า>/<params...>) ตั้งค่าแอปที่ site_app.bundle.js (configure)
 // สลับหมวดผ่าน SectionLauncher.vue (ตารางไอคอน เพิ่มหมวดได้ไม่จำกัด)
 // เพิ่มหมวดใหม่: ใส่ใน SECTIONS + หน้าใน ROUTES + component ใน views.js + สิทธิ์ใน site_app.boot_data
 // ชื่อหน้า (view) ห้ามซ้ำข้ามหมวด เพราะ go("<view>") หาหมวดจากชื่อหน้า
 
+import { MODULE_META } from "../shared/modules.js";
+
 export const SECTIONS = {
 	store: {
 		key: "store",
-		label: "สโตร์",
-		title: "สโตร์หน้างาน",
-		note: "รับของ เบิก ยืม-คืน คลัง",
-		icon: "package",
+		...MODULE_META.site.store,
 		home: "home",
-		theme: "#1f6feb",
-		colors: ["#1f6feb", "#5b3df5"],
 		// badge(summary) = ตัวเลขบนเมนู, alert(summary) = แดง
 		tabs: [
 			{ view: "home", label: "หน้าหลัก", icon: "home" },
@@ -32,13 +29,8 @@ export const SECTIONS = {
 	},
 	work: {
 		key: "work",
-		label: "ควบคุมงาน",
-		title: "ควบคุมงาน",
-		note: "ความคืบหน้า รายงานประจำวัน คอนกรีต ตรวจงาน",
-		icon: "hardhat",
+		...MODULE_META.site.work,
 		home: "work",
-		theme: "#e8590c",
-		colors: ["#e8590c", "#d6336c"],
 		tabs: [
 			{ view: "work", label: "หน้าหลัก", icon: "home" },
 			{ view: "reports", label: "รายงาน", icon: "clipboard", badge: (s) => s?.requests_pending },
@@ -55,13 +47,8 @@ export const SECTIONS = {
 	},
 	pm: {
 		key: "pm",
-		label: "บริหารโครงการ",
-		title: "บริหารโครงการ",
-		note: "ภาพรวม แผนงาน Look-ahead ทรัพยากร แผนจัดซื้อวัสดุ เอกสาร",
-		icon: "gantt",
+		...MODULE_META.site.pm,
 		home: "pm",
-		theme: "#6d4cf6",
-		colors: ["#6d4cf6", "#2563eb"],
 		// summary หนัก (ทั้งแผนงาน) โหลดเมื่อเปิดหมวดนี้เท่านั้น
 		lazy: true,
 		tabs: [
@@ -75,13 +62,8 @@ export const SECTIONS = {
 	// ขอซื้อ: หน้างานสร้าง/ติดตามใบขอซื้อ สั่งซื้อ/แจ้งหนี้/ขาย ทำที่แอปออฟฟิศ (/office)
 	buy: {
 		key: "buy",
-		label: "ขอซื้อ",
-		title: "ขอซื้อ",
-		note: "ขอซื้อวัสดุ ติดตามการสั่งซื้อ/รับของ",
-		icon: "cart",
+		...MODULE_META.site.buy,
 		home: "buy",
-		theme: "#0d9488",
-		colors: ["#0d9488", "#0284c7"],
 		tabs: [
 			{ view: "buy", label: "หน้าหลัก", icon: "home" },
 			{ view: "mr", label: "ขอซื้อ", icon: "clipboard", badge: (s) => s?.mr_todo?.count },

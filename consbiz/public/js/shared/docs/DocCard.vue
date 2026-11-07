@@ -45,10 +45,10 @@ const props = defineProps({ row: Object, kind: String, i: { type: Number, defaul
 const config = computed(() => DOC_KINDS[props.kind]);
 const progress = computed(() =>
 	props.row.docstatus === 1
-		? (config.value.progress || []).map(([field, label]) => ({
-				label,
-				value: Number(props.row[field]) || 0,
-		  }))
+		? (config.value.progress || [])
+				// null = ไม่มีขั้นนี้ (สั่งซื้อของใบขอซื้อผู้ว่าจ้างจัดหา)
+				.filter(([field]) => props.row[field] != null)
+				.map(([field, label]) => ({ label, value: Number(props.row[field]) || 0 }))
 		: []
 );
 // วันครบกำหนดแสดงเมื่อเอกสารยังรอดำเนินการ (สถานะสีเหลือง/แดง)

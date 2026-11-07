@@ -3,14 +3,15 @@
 // จัดซื้อ/ขาย (shared/docs, API consbiz/site_docs.py)
 import { createApp } from "vue";
 import { configure } from "../shared/app.js";
-import { state } from "../shared/api.js";
+import { scope_args } from "../shared/api.js";
 import AppShell from "../shared/AppShell.vue";
 import { ROUTES, SECTIONS } from "./sections.js";
 import VIEWS from "./views.js";
 
 configure({
 	key: "office",
-	base: "/office",
+	// ทุกหมวดอยู่ระดับเดียวกับหมวดของหน้างาน (/conserp/<หมวด>) server เลือก bundle ตามชื่อหมวด (website_route_rules)
+	base: "/conserp",
 	storage: "consbiz.office",
 	title: "ConsOffice",
 	sections: SECTIONS,
@@ -19,11 +20,15 @@ configure({
 	parent_tab: {},
 	kind_pages: ["buy-doc", "sell-doc", "buy-form", "sell-form"],
 	summary_api: {
-		buy: () => ["consbiz.site_docs.get_summary", { section: "buy", scope: state.doc_scope }],
-		sell: () => ["consbiz.site_docs.get_summary", { section: "sell", scope: state.doc_scope }],
+		purchase: () => ["consbiz.site_docs.get_summary", { section: "buy", ...scope_args() }],
+		sales: () => ["consbiz.site_docs.get_summary", { section: "sell", ...scope_args() }],
 	},
-	fallback: "buy",
+	fallback: "purchase",
 	doc_kinds: ["mr", "po", "pi", "qtn", "so", "si"],
+	// งานออฟฟิศดูหลายโครงการ: โครงการเป็นตัวกรอง + ตัวเลือกบริษัท + คีย์ลัด
+	project_filter: true,
+	project_key: "consbiz.office.project",
+	shortcuts: true,
 });
 
 const app = createApp(AppShell);

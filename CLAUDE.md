@@ -148,6 +148,7 @@ pre-commit run --all-files                               # ruff + prettier (ต�
   ชื่อ = ชื่อ Item หลัก + " (ผู้ว่าจ้างจัดหา)" กลุ่ม/หน่วย/UOM ตาม Item หลักเสมอ (doc_events ของ Item รวม merge)
   ผู้ใช้เลือก Item หลัก: MR ประเภท Customer Provided สลับเป็น Item คู่ (เลขชุด `OPO-`, ไม่มี VAT, Print Format `Employer Material Order`)
   แผนวัสดุ: ติ๊ก `employer_supplied` แล้วแถวเก็บ Item คู่ ยอดแยกตาม Item จึงไม่ต้องแก้ `get_supply` / `allocate`
+  ERPNext นับของที่รับเข้าของ MR ผู้ว่าจ้างจัดหาใน `per_ordered` / `ordered_qty` (ไม่ใช่ `per_received`) แอปแสดงเป็นรับของด้วย `site_docs.received_as_received`
 - สต็อกหน้างาน (`consbiz/site_stock.py`) ใช้เอกสารสต็อกของ ERPNext:
   1 คลังต่อโครงการ: Project.after_insert สร้าง `All Warehouses / โครงการ (หรือกลุ่ม Project/Projects ที่มีอยู่) / <ชื่อคลัง>`
   ชื่อคลังผู้ใช้ตั้งเองตอนสร้างโครงการ (`Project.custom_warehouse_name`) เพราะ ERPNext ซ่อนช่องชื่อคลังหลังบันทึกและปิด Rename
@@ -167,24 +168,39 @@ pre-commit run --all-files                               # ruff + prettier (ต�
 - แผนหน้าแอป (ตกลง 2026-11-06): แยกตามกลุ่มคนใช้/อุปกรณ์ บนแอป Frappe `consbiz` ตัวเดียว เป็นหน้าจอครอบ DocType ของ ERPNext/HRMS ไม่เขียนระบบใหม่
   | URL | คนใช้ | เนื้อหา |
   |---|---|---|
-  | `/site` | หน้างาน (มือถือ) | ควบคุมงาน, สโตร์, บริหารโครงการ, ขอซื้อ/ขอเบิก + ติดตามสถานะ |
-  | `/office` | ออฟฟิศ (จอใหญ่) | ซื้อ, ขาย, บัญชี, ประกันผลงาน, แอดมิน (หนังสือเข้า-ออก, สัญญา ผรม., ใบนำส่ง, ใบปะหน้า, ค่าแรงรายวัน) |
+  | `/conserp` | หน้างาน (มือถือ) | ควบคุมงาน, สโตร์, บริหารโครงการ, ขอซื้อ/ขอเบิก + ติดตามสถานะ |
+  | `/conserp/purchase`, `/conserp/sales`, ... | ออฟฟิศ (จอใหญ่) | ซื้อ, ขาย, บัญชี, ประกันผลงาน, แอดมิน (หนังสือเข้า-ออก, สัญญา ผรม., ใบนำส่ง, ใบปะหน้า, ค่าแรงรายวัน) |
   | `/hr-app` | พนักงานทุกคน | ลงเวลา, ลา, เบิกล่วงหน้า, สลิป (หน้าจอครอบ HRMS) ชื่อไอคอน "ConsHR" |
   | `/contractor` | ผู้รับเหมาช่วง (คนนอก) | อัปเดตผลงาน, ดูสัญญา/งวดของตัวเอง API แยกและตรวจสิทธิ์ทุกคำขอ |
   ห้ามใช้ `/me` (หน้า My Account ของ Frappe), `/hr/...` (Roster ของ HRMS), `/hrms` (ESS ของ HRMS)
-  โค้ดหน้าจอกลางอยู่ `public/js/shared/`: `AppShell.vue` (Dock/sidebar/แถบล่าง/เลือกโครงการ/toast), `api.js` (เรียก API, router, state, รูปแบบ),
+  โค้ดหน้าจอกลางอยู่ `public/js/shared/`: `AppShell.vue` (Dock/แถบล่าง/เลือกโครงการ/toast), `api.js` (เรียก API, router, state, รูปแบบ),
   `app.js` (`configure()` ค่าของแต่ละแอป: base, storage, sections, routes, views, summary_api), `components/`, `docs/` (เอกสารซื้อ-ขาย + `kinds.js` = DOC_KINDS),
   `style.css` (CSS ทุกแอป class `ss-`) แต่ละแอป = `<แอป>.bundle.js` ที่ `configure()` แล้ว mount `AppShell` ห้ามอ่าน `app` ตอนโหลดโมดูล (import มาก่อน configure)
-  แก้ไฟล์ใน `shared/` มีผลทุกแอป ตรวจทุกแอปทุกครั้ง ตัวสลับแอปมุมซ้ายบนสำหรับคนที่ใช้หลายแอป
-  build ของ Frappe ไม่แบ่งโหลด (code splitting) จึงแยกเป็น bundle ต่อแอป ไม่ใช่ต่อหมวด
-- แอปหน้างาน `/site` (มือถือ, ติดตั้งลงหน้าจอได้) = หน้า www (`consbiz/www/site.html`) + Vue (`public/js/site_app/`) แอปเดียวแบ่งหมวดงาน
-  หมวดขอซื้อของ `/site` = ใบขอซื้ออย่างเดียว (`doc_kinds: ["mr"]`) สั่งซื้อ/แจ้งหนี้/ขาย อยู่ `/office`
-- แอปออฟฟิศ `/office` (จอใหญ่) = `consbiz/www/office.html` + `public/js/office_app/` (sections/views/bundle) หมวดจัดซื้อ/ขายเต็ม (`doc_kinds` ทั้ง 6 ชนิด)
+  แก้ไฟล์ใน `shared/` มีผลทุกแอป ตรวจทุกแอปทุกครั้ง
+  ผู้ใช้เห็นเป็นแอปเดียว "ConsERP" (ตกลง 2026-11-08): PWA ตัวเดียว `site_app/manifest.webmanifest` (scope `/conserp`, start_url `/conserp/desktop`,
+  id `/site` คงไว้จากแอปเดิม ห้ามเปลี่ยน) แก้ manifest แล้วเพิ่มเลข `?v=` ที่ลิงก์ใน www/*.html (`/assets` cache 12 ชม.)
+  ทุกหมวดของทุกแอปอยู่ระดับเดียวกัน `/conserp/<หมวด>` (ทุก bundle `base: "/conserp"`) server เลือก bundle ตามชื่อหมวด (`website_route_rules`:
+  `_OFFICE_SECTIONS` ใน hooks.py = bundle ออฟฟิศ ตรงกับ `site_app.office_sections` ที่เหลือ = bundle หน้างาน) ชื่อหมวดจึงห้ามซ้ำข้ามแอป
+  หมวดใหม่ของออฟฟิศต้องเพิ่มใน `_OFFICE_SECTIONS` ด้วย URL เดิม `/site`, `/office`, `/conserp/office`, `/store` เด้งมาที่ใหม่ (`website_redirects` ข้อแรกที่ตรงชนะ)
+  หมวดออฟฟิศ `purchase`/`sales` ใช้ชุดเอกสาร `buy`/`sell` (`sections[].docs`, `DOC_KINDS[].section`, ชื่อหน้า `buy-doc` ฯลฯ) ภาพรวมออฟฟิศเลิกใช้แล้ว
+  Dock พับ/กางจำค่าเดียวทุก bundle (`consbiz.conserp.sidebar`) หน้าแรก/ตารางหมวด = ไอคอน + ชื่อ (`ModuleGrid.vue`, คำอธิบายอยู่ใน tooltip)
+  ทุกหน้า www ของแอปลิงก์ manifest นี้ ไอคอน = `public/images/logo.png` (สร้าง `conserp-round-*.png` (ขอบมน) + `conserp-maskable.png` (เต็มกรอบ ให้ Android ตัดเอง), `logo-96.png` เปลี่ยนรูปต้องเปลี่ยนชื่อไฟล์ เพราะ Chrome จำไอคอนตาม URL ใน `public/site_app/`) ข้างในยังแยก bundle ต่อแอป
+  หน้าแรก (Desktop) = หมวดพิเศษ `desktop` ที่ `configure()` ใส่ให้ทุกแอป (`shared/components/Desktop.vue`, ไม่ต้องเลือกโครงการ)
+  ชื่อ/ไอคอน/สีของหมวดทุกแอปอยู่ `shared/modules.js` (`MODULE_META`) ที่เดียว sections.js ดึงไปใช้
+  หมวดที่มีสิทธิ์ของทุกแอป = `site_app.app_modules` → `boot.modules` (มี `purchase` แล้วไม่แสดงขอซื้อ `buy` ของหน้างาน) หมวดของแอปอื่น = ลิงก์ (โหลด bundle นั้น)
+  build ของ Frappe ไม่แบ่งโหลด (code splitting) จึงแยกเป็น bundle ต่อกลุ่มแอป ไม่ใช่ต่อหมวด และไม่รวมเป็น bundle เดียว (ตกลง 2026-11-08:
+  แอปจะเพิ่มอีกมาก bundle เดียวโตเรื่อยๆ มือถือเปิดช้า) สลับหมวดในกลุ่มลื่น ข้ามกลุ่มโหลดหน้าใหม่ (ผ่านหน้าแรกเท่านั้น)
+- แอปหน้างาน `/conserp` (มือถือ, ติดตั้งลงหน้าจอได้) = หน้า www (`consbiz/www/site.html`) + Vue (`public/js/site_app/`) แอปเดียวแบ่งหมวดงาน
+  หมวดขอซื้อของหน้างาน = ใบขอซื้ออย่างเดียว (`doc_kinds: ["mr"]`) สั่งซื้อ/แจ้งหนี้/ขาย อยู่แอปออฟฟิศ
+- แอปออฟฟิศ (`/conserp/purchase`, `/conserp/sales`, จอใหญ่) = `consbiz/www/office.html` + `public/js/office_app/` (sections/views/bundle) หมวดจัดซื้อ/ขายเต็ม (`doc_kinds` ทั้ง 6 ชนิด)
   boot = `site_app.office_boot_data` หมวดตามสิทธิ์ `site_app.office_sections` / ของหน้างาน `site_app.site_sections`
-  ตัวสลับแอป: `site_app.APPS` + `available_apps` (แอปที่มีอย่างน้อย 1 หมวด) → `boot.apps` แสดงใน Dock / ท้าย sidebar / ตารางหมวดของมือถือ
+  `site_app.APPS` + `available_apps` → `boot.apps` (ใช้หาแอปที่ดูแลเอกสาร `doc_url`)
   เอกสารชนิดที่แอปไม่ได้ดูแล: `open_doc` / `doc_url` (`shared/docs/kinds.js`) เปิดในแอปออฟฟิศ (ไม่มีสิทธิ์ = ระบบเต็ม) ปุ่มสร้างเอกสารถัดไปซ่อน (`in_app`)
-  URL เดิม `/site/sell/...`, `/site/buy/(po|pi)...`, `/site/buy/(buy-doc|buy-form)/(po|pi)/...` เด้งไป `/office` (`website_redirects`)
+  URL เดิม `/site/sell/...`, `/site/buy/(po|pi)...`, `/site/buy/(buy-doc|buy-form)/(po|pi)/...` เด้งไป `/conserp/purchase`, `/conserp/sales` (`website_redirects`)
   `get_summary` คืน `drafts_by_kind` หน้าหลักนับร่างเฉพาะชนิดของแอปนั้น
+  ออฟฟิศไม่บังคับเลือกโครงการ (`app.project_filter`): โครงการเป็นตัวกรอง (`ProjectFilter.vue`, ว่าง = ทุกโครงการ) + ตัวเลือกบริษัทที่หัว sidebar (`state.company`, `boot.companies`)
+  รายการ/ตัวเลขใช้ `scope_args()` (api.js) → `get_docs`/`get_summary` รับ `company` ฟอร์มเลือกบริษัท (เอกสารใหม่) และโครงการเองได้ (`site_docs.set_project` ต้องเป็นบริษัทเดียวกัน ย้ายคลังของรายการตาม)
+  คีย์ลัด (`shared/shortcuts.js`, `app.shortcuts`): รายการ `/` ค้นหา `n` สร้าง `j`/`k` เลื่อนแถว, หน้าดู `e` แก้ไข `p` PDF `i` แผงข้อมูล
   หมวด (`site_app/sections.js`, หน้า → component ใน `site_app/views.js`): สโตร์ (`views/store/`, API `consbiz/store_app.py`) / ควบคุมงาน (`views/work/`, รวมคอนกรีต) / บริหารโครงการ (`views/pm/`) API 2 หมวดนี้อยู่ `consbiz/site_app.py`
   จัดซื้อ (MR ประเภท Purchase → PO → PI) / ขาย (Quotation → SO → SI): `shared/docs/` ชุดเดียวกันทั้ง 6 ชนิด (`DOC_KINDS` ใน `shared/docs/kinds.js` ตรงกับ `DOCS` ใน `consbiz/site_docs.py`)
   ดูรายการ/รายละเอียด/เอกสารต้นทาง-ปลายทาง, ส่งเอกสารร่าง, PDF ขอบเขต โครงการนี้/ทุกโครงการ (`state.doc_scope`)
@@ -209,23 +225,34 @@ pre-commit run --all-files                               # ruff + prettier (ต�
   ดูเอกสาร (`DocView.vue`): หัวเอกสาร = คู่ค้า/สถานะ + ช่องข้อมูลเป็นตาราง, ≥768 = ตารางรายการ + สรุปยอดท้ายตาราง, ≥1180 = แผงข้าง (เอกสารที่เกี่ยวข้อง/หมายเหตุ)
   เอกสารถัดไป (`MAPPERS`: MR→PO, PO→PI, QTN→SO, SO→SI) ใช้ mapper ของ ERPNext ตอนบันทึกเรียก mapper ใหม่แล้วจับคู่แถวด้วย `key` (แถวบันทึกแล้ว = name, แถวจาก mapper = ลำดับ)
   ยอด/ภาษีคำนวณที่ server (`preview_doc`) แล้ว rollback เสมอ (ERPNext สร้าง Item Price อัตโนมัติระหว่างเติมค่า) PI มีเลขที่ใบกำกับภาษี (erpnext_thailand บังคับเมื่อมีภาษีซื้อ)
-  ทางเข้าจากระบบเต็ม: Desktop Icon "ConsERP" (`consbiz/desktop_icon/conserp.json`, External → /site) และ "ConsOffice" (`consoffice.json` → /office, patch `add_consoffice_to_desktop_layouts`) ผู้ใช้ที่มี Desktop Layout ของตัวเองเห็นไอคอนใหม่เฉพาะที่อยู่ใน layout (patch `add_conserp_to_desktop_layouts`)
+  ทางเข้าจากระบบเต็ม: Desktop Icon "ConsERP" (`consbiz/desktop_icon/conserp.json`, External → /conserp/desktop) และ "ConsOffice" (`consoffice.json` → /conserp/purchase, patch `add_consoffice_to_desktop_layouts`) ผู้ใช้ที่มี Desktop Layout ของตัวเองเห็นไอคอนใหม่เฉพาะที่อยู่ใน layout (patch `add_conserp_to_desktop_layouts`)
   บริหารโครงการ (สิทธิ์อ่าน CM) ดูอย่างเดียว: ภาพรวม (`dashboard.get_dashboard`), แผนงาน Gantt (`get_plan`), Look-ahead (`lookahead.get_lookahead` สถานะวันตรงกับ `LookAhead.vue`),
   ทรัพยากร + แผนจัดซื้อวัสดุ (`resources.get_overview`), เอกสาร (`get_documents`) แก้แผนที่หน้า Gantt ในระบบเต็ม
   Look-ahead: มือถือ = การ์ดทีละสัปดาห์, แท็บเล็ต = ตาราง 2 สัปดาห์, จอใหญ่ = ตารางทั้งช่วง (matchMedia ใน `Lookahead.vue`)
   summary ของหมวดที่ `lazy` (บริหารโครงการ) โหลดเมื่อเปิดหมวดนั้นเท่านั้น
-  หมวดที่เห็นตามสิทธิ์ (`site_app.boot_data` → `sections`) สลับหมวด: มือถือ = ตารางไอคอน (`SectionLauncher.vue`) เปิดจากชิปบน hero (`Hero.vue`)
-  แท็บเล็ต/จอใหญ่ = Dock คอลัมน์ซ้ายสุด (`SectionDock.vue`) + sidebar เมนูของหมวด ค่าเริ่มต้นพับ (ไอคอน)
-  กางชั่วคราวทับเนื้อหา (`html[data-peek]`): ใช้เมาส์ = ชี้แล้วกาง, จอสัมผัส = ปุ่มล่างสุด เลือกเมนู/แตะนอกแถบแล้วพับ
-  ปักหมุด (`html[data-side="expanded"]`, ปุ่มล่างสุดบนจอใช้เมาส์) = กางค้างและดันเนื้อหา จำในเครื่อง
-  `html[data-dock]` + `html[data-side]` กำหนด `--ss-side` (ความกว้าง Dock + sidebar) ที่เนื้อหา/sheet/แถบล่างใช้ (data-peek ไม่เปลี่ยน --ss-side)
-  รายการเอกสารจัดซื้อ/ขาย (`DocList.vue`): แท็บสถานะมีจำนวน, ค้นหา/ช่วงวันที่/คู่ค้า/เกินกำหนด/ขอบเขต, เรียงคอลัมน์, เลือกหลายแถวแล้วส่ง (`submit_docs` ใช้ savepoint ต่อใบ), ส่งออก CSV
+  หมวดที่เห็นตามสิทธิ์ (`site_app.boot_data` → `sections`) สลับหมวด: มือถือ = ตารางหมวดทุกแอป (`SectionLauncher.vue` → `ModuleGrid.vue`) เปิดจากชิปบน hero (`Hero.vue`)
+  แท็บเล็ต/จอใหญ่ = Dock แถบเดียว `.ss-rail` ใน AppShell กว้าง 56px เท่า Dock ของ Frappe (ไม่มี sidebar แยก) โลโก้ = หน้าแรก, หมวดของกลุ่มแอปนี้เท่านั้น
+  (หน้าแรกแสดงทุกกลุ่ม ตารางหมวดของมือถือ = กลุ่มนี้ + ปุ่มหน้าแรก `ModuleGrid local_only`),
+  เมนูของหมวด = แท็บบนแถบบน (`SectionTabs.vue`, ข้อมูลจาก AppShell `provide("section_nav")`): หน้ารายการอยู่ใน `TopBar` แทนชื่อหน้า
+  (เฉพาะหน้าที่ไม่มีปุ่มย้อนกลับ) หน้าหลักหมวดอยู่ใน `Hero` จอ < 1100 แท็บที่ไม่ได้เลือกเหลือไอคอน Dock ค่าเริ่มต้นพับ (ไอคอน)
+  ชี้เมาส์แล้วไม่กางเอง (ชื่อเมนูดูจาก tooltip) จอสัมผัส = ปุ่มพับ/กางกางชั่วคราวทับเนื้อหา (`html[data-peek]`) เลือกเมนู/แตะนอกแถบแล้วพับ
+  Dock ไม่มีปุ่มเลือกโครงการ: เลือกที่ชิปบน hero ของหน้าหลักหมวด และปุ่มโครงการบน `TopBar.vue` (จอ ≥768, เฉพาะหน้าเมนูหลักที่ไม่มีปุ่มย้อนกลับ
+  หน้าดู/ฟอร์มไม่ให้เปลี่ยนโครงการกลางคัน, `no_project` = ซ่อน) Dock มีแค่ตัวเลือกบริษัทของออฟฟิศ
+  `DocList` จอ ≥768: ค้นหา + ส่งออก CSV อยู่ขวาของแถบบน (ไม่มีปุ่มโครงการบนแถบบน `no_project`) สถานะเป็นปุ่มติดกัน (`.ss-status-pills`)
+  ต้นแถวตัวกรอง ต่อด้วยวันที่/คู่ค้า/เกินกำหนด/โครงการ (แถวเดียว) มือถือ = แท็บสถานะ + ค้นหาในแถบเครื่องมือ + ตัวกรองใน sheet
+  ปุ่มพับ/กาง = วงกลมเล็กคร่อมขอบขวาของ Dock (`.ss-rail-toggle`, ไม่กินแถว จอเมาส์แสดงเมื่อชี้ที่ Dock) จอเมาส์ = ปักหมุด
+  (`html[data-side="expanded"]`) กางค้างและดันเนื้อหา จำในเครื่อง ท้าย Dock = บริษัท (ออฟฟิศ) + avatar ผู้ใช้ (เมนู: ระบบเต็ม / ออกจากระบบ)
+  `html[data-side]` กำหนด `--ss-side` (56px / กาง 232px) ที่เนื้อหา/sheet/แถบล่างใช้ (data-peek ไม่เปลี่ยน --ss-side)
+  รายการเอกสารจัดซื้อ/ขาย (`DocList.vue`): สถานะมีจำนวน, ค้นหา (เลขที่/คู่ค้า/เลขที่บิล/ชื่อหรือรหัสสินค้า `search_filters`)/ช่วงวันที่/คู่ค้า/เกินกำหนด/ขอบเขต, เรียงคอลัมน์, เลือกหลายแถวแล้วส่ง (`submit_docs` ใช้ savepoint ต่อใบ), ส่งออก CSV
   คอลัมน์ต่อชนิดเอกสารใน `DocTable.vue` (ท้ายตาราง: มอบหมาย `_assign` / แก้ไขล่าสุด / ถูกใจ `frappe.desk.like.toggle_like`)
   `get_docs` คืน rows + total + sums (ยอดรวมทั้งชุด) + counts (ของแต่ละแท็บ) มือถือ = การ์ด (`DocCard.vue`) + ตัวกรองใน sheet, แท็บเล็ต/จอใหญ่ = ตาราง (`DocTable.vue`) + แบ่งหน้า
-  sidebar พับ/กางใช้โครงแนวตั้งเดียวกัน (หัว/โครงการ 52px, เมนู 48px) ห้ามให้ความสูงต่างกันตามสถานะ ไม่งั้นเมนูขยับตอนเปิด-ปิด
+  Dock พับ/กางใช้แถวสูงเท่ากัน (ชื่อแค่จางหาย) ห้ามให้ความสูงต่างกันตามสถานะ ไม่งั้นเมนูขยับตอนเปิด-ปิด
+  ขนาดกระชับของแท็บเล็ต/จอใหญ่อยู่ท้าย `style.css`: จอสัมผัส ≥768 ปุ่ม 40px, จอใช้เมาส์ปุ่ม/ช่องกรอก/เครื่องมือ 32–36px (ใกล้ปุ่มของ Frappe)
   หน้าหลักทุกหมวด (`Hero.vue`): มือถือ = hero เต็ม, ≥768 = แถบเตี้ยแถวเดียว
   จอ ≥1480: รายการ = ตาราง + ตัวอย่างเอกสารขวา (`DocPreview.vue`, คลิก = ดูตัวอย่าง, ↑↓ เลื่อน, ดับเบิลคลิก/Enter = เปิดเต็มหน้า)
   แผงตัวอย่างต้องพอดีจอโน้ตบุ๊ก (สูง ~760px) โดยไม่เลื่อน: รายการ 3 แถวแรก + ยอดสำคัญ (ยอดรวม/ยอดสุทธิ/ค้าง) รายละเอียดอื่นดูในหน้าเต็ม
+  ตารางคู่แผงตัวอย่าง (`is-compact`) ซ่อนคอลัมน์ `col-wide` (วันต้องการ/ครบกำหนด, %, วัตถุประสงค์, ค้าง, มอบหมาย, แก้ไขล่าสุด) แผงจึงต้องแสดงข้อมูลเหล่านี้
+  ไม่ซ้ำกับคอลัมน์ที่ยังเห็น (โครงการ, เลขที่บิล) แต่คงเลขที่/สถานะ/คู่ค้า/วันที่ไว้เป็นหัวแผง (ให้รู้ว่ากำลังดูใบไหน)
   ฟอร์ม = แผงข้อมูลประกอบของแถวที่เลือก (`ItemInsight.vue`, `site_docs.get_item_insight`: คงเหลือ / แผนวัสดุเทียบขอ-สั่ง-รับ / ราคาล่าสุด / PO ค้างรับ)
   เทสต์แบบ rollback บน dev: คำสั่งที่ทำ DDL (เช่น frappe เพิ่มคอลัมน์ `_liked_by` ครั้งแรก) commit ทันที ข้อมูลทดสอบจะค้าง ตรวจและลบเองทุกครั้ง
   สลับแล้วไปเมนูล่าสุดของหมวดนั้น (`state.last_tab`)
@@ -241,14 +268,14 @@ pre-commit run --all-files                               # ruff + prettier (ต�
   ขออนุมัติได้ทุกวัน (ย้อนหลังได้) PDF/แชร์ไฟล์: `site_app.pdf_url` เลือกตัวสร้าง PDF แบบหน้าพิมพ์ของระบบเต็ม (Print Format → Print Settings)
   ดู PDF ในแอป (`PdfViewer.vue`) วาดด้วย PDF.js ที่ `public/js/lib/pdfjs/` (มือถือแสดง PDF ใน iframe ไม่ได้) โหลดเมื่อเปิดครั้งแรก
   ไม่ใช้ desk: เรียก API ด้วย fetch เอง (`api.js`), router เอง (`<base>/<หมวด>/<view>/<params>`, `website_route_rules`), CSS อยู่ `shared/style.css` (class `ss-`)
-  `/store/...` เดิมเด้งไป `/site/store/...` (`website_redirects` ใน hooks.py) ไอคอนที่ติดตั้งไว้แล้วยังใช้ได้
+  `/store/...` เดิมเด้งไป `/conserp/store/...` (`website_redirects` ใน hooks.py) ไอคอนที่ติดตั้งไว้แล้วยังใช้ได้
   CSS ต้อง `@import` ใน `<style>` ของ `AppShell.vue` (Frappe ฝัง CSS เข้า bundle เฉพาะที่มาจาก .vue ถ้า import .css ตรงๆ ไฟล์ JS ถูกลบตอน build)
   ห้ามวาง comment ระดับ root ใน `<template>` (ข้าง root element) ให้วางเหนือ `<template>` หรือในตัว element:
   build `--production` (เซิร์ฟเวอร์จริง) นับ comment เป็น root ด้วย class/attrs จากตัวแม่ (เช่น `ss-view`) จึงหาย dev build ไม่เป็น
   เคยทำให้หน้าแรกซื้อ/ขายกว้างเกินจอเมื่อชื่อโครงการยาว ตรวจเลย์เอาต์ก่อนขึ้นระบบด้วย `bench build --app consbiz --production`
   Responsive 3 ขนาด: มือถือ = แถบเมนูล่าง, ≥768 = แถบไอคอนซ้าย + sheet เป็นหน้าต่างกลางจอ, ≥1180 = sidebar + ฟอร์มแบ่งซ้าย-ขวา (`.ss-split`) ใช้เต็มจอ: จอกว้างได้คอลัมน์เพิ่ม (auto-fill) ไม่ยืดการ์ด, การ์ดในรายการสูงเท่ากัน (`grid-auto-rows: 1fr`)
   แถบล่าง/ปุ่มลอยของหน้า ต้อง `<Teleport to="#ss-layer">` (ตอนเปลี่ยนหน้า view มี transform ทำให้ position: fixed เพี้ยน)
-  ห้ามส่ง reactive object ของ Vue เข้า `history.pushState/replaceState` (clone ไม่ได้ แอปค้าง) `/app/site-store` เดิมเด้งไป `/site/store`
+  ห้ามส่ง reactive object ของ Vue เข้า `history.pushState/replaceState` (clone ไม่ได้ แอปค้าง) `/app/site-store` เดิมเด้งไป `/conserp/store`
   สโตร์ รับของ: PO ของโครงการ → Purchase Receipt (บัญชีทำ PI ต่อจาก PR), MR ผู้ว่าจ้างจัดหา → Stock Entry Material Receipt
   ตีกลับที่หน้างาน = ไม่รับเข้า ยอดค้างที่ PO/MR เก็บใน `custom_site_rejected_qty` / `custom_site_reject_reason` ของแถว
   ตีกลับทั้งหมด = ไม่มีใบรับ บันทึก Comment ที่ PO/MR, รูปอัปโหลดก่อนแล้ว server ผูกกับเอกสาร (`attach_files`)
