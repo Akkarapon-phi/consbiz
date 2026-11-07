@@ -53,6 +53,8 @@
 					@keydown.enter="open(row)"
 					@keydown.down.prevent="step($event, 1)"
 					@keydown.up.prevent="step($event, -1)"
+					@keydown.j.exact="app.shortcuts && step($event, 1)"
+					@keydown.k.exact="app.shortcuts && step($event, -1)"
 				>
 					<td class="col-check" @click.stop>
 						<input
@@ -90,6 +92,8 @@
 								thai_date(row.due, { year: true })
 							}}</span>
 						</template>
+						<!-- null = ไม่มีขั้นนี้ (เช่น สั่งซื้อของใบขอซื้อผู้ว่าจ้างจัดหา) -->
+						<span v-else-if="c.pct && row[c.pct] == null" class="ss-muted">—</span>
 						<span
 							v-else-if="c.pct"
 							class="ss-table-pct"
@@ -148,6 +152,7 @@
 <script setup>
 import { computed } from "vue";
 import Icon from "../components/Icon.vue";
+import { app } from "../app.js";
 import { DOC_KINDS } from "./kinds.js";
 import { go, initials, money, post, show_error, thai_date, time_ago, tone } from "../api.js";
 

@@ -39,37 +39,39 @@ app_include_js = [
 ]
 
 
-# แอปหน้างาน (www/site.html) ทุก path ใต้ /site ให้แอปจัดการเอง, /store เดิม (แอปสโตร์) เด้งไปหมวดสโตร์
+# แอป ConsERP: ทุกหมวดอยู่ระดับเดียวกันใต้ /conserp/<หมวด> (PWA ตัวเดียว scope /conserp)
+# หมวดจัดซื้อ/ขาย = bundle ออฟฟิศ (www/office.html, ชื่อหมวดตรงกับ site_app.office_sections) ที่เหลือ = bundle หน้างาน (www/site.html)
+_OFFICE_SECTIONS = ("purchase", "sales")
 website_route_rules = [
-	{"from_route": "/site/<path:app_path>", "to_route": "site"},
-	{"from_route": "/office/<path:app_path>", "to_route": "office"},
+	*(
+		rule
+		for section in _OFFICE_SECTIONS
+		for rule in (
+			{"from_route": f"/conserp/{section}", "to_route": "office"},
+			{"from_route": f"/conserp/{section}/<path:app_path>", "to_route": "office"},
+		)
+	),
+	{"from_route": "/conserp", "to_route": "site"},
+	{"from_route": "/conserp/<path:app_path>", "to_route": "site"},
 ]
+
+
+def _redirect(source, target):
+	return {"source": source, "target": target, "redirect_http_status": 302, "forward_query_parameters": True}
+
+
+# URL เดิมยังใช้ได้ (ข้อแรกที่ตรงชนะ เรียงเฉพาะเจาะจงก่อน)
+# /office/... และ /conserp/office/... (ออฟฟิศเดิม: buy/sell, ภาพรวมเลิกใช้แล้ว)
+# /site/sell, /site/buy/(po|pi) (เคยอยู่แอปหน้างาน), /site/..., /store/... (แอปสโตร์เดิม)
 website_redirects = [
-	{
-		"source": r"store(/.*)?",
-		"target": r"/site/store\1",
-		"redirect_http_status": 302,
-		"forward_query_parameters": True,
-	},
-	# จัดซื้อ (ยกเว้นใบขอซื้อ) และขาย ย้ายจากแอปหน้างานไปแอปออฟฟิศ: ลิงก์/ไอคอนเดิมยังใช้ได้
-	{
-		"source": r"site/sell(/.*)?",
-		"target": r"/office/sell\1",
-		"redirect_http_status": 302,
-		"forward_query_parameters": True,
-	},
-	{
-		"source": r"site/buy/(po|pi)(/.*)?",
-		"target": r"/office/buy/\1\2",
-		"redirect_http_status": 302,
-		"forward_query_parameters": True,
-	},
-	{
-		"source": r"site/buy/(buy-doc|buy-form)/(po|pi)(/.*)?",
-		"target": r"/office/buy/\1/\2\3",
-		"redirect_http_status": 302,
-		"forward_query_parameters": True,
-	},
+	_redirect(r"(?:conserp/)?office/buy(/.*)?", r"/conserp/purchase\1"),
+	_redirect(r"(?:conserp/)?office/sell(/.*)?", r"/conserp/sales\1"),
+	_redirect(r"(?:conserp/)?office(/.*)?", r"/conserp/purchase"),
+	_redirect(r"site/sell(/.*)?", r"/conserp/sales\1"),
+	_redirect(r"site/buy/(po|pi)(/.*)?", r"/conserp/purchase/\1\2"),
+	_redirect(r"site/buy/(buy-doc|buy-form)/(po|pi)(/.*)?", r"/conserp/purchase/\1/\2\3"),
+	_redirect(r"site(/.*)?", r"/conserp\1"),
+	_redirect(r"store(/.*)?", r"/conserp/store\1"),
 ]
 
 naming_series_variables = {

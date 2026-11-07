@@ -10,11 +10,11 @@
 		<meta name="apple-mobile-web-app-capable" content="yes" />
 		<meta name="mobile-web-app-capable" content="yes" />
 		<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-		<meta name="apple-mobile-web-app-title" content="หน้างาน" />
-		<title>หน้างาน</title>
-		<link rel="manifest" href="/assets/consbiz/site_app/manifest.webmanifest" />
-		<link rel="icon" type="image/png" href="/assets/consbiz/site_app/icon-192.png" />
-		<link rel="apple-touch-icon" href="/assets/consbiz/site_app/icon-192.png" />
+		<meta name="apple-mobile-web-app-title" content="ConsERP" />
+		<title>ConsERP</title>
+		<link rel="manifest" href="/assets/consbiz/site_app/manifest.webmanifest?v=5" />
+		<link rel="icon" type="image/png" href="/assets/consbiz/site_app/conserp-round-192.png" />
+		<link rel="apple-touch-icon" href="/assets/consbiz/site_app/conserp-round-192.png" />
 		<link rel="preload" as="font" type="font/woff2" crossorigin
 			href="/assets/consbiz/fonts/noto-sans-thai/NotoSansThai-Variable-thai.woff2" />
 		<style>
@@ -55,7 +55,7 @@
 				inset: 0;
 				display: grid;
 				place-items: center;
-				background: linear-gradient(160deg, #1f6feb, #5b3df5);
+				background: #2e3754;
 				color: #fff;
 				transition: opacity 0.35s ease;
 			}
@@ -63,9 +63,6 @@
 				width: 76px;
 				height: 76px;
 				border-radius: 22px;
-				background: rgba(255, 255, 255, 0.16);
-				display: grid;
-				place-items: center;
 				animation: boot-pulse 1.2s ease-in-out infinite;
 			}
 			@keyframes boot-pulse {
@@ -79,13 +76,7 @@
 	<body>
 		<div id="site-app">
 			<div class="boot-splash">
-				<div class="logo">
-					<svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"
-						stroke-linecap="round" stroke-linejoin="round">
-						<path d="M21 8 12 3 3 8v8l9 5 9-5z" />
-						<path d="m3 8 9 5 9-5M12 13v8" />
-					</svg>
-				</div>
+				<img class="logo" src="/assets/consbiz/site_app/conserp-round-192.png" alt="ConsERP" />
 			</div>
 		</div>
 		<script>

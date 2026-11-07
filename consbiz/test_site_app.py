@@ -46,14 +46,27 @@ class IntegrationTestSiteApp(IntegrationTestCase):
 		self.assertEqual([a["key"] for a in boot["apps"]], ["site", "office"])
 
 		office = site_app.office_boot_data()
-		self.assertEqual(office["sections"], ["buy", "sell"])
+		self.assertEqual(office["sections"], ["purchase", "sales"])
+		self.assertTrue(office["companies"])
 		self.assertEqual([a["key"] for a in office["apps"]], ["site", "office"])
+		# Desktop: หมวดของทุกแอป ขอซื้อของหน้างานซ้ำกับจัดซื้อของออฟฟิศ จึงไม่แสดง
+		modules = [(m["app"], m["section"]) for m in office["modules"]]
+		self.assertEqual(modules, [m for m in modules if m != ("site", "buy")])
+		self.assertIn(("office", "purchase"), modules)
+		self.assertIn({"app": "office", "section": "sales", "url": "/conserp/sales"}, office["modules"])
+		self.assertIn({"app": "site", "section": "store", "url": "/conserp/store"}, boot["modules"])
+		self.assertEqual(boot["modules"], office["modules"])
 
 	def test_apps_follow_permissions(self):
-		# ไม่มีสิทธิ์เอกสารซื้อ-ขายเลย = ไม่เห็นแอปออฟฟิศ / ไม่มีหมวดหน้างานเลย = ไม่เห็นแอปหน้างาน
+		# ไม่มีสิทธิ์เอกสารซื้อ-ขายเลย = ไม่เห็นแอปออฟฟิศ และขอซื้อของหน้างานกลับมาแสดง
+		# ไม่มีหมวดหน้างานเลย = ไม่เห็นแอปหน้างาน
 		with patch.dict(site_app.APP_SECTIONS, {"office": lambda: []}):
-			self.assertEqual([a["key"] for a in site_app.available_apps()], ["site"])
-		self.assertEqual([a["key"] for a in site_app.available_apps(("site", []))], ["office"])
+			by_app = site_app.sections_by_app()
+			self.assertEqual([a["key"] for a in site_app.available_apps(by_app)], ["site"])
+			self.assertIn("buy", [m["section"] for m in site_app.app_modules(by_app)])
+		by_app = site_app.sections_by_app(("site", []))
+		self.assertEqual([a["key"] for a in site_app.available_apps(by_app)], ["office"])
+		self.assertTrue(all(m["app"] == "office" for m in site_app.app_modules(by_app)))
 
 	def test_office_icon_in_saved_layouts(self):
 		from consbiz.patches import add_consoffice_to_desktop_layouts as patch_module

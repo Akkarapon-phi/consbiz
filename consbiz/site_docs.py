@@ -159,12 +159,13 @@ def config_of(kind):
 	return DOCS[kind]
 
 
-def scope_filters(config, project, scope):
-	"""ขอบเขตโครงการที่เลือก: ช่องโครงการของเอกสาร (ไม่มีช่อง = ทุกโครงการ)"""
+def scope_filters(config, project, scope, company=None):
+	"""ขอบเขตโครงการที่เลือก: ช่องโครงการของเอกสาร (ไม่มีช่อง = ทุกโครงการ) + บริษัท (แอปออฟฟิศ ว่าง = ทุกบริษัท)"""
+	filters = {"company": company} if company else {}
 	if scope == "project" and project and config["project"]:
 		store_app.check_project(project)
-		return {config["project"]: project}
-	return {}
+		filters[config["project"]] = project
+	return filters
 
 
 def list_fields(config):
@@ -183,6 +184,20 @@ def list_fields(config):
 
 
 PURPOSE = {"Purchase": "ซื้อ", "Customer Provided": "ผู้ว่าจ้างจัดหา"}
+
+
+def employer_supplied(doc):
+	"""ใบขอซื้อผู้ว่าจ้างจัดหา: ไม่มีขั้นสั่งซื้อ ERPNext นับของที่รับเข้า (Stock Entry) ใน per_ordered / ordered_qty
+	ไม่ใช่ per_received / received_qty (update_completed_qty ของ Material Request)"""
+	return doc.get("material_request_type") == "Customer Provided"
+
+
+def received_as_received(values):
+	"""ย้ายยอดรับของผู้ว่าจ้างจัดหาจากช่อง ordered ไปช่อง received (ช่อง ordered = None: ไม่แสดงสั่งซื้อ)"""
+	for ordered, received in (("per_ordered", "per_received"), ("ordered_qty", "received_qty")):
+		if ordered in values:
+			values[received], values[ordered] = values[ordered], None
+	return values
 
 
 def user_list(value):
@@ -221,6 +236,8 @@ def decorate(rows, config):
 		row.likes = len(liked)
 		if row.get("material_request_type"):
 			row.purpose = _(PURPOSE.get(row.material_request_type, row.material_request_type))
+			if employer_supplied(row):
+				received_as_received(row)
 		row.status_label, row.status_tone = status_of(row.status, row.docstatus)
 		row.overdue = bool(
 			row.docstatus == 1
@@ -250,10 +267,12 @@ def sort_field(config, sort):
 	return field or config["date"]
 
 
-def list_filters(config, project, scope, filter, date_from=None, date_to=None, party=None, overdue=0):
+def list_filters(
+	config, project, scope, filter, date_from=None, date_to=None, party=None, overdue=0, company=None
+):
 	"""ตัวกรองของรายการ (ไม่รวมคำค้น) filter = todo / draft / done / all"""
 	doctype = config["doctype"]
-	filters = {**config.get("base", {}), **scope_filters(config, project, scope)}
+	filters = {**config.get("base", {}), **scope_filters(config, project, scope, company)}
 	if date_from and date_to:
 		filters[config["date"]] = ("between", (getdate(date_from), getdate(date_to)))
 	elif date_from:
@@ -281,13 +300,35 @@ def list_filters(config, project, scope, filter, date_from=None, date_to=None, p
 	return filters
 
 
+# เอกสารที่มีสินค้าตรงคำค้นสูงสุดกี่ใบ (ค้นในตารางรายการก่อน แล้วกรองเอกสารด้วยชื่อ)
+ITEM_SEARCH_LIMIT = 500
+
+
 def search_filters(config, search):
+	"""ค้นหา: เลขที่ / เรื่อง / คู่ค้า / เลขที่บิลผู้ขาย (PI) / ชื่อหรือรหัสสินค้าในรายการ (คำบางส่วนได้)"""
 	if not search or not search.strip():
 		return None
 	like = f"%{search.strip()}%"
-	or_filters = {"name": ("like", like), "title": ("like", like)}
+	doctype = config["doctype"]
+	meta = frappe.get_meta(doctype)
+	or_filters = [["name", "like", like], ["title", "like", like]]
 	if config["party"]:
-		or_filters[config["party"]] = ("like", like)
+		or_filters.append([config["party"], "like", like])
+	if meta.has_field("bill_no"):
+		or_filters.append(["bill_no", "like", like])
+	# สินค้า: หาเอกสารแม่จากตารางรายการ (get_all ไม่ตรวจสิทธิ์ แต่รายการเอกสารยังผ่าน get_list ที่ตรวจสิทธิ์)
+	item_doctype = meta.get_field("items").options
+	parents = frappe.get_all(
+		item_doctype,
+		filters={"parenttype": doctype},
+		or_filters=[["item_code", "like", like], ["item_name", "like", like]],
+		pluck="parent",
+		distinct=True,
+		order_by="creation desc",
+		limit=ITEM_SEARCH_LIMIT,
+	)
+	if parents:
+		or_filters.append(["name", "in", parents])
 	return or_filters
 
 
@@ -319,6 +360,7 @@ def get_docs(
 	overdue=0,
 	page_size=PAGE,
 	export=0,
+	company=None,
 ):
 	"""รายการเอกสาร ล่าสุดก่อน (เรียงตาม sort/order ได้)
 	คืน rows + total (จำนวนตามตัวกรอง) + sums (ยอดรวมทั้งชุด) + counts (จำนวนของแต่ละแท็บ)
@@ -330,7 +372,13 @@ def get_docs(
 	config = config_of(kind)
 	doctype = config["doctype"]
 	frappe.has_permission(doctype, "read", throw=True)
-	extra = {"date_from": date_from, "date_to": date_to, "party": party, "overdue": overdue}
+	extra = {
+		"date_from": date_from,
+		"date_to": date_to,
+		"party": party,
+		"overdue": overdue,
+		"company": company,
+	}
 	filters = list_filters(config, project, scope, filter, **extra)
 	or_filters = search_filters(config, search)
 	page_size = cint(page_size) if cint(page_size) in PAGE_SIZES else PAGE
@@ -432,13 +480,13 @@ def top(kind, filters, order_by, limit=5):
 
 
 @frappe.whitelist()
-def get_summary(section, project=None, scope="project"):
+def get_summary(section, project=None, scope="project", company=None):
 	"""ตัวเลขหน้าหลักของหมวดจัดซื้อ/ขาย และรายการที่ต้องตามต่อ"""
 	today = getdate(nowdate())
 	soon = getdate(add_days(today, SOON_DAYS))
 
 	def scoped(kind, extra=None):
-		return {**scope_filters(DOCS[kind], project, scope), **(extra or {})}
+		return {**scope_filters(DOCS[kind], project, scope, company), **(extra or {})}
 
 	def drafts(kinds):
 		# ร่างแยกชนิด: แอปหน้างานนับเฉพาะใบขอซื้อ แอปออฟฟิศนับทุกชนิด (doc_kinds ของแต่ละแอป)
@@ -667,8 +715,8 @@ def steps_of(doc, kind):
 	"""ขั้นตอนของเอกสาร (แถบความคืบหน้าในหน้าดู) state = done / current / todo / error, note = % ของขั้นนั้น"""
 	if kind == "mr":
 		flow = [("สั่งซื้อ", "per_ordered"), ("รับของ", "per_received")]
-		if doc.material_request_type == "Customer Provided":
-			flow = [("รับของ", "per_received")]
+		if employer_supplied(doc):
+			flow = [("รับของ", "per_ordered")]
 		labels = ("ร่าง", "ส่งแล้ว")
 	elif kind == "po":
 		flow, labels = [("รับของ", "per_received"), ("วางบิล", "per_billed")], ("ร่าง", "ส่งแล้ว")
@@ -711,6 +759,11 @@ def steps_of(doc, kind):
 	return steps
 
 
+def progress_of(doc, config):
+	progress = {field: flt(doc.get(field)) for field in config.get("progress", ())}
+	return received_as_received(progress) if employer_supplied(doc) else progress
+
+
 @frappe.whitelist()
 def get_doc(kind, name):
 	from consbiz.site_app import pdf_url
@@ -724,6 +777,8 @@ def get_doc(kind, name):
 		{"name": row.name, **{field: row.get(field) for field in ITEM_FIELDS if row.meta.has_field(field)}}
 		for row in doc.items
 	]
+	if employer_supplied(doc):
+		items = [received_as_received(row) for row in items]
 	project = doc.get(config["project"]) if config["project"] else None
 	return {
 		**header_info(doc, kind),
@@ -745,7 +800,7 @@ def get_doc(kind, name):
 		"company": doc.company,
 		"currency": doc.get("currency"),
 		"owner_name": frappe.utils.get_fullname(doc.owner),
-		"progress": {field: flt(doc.get(field)) for field in config.get("progress", ())},
+		"progress": progress_of(doc, config),
 		"bill_no": doc.get("bill_no"),
 		"items": items,
 		"totals": {
@@ -1074,15 +1129,16 @@ def mapped_doc(kind, source):
 	return doc
 
 
-def new_doc(kind, project):
+def new_doc(kind, project, company=None):
 	config = DOCS[kind]
 	doc = frappe.new_doc(config["doctype"])
 	if kind == "mr":
 		doc.material_request_type = "Purchase"
 	if kind == "qtn":
 		doc.quotation_to = "Customer"
-	company = frappe.db.get_value("Project", project, "company") if project else None
-	doc.company = company or frappe.defaults.get_user_default("Company")
+	# บริษัท: ของโครงการ > ที่เลือกในแอปออฟฟิศ > ค่าเริ่มต้นของผู้ใช้
+	project_company = frappe.db.get_value("Project", project, "company") if project else None
+	doc.company = project_company or company or frappe.defaults.get_user_default("Company")
 	today = nowdate()
 	for field in ("transaction_date", "posting_date"):
 		if doc.meta.has_field(field):
@@ -1104,7 +1160,7 @@ def new_doc(kind, project):
 	return doc
 
 
-def load_doc(kind, name=None, source=None, project=None):
+def load_doc(kind, name=None, source=None, project=None, company=None):
 	"""เอกสารร่างเดิม / เอกสารใหม่จาก mapper / เอกสารใหม่เปล่า ยังไม่บันทึก"""
 	config = config_of(kind)
 	doctype = config["doctype"]
@@ -1120,12 +1176,38 @@ def load_doc(kind, name=None, source=None, project=None):
 		if config["project"] and project and not doc.get(config["project"]):
 			doc.set(config["project"], project)
 		return doc
-	return new_doc(kind, project)
+	return new_doc(kind, project, company)
 
 
 def row_key(row, index):
 	"""ตัวจับคู่แถวระหว่างแอปกับเอกสาร: แถวที่บันทึกแล้วใช้ name, แถวจาก mapper ใช้ลำดับ"""
 	return row.name if row.get("name") and not row.is_new() else f"m{index}"
+
+
+def set_project(doc, kind, data):
+	"""โครงการที่เลือกในฟอร์ม (ช่องโครงการของเอกสาร) ต้องเป็นของบริษัทเดียวกับเอกสาร ว่าง = ไม่ระบุโครงการ"""
+	field = DOCS[kind]["project"]
+	if not field or "project" not in data or (data.get("project") or None) == (doc.get(field) or None):
+		return
+	project = data.get("project") or None
+	if project:
+		company = frappe.db.get_value("Project", project, "company")
+		if company and company != doc.company:
+			frappe.throw(_("โครงการ {0} เป็นของ {1} ไม่ใช่ {2}").format(project, company, doc.company))
+	doc.set(field, project)
+	# แถวรายการ/คลังของโครงการเดิมตามโครงการใหม่
+	for row in doc.get("items") or []:
+		if row.meta.has_field("project"):
+			row.project = project
+	if kind in ("mr", "po"):
+		from consbiz.site_stock import project_warehouse
+
+		warehouse = project_warehouse(project) if project else None
+		if warehouse and doc.meta.has_field("set_warehouse"):
+			doc.set_warehouse = warehouse
+		for row in doc.get("items") or []:
+			if warehouse and row.meta.has_field("warehouse"):
+				row.warehouse = warehouse
 
 
 def project_of(doc, kind):
@@ -1165,6 +1247,7 @@ def apply_form(doc, kind, data):
 		if doc.get("tax_invoice_number") and not doc.get("tax_invoice_date"):
 			doc.tax_invoice_date = doc.get("bill_date") or doc.posting_date
 
+	set_project(doc, kind, data)
 	project = project_of(doc, kind)
 	warehouse = project_warehouse(project) if kind in ("mr", "po") else None
 	if warehouse and doc.meta.has_field("set_warehouse") and not doc.get("set_warehouse"):
@@ -1317,9 +1400,9 @@ def item_uoms(item_code):
 
 
 @frappe.whitelist()
-def get_form(kind, name=None, source=None, project=None):
+def get_form(kind, name=None, source=None, project=None, company=None):
 	"""ข้อมูลฟอร์มสร้าง/แก้ไข: เอกสาร (ยังไม่บันทึก) + ตัวเลือกภาษี"""
-	doc = load_doc(kind, name=name, source=source, project=project)
+	doc = load_doc(kind, name=name, source=source, project=project, company=company)
 	apply_form(doc, kind, {"items": serialize_form(doc, kind)["items"]})
 	out = serialize_form(doc, kind)
 	out["source"] = source
@@ -1337,7 +1420,13 @@ def parse(data):
 def preview_doc(kind, data):
 	"""คำนวณยอด/ภาษีตามที่กรอก (ไม่บันทึก)"""
 	data = parse(data)
-	doc = load_doc(kind, name=data.get("name"), source=data.get("source"), project=data.get("project"))
+	doc = load_doc(
+		kind,
+		name=data.get("name"),
+		source=data.get("source"),
+		project=data.get("project"),
+		company=data.get("company"),
+	)
 	# ERPNext อาจเขียนข้อมูลระหว่างเติมค่า (เช่น สร้าง Item Price อัตโนมัติ) ตัวอย่างยอดต้องไม่บันทึกอะไร
 	# ย้อนเฉพาะส่วนนี้ด้วย savepoint (ไม่ย้อนทั้ง transaction ที่อาจมีงานอื่นอยู่ก่อน)
 	frappe.db.savepoint("site_preview")
@@ -1369,7 +1458,13 @@ def keep_request_rates(doc, wanted):
 def save_doc(kind, data, submit=0):
 	"""บันทึกร่าง (submit=1 ส่งเอกสารต่อเลย) ตรวจสิทธิ์และเงื่อนไขของ ERPNext ตามปกติ"""
 	data = parse(data)
-	doc = load_doc(kind, name=data.get("name"), source=data.get("source"), project=data.get("project"))
+	doc = load_doc(
+		kind,
+		name=data.get("name"),
+		source=data.get("source"),
+		project=data.get("project"),
+		company=data.get("company"),
+	)
 	apply_form(doc, kind, data)
 	if not doc.get("items"):
 		frappe.throw(_("เพิ่มรายการอย่างน้อย 1 รายการ"))

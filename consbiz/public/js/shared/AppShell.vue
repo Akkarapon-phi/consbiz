@@ -1,7 +1,7 @@
 <template>
 	<div
 		class="ss-app"
-		:class="{ 'has-nav': show_nav, 'has-side': state.project }"
+		:class="{ 'has-nav': show_nav, 'has-side': has_shell }"
 		:data-section="state.section"
 	>
 		<!-- แถบล่าง/ปุ่มลอยของแต่ละหน้า (Teleport มาที่นี่: ไม่ให้ transform ตอนเปลี่ยนหน้าดึงตำแหน่ง fixed) -->
@@ -10,7 +10,7 @@
 			<Transition :name="`ss-${state.direction}`">
 				<component
 					:is="view"
-					v-if="state.project || state.route.view === section.home"
+					v-if="ready"
 					:key="route_key"
 					class="ss-view"
 					@pick-project="picker = true"
@@ -18,75 +18,128 @@
 			</Transition>
 		</main>
 
-		<!-- จอใหญ่: Dock หมวดงานซ้ายสุด (แท็บเล็ตอยู่บนสุดของแถบไอคอน, มือถือใช้ตารางหมวดงาน) -->
-		<Transition name="ss-dock">
-			<aside v-if="state.project && boot.sections.length > 1" class="ss-dock" aria-label="หมวดงาน">
-				<span class="ss-dock-logo" :title="app.title"
-					><Icon name="building" :size="20" :stroke="2.2"
-				/></span>
-				<SectionDock variant="dock" />
-				<!-- แอปอื่น (ตัวสลับแอป) เหนือระบบเต็ม -->
-				<div v-if="apps.length" class="ss-dock-apps">
-					<a
-						v-for="a in apps"
-						:key="a.key"
-						class="ss-sec"
-						:href="a.url"
-						:title="`เปิดแอป${a.label} (${a.title})`"
+		<!-- แท็บเล็ต/จอใหญ่: Dock แถบเดียว (กว้างเท่า Dock ของ Frappe) หมวดของกลุ่มแอปนี้
+		     เมนูของหมวดอยู่บนแถบบนของหน้า (SectionTabs.vue) พับ = ไอคอน, ปักหมุด = ไอคอน + ชื่อ -->
+		<Transition name="ss-rail">
+			<aside
+				v-if="has_shell"
+				class="ss-rail"
+				aria-label="เมนูหลัก"
+			>
+				<button
+					type="button"
+					class="ss-rail-row ss-rail-logo"
+					:class="{ 'is-active': desktop }"
+					title="หน้าแรก"
+					@click="switch_section('desktop')"
+				>
+					<img class="ss-rail-logo-img" :src="LOGO" alt="" />
+					<span class="ss-rail-text ss-rail-brand">ConsERP</span>
+				</button>
+				<nav class="ss-rail-list">
+					<template v-for="m in rail_modules" :key="m.key">
+						<component
+							:is="m.local ? 'button' : 'a'"
+							:type="m.local ? 'button' : undefined"
+							:href="m.local ? undefined : m.url"
+							class="ss-rail-row ss-rail-mod"
+							:class="{ 'is-open': is_open(m), 'is-active': is_open(m) && active_view === section.home }"
+							:style="{ '--sw': m.colors[0], '--sw2': m.colors[1] }"
+							:title="m.title"
+							@click="m.local && switch_section(m.section)"
+						>
+							<span class="ss-rail-icon">
+								<Icon :name="m.icon" :size="18" :stroke="2.1" />
+								<span v-if="module_badge(m, state)" class="ss-rail-badge">{{
+									module_badge(m, state)
+								}}</span>
+							</span>
+							<span class="ss-rail-text">{{ m.label }}</span>
+						</component>
+					</template>
+				</nav>
+				<!-- ท้าย Dock: บริษัท (ออฟฟิศ) + ผู้ใช้ (เมนู: ระบบเต็ม / ออกจากระบบ) แบบ Dock ของ Frappe -->
+				<div class="ss-rail-foot">
+					<button
+						v-if="app.project_filter && companies.length > 1"
+						type="button"
+						class="ss-rail-row ss-rail-ctx"
+						:title="`บริษัท: ${company_label}`"
+						@click="company_sheet = true"
 					>
-						<span class="ss-sec-icon"><Icon :name="a.icon" :size="20" /></span>
-						<span class="ss-sec-label">{{ a.label }}</span>
-					</a>
+						<span class="ss-avatar" :class="`tone-${tone(state.company || 'all')}`">{{
+							state.company ? initials(company_label) : "ทั้ง"
+						}}</span>
+						<span class="ss-rail-text ss-rail-ctx-text">
+							<span>{{ company_label }}</span>
+							<small>บริษัท</small>
+						</span>
+					</button>
+					<button
+						type="button"
+						class="ss-rail-row ss-rail-ctx ss-rail-user"
+						:class="{ 'is-open': user_menu }"
+						:title="boot.full_name"
+						aria-haspopup="menu"
+						:aria-expanded="user_menu"
+						@click="user_menu = !user_menu"
+					>
+						<span class="ss-avatar ss-user-avatar" :class="`tone-${tone(boot.user || '')}`">
+							<img v-if="boot.user_image" :src="boot.user_image" alt="" />
+							<template v-else>{{ initials(boot.full_name || boot.user || "") }}</template>
+						</span>
+						<span class="ss-rail-text ss-rail-ctx-text">
+							<span>{{ boot.full_name }}</span>
+							<small>{{ boot.user }}</small>
+						</span>
+					</button>
 				</div>
-				<a v-if="boot.desk" class="ss-sec ss-dock-desk" href="/app" title="เปิดระบบเต็ม">
-					<span class="ss-sec-icon"><Icon name="monitor" :size="20" /></span>
-					<span class="ss-sec-label">ระบบเต็ม</span>
-				</a>
 			</aside>
 		</Transition>
 
-		<!-- มือถือ: แถบล่าง (เฉพาะหน้าหลักของแต่ละเมนู) / แท็บเล็ต-จอใหญ่: แถบข้างซ้าย (ทุกหน้า) -->
+		<!-- ปุ่มพับ/กาง Dock: ปุ่มกลมเล็กที่ขอบขวาของ Dock (ไม่กินแถว) จอใช้เมาส์แสดงเมื่อชี้ที่ Dock -->
+		<button
+			v-if="has_shell"
+			type="button"
+			class="ss-rail-toggle"
+			:title="pin_label"
+			:aria-label="pin_label"
+			:aria-pressed="side === 'expanded' || peek"
+			@click="toggle_side"
+		>
+			<Icon :name="side === 'expanded' || peek ? 'chevron-left' : 'chevron-right'" :size="14" :stroke="2.6" />
+		</button>
+
+		<Transition name="ss-pop">
+			<div v-if="user_menu" class="ss-user-menu" role="menu">
+				<div class="ss-user-menu-head">
+					<span class="ss-user-menu-name">{{ boot.full_name }}</span>
+					<span class="ss-user-menu-mail">{{ boot.user }}</span>
+				</div>
+				<a v-if="boot.desk" class="ss-user-menu-item" role="menuitem" href="/app">
+					<Icon name="monitor" :size="16" /> ระบบเต็ม
+				</a>
+				<button type="button" class="ss-user-menu-item is-danger" role="menuitem" @click="logout">
+					<Icon name="external" :size="16" /> ออกจากระบบ
+				</button>
+			</div>
+		</Transition>
+
+		<!-- มือถือ: แถบเมนูล่างของหมวด (เฉพาะหน้าหลักของแต่ละเมนู) -->
 		<Transition name="ss-nav">
 			<nav
-				v-if="state.project"
+				v-if="show_nav"
 				class="ss-nav"
-				:class="{ 'is-sub': !show_nav, 'has-sections': boot.sections.length > 1 }"
 				:style="{ '--count': mobile_tabs.length }"
-				aria-label="เมนูหลัก"
-				@mouseenter="hover_side(true)"
-				@mouseleave="hover_side(false)"
+				aria-label="เมนูของหมวด"
 			>
-				<!-- หัว sidebar: ชื่อหมวด (แสดงเมื่อกาง) เปลี่ยนหมวดที่ Dock -->
-				<div class="ss-nav-head">
-					<div class="ss-nav-brand">
-						<span class="ss-nav-logo"
-							><Icon :name="section.icon" :size="20" :stroke="2.2"
-						/></span>
-						<span class="ss-nav-brand-text">{{ section.title }}</span>
-					</div>
-				</div>
-				<button
-					type="button"
-					class="ss-nav-project"
-					:title="`โครงการ: ${state.project.project_name || state.project.name}`"
-					@click="picker = true"
-				>
-					<span class="ss-avatar" :class="`tone-${tone(state.project.name)}`">{{
-						initials(state.project.project_name || state.project.name)
-					}}</span>
-					<span class="ss-nav-project-text">
-						<span>{{ state.project.project_name || state.project.name }}</span>
-						<small>{{ state.project.name }}</small>
-					</span>
-					<Icon name="swap" :size="16" />
-				</button>
 				<span class="ss-nav-pill" :style="{ '--tab': tab_index }"></span>
 				<button
-					v-for="(tab, i) in tabs"
+					v-for="(tab, i) in mobile_tabs"
 					:key="`${state.section}:${tab.view}`"
 					type="button"
 					class="ss-nav-item"
-					:class="{ 'is-active': tab.view === active_view, 'is-wide-only': tab.wide_only }"
+					:class="{ 'is-active': tab.view === active_view }"
 					:title="tab.label"
 					:style="{ '--i': i }"
 					@click="open_tab(tab.view)"
@@ -105,44 +158,15 @@
 					</span>
 					<span class="ss-nav-label">{{ tab.label }}</span>
 				</button>
-				<!-- ท้าย sidebar: ระบบเต็ม (ไม่มี Dock) + ปุ่มปักหมุด/พับ -->
-				<div class="ss-nav-foot">
-					<!-- ไม่มี Dock (หมวดเดียว): แอปอื่นอยู่ท้าย sidebar -->
-					<a
-						v-for="a in apps"
-						:key="a.key"
-						class="ss-nav-item ss-nav-desk"
-						:href="a.url"
-						:title="`เปิดแอป${a.label} (${a.title})`"
-					>
-						<span class="ss-nav-icon"><Icon :name="a.icon" :size="22" /></span>
-						<span class="ss-nav-label">{{ a.label }}</span>
-					</a>
-					<a v-if="boot.desk" class="ss-nav-item ss-nav-desk" href="/app" title="เปิดระบบเต็ม">
-						<span class="ss-nav-icon"><Icon name="monitor" :size="22" /></span>
-						<span class="ss-nav-label">ระบบเต็ม</span>
-					</a>
-					<button
-						type="button"
-						class="ss-nav-item ss-nav-pin"
-						:title="pin_label"
-						:aria-label="pin_label"
-						:aria-pressed="side === 'expanded'"
-						@click="toggle_side"
-					>
-						<span class="ss-nav-icon"
-							><Icon :name="side === 'expanded' ? 'chevrons-left' : 'panel'" :size="20"
-						/></span>
-						<span class="ss-nav-label">{{ pin_label }}</span>
-					</button>
-				</div>
 			</nav>
 		</Transition>
 
 		<Sheet
 			:open="picker"
 			title="เลือกโครงการ"
-			subtitle="ข้อมูลทุกหน้าเป็นของโครงการที่เลือก"
+			:subtitle="
+				app.project_filter ? 'แสดงเอกสารเฉพาะโครงการที่เลือก' : 'ข้อมูลทุกหน้าเป็นของโครงการที่เลือก'
+			"
 			half
 			@close="close_picker"
 		>
@@ -152,6 +176,23 @@
 			</div>
 			<div v-if="projects === null" class="ss-options-note"><span class="ss-spinner"></span></div>
 			<div v-else class="ss-options">
+				<!-- ออฟฟิศ: ไม่กรองโครงการ -->
+				<button
+					v-if="app.project_filter"
+					type="button"
+					class="ss-option ss-option--project"
+					:class="{ 'is-active': !state.project }"
+					@click="choose_project(null)"
+				>
+					<span class="ss-avatar tone-blue"><Icon name="layers" :size="18" /></span>
+					<span class="ss-option-main">
+						<span class="ss-option-label">ทุกโครงการ</span>
+						<span class="ss-option-desc">{{
+							state.company ? `ทุกโครงการของ ${company_label}` : "ไม่กรองโครงการ"
+						}}</span>
+					</span>
+					<Icon v-if="!state.project" name="check" :size="18" />
+				</button>
 				<button
 					v-for="(p, i) in filtered_projects"
 					:key="p.name"
@@ -171,6 +212,33 @@
 					<Icon v-if="p.name === state.project?.name" name="check" :size="18" />
 				</button>
 				<div v-if="!filtered_projects.length" class="ss-options-note">ไม่พบโครงการที่เปิดอยู่</div>
+			</div>
+		</Sheet>
+
+		<!-- ออฟฟิศ: เลือกบริษัท -->
+		<Sheet
+			:open="company_sheet"
+			title="เลือกบริษัท"
+			subtitle="กรองเอกสาร/ตัวเลข และใช้เป็นบริษัทของเอกสารใหม่"
+			half
+			@close="company_sheet = false"
+		>
+			<div class="ss-options">
+				<button
+					v-for="c in company_options"
+					:key="c.value"
+					type="button"
+					class="ss-option ss-option--project"
+					:class="{ 'is-active': c.value === state.company }"
+					@click="choose_company(c.value)"
+				>
+					<span class="ss-avatar" :class="`tone-${tone(c.value || 'all')}`">{{ c.short }}</span>
+					<span class="ss-option-main">
+						<span class="ss-option-label">{{ c.label }}</span>
+						<span v-if="c.desc" class="ss-option-desc">{{ c.desc }}</span>
+					</span>
+					<Icon v-if="c.value === state.company" name="check" :size="18" />
+				</button>
 			</div>
 		</Sheet>
 
@@ -213,20 +281,23 @@ import { computed, onBeforeUnmount, onMounted, provide, ref, watch } from "vue";
 import Icon from "./components/Icon.vue";
 import Sheet from "./components/Sheet.vue";
 import SectionLauncher from "./components/SectionLauncher.vue";
-import SectionDock from "./components/SectionDock.vue";
-import { app, is_tab } from "./app.js";
+import Desktop from "./components/Desktop.vue";
+import { app, is_desktop, is_tab } from "./app.js";
+import { module_badge, module_list, MODULE_META } from "./modules.js";
 import {
 	boot,
 	call,
 	go,
 	init_app,
 	initials,
-	other_apps,
 	remember_project,
 	remembered_project,
+	scope_key,
+	set_company,
 	show_error,
 	start_router,
 	state,
+	switch_section,
 	tone,
 } from "./api.js";
 
@@ -234,15 +305,21 @@ import {
 // หมวด/หน้า/component ของแต่ละแอปมาจาก app.js (configure ใน bundle ของแอป)
 init_app();
 const SECTIONS = app.sections;
-const VIEWS = app.views;
-const apps = other_apps();
+const VIEWS = { ...app.views, desktop: Desktop };
+const LOGO = "/assets/consbiz/site_app/logo-96.png";
 
 const section = computed(() => SECTIONS[state.section]);
 const view = computed(() => VIEWS[state.route.view] || VIEWS[section.value.home]);
 const route_key = computed(
 	() => `${state.route.view}:${JSON.stringify(state.route.params)}:${state.project?.name}`
 );
-const show_nav = computed(() => is_tab(state.route.view) && state.project);
+const desktop = computed(() => is_desktop(state.section));
+// ออฟฟิศ / หน้าแรก: แสดงทั้งเปลือกแอปและหน้าโดยไม่ต้องเลือกโครงการ
+const has_shell = computed(() => !!(state.project || app.project_filter || desktop.value));
+const ready = computed(() => has_shell.value || state.route.view === SECTIONS[state.section]?.home);
+
+// มือถือ: แถบล่างเฉพาะหน้าหลักของเมนู (หน้าแรกไม่มี)
+const show_nav = computed(() => is_tab(state.route.view) && has_shell.value && !desktop.value);
 
 const tabs = computed(() => {
 	const summary = state.summaries[state.section];
@@ -253,6 +330,20 @@ const tabs = computed(() => {
 	}));
 });
 const mobile_tabs = computed(() => tabs.value.filter((t) => !t.wide_only));
+
+// Dock: เฉพาะหมวดของกลุ่มแอปนี้ (กลุ่มอื่นเปิดจากหน้าแรก) + หมวดที่เปิดอยู่ถ้าไม่อยู่ในรายการ
+// (เช่น ขอซื้อของหน้างานที่ซ่อนเพราะมีจัดซื้อของออฟฟิศ)
+const ALL_MODULES = module_list().filter((m) => m.app === app.key);
+const rail_modules = computed(() => {
+	if (desktop.value || ALL_MODULES.some((m) => m.local && m.section === state.section))
+		return ALL_MODULES;
+	const meta = MODULE_META[app.key]?.[state.section];
+	if (!meta) return ALL_MODULES;
+	const current = { ...meta, app: app.key, section: state.section, key: `${app.key}:${state.section}`, local: true };
+	const at = ALL_MODULES.findLastIndex((m) => m.app === app.key) + 1;
+	return [...ALL_MODULES.slice(0, at), current, ...ALL_MODULES.slice(at)];
+});
+const is_open = (m) => m.local && m.section === state.section;
 // หน้าเอกสารจัดซื้อ/ขาย (ดู/ฟอร์ม) ไฮไลต์เมนูของชนิดเอกสาร (params.kind)
 const active_view = computed(
 	() =>
@@ -283,9 +374,13 @@ const picker = ref(false);
 const projects = ref(null);
 const project_txt = ref("");
 
+
 const filtered_projects = computed(() => {
 	const q = project_txt.value.trim().toLowerCase();
-	const list = projects.value || [];
+	// ออฟฟิศ: เฉพาะโครงการของบริษัทที่เลือก
+	const list = (projects.value || []).filter(
+		(p) => !app.project_filter || !state.company || p.company === state.company
+	);
 	return q
 		? list.filter((p) => `${p.name} ${p.project_name} ${p.company}`.toLowerCase().includes(q))
 		: list;
@@ -301,7 +396,7 @@ async function load_projects() {
 }
 
 function choose_project(project) {
-	const changed = project.name !== state.project?.name;
+	const changed = project?.name !== state.project?.name;
 	state.project = project;
 	if (changed) state.summaries = {};
 	remember_project(project);
@@ -310,20 +405,54 @@ function choose_project(project) {
 }
 
 function close_picker() {
-	if (state.project) picker.value = false;
+	picker.value = false;
+	// หน้างานยังไม่เลือกโครงการ: กลับหน้าแรก
+	if (!state.project && !app.project_filter && !desktop.value) go("desktop", {}, { replace: true });
 }
+// เปิดหมวดของหน้างานโดยยังไม่เลือกโครงการ: ถามโครงการ
+watch(
+	() => state.section,
+	(section) => {
+		if (projects.value && !app.project_filter && !state.project && !is_desktop(section)) picker.value = true;
+	}
+);
+
+// ---------------------------------------------------------------- บริษัท (ออฟฟิศ)
+
+const company_sheet = ref(false);
+const companies = boot.companies || [];
+const company_label = computed(() => state.company || "ทุกบริษัท");
+const company_options = [
+	{ value: "", label: "ทุกบริษัท", short: "ทั้ง", desc: "รวมเอกสารของทุกบริษัท" },
+	...companies.map((c) => ({ value: c.name, label: c.name, short: c.abbr || initials(c.name), desc: "" })),
+];
+function choose_company(company) {
+	const changed = company !== state.company;
+	set_company(company);
+	company_sheet.value = false;
+	if (!changed) return;
+	// โครงการที่กรองอยู่เป็นของบริษัทอื่น: เลิกกรอง
+	if (state.project && company && state.project.company !== company) {
+		state.project = null;
+		remember_project(null);
+	}
+	state.summaries = {};
+	load_summaries();
+}
+provide("open_company_picker", () => (company_sheet.value = true));
 
 // summary ของแต่ละหมวด (ตัวเลขบนเมนูและบนปุ่มสลับหมวด) ตาม app.summary_api
 const SUMMARY_API = app.summary_api;
 
 async function load_summary(key = state.section) {
-	if (!state.project || !SUMMARY_API[key]) return;
-	const project = state.project.name;
+	// หน้างานต้องมีโครงการ / ออฟฟิศ: โครงการเป็นตัวกรอง (ไม่มี = ทุกโครงการ)
+	if ((!state.project && !app.project_filter) || !SUMMARY_API[key]) return;
+	const stamp = scope_key();
 	try {
 		const [method, args] = SUMMARY_API[key]();
-		const summary = await call(method, { ...args, project });
-		// เปลี่ยนโครงการระหว่างโหลด: ทิ้งผลของโครงการเดิม
-		if (state.project?.name === project) state.summaries[key] = summary;
+		const summary = await call(method, { project: state.project?.name, ...args });
+		// เปลี่ยนโครงการ/บริษัทระหว่างโหลด: ทิ้งผลของขอบเขตเดิม
+		if (scope_key() === stamp) state.summaries[key] = summary;
 	} catch (error) {
 		show_error(error);
 	}
@@ -339,18 +468,18 @@ function load_summaries() {
 }
 provide("reload_summary", (key) => load_summary(typeof key === "string" ? key : undefined));
 provide("open_project_picker", () => (picker.value = true));
+provide("choose_project", (project) => choose_project(project));
 
 // ---------------------------------------------------------------- หมวดงาน
 
 const launcher = ref(false);
-// แท็บเล็ต/จอใหญ่: Dock หมวดงานซ้ายสุด (มีมากกว่า 1 หมวด) ความกว้างรวมใน --ss-side (ดู site.css)
-if (boot.sections.length > 1) document.documentElement.dataset.dock = "1";
 
-// sidebar แท็บเล็ต/จอใหญ่
-// - พับ (ค่าเริ่มต้น): ไอคอนอย่างเดียว กางชั่วคราวทับเนื้อหาเอง (html[data-peek])
-//   ใช้เมาส์ = ชี้แล้วกาง เอาออกแล้วพับ, จอสัมผัส = กดปุ่มล่างสุดแล้วกาง เลือกเมนู/แตะนอกแถบแล้วพับ
+// Dock แท็บเล็ต/จอใหญ่ (ความกว้างใน --ss-side ดู style.css)
+// - พับ (ค่าเริ่มต้น): ไอคอนอย่างเดียว (ชี้แล้วไม่กางเอง ชื่อเมนูดูจาก tooltip)
+//   จอสัมผัส = กดปุ่มล่างสุดแล้วกางทับเนื้อหา (html[data-peek]) เลือกเมนู/แตะนอกแถบแล้วพับ
 // - ปักหมุด (expanded): กางค้างและดันเนื้อหา (ปุ่มล่างสุด) จำในเครื่อง
-const SIDE_KEY = `${app.storage}.sidebar`;
+// ทุกแอปใน ConsERP ใช้ค่าเดียวกัน (สลับหมวดข้าม bundle แล้ว Dock ไม่เปลี่ยนสถานะ)
+const SIDE_KEY = "consbiz.conserp.sidebar";
 const can_hover = window.matchMedia("(hover: hover) and (pointer: fine)").matches;
 function saved_side() {
 	try {
@@ -359,7 +488,7 @@ function saved_side() {
 		return null;
 	}
 }
-const side = ref(saved_side() === "expanded" ? "expanded" : "collapsed");
+const side = ref(["expanded", "collapsed"].includes(saved_side()) ? saved_side() : app.side_default);
 const peek = ref(false);
 document.documentElement.dataset.side = side.value;
 
@@ -369,7 +498,7 @@ watch(peek, (value) => {
 });
 const pin_label = computed(() => {
 	if (side.value === "expanded") return "พับแถบเมนู";
-	return can_hover ? "ปักหมุดแถบเมนู" : peek.value ? "ซ่อนชื่อเมนู" : "แสดงชื่อเมนู";
+	return can_hover ? "กางแถบเมนู" : peek.value ? "ซ่อนชื่อเมนู" : "แสดงชื่อเมนู";
 });
 
 function toggle_side() {
@@ -388,24 +517,32 @@ function toggle_side() {
 	}
 }
 
-let peek_timer = null;
-function hover_side(inside) {
-	if (!can_hover || side.value === "expanded" || window.innerWidth < 768) return;
-	clearTimeout(peek_timer);
-	// หน่วงเล็กน้อย: เมาส์ผ่านเฉยๆ ไม่กาง, ออกแล้วไม่พับทันที
-	peek_timer = setTimeout(() => (peek.value = inside), inside ? 150 : 250);
-}
 // เปลี่ยนหน้า / แตะนอกแถบ: พับกลับ
 watch(
 	() => state.route,
 	() => (peek.value = false)
 );
 function close_peek(event) {
-	if (peek.value && !event.target.closest?.(".ss-nav")) peek.value = false;
+	if (peek.value && !event.target.closest?.(".ss-rail, .ss-rail-toggle")) peek.value = false;
+	if (user_menu.value && !event.target.closest?.(".ss-user-menu, .ss-rail-user")) user_menu.value = false;
+}
+
+// ---------------------------------------------------------------- ผู้ใช้
+
+const user_menu = ref(false);
+async function logout() {
+	try {
+		await call("frappe.handler.logout", {}, { post: true });
+	} catch {
+		// ออกไม่สำเร็จก็ไปหน้าเข้าสู่ระบบ (session อาจหมดแล้ว)
+	}
+	window.location.href = "/login";
 }
 document.addEventListener("pointerdown", close_peek);
 onBeforeUnmount(() => document.removeEventListener("pointerdown", close_peek));
 provide("open_launcher", () => (launcher.value = true));
+// เมนูของหมวดบนแถบบน (SectionTabs.vue ใน TopBar / Hero จอ ≥768)
+provide("section_nav", { tabs, active_view, open_tab });
 
 onMounted(async () => {
 	// ?project=<รหัส> เลือกโครงการให้เลย (ลิงก์จากฟอร์ม Project / CM)
@@ -421,10 +558,14 @@ onMounted(async () => {
 	if (state.project && !projects.value.some((p) => p.name === state.project.name)) {
 		state.project = null;
 	}
-	if (!state.project && projects.value.length === 1) {
+	// ออฟฟิศ: โครงการเป็นแค่ตัวกรอง ไม่ต้องเลือกก่อน (ตัวกรองต้องเป็นของบริษัทที่เลือก)
+	if (app.project_filter) {
+		if (state.project && state.company && state.project.company !== state.company) state.project = null;
+		load_summaries();
+	} else if (!state.project && projects.value.length === 1) {
 		choose_project(projects.value[0]);
 	} else if (!state.project) {
-		picker.value = true;
+		picker.value = !desktop.value;
 	} else {
 		load_summaries();
 	}

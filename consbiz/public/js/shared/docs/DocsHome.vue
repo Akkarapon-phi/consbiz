@@ -1,10 +1,12 @@
-<!-- หน้าหลักของหมวดจัดซื้อ / ขาย (ชุดเดียวกัน ข้อมูลจาก site_docs.get_summary) -->
+<!-- หน้าหลักของหมวดจัดซื้อ / ขาย (ชุดเดียวกัน ข้อมูลจาก site_docs.get_summary)
+     หมวดของออฟฟิศ (purchase/sales) ใช้ชุดเอกสารตาม sections[].docs -->
 <template>
 	<div>
 		<Hero @pick-project="$emit('pick-project')" />
 
 		<div class="ss-content ss-content--lift">
-			<ScopeSwitch />
+			<!-- ออฟฟิศ: เลือกโครงการที่ชิปบน hero แล้ว / หน้างาน: ขอบเขต โครงการนี้-ทุกโครงการ -->
+			<ScopeSwitch v-if="!app.project_filter" />
 
 			<div class="ss-stats">
 				<button
@@ -83,18 +85,22 @@ import Icon from "../components/Icon.vue";
 import Hero from "../components/Hero.vue";
 import DocCard from "./DocCard.vue";
 import ScopeSwitch from "./ScopeSwitch.vue";
+import { app } from "../app.js";
 import { DOC_KINDS, in_app } from "./kinds.js";
-import { go, money, state } from "../api.js";
+import { go, money, scope_key, state } from "../api.js";
 
+const props = defineProps({ section: String });
 defineEmits(["pick-project"]);
 const reload_summary = inject("reload_summary");
 
-const section = state.section;
+const section = props.section || state.section;
+// ชุดเอกสารของหมวด (ออฟฟิศ: purchase → buy, sales → sell)
+const family = app.sections[section]?.docs || section;
 const summary = computed(() => state.summaries[section]);
 const loading = computed(() => !summary.value);
 // เฉพาะชนิดที่แอปนี้ดูแล (หน้างาน = ใบขอซื้อ, ออฟฟิศ = ทุกชนิด)
 const kinds = Object.entries(DOC_KINDS)
-	.filter(([key, k]) => k.section === section && in_app(key))
+	.filter(([key, k]) => k.section === family && in_app(key))
 	.map(([key, k]) => ({ key, ...k }));
 
 // ร่างของชนิดที่แอปนี้ดูแล กดแล้วไปรายการร่างของชนิดแรกที่มีร่าง
@@ -107,7 +113,7 @@ const drafts = computed(() => {
 const stats = computed(() => all_stats().filter((stat) => in_app(stat.view)));
 function all_stats() {
 	const s = summary.value || {};
-	if (section === "buy") {
+	if (family === "buy") {
 		return [
 			{
 				key: "mr",
@@ -191,7 +197,7 @@ function all_stats() {
 const lists = computed(() => all_lists().filter((block) => in_app(block.view)));
 function all_lists() {
 	const s = summary.value || {};
-	return section === "buy"
+	return family === "buy"
 		? [
 				{ title: "ถึงกำหนดรับของ (7 วัน)", rows: s.due_soon, view: "po" },
 				{ title: "ถึงกำหนดจ่าย (7 วัน)", rows: s.to_pay, view: "pi" },
@@ -203,14 +209,11 @@ function all_lists() {
 }
 
 // เปลี่ยนขอบเขต โครงการนี้/ทุกโครงการ: โหลดตัวเลขใหม่
-watch(
-	() => state.doc_scope,
-	() => {
-		state.summaries[section] = null;
-		reload_summary();
-	}
-);
+watch(scope_key, () => {
+	state.summaries[section] = null;
+	reload_summary(section);
+});
 onMounted(() => {
-	if (state.project) reload_summary();
+	if (state.project || app.project_filter) reload_summary(section);
 });
 </script>

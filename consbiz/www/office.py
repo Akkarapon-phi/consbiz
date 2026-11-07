@@ -3,7 +3,7 @@
 
 # แอปออฟฟิศ (/office): หน้าเปล่าที่โหลด Vue (public/js/office_app/ + public/js/shared/)
 # จัดซื้อ/ขาย (ต่อไป: บัญชี ประกันผลงาน แอดมิน) ข้อมูลจาก consbiz/site_docs.py
-# /site/buy/(po|pi)... และ /site/sell/... เดิมเด้งมาที่นี่ (website_redirects ใน hooks.py)
+# หมวดจัดซื้อ/ขาย /conserp/purchase, /conserp/sales (website_route_rules), /office และ /site/buy/(po|pi), /site/sell เดิมเด้งมาที่นี่ (website_redirects)
 
 import json
 from urllib.parse import quote

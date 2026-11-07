@@ -2,10 +2,9 @@
 // router (<base>/<หมวด>/<หน้า>/...), สลับหมวดงาน, toast, รูปแบบตัวเลข/วันที่
 // ค่าของแต่ละแอป (หมวด/หน้า/base) อยู่ใน app.js (configure ใน bundle ของแอป)
 import { reactive } from "vue";
-import { app, is_tab, section_of } from "./app.js";
+import { app, is_desktop, is_tab, section_of } from "./app.js";
 
 const API = "consbiz.store_app.";
-const PROJECT_KEY = "consbiz.store.project"; // ชื่อเดิมจากแอปสโตร์: ผู้ใช้เดิมไม่ต้องเลือกโครงการใหม่
 const section_key = () => `${app.storage}.section`;
 
 // ข้อมูลตั้งต้นจากหน้า www ของแอป (boot_data ฝั่ง server)
@@ -39,7 +38,10 @@ export function money(value, { short = false } = {}) {
 	return n.toLocaleString("th-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 export const state = reactive({
+	// หน้างาน: โครงการที่ทำงาน (ต้องเลือก) / ออฟฟิศ: ตัวกรองโครงการ (null = ทุกโครงการ)
 	project: null, // {name, project_name, company}
+	// ออฟฟิศ: บริษัทที่เลือก ("" = ทุกบริษัท) กรองรายการ/ตัวเลข และเป็นบริษัทของเอกสารใหม่
+	company: "",
 	section: null, // ตั้งใน init_app()
 	// summary ของแต่ละหมวด (สโตร์ = store_app.get_summary, ควบคุมงาน = site_app.get_work_summary)
 	summaries: {},
@@ -223,7 +225,7 @@ export function vibrate(pattern) {
 
 export function remembered_project() {
 	try {
-		return JSON.parse(localStorage.getItem(PROJECT_KEY) || "null");
+		return JSON.parse(localStorage.getItem(app.project_key) || "null");
 	} catch {
 		return null;
 	}
@@ -231,7 +233,8 @@ export function remembered_project() {
 
 export function remember_project(project) {
 	try {
-		localStorage.setItem(PROJECT_KEY, JSON.stringify(project));
+		if (project) localStorage.setItem(app.project_key, JSON.stringify(project));
+		else localStorage.removeItem(app.project_key);
 	} catch {
 		// private mode: ใช้ได้ แค่ไม่จำ
 	}
@@ -255,12 +258,14 @@ function remember_section(section) {
 	}
 }
 
-const allowed = (section) => boot.sections.includes(section);
+// หน้าแรก (Desktop) เปิดได้ทุกคน
+const allowed = (section) => is_desktop(section) || boot.sections.includes(section);
 
 function set_section(section, force = false) {
 	if (state.section === section && !force) return;
 	state.section = section;
-	remember_section(section);
+	// เปิด <base> เปล่าครั้งหน้า = หมวดงานล่าสุด (ไม่ใช่หน้าแรก)
+	if (!is_desktop(section)) remember_section(section);
 	// สีหลักตามหมวด: ใส่ที่ <html> ด้วย (sheet ถูก Teleport ไปที่ body อยู่นอก .ss-app)
 	document.documentElement.dataset.section = section;
 	// สีแถบสถานะของมือถือตามหมวด
@@ -275,11 +280,10 @@ export function switch_section(section) {
 		return;
 	}
 	const last = state.last_tab[section] || { view: app.sections[section].home, params: {} };
-	go(last.view, last.params, { replace: is_tab(state.route.view) });
+	// จากหน้าแรกเพิ่มประวัติ (ย้อนกลับมาหน้าแรกได้)
+	go(last.view, last.params, { replace: is_tab(state.route.view) && !is_desktop(state.section) });
 }
 
-// แอปอื่นที่ผู้ใช้เปิดได้ (ตัวสลับแอป: Dock / ท้าย sidebar / ตารางหมวดของมือถือ) จาก site_app.available_apps
-export const other_apps = () => (boot.apps || []).filter((a) => a.key !== app.key);
 
 // ---------------------------------------------------------------- เริ่มแอป
 
@@ -292,7 +296,35 @@ export function init_app() {
 	if (!boot.sections.length) boot.sections = [app.fallback || Object.keys(app.sections)[0]];
 	state.section = boot.sections[0];
 	document.documentElement.dataset.app = app.key;
+	// บริษัท: ที่จำไว้ (ยังมีสิทธิ์) > มีบริษัทเดียว = บริษัทนั้น > ทุกบริษัท
+	const companies = (boot.companies || []).map((c) => c.name);
+	const saved = remembered(`${app.storage}.company`, "");
+	state.company = companies.includes(saved) ? saved : companies.length === 1 ? companies[0] : "";
 }
+
+export function set_company(company) {
+	state.company = company || "";
+	try {
+		localStorage.setItem(`${app.storage}.company`, state.company);
+	} catch {
+		// private mode
+	}
+}
+
+// ขอบเขตของรายการ/ตัวเลขเอกสารซื้อ-ขาย (site_docs.get_docs / get_summary)
+// หน้างาน: โครงการที่เลือก หรือทุกโครงการ (state.doc_scope) / ออฟฟิศ: ตัวกรองโครงการ + บริษัท
+export function scope_args() {
+	if (app.project_filter) {
+		return {
+			project: state.project?.name,
+			scope: state.project ? "project" : "all",
+			company: state.company || undefined,
+		};
+	}
+	return { project: state.project?.name, scope: state.doc_scope };
+}
+// เปลี่ยนเมื่อขอบเขตเปลี่ยน (ใช้ใน watch)
+export const scope_key = () => JSON.stringify(scope_args());
 
 // ---------------------------------------------------------------- router (<base>/<หมวด>/<หน้า>/<params...>)
 

@@ -4,14 +4,14 @@
 // ขอซื้อ (shared/docs เฉพาะใบขอซื้อ, API consbiz/site_docs.py) สั่งซื้อ/แจ้งหนี้/ขายอยู่แอปออฟฟิศ (/office)
 import { createApp } from "vue";
 import { configure } from "../shared/app.js";
-import { state } from "../shared/api.js";
+import { scope_args } from "../shared/api.js";
 import AppShell from "../shared/AppShell.vue";
 import { PARENT_TAB, ROUTES, SECTIONS } from "./sections.js";
 import VIEWS from "./views.js";
 
 configure({
 	key: "site",
-	base: "/site",
+	base: "/conserp",
 	// ค่าที่ผู้ใช้จำไว้ในเครื่อง (หมวดล่าสุด, sidebar) ใช้ชื่อเดิม ห้ามเปลี่ยน
 	storage: "consbiz.site",
 	title: "ConsERP",
@@ -24,7 +24,7 @@ configure({
 		store: () => ["get_summary", {}],
 		work: () => ["consbiz.site_app.get_work_summary", {}],
 		pm: () => ["consbiz.site_app.get_pm_summary", {}],
-		buy: () => ["consbiz.site_docs.get_summary", { section: "buy", scope: state.doc_scope }],
+		buy: () => ["consbiz.site_docs.get_summary", { section: "buy", ...scope_args() }],
 	},
 	// ไม่มีสิทธิ์หมวดไหนเลย: เปิดหมวดสโตร์ (แต่ละหน้าแจ้งสิทธิ์เองเหมือนแอปสโตร์เดิม)
 	fallback: "store",

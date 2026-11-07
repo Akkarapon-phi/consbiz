@@ -5,7 +5,7 @@
 		<header class="ss-preview-head">
 			<div class="ss-preview-title">
 				<b>{{ name }}</b>
-				<small>{{ config.label }}</small>
+				<span v-if="doc" class="ss-tag" :class="`tone-${doc.status_tone}`">{{ doc.status_label }}</span>
 			</div>
 			<button
 				type="button"
@@ -21,7 +21,6 @@
 		<div v-else class="ss-preview-body">
 			<div class="ss-preview-party">
 				<b>{{ doc.party || doc.title || doc.name }}</b>
-				<span class="ss-tag" :class="`tone-${doc.status_tone}`">{{ doc.status_label }}</span>
 			</div>
 
 			<ol class="ss-preview-steps">
@@ -34,27 +33,28 @@
 				</li>
 			</ol>
 
-			<dl class="ss-kv ss-preview-kv">
-				<template v-if="doc.purpose">
+			<!-- แถวบน 3 ช่อง: วัตถุประสงค์ | วันที่ | วันที่ต้องการ, แถวล่าง 2 ช่อง: ผู้จัดทำ | ผู้อนุมัติ -->
+			<dl class="ss-preview-facts">
+				<div v-if="doc.purpose">
 					<dt>วัตถุประสงค์</dt>
 					<dd>{{ doc.purpose }}</dd>
-				</template>
-				<dt>วันที่</dt>
-				<dd>{{ thai_date(doc.date, { year: true }) }}</dd>
-				<template v-if="doc.due">
+				</div>
+				<div>
+					<dt>วันที่</dt>
+					<dd>{{ thai_date(doc.date, { year: true }) }}</dd>
+				</div>
+				<div v-if="doc.due">
 					<dt>{{ config.due || "วันที่ต้องการ" }}</dt>
 					<dd>{{ thai_date(doc.due, { year: true }) }}</dd>
-				</template>
-				<template v-if="doc.bill_no">
-					<dt>เลขที่บิลผู้ขาย</dt>
-					<dd>{{ doc.bill_no }}</dd>
-				</template>
-				<template v-if="doc.project">
-					<dt>โครงการ</dt>
-					<dd class="is-line" :title="doc.project_name">{{ doc.project_name || doc.project }}</dd>
-				</template>
-				<dt>ผู้จัดทำ</dt>
-				<dd>{{ doc.request_by || doc.owner_name }}</dd>
+				</div>
+				<div class="is-person">
+					<dt>ผู้จัดทำ</dt>
+					<dd>{{ doc.request_by || doc.owner_name }}</dd>
+				</div>
+				<div v-if="doc.approve_by" class="is-person">
+					<dt>ผู้อนุมัติ</dt>
+					<dd>{{ doc.approve_by }}</dd>
+				</div>
 			</dl>
 
 			<section>
@@ -115,11 +115,20 @@
 				<button
 					type="button"
 					class="ss-icon-btn"
-					title="ดู PDF"
-					aria-label="ดู PDF"
+					title="เปิดเต็มหน้า"
+					aria-label="เปิดเต็มหน้า"
+					@click="open_full"
+				>
+					<Icon name="maximize" :size="17" />
+				</button>
+				<button
+					type="button"
+					class="ss-icon-btn"
+					title="PDF / พิมพ์"
+					aria-label="PDF / พิมพ์"
 					@click="pdf = true"
 				>
-					<Icon name="file" :size="18" />
+					<Icon name="printer" :size="18" />
 				</button>
 				<a
 					class="ss-icon-btn"
@@ -153,9 +162,6 @@
 					@click="go(`${config.section}-form`, { kind: doc.next_kind, name: 'new', source: name })"
 				>
 					<Icon name="plus" :size="15" :stroke="2.6" /> สร้าง{{ DOC_KINDS[doc.next_kind].label }}
-				</button>
-				<button v-else type="button" class="ss-btn ss-btn--ghost ss-btn--sm" @click="open_full">
-					เปิดเต็มหน้า
 				</button>
 			</template>
 		</footer>

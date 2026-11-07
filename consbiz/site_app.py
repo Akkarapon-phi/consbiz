@@ -27,8 +27,8 @@ WORK_DOCTYPES = ("Daily Report", "Daily Request", "Inspection Request", "Punch L
 
 # แอปหน้าจอของ consbiz (ตัวสลับแอป) ลำดับตามที่แสดง เพิ่มแอปใหม่ที่นี่ + ฟังก์ชันหมวดของแอปนั้นใน APP_SECTIONS
 APPS = (
-	{"key": "site", "title": "ConsERP", "label": "หน้างาน", "url": "/site", "icon": "hardhat"},
-	{"key": "office", "title": "ConsOffice", "label": "ออฟฟิศ", "url": "/office", "icon": "briefcase"},
+	{"key": "site", "title": "ConsERP", "label": "หน้างาน", "url": "/conserp", "icon": "hardhat"},
+	{"key": "office", "title": "ConsOffice", "label": "ออฟฟิศ", "url": "/conserp", "icon": "briefcase"},
 )
 BUY_DOCTYPES = ("Material Request", "Purchase Order", "Purchase Invoice")
 SELL_DOCTYPES = ("Quotation", "Sales Order", "Sales Invoice")
@@ -39,12 +39,13 @@ def readable_any(doctypes):
 
 
 def office_sections():
-	"""หมวดของแอปออฟฟิศ (/office) ที่ผู้ใช้มีสิทธิ์"""
+	"""หมวดของแอปออฟฟิศ (/conserp/purchase, /conserp/sales) ที่ผู้ใช้มีสิทธิ์
+	ชื่อหมวดต้องตรงกับ website_route_rules ใน hooks.py (server เลือก bundle ออฟฟิศตามชื่อหมวด)"""
 	sections = []
 	if readable_any(BUY_DOCTYPES):
-		sections.append("buy")
+		sections.append("purchase")
 	if readable_any(SELL_DOCTYPES):
-		sections.append("sell")
+		sections.append("sales")
 	return sections
 
 
@@ -67,14 +68,35 @@ def site_sections(can=None):
 APP_SECTIONS = {"site": site_sections, "office": office_sections}
 
 
-def available_apps(current=None):
-	"""แอปที่ผู้ใช้เปิดได้ (มีอย่างน้อย 1 หมวด) current = แอปที่เปิดอยู่ (ไม่ต้องคำนวณหมวดซ้ำ)"""
-	apps = []
+def sections_by_app(current=None):
+	"""{แอป: หมวดที่ผู้ใช้มีสิทธิ์} current = (แอปที่เปิดอยู่, หมวดของแอปนั้น) ไม่ต้องคำนวณซ้ำ"""
+	return {
+		config["key"]: current[1] if current and current[0] == config["key"] else APP_SECTIONS[config["key"]]()
+		for config in APPS
+	}
+
+
+def available_apps(by_app):
+	"""แอปที่ผู้ใช้เปิดได้ (มีอย่างน้อย 1 หมวด)"""
+	return [dict(config) for config in APPS if by_app[config["key"]]]
+
+
+def app_modules(by_app):
+	"""หมวดของทุกแอปเรียงตาม APPS (หน้า Desktop / Dock ของแอป ConsERP ที่ติดตั้งตัวเดียว)
+	ขอซื้อของหน้างานซ้ำกับจัดซื้อของออฟฟิศ: มีจัดซื้อแล้วไม่แสดงขอซื้อ"""
+	modules = []
 	for config in APPS:
-		sections = current[1] if current and current[0] == config["key"] else APP_SECTIONS[config["key"]]()
-		if sections:
-			apps.append(dict(config))
-	return apps
+		for section in by_app[config["key"]]:
+			if config["key"] == "site" and section == "buy" and "purchase" in by_app.get("office", []):
+				continue
+			modules.append({"app": config["key"], "section": section, "url": f"{config['url']}/{section}"})
+	return modules
+
+
+def add_apps(boot, current):
+	by_app = sections_by_app(current)
+	boot["apps"] = available_apps(by_app)
+	boot["modules"] = app_modules(by_app)
 
 
 def office_boot_data():
@@ -84,10 +106,15 @@ def office_boot_data():
 	boot.update(
 		{
 			"sections": sections,
-			"apps": available_apps(("office", sections)),
 			"desk": bool(sections),
+			# ตัวเลือกบริษัท (กรองรายการ/ตัวเลข + บริษัทของเอกสารใหม่) เฉพาะบริษัทที่ผู้ใช้มีสิทธิ์
+			"companies": frappe.get_list(
+				"Company", fields=["name", "abbr"], order_by="name asc", limit_page_length=0
+			),
+			"default_company": frappe.defaults.get_user_default("Company"),
 		}
 	)
+	add_apps(boot, ("office", sections))
 	return boot
 
 
@@ -104,7 +131,7 @@ def boot_data():
 	)
 	sections = site_sections(boot["can"])
 	boot["sections"] = sections
-	boot["apps"] = available_apps(("site", sections))
+	add_apps(boot, ("site", sections))
 	boot["desk"] = boot["desk"] or any(can_work.values())
 	return boot
 

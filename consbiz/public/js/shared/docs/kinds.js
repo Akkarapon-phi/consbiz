@@ -83,6 +83,8 @@ export const DOC_KINDS = {
 
 // แอปที่ดูแลเอกสารทุกชนิด (สั่งซื้อ แจ้งหนี้ ขาย) แอปหน้างานดูแลเฉพาะใบขอซื้อ (app.doc_kinds)
 const DOC_APP = "office";
+// ชุดเอกสาร → หมวดของแอปที่ดูแล (URL)
+const DOC_APP_SECTION = { buy: "purchase", sell: "sales" };
 
 // แอปนี้เปิด/สร้างเอกสารชนิดนี้เองได้ไหม
 export const in_app = (kind) => app.doc_kinds.includes(kind);
@@ -92,7 +94,7 @@ export function doc_url(kind, name) {
 	const config = DOC_KINDS[kind];
 	const owner = (boot.apps || []).find((a) => a.key === DOC_APP);
 	if (owner)
-		return `${owner.url}/${config.section}/${config.section}-doc/${kind}/${encodeURIComponent(name)}`;
+		return `${owner.url}/${DOC_APP_SECTION[config.section]}/${config.section}-doc/${kind}/${encodeURIComponent(name)}`;
 	return `/app/${config.doctype.toLowerCase().replace(/ /g, "-")}/${encodeURIComponent(name)}`;
 }
 

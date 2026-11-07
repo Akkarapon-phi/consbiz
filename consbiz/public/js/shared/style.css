@@ -2548,11 +2548,7 @@ button.ss-card:active {
 	--ss-side: 0px;
 }
 
-.ss-nav-brand,
-.ss-nav-project,
-.ss-nav-desk,
-.ss-nav-item.is-wide-only,
-.ss-nav.is-sub {
+.ss-nav-item.is-wide-only {
 	display: none;
 }
 
@@ -2585,9 +2581,6 @@ button.ss-card:active {
 }
 
 @media (min-width: 768px) {
-	:root {
-		--ss-side: 88px;
-	}
 
 	.ss-app {
 		max-width: none;
@@ -2602,78 +2595,9 @@ button.ss-card:active {
 		padding-bottom: calc(40px + var(--ss-bottom));
 	}
 
-	/* แถบข้าง */
-	.ss-nav,
-	.ss-nav.is-sub {
-		display: flex;
-		flex-direction: column;
-		align-items: stretch;
-		gap: 4px;
-		top: 0;
-		bottom: 0;
-		left: 0;
-		transform: none;
-		left: var(--ss-dock, 0px);
-		width: calc(var(--ss-side) - var(--ss-dock, 0px));
-		max-width: none;
-		height: auto;
-		padding: calc(16px + var(--ss-top)) 10px calc(16px + var(--ss-bottom));
-		border-radius: 0;
-		border: 0;
-		border-right: 1px solid var(--ss-border);
-		box-shadow: none;
-		background: color-mix(in srgb, var(--ss-surface) 86%, transparent);
-		overflow-y: auto;
-	}
-	.ss-nav-pill {
+	/* เมนูของหมวดอยู่ใน Dock (.ss-rail) */
+	.ss-nav {
 		display: none;
-	}
-	.ss-nav-item {
-		flex: none;
-		height: 66px;
-		border-radius: 18px;
-		transition: background 0.2s ease, color 0.2s ease;
-	}
-	.ss-nav-item.is-active {
-		background: var(--ss-brand-soft);
-	}
-	/* แถบข้างไม่เด้งไอคอน (เด้งเฉพาะแถบล่างของมือถือ) */
-	.ss-nav-item.is-active .ss-nav-icon {
-		animation: none;
-	}
-	.ss-nav-item:not(.is-active):hover {
-		background: var(--ss-surface-2);
-		color: var(--ss-text);
-	}
-	.ss-nav-item.is-wide-only {
-		display: flex;
-	}
-	.ss-nav-desk {
-		display: flex;
-		margin-top: auto;
-	}
-	.ss-nav-brand {
-		display: flex;
-		justify-content: center;
-		margin-bottom: 14px;
-	}
-	.ss-nav-brand-text {
-		display: none;
-	}
-	.ss-nav-logo {
-		width: 46px;
-		height: 46px;
-		border-radius: 15px;
-		display: grid;
-		place-items: center;
-		color: #fff;
-		background: linear-gradient(140deg, var(--ss-brand), var(--ss-brand-2));
-		box-shadow: 0 12px 24px -12px var(--ss-brand);
-	}
-	.ss-nav-enter-from,
-	.ss-nav-leave-to {
-		transform: translateX(-100%);
-		opacity: 0;
 	}
 
 	/* แถบบน / เนื้อหา */
@@ -2946,85 +2870,79 @@ a.ss-option {
 	transform: scale(1.015);
 }
 
-/* ---------------------------------------------------------------- หมวดงาน: ตารางไอคอน + ปุ่มเปิด */
+/* ---------------------------------------------------------------- หมวดงาน: ไอคอน + ชื่อ (ModuleGrid.vue: หน้าแรก + ตารางหมวดของมือถือ) */
 
-.ss-launcher {
+.ss-module-grid {
 	display: grid;
-	grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-	gap: 12px;
-	padding: 4px 0 8px;
+	grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+	gap: 6px;
 }
-.ss-app-tile {
+.ss-module {
 	position: relative;
 	display: flex;
 	flex-direction: column;
-	align-items: flex-start;
-	gap: 2px;
-	padding: 16px 14px 14px;
-	border-radius: var(--ss-radius);
-	background: var(--ss-surface-2);
-	border: 1.5px solid transparent;
+	align-items: center;
+	gap: 6px;
+	padding: 10px 4px 8px;
+	border-radius: 14px;
 	color: var(--ss-text);
-	text-align: left;
+	text-align: center;
 	text-decoration: none;
-	animation: ss-rise 0.45s calc(var(--i, 0) * 50ms) var(--ss-ease) both;
-	transition: transform 0.25s var(--ss-spring), border-color 0.25s ease, background 0.25s ease;
+	animation: ss-rise 0.4s calc(var(--i, 0) * 40ms) var(--ss-ease) both;
+	transition: background 0.2s ease, transform 0.25s var(--ss-spring);
 }
-.ss-app-tile:active {
-	transform: scale(0.96);
+.ss-module:active {
+	transform: scale(0.94);
 }
-.ss-app-tile.is-active {
-	border-color: var(--sw);
-	background: color-mix(in srgb, var(--sw) 8%, var(--ss-surface));
+.ss-module.is-active {
+	background: color-mix(in srgb, var(--sw) 10%, transparent);
 }
-.ss-app-tile-icon {
+.ss-module-icon {
 	position: relative;
-	width: 56px;
-	height: 56px;
-	margin-bottom: 10px;
+	width: 52px;
+	height: 52px;
 	display: grid;
 	place-items: center;
-	border-radius: 18px;
+	border-radius: 15px;
 	color: #fff;
 	background: linear-gradient(140deg, var(--sw), var(--sw2));
-	box-shadow: 0 12px 24px -12px var(--sw);
+	box-shadow: 0 10px 20px -12px var(--sw);
 }
-.ss-app-tile-badge {
+.ss-module-badge {
 	position: absolute;
-	top: -6px;
-	right: -8px;
-	min-width: 21px;
-	height: 21px;
-	padding: 0 5px;
+	top: -5px;
+	right: -7px;
+	min-width: 19px;
+	height: 19px;
+	padding: 0 4px;
 	border-radius: 99px;
-	font-size: 11.5px;
+	font-size: 11px;
 	font-weight: 700;
-	line-height: 17px;
-	text-align: center;
+	line-height: 15px;
 	color: #fff;
 	background: var(--ss-danger);
-	border: 2px solid var(--ss-surface);
+	border: 2px solid var(--ss-bg);
 }
-.ss-app-tile-label {
-	font-size: 15.5px;
-	font-weight: 700;
-}
-.ss-app-tile-note {
+.ss-module-label {
+	max-width: 100%;
 	font-size: 12.5px;
-	line-height: 1.4;
-	color: var(--ss-muted);
+	font-weight: 600;
+	line-height: 1.3;
+	overflow: hidden;
+	display: -webkit-box;
+	-webkit-line-clamp: 2;
+	-webkit-box-orient: vertical;
 }
-.ss-app-tile-check {
-	position: absolute;
-	top: 12px;
-	right: 12px;
-	width: 24px;
-	height: 24px;
-	display: grid;
-	place-items: center;
-	border-radius: 50%;
-	color: #fff;
-	background: var(--sw);
+@media (hover: hover) {
+	.ss-module:hover {
+		background: color-mix(in srgb, var(--sw) 8%, transparent);
+	}
+}
+@media (min-width: 768px) {
+	.ss-module-grid {
+		grid-template-columns: repeat(auto-fill, 96px);
+		gap: 8px;
+	}
 }
 
 /* ชิปหมวดงานบน hero (มือถือ) */
@@ -3081,10 +2999,6 @@ a.ss-option {
 	position: relative;
 	margin-bottom: 16px;
 	animation: ss-rise 0.6s 0.04s var(--ss-ease) both;
-}
-
-.ss-nav-logo {
-	position: relative;
 }
 
 /* ---------------------------------------------------------------- ควบคุมงาน: ความคืบหน้า */
@@ -3210,12 +3124,6 @@ a.ss-option {
 		top: 24px;
 		right: 24px;
 		margin: 0;
-	}
-	.ss-launcher {
-		grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-	}
-	.ss-nav-logo {
-		transition: transform 0.25s var(--ss-spring);
 	}
 	.ss-plan {
 		padding: 20px 22px;
@@ -5003,391 +4911,345 @@ a.ss-btn--soft {
 	}
 }
 
-/* ================================================================ Dock หมวดงาน (SectionDock.vue)
-   จอใหญ่: คอลัมน์ 64px ซ้ายสุด (html[data-dock] รวมความกว้างไว้ใน --ss-side ให้ sheet/toast/แถบล่างเลื่อนตาม)
-   แท็บเล็ต: ปุ่มหมวดอยู่บนสุดของแถบไอคอน แบ่งจากเมนูด้วยเส้น  มือถือ: ไม่แสดง */
+/* ================================================================ Dock (แท็บเล็ต/จอใหญ่) .ss-rail ใน AppShell.vue
+   แถบเดียวกว้าง 56px เท่า Dock ของ Frappe: โลโก้ (หน้าแรก) / บริษัท / หมวดของกลุ่มแอปนี้ + ระบบเต็ม (กลุ่มอื่นเปิดจากหน้าแรก)
+   เมนูย่อยของหมวดที่เปิดอยู่แสดงใต้หมวดนั้น (มือถือใช้แถบล่าง .ss-nav + ตารางหมวด)
+   ปักหมุด html[data-side="expanded"] = กางค้างดันเนื้อหา, ชี้/แตะปุ่มล่างสุด html[data-peek] = กางทับเนื้อหา
+   พับ/กางใช้แถวสูงเท่ากัน (ชื่อแค่จางหาย) เมนูไม่ขยับตอนเปิด-ปิด --ss-side = ความกว้างที่เนื้อหา/sheet/แถบล่างใช้ */
 
-.ss-dock {
-	display: none;
-}
-.ss-sections {
-	flex-direction: column;
-	align-items: stretch;
-	gap: 4px;
-}
-.ss-sec {
-	position: relative;
-	display: flex;
-	flex-direction: column;
-	align-items: center;
-	gap: 3px;
-	padding: 3px 0;
-	color: var(--ss-muted);
-	text-decoration: none;
-	transition: color 0.2s ease;
-}
-.ss-sec-icon {
-	position: relative;
-	width: 42px;
-	height: 42px;
-	display: grid;
-	place-items: center;
-	border-radius: 14px;
-	color: var(--sw, var(--ss-text-2));
-	background: color-mix(in srgb, var(--sw, var(--ss-muted)) 13%, transparent);
-	transition: background 0.25s ease, color 0.25s ease, border-radius 0.3s var(--ss-ease),
-		box-shadow 0.25s ease, transform 0.25s var(--ss-spring);
-}
-.ss-sec:active .ss-sec-icon {
-	transform: scale(0.92);
-}
-.ss-sec.is-active {
-	color: var(--ss-text);
-}
-.ss-sec.is-active .ss-sec-icon {
-	color: #fff;
-	border-radius: 13px;
-	background: linear-gradient(140deg, var(--sw), var(--sw2));
-	box-shadow: 0 10px 20px -10px var(--sw);
-}
-/* ชื่อหมวดยาวขึ้น 2 บรรทัด (แถบแคบ) */
-.ss-sec-label {
-	max-width: 100%;
-	font-size: 10.5px;
-	font-weight: 600;
-	line-height: 1.2;
-	text-align: center;
-	overflow: hidden;
-	display: -webkit-box;
-	-webkit-line-clamp: 2;
-	-webkit-box-orient: vertical;
-}
-.ss-sec-badge {
-	position: absolute;
-	top: -5px;
-	right: -7px;
-	min-width: 18px;
-	height: 18px;
-	padding: 0 4px;
-	border-radius: 99px;
-	font-size: 10.5px;
-	font-weight: 700;
-	line-height: 14px;
-	text-align: center;
-	color: #fff;
-	background: var(--ss-danger);
-	border: 2px solid var(--ss-surface);
-}
-@media (hover: hover) {
-	.ss-sec:not(.is-active):hover {
-		color: var(--ss-text);
-	}
-	.ss-sec:not(.is-active):hover .ss-sec-icon {
-		border-radius: 12px;
-		background: color-mix(in srgb, var(--sw, var(--ss-muted)) 22%, transparent);
-	}
-}
-
-@media (min-width: 768px) {
-	html[data-dock] .ss-dock {
-		position: fixed;
-		z-index: 31;
-		top: 0;
-		bottom: 0;
-		left: 0;
-		width: var(--ss-dock);
-		display: flex;
-		flex-direction: column;
-		align-items: stretch;
-		gap: 10px;
-		padding: calc(18px + var(--ss-top)) 8px calc(16px + var(--ss-bottom));
-		background: color-mix(in srgb, var(--ss-surface-2) 70%, var(--ss-bg));
-		border-right: 1px solid var(--ss-border);
-		overflow-y: auto;
-	}
-	.ss-dock .ss-sections {
-		display: flex;
-		gap: 8px;
-	}
-	.ss-dock .ss-sec-label {
-		font-size: 10px;
-	}
-	.ss-dock-logo {
-		align-self: center;
-		width: 36px;
-		height: 36px;
-		margin-bottom: 8px;
-		display: grid;
-		place-items: center;
-		border-radius: 11px;
-		color: #fff;
-		background: var(--ss-text);
-	}
-	.ss-dock-desk {
-		margin-top: auto;
-		--sw: var(--ss-text-2);
-	}
-	/* แอปอื่น (ตัวสลับแอป) ชิดล่างเหนือระบบเต็ม คั่นจากหมวดของแอปนี้ */
-	.ss-dock-apps {
-		display: flex;
-		flex-direction: column;
-		gap: 8px;
-		margin-top: auto;
-		padding-top: 10px;
-		border-top: 1px solid var(--ss-border);
-	}
-	.ss-dock-apps .ss-sec {
-		--sw: #0f766e;
-	}
-	.ss-dock-apps + .ss-dock-desk {
-		margin-top: 0;
-	}
-	/* ปุ่มระบบเต็มอยู่ที่ Dock แล้ว */
-	html[data-dock] .ss-nav-desk {
-		display: none !important;
-	}
-	.ss-dock-enter-active,
-	.ss-dock-leave-active {
-		transition: transform 0.4s var(--ss-ease), opacity 0.3s ease;
-	}
-	.ss-dock-enter-from,
-	.ss-dock-leave-to {
-		transform: translateX(-100%);
-		opacity: 0;
-	}
-}
-
-/* ================================================================ sidebar พับ (ไอคอนอย่างเดียว) / กาง (ไอคอน + ชื่อ)
-   html[data-side] จาก App.vue (toggle_side) ความกว้างรวม Dock ไว้ใน --ss-side ให้เนื้อหา/sheet/toast/แถบล่างเลื่อนตาม */
-
-.ss-nav-head {
+.ss-rail {
 	display: none;
 }
 
 @media (min-width: 768px) {
 	:root {
-		--ss-side: 76px;
+		--ss-side: 56px;
+		--ss-rail-open: 232px;
 	}
 	html[data-side="expanded"] {
-		--ss-side: 268px;
-	}
-	html[data-dock] {
-		--ss-dock: 72px;
-		--ss-side: 148px;
-	}
-	html[data-dock][data-side="expanded"] {
-		--ss-side: 340px;
-	}
-
-	.ss-nav,
-	.ss-nav.is-sub {
-		padding-left: 10px;
-		padding-right: 10px;
-		transition: width 0.3s var(--ss-ease), left 0.3s var(--ss-ease);
+		--ss-side: var(--ss-rail-open);
 	}
 	.ss-app.has-side {
 		transition: padding-left 0.3s var(--ss-ease);
 	}
 
-	/* หัว sidebar: พับ = โลโก้หมวด (มี Dock = ไม่แสดง เพราะ Dock บอกหมวดแล้ว), กาง = ชื่อหมวด */
-	html[data-dock] .ss-nav-head {
-		display: none;
-	}
-	/* พับ/กาง ใช้โครงแนวตั้งเดียวกัน (หัว 52px, โครงการ 52px, เมนู 48px ห่าง 2px) เมนูไม่ขยับขึ้นลงตอนเปิด-ปิด */
-	.ss-nav-head {
+	.ss-rail {
+		position: fixed;
+		z-index: 31;
+		top: 0;
+		bottom: 0;
+		left: 0;
+		width: var(--ss-side);
 		display: flex;
 		flex-direction: column;
-		justify-content: center;
-		align-items: center;
-		flex: none;
-		height: 52px;
-		margin-bottom: 6px;
+		gap: 2px;
+		padding: calc(8px + var(--ss-top)) 8px calc(8px + var(--ss-bottom));
+		background: var(--ss-surface);
+		border-right: 1px solid var(--ss-border);
+		overflow-x: hidden;
+		overflow-y: auto;
+		scrollbar-width: none;
+		transition: width 0.3s var(--ss-ease), box-shadow 0.3s ease;
 	}
-	.ss-nav-head .ss-nav-logo {
-		width: 40px;
-		height: 40px;
-		border-radius: 13px;
-	}
-	.ss-nav-head .ss-nav-brand {
-		margin: 0;
-	}
-	html[data-dock] .ss-nav-head .ss-nav-brand {
+	.ss-rail::-webkit-scrollbar {
 		display: none;
 	}
-	.ss-nav-toggle {
-		color: var(--ss-muted);
+	html[data-peek] .ss-rail {
+		width: var(--ss-rail-open);
+		z-index: 32;
+		box-shadow: 18px 0 40px -18px rgba(15, 23, 42, 0.35);
 	}
-	.ss-nav-toggle:hover {
-		color: var(--ss-text);
+	.ss-rail-enter-active,
+	.ss-rail-leave-active {
+		transition: transform 0.4s var(--ss-ease), opacity 0.3s ease;
+	}
+	.ss-rail-enter-from,
+	.ss-rail-leave-to {
+		transform: translateX(-100%);
+		opacity: 0;
 	}
 
-	/* พับ: โครงการเหลือแค่ตัวย่อ (แตะเพื่อเปลี่ยนโครงการ) */
-	.ss-nav-project {
+	.ss-rail-row {
+		flex: none;
 		display: flex;
 		align-items: center;
-		justify-content: center;
-		flex: none;
-		height: 52px;
-		margin-bottom: 10px;
-		border-radius: 14px;
+		gap: 8px;
+		width: 100%;
+		min-height: 36px;
+		padding: 1px;
+		border-radius: 10px;
+		color: var(--ss-text-2);
+		text-align: left;
+		text-decoration: none;
+		white-space: nowrap;
+		transition: background 0.15s ease, color 0.15s ease;
 	}
-	.ss-nav-project .ss-avatar {
+	.ss-rail-row:hover {
+		background: var(--ss-surface-2);
+		color: var(--ss-text);
+	}
+	.ss-rail-icon {
+		position: relative;
 		flex: none;
 		width: 38px;
-		height: 38px;
-		border-radius: 12px;
-		font-size: 13px;
+		height: 34px;
+		display: grid;
+		place-items: center;
+		border-radius: 9px;
+		transition: background 0.2s ease, color 0.2s ease;
 	}
-	.ss-nav-project-text,
-	.ss-nav-project > .ss-icon {
-		display: none;
+	.ss-rail-text {
+		min-width: 0;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		font-size: 13.5px;
+		font-weight: 500;
+		opacity: 0;
+		transition: opacity 0.2s ease;
 	}
-	:is(html[data-side="expanded"], html[data-peek]) .ss-nav-project > .ss-icon {
-		display: block;
+	:is(html[data-side="expanded"], html[data-peek]) .ss-rail-text {
+		opacity: 1;
 	}
-	/* พับ: ไอคอนอย่างเดียว (ชื่อเมนูดูได้จาก tooltip) */
-	.ss-nav,
-	.ss-nav.is-sub {
-		gap: 2px;
+	.ss-rail-badge {
+		position: absolute;
+		top: -3px;
+		right: -1px;
+		min-width: 16px;
+		height: 16px;
+		padding: 0 4px;
+		border-radius: 99px;
+		font-size: 10px;
+		font-weight: 700;
+		line-height: 13px;
+		text-align: center;
+		color: #fff;
+		background: var(--ss-brand);
+		border: 1.5px solid var(--ss-surface);
 	}
-	.ss-nav-item {
-		height: 48px;
+	.ss-rail-badge.is-danger,
+	.ss-rail-mod .ss-rail-badge {
+		background: var(--ss-danger);
 	}
-	.ss-nav-label {
-		display: none;
-	}
-	.ss-nav-item .ss-badge {
-		top: -7px;
-		right: -10px;
-	}
-}
 
-@media (min-width: 768px) {
-	:is(html[data-side="expanded"], html[data-peek]) .ss-nav,
-	:is(html[data-side="expanded"], html[data-peek]) .ss-nav.is-sub {
-		padding: calc(16px + var(--ss-top)) 10px calc(16px + var(--ss-bottom));
-		gap: 2px;
+	/* โลโก้ = หน้าแรก */
+	.ss-rail-logo-img {
+		flex: none;
+		width: 30px;
+		height: 30px;
+		margin: 3px 4px 3px 5px;
+		border-radius: 8px;
 	}
-	:is(html[data-side="expanded"], html[data-peek]) .ss-nav-brand {
-		justify-content: flex-start;
-		align-items: center;
-		gap: 12px;
-		padding: 0;
-		margin: 0;
-	}
-	:is(html[data-side="expanded"], html[data-peek]) .ss-nav-brand-text {
-		display: block;
-		font-size: 18px;
+	.ss-rail-brand {
+		font-size: 15px;
 		font-weight: 700;
 		letter-spacing: -0.01em;
-	}
-	:is(html[data-side="expanded"], html[data-peek]) .ss-nav-project {
-		display: flex;
-		align-items: center;
-		justify-content: flex-start;
-		gap: 10px;
-		width: 100%;
-		padding: 0 8px 0 9px;
-		border-radius: 14px;
-		background: var(--ss-surface-2);
-		text-align: left;
 		color: var(--ss-text);
-		transition: background 0.2s ease;
 	}
-	:is(html[data-side="expanded"], html[data-peek]) .ss-nav-project:hover {
-		background: var(--ss-brand-soft);
+	.ss-rail-logo.is-active {
+		background: var(--ss-surface-2);
 	}
-	:is(html[data-side="expanded"], html[data-peek]) .ss-nav-project .ss-avatar {
-		width: 38px;
-		height: 38px;
-		border-radius: 12px;
-		font-size: 13px;
+
+	/* บริษัท / โครงการ */
+	.ss-rail-ctx .ss-avatar {
+		flex: none;
+		width: 30px;
+		height: 30px;
+		margin: 2px 4px 2px 5px;
+		border-radius: 8px;
+		font-size: 11.5px;
 	}
-	:is(html[data-side="expanded"], html[data-peek]) .ss-nav-project-text {
-		flex: 1;
-		min-width: 0;
+	.ss-rail-ctx-text {
 		display: flex;
 		flex-direction: column;
+		line-height: 1.25;
 	}
-	:is(html[data-side="expanded"], html[data-peek]) .ss-nav-project-text span {
-		font-size: 13.5px;
-		font-weight: 600;
-		line-height: 1.3;
+	.ss-rail-ctx-text span {
 		overflow: hidden;
 		text-overflow: ellipsis;
-		white-space: nowrap;
+		font-size: 13px;
+		font-weight: 600;
+		color: var(--ss-text);
 	}
-	:is(html[data-side="expanded"], html[data-peek]) .ss-nav-project-text small {
-		font-size: 11.5px;
+	.ss-rail-ctx-text small {
+		font-size: 11px;
 		color: var(--ss-muted);
 	}
-	:is(html[data-side="expanded"], html[data-peek]) .ss-nav-item {
-		flex-direction: row;
-		justify-content: flex-start;
-		gap: 14px;
-		height: 48px;
-		padding: 0 16px;
-		border-radius: 14px;
-	}
-	:is(html[data-side="expanded"], html[data-peek]) .ss-nav-label {
-		font-size: 14.5px;
-	}
-	:is(html[data-side="expanded"], html[data-peek]) .ss-nav-item .ss-nav-icon {
-		position: static;
-	}
-	:is(html[data-side="expanded"], html[data-peek]) .ss-nav-item .ss-badge {
-		top: calc(50% - 10px);
-		right: 12px;
-	}
 
-	:is(html[data-side="expanded"], html[data-peek]) .ss-nav-label {
-		display: block;
-	}
-	:is(html[data-side="expanded"], html[data-peek]) .ss-nav-head {
-		flex-direction: row;
-		justify-content: space-between;
-		padding: 0 0 0 8px;
-	}
-	:is(html[data-side="expanded"], html[data-peek]) .ss-nav-head .ss-nav-brand,
-	html[data-dock]:is([data-side="expanded"], [data-peek]) .ss-nav-head .ss-nav-brand {
+	/* หมวดของทุกแอป (คั่นแอปด้วยเส้น) */
+	.ss-rail-list {
 		display: flex;
-		flex: 1;
-		min-width: 0;
-		padding: 0;
+		flex-direction: column;
+		gap: 2px;
+		margin-top: 4px;
+		padding-top: 6px;
+		border-top: 1px solid var(--ss-border);
 	}
-	:is(html[data-side="expanded"], html[data-peek]) .ss-nav-brand-text {
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
+	.ss-rail-mod .ss-rail-icon {
+		color: var(--sw);
 	}
-}
+	.ss-rail-mod.is-open {
+		color: var(--ss-text);
+	}
+	.ss-rail-mod.is-open .ss-rail-text {
+		font-weight: 600;
+	}
+	.ss-rail-mod.is-open .ss-rail-icon {
+		color: #fff;
+		background: linear-gradient(140deg, var(--sw), var(--sw2));
+		box-shadow: 0 8px 16px -10px var(--sw);
+	}
+	.ss-rail-mod.is-active {
+		background: color-mix(in srgb, var(--sw) 10%, transparent);
+	}
 
-/* ---------------------------------------------------------------- sidebar: กางชั่วคราวทับเนื้อหา + ปุ่มล่างสุด */
-
-.ss-nav-foot {
-	display: none;
-}
-@media (min-width: 768px) {
-	.ss-nav-foot {
+	.ss-rail-foot {
 		display: flex;
 		flex-direction: column;
 		gap: 2px;
 		margin-top: auto;
-		padding-top: 8px;
+		padding-top: 6px;
+		border-top: 1px solid var(--ss-border);
 	}
-	.ss-nav-foot .ss-nav-desk {
-		margin-top: 0;
+	.ss-rail-user.is-open {
+		background: var(--ss-surface-2);
 	}
-	.ss-nav-pin {
+	.ss-user-avatar {
+		overflow: hidden;
+	}
+	.ss-user-avatar img {
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+	}
+
+	/* ปุ่มพับ/กาง: วงกลมเล็กคร่อมขอบขวาของ Dock (ไม่กินแถวใน Dock)
+	   จอใช้เมาส์ = แสดงเมื่อชี้ที่ Dock/ปุ่ม, จอสัมผัส = แสดงตลอด */
+	.ss-rail-toggle {
+		position: fixed;
+		z-index: 33;
+		top: calc(56px + var(--ss-top));
+		left: calc(var(--ss-side) - 11px);
+		width: 22px;
+		height: 22px;
+		display: grid;
+		place-items: center;
+		border-radius: 50%;
+		color: var(--ss-text-2);
+		background: var(--ss-surface);
+		border: 1px solid var(--ss-border-strong);
+		box-shadow: 0 2px 6px rgba(15, 23, 42, 0.12);
+		transition: left 0.3s var(--ss-ease), opacity 0.2s ease, color 0.2s ease;
+	}
+	.ss-rail-toggle:hover {
+		color: var(--ss-brand);
+		border-color: var(--ss-brand);
+	}
+	html[data-peek] .ss-rail-toggle {
+		left: calc(var(--ss-rail-open) - 11px);
+	}
+	@media (hover: hover) and (pointer: fine) {
+		.ss-rail-toggle {
+			opacity: 0;
+		}
+		.ss-rail:hover ~ .ss-rail-toggle,
+		.ss-rail-toggle:hover,
+		.ss-rail-toggle:focus-visible {
+			opacity: 1;
+		}
+	}
+
+	/* เมนูผู้ใช้: ลอยข้าง Dock ชิดล่าง */
+	.ss-user-menu {
+		position: fixed;
+		z-index: 40;
+		left: calc(var(--ss-side) + 8px);
+		bottom: calc(10px + var(--ss-bottom));
+		min-width: 220px;
+		padding: 6px;
+		border-radius: 12px;
+		background: var(--ss-surface);
+		border: 1px solid var(--ss-border);
+		box-shadow: var(--ss-shadow-lg);
+	}
+	.ss-user-menu-head {
+		display: flex;
+		flex-direction: column;
+		padding: 6px 10px 8px;
+		margin-bottom: 4px;
+		border-bottom: 1px solid var(--ss-border);
+	}
+	.ss-user-menu-name {
+		font-size: 14px;
+		font-weight: 600;
+	}
+	.ss-user-menu-mail {
+		font-size: 12px;
 		color: var(--ss-muted);
 	}
-	/* กางชั่วคราว: กว้างเท่าตอนกาง ทับเนื้อหา (เนื้อหาไม่ขยับ) */
-	html[data-peek] .ss-nav,
-	html[data-peek] .ss-nav.is-sub {
-		width: 268px;
-		z-index: 32;
-		box-shadow: 18px 0 40px -18px rgba(15, 23, 42, 0.35);
-		background: var(--ss-surface);
+	.ss-user-menu-item {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		width: 100%;
+		padding: 7px 10px;
+		border-radius: 8px;
+		font-size: 13.5px;
+		color: var(--ss-text);
+		text-decoration: none;
+		text-align: left;
+	}
+	.ss-user-menu-item:hover {
+		background: var(--ss-surface-2);
+	}
+	.ss-user-menu-item.is-danger {
+		color: var(--ss-danger);
+	}
+}
+
+/* ================================================================ หน้าแรก (Desktop.vue): หมวดของทุกแอป จัดกลุ่มตามแอป */
+
+.ss-desktop-head {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	padding: calc(20px + var(--ss-top)) 16px 10px;
+}
+.ss-desktop-logo {
+	width: 44px;
+	height: 44px;
+	border-radius: 12px;
+	animation: ss-rise 0.45s var(--ss-ease) both;
+}
+.ss-desktop-greet {
+	font-size: 13px;
+	color: var(--ss-muted);
+}
+.ss-desktop-name {
+	font-size: 20px;
+	font-weight: 700;
+	letter-spacing: -0.01em;
+}
+.ss-launcher-home {
+	margin-top: 14px;
+}
+.ss-modules {
+	display: flex;
+	flex-direction: column;
+	gap: 18px;
+}
+.ss-module-group-title {
+	margin: 0 0 8px;
+	font-size: 12.5px;
+	font-weight: 600;
+	letter-spacing: 0.02em;
+	color: var(--ss-muted);
+}
+@media (min-width: 768px) {
+	.ss-desktop-head {
+		padding: calc(24px + var(--ss-top)) 24px 12px;
+	}
+	.ss-desktop .ss-content {
+		max-width: 1180px;
 	}
 }
 
@@ -7879,8 +7741,44 @@ div.ss-line-del {
 	font-size: 17px;
 	line-height: 1.35;
 }
-.ss-preview-party .ss-tag {
+.ss-preview-facts {
+	display: grid;
+	grid-template-columns: repeat(6, minmax(0, 1fr));
+	gap: 8px 12px;
+	margin: 0;
+}
+/* วันที่/วัตถุประสงค์ = 3 ช่องต่อแถว, ผู้จัดทำ/ผู้อนุมัติ = 2 ช่องต่อแถว (ขึ้นแถวใหม่เสมอ) */
+.ss-preview-facts > div {
+	grid-column: span 2;
+	min-width: 0;
+}
+.ss-preview-facts > .is-person {
+	grid-column: span 3;
+}
+.ss-preview-facts > .is-person:first-of-type,
+.ss-preview-facts > div:not(.is-person) + .is-person {
+	grid-column: 1 / span 3;
+}
+.ss-preview-facts dt {
+	font-size: 11.5px;
+	color: var(--ss-muted);
+}
+.ss-preview-facts dd {
+	margin: 0;
+	font-size: 13.5px;
+	font-weight: 500;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.ss-preview-date {
 	flex: none;
+	font-size: 13px;
+	color: var(--ss-muted);
+	font-variant-numeric: tabular-nums;
+}
+.ss-preview-title .ss-tag {
+	align-self: center;
 }
 /* ขั้นตอนแบบย่อ: แถบต่อกัน */
 .ss-preview-steps {
@@ -8030,8 +7928,9 @@ div.ss-line-del {
 }
 .ss-preview-title {
 	flex-direction: row;
-	align-items: baseline;
+	align-items: center;
 	gap: 8px;
+	min-width: 0;
 }
 .ss-preview-title b {
 	font-size: 15px;
@@ -8477,4 +8376,471 @@ div.ss-line-del {
 .ss-table--doc td .ss-ie-form {
 	min-width: 190px;
 	flex-wrap: nowrap;
+}
+
+/* ================================================================ แอปออฟฟิศ: ตัวกรองโครงการ (ProjectFilter.vue) + หน้าภาพรวม (OfficeHome.vue) */
+.ss-project-filter {
+	display: inline-flex;
+	align-items: center;
+	gap: 2px;
+	max-width: 100%;
+	min-width: 0;
+}
+.ss-project-filter .ss-tool {
+	min-width: 0;
+	max-width: 320px;
+}
+.ss-project-filter-text {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.ss-project-filter.is-active .ss-tool {
+	color: var(--ss-brand);
+	border-color: color-mix(in srgb, var(--ss-brand) 45%, var(--ss-border));
+	background: var(--ss-brand-soft);
+}
+.ss-project-filter-clear {
+	display: inline-grid;
+	place-items: center;
+	width: 28px;
+	height: 28px;
+	border-radius: 8px;
+	color: var(--ss-muted);
+}
+.ss-project-filter-clear:hover {
+	color: var(--ss-text);
+	background: var(--ss-surface-2);
+}
+.ss-home-filter {
+	align-self: flex-start;
+}
+/* ---------------------------------------------------------------- แถบบน (TopBar.vue): โครงการ + ค้นหาของรายการเอกสาร (จอ ≥768)
+   มือถือไม่แสดง (จอแคบ: ค้นหาอยู่ในแถบเครื่องมือ, โครงการอยู่บน hero/ตัวกรอง) */
+.ss-topbar-project {
+	display: none;
+}
+@media (min-width: 768px) {
+	.ss-topbar-sub.is-project {
+		display: none;
+	}
+	.ss-topbar-search {
+		flex: 0 1 260px;
+		min-width: 140px;
+		height: 36px;
+		margin-left: 12px;
+	}
+	.ss-topbar-project {
+		display: inline-flex;
+		align-items: center;
+		gap: 8px;
+		flex: 0 1 auto;
+		min-width: 0;
+		max-width: 260px;
+		height: 36px;
+		margin-left: 8px;
+		padding: 0 10px 0 4px;
+		border-radius: 10px;
+		border: 1px solid var(--ss-border-strong);
+		background: var(--ss-surface);
+		color: var(--ss-text-2);
+		font-size: 13.5px;
+		font-weight: 500;
+		transition: border-color 0.2s ease, background 0.2s ease;
+	}
+	.ss-topbar-project:hover {
+		border-color: color-mix(in srgb, var(--ss-brand) 45%, var(--ss-border-strong));
+		color: var(--ss-text);
+	}
+	.ss-topbar-project.is-active {
+		color: var(--ss-text);
+	}
+	.ss-topbar-project .ss-avatar {
+		flex: none;
+		width: 28px;
+		height: 28px;
+		border-radius: 7px;
+		font-size: 11px;
+	}
+	.ss-topbar-project-text {
+		min-width: 0;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	.ss-topbar-project + .ss-icon-btn,
+	.ss-topbar-project + .ss-btn {
+		margin-left: 4px;
+	}
+}
+@media (min-width: 768px) and (hover: hover) and (pointer: fine) {
+	.ss-topbar-project {
+		height: 32px;
+		border-radius: 8px;
+	}
+	.ss-topbar-project .ss-avatar {
+		width: 24px;
+		height: 24px;
+		border-radius: 6px;
+		font-size: 10.5px;
+	}
+}
+
+/* ---------------------------------------------------------------- สถานะเอกสารแบบปุ่มติดกัน (DocList จอ ≥768: ต้นแถวตัวกรอง แทนแถวแท็บ) */
+.ss-status-pills {
+	display: inline-flex;
+	flex-wrap: wrap;
+	gap: 2px;
+	padding: 3px;
+	border-radius: 11px;
+	background: color-mix(in srgb, var(--ss-text) 6%, transparent);
+}
+.ss-status-pill {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	height: 32px;
+	padding: 0 10px;
+	border-radius: 8px;
+	font-size: 13.5px;
+	font-weight: 600;
+	color: var(--ss-muted);
+	white-space: nowrap;
+	transition: background 0.2s ease, color 0.2s ease;
+}
+.ss-status-pill:hover {
+	color: var(--ss-text);
+}
+.ss-status-pill.is-active {
+	color: var(--ss-text);
+	background: var(--ss-surface);
+	box-shadow: 0 1px 3px rgba(15, 23, 42, 0.14);
+}
+.ss-status-pill.is-active .ss-tab-count {
+	color: var(--ss-brand);
+	background: var(--ss-brand-soft);
+}
+@media (hover: hover) and (pointer: fine) {
+	.ss-status-pill {
+		height: 26px;
+		font-size: 13px;
+	}
+	.ss-topbar-search {
+		height: 32px;
+	}
+}
+
+/* ---------------------------------------------------------------- เมนูของหมวดบนแถบบน (SectionTabs.vue, จอ ≥768)
+   หน้ารายการ: ใน TopBar แทนชื่อหน้า (.has-tabs ซ่อนชื่อ), หน้าหลักหมวด: ใน Hero (--hero สีขาวบนพื้นสีหมวด)
+   จอ < 1100: แท็บที่ไม่ได้เลือกเหลือแค่ไอคอน (ชื่อดูจาก tooltip) มือถือใช้แถบเมนูล่าง */
+.ss-sectabs {
+	display: none;
+}
+@media (min-width: 768px) {
+	.ss-topbar.has-tabs .ss-topbar-title {
+		display: none;
+	}
+	.ss-sectabs {
+		display: flex;
+		align-items: center;
+		gap: 2px;
+		flex: 0 1 auto;
+		min-width: 0;
+		overflow-x: auto;
+		scrollbar-width: none;
+	}
+	.ss-sectabs::-webkit-scrollbar {
+		display: none;
+	}
+	.ss-topbar.has-tabs .ss-sectabs {
+		margin-right: auto;
+	}
+	.ss-sectab {
+		position: relative;
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
+		flex: none;
+		height: 34px;
+		padding: 0 12px;
+		border-radius: 9px;
+		font-size: 14px;
+		font-weight: 600;
+		color: var(--ss-muted);
+		white-space: nowrap;
+		transition: background 0.15s ease, color 0.15s ease;
+	}
+	.ss-sectab:hover {
+		color: var(--ss-text);
+		background: color-mix(in srgb, var(--ss-text) 6%, transparent);
+	}
+	.ss-sectab.is-active {
+		color: var(--ss-brand);
+		background: var(--ss-brand-soft);
+	}
+	.ss-sectab-badge {
+		min-width: 18px;
+		height: 18px;
+		padding: 0 5px;
+		border-radius: 99px;
+		font-size: 11px;
+		font-weight: 700;
+		line-height: 18px;
+		text-align: center;
+		color: #fff;
+		background: var(--ss-brand);
+	}
+	.ss-sectab-badge.is-danger {
+		background: var(--ss-danger);
+	}
+	/* Hero: ตัวอักษรขาวบนพื้นสีหมวด */
+	.ss-sectabs--hero {
+		padding: 3px;
+		border-radius: 12px;
+		background: rgba(255, 255, 255, 0.14);
+	}
+	.ss-sectabs--hero .ss-sectab {
+		color: rgba(255, 255, 255, 0.82);
+	}
+	.ss-sectabs--hero .ss-sectab:hover {
+		color: #fff;
+		background: rgba(255, 255, 255, 0.14);
+	}
+	.ss-sectabs--hero .ss-sectab.is-active {
+		color: var(--ss-brand);
+		background: #fff;
+	}
+	.ss-sectabs--hero .ss-sectab-badge {
+		background: rgba(255, 255, 255, 0.25);
+	}
+	.ss-sectabs--hero .ss-sectab.is-active .ss-sectab-badge {
+		color: #fff;
+		background: var(--ss-brand);
+	}
+	.ss-sectabs--hero .ss-sectab-badge.is-danger {
+		background: var(--ss-danger);
+	}
+}
+@media (min-width: 768px) and (max-width: 1099px) {
+	.ss-sectab:not(.is-active) .ss-sectab-label {
+		display: none;
+	}
+	.ss-sectab:not(.is-active) {
+		padding: 0 9px;
+	}
+}
+@media (min-width: 768px) and (hover: hover) and (pointer: fine) {
+	.ss-sectab {
+		height: 30px;
+		padding: 0 10px;
+		font-size: 13.5px;
+		border-radius: 8px;
+	}
+}
+
+/* ================================================================ ขนาดกระชับ (แท็บเล็ต/จอใหญ่)
+   วางท้ายไฟล์ให้ทับขนาดเดิมของแต่ละส่วน แถบบน/hero/ระยะขอบเตี้ยลงทุกจอ ≥768
+   ปุ่ม/การ์ดเล็กลงเฉพาะจอใช้เมาส์ (จอสัมผัสคงเป้าแตะใหญ่) */
+
+@media (min-width: 768px) {
+	.ss-topbar {
+		min-height: calc(56px + var(--ss-top));
+		padding: calc(8px + var(--ss-top)) 16px 8px 24px;
+	}
+	.ss-topbar:has(> .ss-icon-btn:first-child) {
+		padding-left: 12px;
+	}
+	.ss-topbar-main {
+		font-size: 19px;
+	}
+	.ss-content {
+		padding: 4px 24px 24px;
+	}
+	.ss-hero {
+		min-height: 68px;
+		margin: calc(12px + var(--ss-top)) 24px 0;
+		padding: 10px 12px 10px 20px;
+		border-radius: 18px;
+	}
+	.ss-hero-title {
+		font-size: 19px;
+	}
+	.ss-content--lift {
+		padding: 14px 24px 24px;
+	}
+	.ss-project-chip {
+		padding: 6px 10px 6px 6px;
+		border-radius: 13px;
+	}
+	.ss-project-chip-icon {
+		width: 30px;
+		height: 30px;
+		border-radius: 9px;
+	}
+	.ss-bottom-bar {
+		padding: 10px 24px calc(10px + var(--ss-bottom));
+	}
+	.ss-fab,
+	.ss-app.has-nav .ss-fab {
+		right: 24px;
+		bottom: calc(24px + var(--ss-bottom));
+	}
+}
+
+/* จอสัมผัส (แท็บเล็ต): เล็กลงแต่ยังแตะสะดวก (≥ 40px) */
+@media (min-width: 768px) {
+	.ss-btn {
+		min-height: 40px;
+		padding: 8px 16px;
+		border-radius: 12px;
+	}
+	.ss-btn--sm {
+		min-height: 34px;
+	}
+	.ss-btn--lg {
+		min-height: 46px;
+		font-size: 15px;
+	}
+	.ss-icon-btn {
+		width: 38px;
+		height: 38px;
+	}
+	.ss-fab {
+		height: 48px;
+		padding: 0 18px 0 14px;
+		border-radius: 16px;
+	}
+	.ss-search {
+		height: 42px;
+		border-radius: 13px;
+	}
+}
+
+/* จอใช้เมาส์: ขนาดใกล้ปุ่มของ Frappe (32px) ช่องกรอก/ตัวเลือก/เครื่องมือสูงเท่าปุ่ม */
+@media (min-width: 768px) and (hover: hover) and (pointer: fine) {
+	:root {
+		--ss-radius: 14px;
+		--ss-radius-sm: 10px;
+	}
+	.ss-btn {
+		min-height: 32px;
+		padding: 5px 12px;
+		gap: 6px;
+		border-radius: 8px;
+		font-size: 13.5px;
+	}
+	.ss-btn--sm {
+		min-height: 28px;
+		padding: 3px 10px;
+		font-size: 13px;
+		border-radius: 7px;
+	}
+	.ss-btn--lg {
+		min-height: 36px;
+		padding: 6px 16px;
+		font-size: 14px;
+		border-radius: 9px;
+	}
+	.ss-btn--primary {
+		box-shadow: 0 6px 14px -10px var(--ss-brand);
+	}
+	.ss-bottom-bar > .ss-btn--primary:last-child,
+	.ss-bottom-bar > .ss-grow {
+		min-width: 140px;
+	}
+	.ss-icon-btn {
+		width: 32px;
+		height: 32px;
+	}
+	.ss-fab {
+		height: 40px;
+		padding: 0 16px 0 12px;
+		border-radius: 12px;
+		font-size: 14px;
+	}
+	.ss-input,
+	.ss-picker-value,
+	.ss-select--field {
+		min-height: 36px;
+		border-radius: 9px;
+	}
+	.ss-input {
+		padding: 6px 10px;
+		font-size: 14.5px;
+	}
+	.ss-input--sm {
+		min-height: 32px;
+		padding: 4px 9px;
+		font-size: 14px;
+	}
+	.ss-stepper {
+		height: 36px;
+		border-radius: 9px;
+	}
+	.ss-stepper-btn {
+		width: 34px;
+	}
+	.ss-search {
+		height: 36px;
+		padding: 0 12px;
+		border-radius: 10px;
+	}
+	.ss-toolbar-search,
+	.ss-tool,
+	.ss-select--tool,
+	.ss-tool-picker .ss-picker-value,
+	.ss-list-create,
+	.ss-bulk-bar .ss-btn {
+		height: 32px;
+		min-height: 32px;
+		border-radius: 8px;
+	}
+	.ss-tool {
+		font-size: 13.5px;
+	}
+	.ss-toolbar-search input {
+		font-size: 14px;
+	}
+	.ss-choice {
+		padding: 5px 11px;
+		font-size: 13px;
+	}
+	.ss-action {
+		padding: 12px;
+	}
+	.ss-action-icon {
+		width: 36px;
+		height: 36px;
+		border-radius: 10px;
+	}
+	.ss-stat {
+		padding: 12px;
+	}
+	.ss-stat-icon {
+		width: 28px;
+		height: 28px;
+		border-radius: 8px;
+	}
+	.ss-stat-value {
+		font-size: 21px;
+	}
+	.ss-segmented {
+		padding: 3px;
+		border-radius: 10px;
+	}
+	.ss-segmented-thumb {
+		top: 3px;
+		bottom: 3px;
+		left: 3px;
+		width: calc((100% - 6px) / var(--count));
+		border-radius: 8px;
+	}
+	.ss-segmented button {
+		padding: 5px 6px;
+		font-size: 13.5px;
+	}
+	.ss-tab {
+		padding: 7px 10px 8px;
+		font-size: 13.5px;
+	}
 }
