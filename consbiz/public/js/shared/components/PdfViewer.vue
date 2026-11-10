@@ -29,7 +29,7 @@
 							type="button"
 							class="ss-icon-btn"
 							aria-label="ขยาย"
-							:disabled="zoom >= 3"
+							:disabled="zoom >= max_zoom"
 							@click="set_zoom(zoom + 0.5)"
 						>
 							<Icon name="plus" :size="18" :stroke="2.4" />
@@ -58,14 +58,22 @@
 					</button>
 				</header>
 
-				<div ref="scroller" class="ss-pdf-pages" @dblclick="set_zoom(zoom > 1 ? 1 : 2)">
+				<div
+					ref="scroller"
+					class="ss-pdf-pages"
+					@dblclick="set_zoom(zoom > 1 ? 1 : 2)"
+					@touchstart="pinch_start"
+					@touchmove="pinch_move"
+					@touchend="pinch_end"
+					@touchcancel="pinch_end"
+				>
 					<div v-if="loading" class="ss-pdf-note">
 						<span class="ss-spinner"></span> กำลังสร้าง PDF…
 					</div>
 					<div v-else-if="error" class="ss-pdf-note">
 						<Icon name="alert" :size="28" />
 						<span>{{ error }}</span>
-						<a class="ss-btn ss-btn--soft" :href="url" target="_blank" rel="noopener"
+						<a v-if="url" class="ss-btn ss-btn--soft" :href="url" target="_blank" rel="noopener"
 							>เปิดในเบราว์เซอร์</a
 						>
 					</div>
@@ -81,7 +89,16 @@ import { nextTick, onBeforeUnmount, ref, shallowRef, watch } from "vue";
 import Icon from "./Icon.vue";
 import { show_error, strip_html } from "../api.js";
 
-const props = defineProps({ open: Boolean, url: String, name: String, title: String });
+// fetch_file = สร้างไฟล์เอง คืน Response (ใช้แทน url), file_name = ชื่อไฟล์ตอนบันทึก/แชร์ (ไม่ใส่ = name)
+const props = defineProps({
+	open: Boolean,
+	url: String,
+	name: String,
+	title: String,
+	fetch_file: Function,
+	file_name: String,
+	max_zoom: { type: Number, default: 3 },
+});
 const emit = defineEmits(["close"]);
 
 // โหลด PDF.js เมื่อเปิดครั้งแรกเท่านั้น (ไม่รวมใน bundle ของแอป)
@@ -98,6 +115,11 @@ const file = shallowRef(null);
 const pdf = shallowRef(null);
 const can_share = typeof navigator !== "undefined" && !!navigator.canShare;
 let render_id = 0;
+let pinch = null;
+let pending_scroll = null;
+// จำกัดขนาด canvas (Safari บนมือถือวาดเกินนี้ไม่ได้) เอกสารหลายหน้าแบ่งงบกัน
+const MAX_PAGE_PIXELS = 16e6;
+const MAX_TOTAL_PIXELS = 96e6;
 let lib_promise = null;
 
 function pdfjs() {
@@ -128,11 +150,11 @@ async function load() {
 	try {
 		const [lib, response] = await Promise.all([
 			pdfjs(),
-			fetch(props.url, { credentials: "same-origin" }),
+			props.fetch_file ? props.fetch_file() : fetch(props.url, { credentials: "same-origin" }),
 		]);
 		if (!response.ok) throw new Error(`สร้าง PDF ไม่สำเร็จ${await server_reason(response)}`);
 		const blob = await response.blob();
-		file.value = new File([blob], `${props.name}.pdf`, { type: "application/pdf" });
+		file.value = new File([blob], `${props.file_name || props.name}.pdf`, { type: "application/pdf" });
 		pdf.value = await lib.getDocument({ data: new Uint8Array(await blob.arrayBuffer()) }).promise;
 		pages.value = pdf.value.numPages;
 		loading.value = false;
@@ -152,29 +174,76 @@ async function render() {
 	const box = holder.value;
 	if (!doc || !box) return;
 	const width = (scroller.value?.clientWidth || window.innerWidth) - 24;
-	const ratio = Math.min(window.devicePixelRatio || 1, 3);
+	const budget = Math.min(MAX_PAGE_PIXELS, MAX_TOTAL_PIXELS / doc.numPages);
+	const sheets = [];
+	// จองขนาดทุกหน้าก่อนวาด ความสูงรวมถูกต้องทันที เลื่อนไปจุดที่ซูมได้
 	for (let n = 1; n <= doc.numPages; n++) {
 		const page = await doc.getPage(n);
 		if (id !== render_id) return;
 		const base = page.getViewport({ scale: 1 });
-		const scale = (Math.min(width, 900) / base.width) * zoom.value;
-		const viewport = page.getViewport({ scale: scale * ratio });
+		const css = (Math.min(width, 900) / base.width) * zoom.value;
+		const area = base.width * base.height * css * css;
+		const ratio = Math.min(window.devicePixelRatio || 1, 3, Math.sqrt(budget / area));
+		const viewport = page.getViewport({ scale: css * ratio });
 		const canvas = document.createElement("canvas");
 		canvas.className = "ss-pdf-page";
 		canvas.width = Math.floor(viewport.width);
 		canvas.height = Math.floor(viewport.height);
 		canvas.style.width = `${Math.floor(viewport.width / ratio)}px`;
 		canvas.style.height = `${Math.floor(viewport.height / ratio)}px`;
-		await page.render({ canvasContext: canvas.getContext("2d"), viewport }).promise;
+		sheets.push({ page, viewport, canvas });
+	}
+	box.replaceChildren(...sheets.map((sheet) => sheet.canvas));
+	if (pending_scroll) {
+		scroller.value.scrollTo(pending_scroll);
+		pending_scroll = null;
+	}
+	for (const { page, viewport, canvas } of sheets) {
+		try {
+			await page.render({ canvasContext: canvas.getContext("2d"), viewport }).promise;
+		} catch (err) {
+			// ปิดหน้าต่างหรือซูมต่อระหว่างวาด
+			if (err?.name === "RenderingCancelledException" || id !== render_id) return;
+			throw err;
+		}
 		if (id !== render_id) return;
-		// หน้าแรกขึ้นทันที ไม่ต้องรอทุกหน้า
-		if (n === 1) box.replaceChildren(canvas);
-		else box.appendChild(canvas);
 	}
 }
 
 function set_zoom(value) {
-	zoom.value = Math.max(1, Math.min(3, value));
+	zoom.value = Math.max(1, Math.min(props.max_zoom, value));
+}
+
+// ซูมสองนิ้ว: ระหว่างนิ้วขยับใช้ transform (ลื่น) ปล่อยนิ้วแล้ววาดใหม่ให้คมตามจุดที่ซูม
+const finger_gap = ([a, b]) => Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+function pinch_start(event) {
+	if (event.touches.length !== 2) return;
+	const [a, b] = event.touches;
+	const x = (a.clientX + b.clientX) / 2;
+	const y = (a.clientY + b.clientY) / 2;
+	const box = holder.value.getBoundingClientRect();
+	pinch = { gap: finger_gap(event.touches), x, y, ox: x - box.left, oy: y - box.top, k: 1 };
+	holder.value.style.transformOrigin = `${pinch.ox}px ${pinch.oy}px`;
+}
+function pinch_move(event) {
+	if (!pinch || event.touches.length !== 2) return;
+	event.preventDefault();
+	pinch.k = Math.min(props.max_zoom / zoom.value, Math.max(1 / zoom.value, finger_gap(event.touches) / pinch.gap));
+	holder.value.style.transform = `scale(${pinch.k})`;
+}
+function pinch_end() {
+	if (!pinch) return;
+	const { k, x, y, ox, oy } = pinch;
+	pinch = null;
+	holder.value.style.transform = "";
+	if (Math.abs(k - 1) < 0.02) return;
+	const view = scroller.value.getBoundingClientRect();
+	const box = holder.value.getBoundingClientRect();
+	pending_scroll = {
+		left: scroller.value.scrollLeft + box.left - view.left + ox * k - (x - view.left),
+		top: scroller.value.scrollTop + box.top - view.top + oy * k - (y - view.top),
+	};
+	set_zoom(zoom.value * k);
 }
 
 function save_file(f) {

@@ -171,7 +171,6 @@ a {
 .ss-app {
 	min-height: 100vh;
 	min-height: 100dvh;
-	max-width: 640px;
 	margin: 0 auto;
 	position: relative;
 }
@@ -1172,7 +1171,6 @@ button.ss-card:active {
 	bottom: calc(10px + var(--ss-bottom));
 	transform: translateX(-50%);
 	width: calc(100% - 20px);
-	max-width: 620px;
 	height: var(--ss-nav-h);
 	display: grid;
 	grid-template-columns: repeat(5, 1fr);
@@ -1280,7 +1278,6 @@ button.ss-card:active {
 	bottom: 0;
 	transform: translateX(-50%);
 	width: 100%;
-	max-width: 640px;
 	display: flex;
 	align-items: center;
 	gap: 10px;
@@ -1999,7 +1996,6 @@ button.ss-card:active {
 	bottom: 0;
 	transform: translateX(-50%);
 	width: 100%;
-	max-width: 640px;
 	max-height: calc(92vh - var(--ss-top));
 	display: flex;
 	flex-direction: column;
@@ -7304,6 +7300,7 @@ a.ss-btn--soft {
 }
 .ss-pdf-pages {
 	flex: 1;
+	touch-action: pan-x pan-y;
 	overflow: auto;
 	overscroll-behavior: contain;
 	-webkit-overflow-scrolling: touch;

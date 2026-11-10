@@ -141,11 +141,15 @@
 			</div>
 			<div class="pl-print-foot">
 				<span>{{ result.error ? "–" : `${rows.length} แถว · ${result.pages} หน้า · ${options.paper}` }}</span>
+				<button type="button" class="ss-btn ss-btn--soft" :disabled="!!result.error" @click="pdf_open = true">
+					<Icon name="file" :size="16" /> <span>ดู PDF</span>
+				</button>
 				<button type="button" class="ss-btn ss-btn--primary" :disabled="!!result.error || printing" @click="print">
 					<Icon name="printer" :size="16" /> <span>พิมพ์</span>
 				</button>
 			</div>
 		</aside>
+		<PdfViewer :open="pdf_open" :fetch_file="fetch_pdf" :name="file_name" :file_name="file_name" title="แผนงาน" :max_zoom="8" @close="pdf_open = false" />
 	</div>
 </template>
 
@@ -153,12 +157,13 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 import Empty from "../../../../shared/components/Empty.vue";
 import Icon from "../../../../shared/components/Icon.vue";
+import PdfViewer from "../../../../shared/components/PdfViewer.vue";
 import Segmented from "../../../../shared/components/Segmented.vue";
 import SelectBox from "../../../../shared/components/SelectBox.vue";
 import StatusTabs from "../../../../shared/components/StatusTabs.vue";
 import { build_print } from "../../../../construction_management/print.js";
 import { COLUMNS, CURVE_ITEMS, SUMMARY_ROWS, default_curves, default_summary } from "./planner.js";
-import { MIN_COLUMN_WIDTH, PRINT_SCALES, build_print_model, fit_column_widths } from "./print_model.js";
+import { MIN_COLUMN_WIDTH, PRINT_SCALES, build_print_model, fit_column_widths, print_file_name } from "./print_model.js";
 
 const props = defineProps({
 	p: { type: Object, required: true },
@@ -487,6 +492,30 @@ watch(
 	}
 );
 
+const pdf_open = ref(false);
+const file_name = computed(() => print_file_name(props.p));
+// สร้าง PDF จากเอกสารเดียวกับ Preview ส่งเป็น JSON เพราะ HTML ใหญ่เกินขีดจำกัดของฟอร์ม
+function fetch_pdf() {
+	const [short, long] = result.value.size;
+	const landscape = options.orientation === "landscape";
+	return fetch("/api/method/consbiz.consbiz.doctype.construction_management.print_pdf.get_plan_pdf", {
+		method: "POST",
+		credentials: "same-origin",
+		headers: {
+			"Content-Type": "application/json",
+			Accept: "application/json",
+			"X-Frappe-CSRF-Token": window.frappe?.csrf_token || "",
+		},
+		body: JSON.stringify({
+			name: props.p.name,
+			html: result.value.html,
+			paper_w: landscape ? long : short,
+			paper_h: landscape ? short : long,
+			margin: options.margin,
+		}),
+	});
+}
+
 function print() {
 	const win = frame.value?.contentWindow;
 	if (!win || result.value.error) return;
@@ -498,8 +527,12 @@ function print() {
 		.load('10px "Noto Sans Thai"', "ก")
 		.finally(() => {
 			printing.value = false;
+			// เบราว์เซอร์ตั้งชื่อไฟล์ "บันทึกเป็น PDF" จากชื่อหน้า
+			const page_title = document.title;
+			document.title = file_name.value;
 			win.focus();
 			win.print();
+			setTimeout(() => (document.title = page_title), 3000);
 		});
 }
 
