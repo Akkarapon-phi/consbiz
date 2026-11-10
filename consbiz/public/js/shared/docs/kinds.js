@@ -86,6 +86,43 @@ const DOC_APP = "office";
 // ชุดเอกสาร → หมวดของแอปที่ดูแล (URL)
 const DOC_APP_SECTION = { buy: "purchase", sell: "sales" };
 
+// สิทธิ์ของผู้ใช้ต่อชนิดเอกสาร (site_docs.doc_permissions) ptype = read / create / submit / export
+export const can_doc = (kind, ptype = "read") => !!boot.docs?.[kind]?.[ptype];
+
+// ขอซื้อจากแผนวัสดุ (หมวดทรัพยากร): ส่งแถวที่ติ๊กไปฟอร์ม ใบขอซื้อยังไม่ถูกบันทึกจนกว่าผู้ใช้จะกดเอง
+// เก็บใน sessionStorage เพราะรายการยาวเกิน URL และให้กดโหลดหน้าฟอร์มใหม่ได้
+export const PLAN_SOURCE = "plan";
+const PLAN_KEY = "consbiz.site.plan_request";
+let plan_stash = null;
+
+export function open_plan_request(project, rows) {
+	plan_stash = { project, rows };
+	try {
+		sessionStorage.setItem(PLAN_KEY, JSON.stringify(plan_stash));
+	} catch {
+		/* เข้าถึงไม่ได้: ใช้ค่าในหน่วยความจำ */
+	}
+	go("buy-form", { kind: "mr", name: "new", source: PLAN_SOURCE });
+}
+
+export function plan_request() {
+	if (plan_stash) return plan_stash;
+	try {
+		return JSON.parse(sessionStorage.getItem(PLAN_KEY) || "null");
+	} catch {
+		return null;
+	}
+}
+
+export function clear_plan_request() {
+	plan_stash = null;
+	try {
+		sessionStorage.removeItem(PLAN_KEY);
+	} catch {
+		/* เข้าถึงไม่ได้ */
+	}
+}
+
 // แอปนี้เปิด/สร้างเอกสารชนิดนี้เองได้ไหม
 export const in_app = (kind) => app.doc_kinds.includes(kind);
 

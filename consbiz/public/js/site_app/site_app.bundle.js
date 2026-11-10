@@ -1,6 +1,6 @@
 // แอปหน้างาน (/site) โหลดจาก consbiz/www/site.html แบ่งหมวดงาน (sections.js) สลับในแอป
 // โครงแอป/ตัวช่วย/component กลางอยู่ public/js/shared/ (ใช้ร่วมกับแอปอื่น) ที่นี่ตั้งค่าเฉพาะของ /site
-// สโตร์ (views/store, API consbiz/store_app.py) / ควบคุมงาน + บริหารโครงการ (views/work, views/pm, API consbiz/site_app.py)
+// สโตร์ (views/store, API consbiz/store_app.py) / ควบคุมงาน + แผนงาน (รวมการเงิน) + ทรัพยากร (views/work, views/pm, views/resources, views/finance, API consbiz/site_app.py)
 // ขอซื้อ (shared/docs เฉพาะใบขอซื้อ, API consbiz/site_docs.py) สั่งซื้อ/แจ้งหนี้/ขายอยู่แอปออฟฟิศ (/office)
 import { createApp } from "vue";
 import { configure } from "../shared/app.js";

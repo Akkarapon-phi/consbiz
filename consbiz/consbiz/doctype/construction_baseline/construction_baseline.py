@@ -17,4 +17,4 @@ class ConstructionBaseline(Document):
 			frappe.db.get_value("Construction Management", self.construction_management, "active_baseline")
 			== self.name
 		):
-			frappe.throw(_("Baseline {0} ใช้เทียบกับความคืบหน้าจริงอยู่ ให้เลือกชุดอื่นเป็นตัวเทียบก่อนลบ").format(self.title))
+			frappe.throw(_("แผนสัญญา {0} ใช้เทียบกับความคืบหน้าจริงอยู่ ให้เลือกชุดอื่นเป็นตัวเทียบก่อนลบ").format(self.title))

@@ -95,12 +95,14 @@
    "fieldname": "rate",
    "fieldtype": "Currency",
    "label": "Rate",
+   "permlevel": 1,
    "read_only": 1
   },
   {
    "fieldname": "amount",
    "fieldtype": "Currency",
    "label": "Amount",
+   "permlevel": 1,
    "read_only": 1
   },
   {
@@ -216,6 +218,7 @@
    "fieldname": "contract_amount",
    "fieldtype": "Currency",
    "label": "Contract Amount",
+   "permlevel": 1,
    "read_only": 1
   },
   {
@@ -256,6 +259,7 @@
    "fieldname": "counted_amount",
    "fieldtype": "Currency",
    "label": "Counted Amount",
+   "permlevel": 1,
    "read_only": 1
   },
   {
@@ -277,7 +281,7 @@
  "grid_page_length": 50,
  "istable": 1,
  "links": [],
- "modified": "2026-10-27 16:00:00.000000",
+ "modified": "2026-11-09 18:00:00.000000",
  "modified_by": "Administrator",
  "module": "ConsBiz",
  "name": "Construction Management Task",

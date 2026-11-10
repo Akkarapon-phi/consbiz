@@ -104,6 +104,7 @@ pre-commit run --all-files                               # ruff + prettier (ต�
   1 วันสร้าง DR / DRQ ได้หลายฉบับ (แบ่งกันลงหลายคน) ฟอร์มแจ้งว่าวันนั้นมีฉบับไหนแล้ว (`consbiz.show_same_day` ใน `utils.js`)
   การคำนวณ %แผน/S-Curve ใน `public/js/construction_management/schedule.js` ต้องตรงกับฝั่ง Python เสมอ
   งานก่อนหน้า (`predecessors` FS/SS/FF/SF + lag) เป็นแบบ ASAP: `apply_dependencies` มีทั้ง Python และ `schedule.js` ต้องตรงกัน
+  ผู้ใช้เห็นคำว่า "แผนสัญญา" แทน Baseline ทุกที่ (ข้อความในโค้ด + `th.csv`) ชื่อ DocType/field/ค่า `plan_basis` ยังเป็น Baseline
   Baseline เก็บได้หลายชุดใน `Construction Baseline` (สำเนาวันที่/% แผน/น้ำหนักของทุกแถว) เลือกดูในหน้า Gantt ได้ทีละชุด
   ชุดที่ใช้เทียบในรายงาน (`active_baseline`) ถูกคัดลอกลงช่อง `baseline_*` ของแถวงาน และลบไม่ได้
   Daily Report/Request เทียบ % จริงกับ Baseline (ไม่มี Baseline ใช้แผนปัจจุบัน: `target_progress`) แล้วเก็บค่าไว้ในเอกสาร
@@ -128,6 +129,7 @@ pre-commit run --all-files                               # ruff + prettier (ต�
   งบอยู่ในตาราง `cost_budgets` ของ CM (permlevel 1) ปุ่ม "เติมงบวัสดุจากแผน" = แผนวัสดุ x ราคาซื้อล่าสุด
   Gantt ในฟอร์มเป็นโหมด `embedded` = ดูอย่างเดียว (แถบบาง `ViewBar.vue`) ใช้ page จำลองที่ไม่ทำอะไร (`embedded_page.js`) ห้ามแตะ Header ของฟอร์ม
   แก้แผนที่หน้าเต็มจอ `/app/construction-gantt/<CM>` ที่เดียว (ปุ่ม "แก้ไขแผนงาน" ใน `ViewBar`, แถบเครื่องมือ `Toolbar.vue`)
+  แอป ConsERP มีหน้าแก้แผนของตัวเอง (`PlanEdit.vue` ในหัวข้อแอปหน้างาน) ใช้ `schedule.js` และ API ชุดเดียวกัน แก้ logic ที่ `schedule.js` มีผลทั้งสองหน้า
   Tab โหลดใหม่เมื่อแผนเปลี่ยน (`activate` → `check_remote`) แผนเปลี่ยนแล้วฟอร์ม `reload_doc` เปิด Tab แล้วซ่อนแผงข้าง (`.consbiz-wide-form`)
   เมนู/แผงในแถบเครื่องมือใช้ `frappe.ui.Dropdown` / `frappe.ui.Popover` (ผ่าน `EsDropdown.vue` / `EsPopover.vue`) ห้ามใช้ dropdown ของ Bootstrap
   `budget_cost` ของ CM เป็น permlevel 1 (เฉพาะ Projects Manager) รายงาน EVM จึงให้สิทธิ์เฉพาะ Projects Manager
@@ -168,7 +170,7 @@ pre-commit run --all-files                               # ruff + prettier (ต�
 - แผนหน้าแอป (ตกลง 2026-11-06): แยกตามกลุ่มคนใช้/อุปกรณ์ บนแอป Frappe `consbiz` ตัวเดียว เป็นหน้าจอครอบ DocType ของ ERPNext/HRMS ไม่เขียนระบบใหม่
   | URL | คนใช้ | เนื้อหา |
   |---|---|---|
-  | `/conserp` | หน้างาน (มือถือ) | ควบคุมงาน, สโตร์, บริหารโครงการ, ขอซื้อ/ขอเบิก + ติดตามสถานะ |
+  | `/conserp` | หน้างาน (มือถือ) | ควบคุมงาน, สโตร์, แผนงาน, ทรัพยากร, การเงิน, ขอซื้อ/ขอเบิก + ติดตามสถานะ |
   | `/conserp/purchase`, `/conserp/sales`, ... | ออฟฟิศ (จอใหญ่) | ซื้อ, ขาย, บัญชี, ประกันผลงาน, แอดมิน (หนังสือเข้า-ออก, สัญญา ผรม., ใบนำส่ง, ใบปะหน้า, ค่าแรงรายวัน) |
   | `/hr-app` | พนักงานทุกคน | ลงเวลา, ลา, เบิกล่วงหน้า, สลิป (หน้าจอครอบ HRMS) ชื่อไอคอน "ConsHR" |
   | `/contractor` | ผู้รับเหมาช่วง (คนนอก) | อัปเดตผลงาน, ดูสัญญา/งวดของตัวเอง API แยกและตรวจสิทธิ์ทุกคำขอ |
@@ -187,11 +189,18 @@ pre-commit run --all-files                               # ruff + prettier (ต�
   ทุกหน้า www ของแอปลิงก์ manifest นี้ ไอคอน = `public/images/logo.png` (สร้าง `conserp-round-*.png` (ขอบมน) + `conserp-maskable.png` (เต็มกรอบ ให้ Android ตัดเอง), `logo-96.png` เปลี่ยนรูปต้องเปลี่ยนชื่อไฟล์ เพราะ Chrome จำไอคอนตาม URL ใน `public/site_app/`) ข้างในยังแยก bundle ต่อแอป
   หน้าแรก (Desktop) = หมวดพิเศษ `desktop` ที่ `configure()` ใส่ให้ทุกแอป (`shared/components/Desktop.vue`, ไม่ต้องเลือกโครงการ)
   ชื่อ/ไอคอน/สีของหมวดทุกแอปอยู่ `shared/modules.js` (`MODULE_META`) ที่เดียว sections.js ดึงไปใช้
-  หมวดที่มีสิทธิ์ของทุกแอป = `site_app.app_modules` → `boot.modules` (มี `purchase` แล้วไม่แสดงขอซื้อ `buy` ของหน้างาน) หมวดของแอปอื่น = ลิงก์ (โหลด bundle นั้น)
+  หมวดที่มีสิทธิ์ของทุกแอป = `site_app.app_modules` → `boot.modules` (แสดงทั้งขอซื้อ `buy` ของหน้างานและจัดซื้อ `purchase` ของออฟฟิศ) หมวดของแอปอื่น = ลิงก์ (โหลด bundle นั้น)
+  สิทธิ์ของหน้าจอ: เมนู = `tab.when(boot)` (สิทธิ์อ่าน `boot.can.view_*` / `boot.docs.<kind>.read`, เปิดจาก URL ตรงก็กลับหน้าหลักหมวด), ปุ่มสร้าง/ส่ง/ส่งออก = `boot.can.*` / `can_doc(kind, ptype)` (`site_docs.doc_permissions`), ปุ่มรายใบ = `can_*` จาก server ไม่มีสิทธิ์ = ไม่แสดง (ไม่ใช่ disabled) API ตรวจซ้ำเสมอ เมนู/ปุ่มใหม่ต้องผูกสิทธิ์ด้วย
+  หน้าตั้งค่า (เมนู avatar เฉพาะ System Manager, `boot.can.settings`): `shared/components/SettingsDialog.vue` เพิ่มหัวข้อที่ `PAGES` สิทธิ์ (เลือกหมวดแล้วเพิ่ม Role) = `settings/PermissionSettings.vue` + `consbiz/app_settings.py` (ครอบ Custom DocPerm ของ Frappe เอกสารของหมวดอยู่ใน `MODULES` เพิ่มหมวด/เอกสารใหม่ต้องเพิ่มที่นั่น)
+  ลบเอกสารในแอป: `shared/components/DeleteSheet.vue` + `store_app.can_delete` / `delete_document` (ร่างหรือยกเลิกแล้ว + สิทธิ์ลบ) เอกสารใหม่ที่มีหน้าดูต้องส่ง `can_delete`
   build ของ Frappe ไม่แบ่งโหลด (code splitting) จึงแยกเป็น bundle ต่อกลุ่มแอป ไม่ใช่ต่อหมวด และไม่รวมเป็น bundle เดียว (ตกลง 2026-11-08:
   แอปจะเพิ่มอีกมาก bundle เดียวโตเรื่อยๆ มือถือเปิดช้า) สลับหมวดในกลุ่มลื่น ข้ามกลุ่มโหลดหน้าใหม่ (ผ่านหน้าแรกเท่านั้น)
 - แอปหน้างาน `/conserp` (มือถือ, ติดตั้งลงหน้าจอได้) = หน้า www (`consbiz/www/site.html`) + Vue (`public/js/site_app/`) แอปเดียวแบ่งหมวดงาน
   หมวดขอซื้อของหน้างาน = ใบขอซื้ออย่างเดียว (`doc_kinds: ["mr"]`) สั่งซื้อ/แจ้งหนี้/ขาย อยู่แอปออฟฟิศ
+- BOQ (หมวด `boq` ของแอปออฟฟิศ `/conserp/boq`, `office_app/views/boq/`, API `consbiz/boq_app.py`): สร้าง/แก้ร่าง นำเข้า-ส่งออก Excel Submit สร้างแผนงาน ใช้แทนฟอร์มระบบเต็ม เฉพาะ Projects Manager / System Manager
+  สร้างแผนงานได้ตั้งแต่ BOQ เป็นร่าง แก้ร่างแล้วกด "อัปเดตแผนงาน" (`construction_management/boq_sync.py`, แสดงสรุปก่อน): แถวเดิมคงวันที่/งานก่อนหน้า ชื่อ/ปริมาณ/ราคา/ลำดับ/WBS ตาม BOQ จับคู่ด้วย `boq_detail` แล้วชื่องาน + หน่วย งานเหมาคงมูลค่าในแผน แถวที่ถูกใช้ห้ามลบ/เปลี่ยนเลข/เป็นหัวกลุ่ม ใช้ได้เมื่อยังไม่มี Baseline/VO `boq_app.fill` ต้องคงรหัสแถว BOQ (แผนอ้างด้วยรหัสนี้)
+  Baseline ต้องการ BOQ ที่ Submit แล้ว Submit BOQ ต้องให้แผนตรงกันก่อน (`BOQ.before_submit`) หลัง Submit งานเพิ่ม-ลดเป็นหน้าที่ของ VO BOQ ที่มีแผนแล้วยกเลิกไม่ได้ (`BOQ.before_cancel`) ยอด/เลข WBS ใน `BoqForm.vue` ต้องตรงกับ `calculate_row` / `assign_wbs` ใน `boq.py`
+- มูลค่าในแผนงาน: ช่องเงินของ CM และ Task เป็น permlevel 1 ผู้ไม่มีสิทธิ์ `get_schedule_data` ส่งมูลค่าเป็นสัดส่วนของสัญญา (`hide_values`, รวม = 100 ให้ % และ S-Curve คำนวณได้) `get_dashboard` ตัดจำนวนเงิน (`hide_money`) หน้าจอซ่อนด้วย `can_view_value` / `show_values`
 - แอปออฟฟิศ (`/conserp/purchase`, `/conserp/sales`, จอใหญ่) = `consbiz/www/office.html` + `public/js/office_app/` (sections/views/bundle) หมวดจัดซื้อ/ขายเต็ม (`doc_kinds` ทั้ง 6 ชนิด)
   boot = `site_app.office_boot_data` หมวดตามสิทธิ์ `site_app.office_sections` / ของหน้างาน `site_app.site_sections`
   `site_app.APPS` + `available_apps` → `boot.apps` (ใช้หาแอปที่ดูแลเอกสาร `doc_url`)
@@ -201,7 +210,7 @@ pre-commit run --all-files                               # ruff + prettier (ต�
   ออฟฟิศไม่บังคับเลือกโครงการ (`app.project_filter`): โครงการเป็นตัวกรอง (`ProjectFilter.vue`, ว่าง = ทุกโครงการ) + ตัวเลือกบริษัทที่หัว sidebar (`state.company`, `boot.companies`)
   รายการ/ตัวเลขใช้ `scope_args()` (api.js) → `get_docs`/`get_summary` รับ `company` ฟอร์มเลือกบริษัท (เอกสารใหม่) และโครงการเองได้ (`site_docs.set_project` ต้องเป็นบริษัทเดียวกัน ย้ายคลังของรายการตาม)
   คีย์ลัด (`shared/shortcuts.js`, `app.shortcuts`): รายการ `/` ค้นหา `n` สร้าง `j`/`k` เลื่อนแถว, หน้าดู `e` แก้ไข `p` PDF `i` แผงข้อมูล
-  หมวด (`site_app/sections.js`, หน้า → component ใน `site_app/views.js`): สโตร์ (`views/store/`, API `consbiz/store_app.py`) / ควบคุมงาน (`views/work/`, รวมคอนกรีต) / บริหารโครงการ (`views/pm/`) API 2 หมวดนี้อยู่ `consbiz/site_app.py`
+  หมวด (`site_app/sections.js`, หน้า → component ใน `site_app/views.js`): สโตร์ (`views/store/`, API `consbiz/store_app.py`) / ควบคุมงาน (`views/work/`, รวมคอนกรีต) / แผนงาน (`views/pm/`) / ทรัพยากร (`views/resources/`) API 2 หมวดนี้ + เมนูการเงินของแผนงาน (`views/finance/`)อยู่ `consbiz/site_app.py`
   จัดซื้อ (MR ประเภท Purchase → PO → PI) / ขาย (Quotation → SO → SI): `shared/docs/` ชุดเดียวกันทั้ง 6 ชนิด (`DOC_KINDS` ใน `shared/docs/kinds.js` ตรงกับ `DOCS` ใน `consbiz/site_docs.py`)
   ดูรายการ/รายละเอียด/เอกสารต้นทาง-ปลายทาง, ส่งเอกสารร่าง, PDF ขอบเขต โครงการนี้/ทุกโครงการ (`state.doc_scope`)
   สร้าง/แก้ไขร่างในแอป (`DocForm.vue`, หน้า `buy-form` / `sell-form`): ช่องที่กรอกได้อยู่ใน `FORM` ของ site_docs.py (รวมส่วนลดท้ายบิล %)
@@ -226,29 +235,39 @@ pre-commit run --all-files                               # ruff + prettier (ต�
   เอกสารถัดไป (`MAPPERS`: MR→PO, PO→PI, QTN→SO, SO→SI) ใช้ mapper ของ ERPNext ตอนบันทึกเรียก mapper ใหม่แล้วจับคู่แถวด้วย `key` (แถวบันทึกแล้ว = name, แถวจาก mapper = ลำดับ)
   ยอด/ภาษีคำนวณที่ server (`preview_doc`) แล้ว rollback เสมอ (ERPNext สร้าง Item Price อัตโนมัติระหว่างเติมค่า) PI มีเลขที่ใบกำกับภาษี (erpnext_thailand บังคับเมื่อมีภาษีซื้อ)
   ทางเข้าจากระบบเต็ม: Desktop Icon "ConsERP" (`consbiz/desktop_icon/conserp.json`, External → /conserp/desktop) และ "ConsOffice" (`consoffice.json` → /conserp/purchase, patch `add_consoffice_to_desktop_layouts`) ผู้ใช้ที่มี Desktop Layout ของตัวเองเห็นไอคอนใหม่เฉพาะที่อยู่ใน layout (patch `add_conserp_to_desktop_layouts`)
-  บริหารโครงการ (สิทธิ์อ่าน CM) ดูอย่างเดียว: ภาพรวม (`dashboard.get_dashboard`), แผนงาน Gantt (`get_plan`), Look-ahead (`lookahead.get_lookahead` สถานะวันตรงกับ `LookAhead.vue`),
-  ทรัพยากร + แผนจัดซื้อวัสดุ (`resources.get_overview`), เอกสาร (`get_documents`) แก้แผนที่หน้า Gantt ในระบบเต็ม
+  แผนงาน (หมวด `pm`, สิทธิ์อ่าน CM): ภาพรวม (`dashboard.get_dashboard`), แผนงาน (`Plan.vue` = `PlanEdit.vue` แบบ `readonly` ใช้ตาราง Gantt ชุดเดียวกับหน้าแก้แผน), Look-ahead (`lookahead.get_lookahead` สถานะวันตรงกับ `LookAhead.vue`), เอกสาร (`PmDocs.vue` 1 ชนิดเอกสาร = 1 tab: VO / EOT / ขอตรวจงาน / Punch List / รายงานประจำวัน / ขออนุมัติ / Baseline / แผนและรายงาน, จำนวน `get_documents` รายการ `site_app.get_pm_document_rows` เพิ่มชนิดใหม่ที่ `DOCUMENT_LISTS` และ `TABS`, ขอตรวจงาน/Punch List มีที่หมวดควบคุมงานด้วย ใช้ข้อมูลชุดเดียวกัน) สร้าง/แก้/ดู VO, EOT, ขอตรวจงาน, Punch List ในแอป: `views/project_docs/` (`PROJECT_KINDS` ใน `kinds.js` ตรงกับ `KINDS` ใน `consbiz/project_docs.py`) VO/EOT อยู่หมวด `pm` (`pm-doc`, `pm-doc-form`) ขอตรวจงาน/Punch List อยู่หมวด `work` (`site-doc`, `site-form`) ยกเลิก/amend ใช้ระบบเต็ม VO แก้ในแอปเฉพาะผู้ที่เห็นงบต้นทุน
+  ทรัพยากร (หมวด `resources`, `views/resources/Resources.vue` ทุกคนที่เข้าหมวดหน้างานได้): ต้องสั่ง / ยอดวัสดุ / คน-เครื่อง / Gantt / รายเดือน แต่ละเมนูเป็น view ของหน้าเดียว ใช้ planner ร่วมกัน (`resource_board.js`)
+  ส่วนแสดงผล `pm/planner/ResourcePane.vue`, `MaterialOrders.vue`, `MaterialSupply.vue`, `ResourcePeople.vue`, `ResourceBoard.vue`, `ResourceMonthly.vue`, `resource_rows.js` (มุมมองของหน้าแผนงานใช้ชุดเดียวกัน แกนเวลา `planner/time_axis.js`) API `site_app.get_resource_board` ไม่ส่งมูลค่า/น้ำหนัก ติ๊กขอซื้อ = สิทธิ์สร้าง Material Request เปิดฟอร์มใบขอซื้อใหม่ (`buy-form` source `plan`, `site_docs.plan_request`) ยังไม่บันทึกจนกว่าผู้ใช้จะกดเอง ซื้อเอง/ผู้ว่าจ้างจัดหาปนกัน = ทำทีละใบ
+  การเงิน (เมนูในหมวด `pm` เห็นตาม `boot.can.finance` ผ่าน `when` ของเมนูใน sections.js, `views/finance/Finance.vue`): tab Cash Flow / ต้นทุน / Earned Value (`/conserp/pm/finance/<tab>`, URL เดิม `/conserp/finance` เด้งมา) ข้อมูล `finance.get_finance` ผ่าน `site_app.get_project_finance` เห็นเฉพาะผู้ที่เห็นงบต้นทุน (`site_app.can_view_finance` = permlevel 1 ของ CM)
+  แก้แผนงาน (สิทธิ์เขียน CM): หน้าเต็มจอ `plan-edit` (`views/pm/PlanEdit.vue`, ไม่ใช้ desk) แถบเครื่องมือ 2 แถว (แท็บ "แผนงาน"/"มุมมอง" / ไอคอน: จอเมาส์ไอคอนล้วน + tooltip, จอสัมผัสมีชื่อ) เมนูคอลัมน์ = ซ้ายสุดของแท็บ "มุมมอง" ช่องติ๊กเปิด-ปิด + ลากย้ายลำดับ (`settings.column_order`, wbs/ชื่องานอยู่ต้นตารางเสมอ) + ตาราง + Gantt + แผงงาน + แถบสถานะ
+  state/การแก้/Undo/บันทึกอัตโนมัติ = `views/pm/planner/planner.js` (คำนวณด้วย `construction_management/schedule.js`, API `get_schedule_data` / `save_tasks` เหมือนหน้า Gantt ระบบเต็ม)
+  ตาราง + Gantt = `planner/PlanSheet.vue` (กล่องเลื่อนเดียว ตารางติดซ้าย, ลากแถบด้วยเมาส์ จอสัมผัสแตะ = แก้ในแผง, สัปดาห์แบ่งในเดือน/รายเดือนช่องกว้างเท่ากัน: คิดตำแหน่งผ่าน `x()` / `axis.day_at()` ห้ามคูณ `ppd` ตรง, tooltip = `planner/PlanTooltip.vue` เขียน `title` ตามปกติ) รายละเอียดงาน = `planner/PlanInspector.vue`
+  แก้ได้: วันเริ่ม/จบ/จำนวนวัน, งานก่อนหน้า, % แผนรายช่วง (แท็บ "% แผน" `planner/PlanDistribution.vue` ตรงกับ `plan_dialog.js` ของระบบเต็ม), คน/เครื่องจักร + วัสดุ (แท็บ "ทรัพยากร" `planner/PlanResources.vue` ตรงกับ `TaskPanel.vue`, บันทึกพร้อม `save_tasks`), % จริง ณ วัน Cut-off, คลิกขวาที่แถว = เมนู (`planner/PlanMenu.vue` รายการอยู่ใน `open_menu` ของ PlanEdit) พิมพ์ = แท็บ "พิมพ์" (`planner/PlanPrint.vue`: Preview ซ้าย + Properties ขวา, สั่งพิมพ์จาก iframe ของ Preview จึงตรงกัน, แบบเอกสาร = `THEMES` ใน print.js (ตามหน้าจอ/ทางการ/แถบข้าง desk ใช้แบบเดิม), ตัวเทียบหลักของหัวกระดาษ/ตารางสรุป/S-Curve = Baseline, ย่อ-หุบ WBS ของงานพิมพ์แยกจากตาราง ค่าจำในเครื่องแยกตามแผน `consbiz.planner.print.<CM>`, ข้อมูล `planner/print_model.js` ตัวสร้าง `build_print` ใน `construction_management/print.js` ชุดเดียวกับระบบเต็ม, `print_env.js` แทนฟังก์ชันของ desk) ส่วน Excel/บันทึก Baseline/แผนทรัพยากร ยังเปิดหน้า Gantt ของระบบเต็ม (แท็บใหม่)
+  แก้โครงสร้างงาน (แท็บ "แผนงาน" เพิ่มงาน/งานย่อย/Indent/Outdent/ลบ, Shift เลือกหลายงาน) = `construction_management/structure.py` บันทึกทันที Undo ไม่ได้ งานเพิ่มในแผน (`boq_detail` ว่าง) มูลค่า 0 งาน BOQ เป็นหัวกลุ่มหรือถูกลบไม่ได้ บันทึก Baseline ชุดแรก = ยืนยันแผน: ปิดคำสั่งโครงสร้างทั้งหมด (WBS มาจาก BOQ/VO เท่านั้น) ยกเลิกการยืนยัน (`unconfirm_plan` ลบ Baseline ทุกชุด) ได้เฉพาะแผนที่ยังไม่มีความคืบหน้า/เอกสารอ้าง WBS/งาน VO ก่อนยืนยัน: ไม่มีเอกสารอ้าง = รันเลข WBS ใหม่ทั้งแผน มีเอกสารอ้าง = งานที่ถูกใช้ล็อก งานใหม่ได้เลขถัดไปท้ายกลุ่ม งานที่เพิ่มเองไม่ขึ้นใน Daily Report / Daily Request (`is_planning_task`) ผู้วางแผนอัปเดต % ในหน้าแก้แผน คอลัมน์ "เลข BOQ" (`boq_wbs`) = เลขเดิมใน BOQ เอกสารที่อ้าง WBS เพิ่มใหม่ต้องเพิ่มใน `CHILD_REFERENCES` / `HEADER_REFERENCES`
+  ออกจากหน้าผ่าน `set_leave_guard` (api.js) บันทึกงานค้างก่อน (`planner.flush`) แก้ logic ฝั่ง App.vue ของระบบเต็มต้องแก้ planner.js ด้วย
   Look-ahead: มือถือ = การ์ดทีละสัปดาห์, แท็บเล็ต = ตาราง 2 สัปดาห์, จอใหญ่ = ตารางทั้งช่วง (matchMedia ใน `Lookahead.vue`)
-  summary ของหมวดที่ `lazy` (บริหารโครงการ) โหลดเมื่อเปิดหมวดนั้นเท่านั้น
-  หมวดที่เห็นตามสิทธิ์ (`site_app.boot_data` → `sections`) สลับหมวด: มือถือ = ตารางหมวดทุกแอป (`SectionLauncher.vue` → `ModuleGrid.vue`) เปิดจากชิปบน hero (`Hero.vue`)
+  summary ของหมวดที่ `lazy` (แผนงาน) โหลดเมื่อเปิดหมวดนั้นเท่านั้น
+  หมวดที่เห็นตามสิทธิ์ (`site_app.boot_data` → `sections`) สลับหมวด: มือถือ = ตารางหมวดทุกแอป (`SectionLauncher.vue` → `ModuleGrid.vue`) เปิดจากปุ่มซ้ายสุดของ `TopBar.vue`
   แท็บเล็ต/จอใหญ่ = Dock แถบเดียว `.ss-rail` ใน AppShell กว้าง 56px เท่า Dock ของ Frappe (ไม่มี sidebar แยก) โลโก้ = หน้าแรก, หมวดของกลุ่มแอปนี้เท่านั้น
   (หน้าแรกแสดงทุกกลุ่ม ตารางหมวดของมือถือ = กลุ่มนี้ + ปุ่มหน้าแรก `ModuleGrid local_only`),
-  เมนูของหมวด = แท็บบนแถบบน (`SectionTabs.vue`, ข้อมูลจาก AppShell `provide("section_nav")`): หน้ารายการอยู่ใน `TopBar` แทนชื่อหน้า
-  (เฉพาะหน้าที่ไม่มีปุ่มย้อนกลับ) หน้าหลักหมวดอยู่ใน `Hero` จอ < 1100 แท็บที่ไม่ได้เลือกเหลือไอคอน Dock ค่าเริ่มต้นพับ (ไอคอน)
+  เมนูของหมวด = แท็บบนแถบบน (`SectionTabs.vue`, ข้อมูลจาก AppShell `provide("section_nav")`): อยู่ใน `TopBar` แทนชื่อหน้า
+  (เฉพาะหน้าที่ไม่มีปุ่มย้อนกลับ) จอ < 1100 แท็บที่ไม่ได้เลือกเหลือไอคอน Dock ค่าเริ่มต้นพับ (ไอคอน)
   ชี้เมาส์แล้วไม่กางเอง (ชื่อเมนูดูจาก tooltip) จอสัมผัส = ปุ่มพับ/กางกางชั่วคราวทับเนื้อหา (`html[data-peek]`) เลือกเมนู/แตะนอกแถบแล้วพับ
-  Dock ไม่มีปุ่มเลือกโครงการ: เลือกที่ชิปบน hero ของหน้าหลักหมวด และปุ่มโครงการบน `TopBar.vue` (จอ ≥768, เฉพาะหน้าเมนูหลักที่ไม่มีปุ่มย้อนกลับ
+  Dock ไม่มีปุ่มเลือกโครงการ: เลือกที่ปุ่มโครงการบน `TopBar.vue` (มือถือ = แถบเต็มแถวใต้แถบบน `.ss-project-bar`, เฉพาะหน้าเมนูหลักที่ไม่มีปุ่มย้อนกลับ
   หน้าดู/ฟอร์มไม่ให้เปลี่ยนโครงการกลางคัน, `no_project` = ซ่อน) Dock มีแค่ตัวเลือกบริษัทของออฟฟิศ
-  `DocList` จอ ≥768: ค้นหา + ส่งออก CSV อยู่ขวาของแถบบน (ไม่มีปุ่มโครงการบนแถบบน `no_project`) สถานะเป็นปุ่มติดกัน (`.ss-status-pills`)
-  ต้นแถวตัวกรอง ต่อด้วยวันที่/คู่ค้า/เกินกำหนด/โครงการ (แถวเดียว) มือถือ = แท็บสถานะ + ค้นหาในแถบเครื่องมือ + ตัวกรองใน sheet
-  ปุ่มพับ/กาง = วงกลมเล็กคร่อมขอบขวาของ Dock (`.ss-rail-toggle`, ไม่กินแถว จอเมาส์แสดงเมื่อชี้ที่ Dock) จอเมาส์ = ปักหมุด
-  (`html[data-side="expanded"]`) กางค้างและดันเนื้อหา จำในเครื่อง ท้าย Dock = บริษัท (ออฟฟิศ) + avatar ผู้ใช้ (เมนู: ระบบเต็ม / ออกจากระบบ)
+  หน้ารายการจอ ≥768: หัวรายการ `.ss-list-head` = แท็บสถานะ (`StatusTabs.vue` หน้าตาเดียวกับ `.pl-tabs`) + ตัวกรอง → ปุ่มส่งออก/สร้าง แถวเดียวเสมอ ต่อเป็นการ์ดเดียวกับตาราง (ไม่มีปุ่มลอย) ตัวกรองที่ไม่พอซ่อนแล้วกำหนดที่ปุ่มตัวกรอง (`use_overflow_row` ใน `table.js`, ปุ่มแสดงจำนวนตัวกรองที่ใช้ ไม่แสดงชิปบนจอ ≥768) ช่องค้นหาอยู่แถบบน (`HeaderSearch.vue` ผ่าน slot `search`, จอ < 1180 = ปุ่มแว่นขยาย กดแล้วกางทับแถบบน) ปุ่มสร้างอยู่ขวาสุดของหัวรายการ ถัดจากปุ่มโหลดใหม่ แถบบนด้านขวาเรียง โครงการ → ค้นหา → แจ้งเตือน ปุ่มโครงการตัดชื่อด้วย … แถบแคบ (≤660px) = `Project.custom_abbr` ไม่ตั้ง = ตัวย่อจากชื่อ
+  มือถือ = แท็บสถานะ + ค้นหาในแถบเครื่องมือ + ตัวกรองใน sheet สโตร์และตรวจงาน/คอนกรีตใช้หัวรายการเดียวกัน หน้ารับของ/เบิก/ยืม-คืน/คลัง + ตาราง `DataTable.vue` (เรียง/แบ่งหน้าในเครื่อง)
+  ปุ่มพับ/กาง = แถวบนสุดของโซนท้าย Dock เหนือบริษัท/avatar (`.ss-rail-toggle`) จอเมาส์ = ปักหมุด
+  (`html[data-side="expanded"]`) กางค้างและดันเนื้อหา จำในเครื่อง ท้าย Dock = บริษัท (ออฟฟิศ) + avatar ผู้ใช้วงกลม (เมนู: ชื่อเต็ม+User → `ProfileSheet.vue` ข้อมูลส่วนตัว / ระบบเต็ม / ออกจากระบบ)
+  tooltip ทุกหมวด = `shared/components/AppTooltip.vue` (วางครั้งเดียวใน AppShell) หน้าจอเขียน `title` ตามปกติ
   `html[data-side]` กำหนด `--ss-side` (56px / กาง 232px) ที่เนื้อหา/sheet/แถบล่างใช้ (data-peek ไม่เปลี่ยน --ss-side)
   รายการเอกสารจัดซื้อ/ขาย (`DocList.vue`): สถานะมีจำนวน, ค้นหา (เลขที่/คู่ค้า/เลขที่บิล/ชื่อหรือรหัสสินค้า `search_filters`)/ช่วงวันที่/คู่ค้า/เกินกำหนด/ขอบเขต, เรียงคอลัมน์, เลือกหลายแถวแล้วส่ง (`submit_docs` ใช้ savepoint ต่อใบ), ส่งออก CSV
   คอลัมน์ต่อชนิดเอกสารใน `DocTable.vue` (ท้ายตาราง: มอบหมาย `_assign` / แก้ไขล่าสุด / ถูกใจ `frappe.desk.like.toggle_like`)
   `get_docs` คืน rows + total + sums (ยอดรวมทั้งชุด) + counts (ของแต่ละแท็บ) มือถือ = การ์ด (`DocCard.vue`) + ตัวกรองใน sheet, แท็บเล็ต/จอใหญ่ = ตาราง (`DocTable.vue`) + แบ่งหน้า
   Dock พับ/กางใช้แถวสูงเท่ากัน (ชื่อแค่จางหาย) ห้ามให้ความสูงต่างกันตามสถานะ ไม่งั้นเมนูขยับตอนเปิด-ปิด
-  ขนาดกระชับของแท็บเล็ต/จอใหญ่อยู่ท้าย `style.css`: จอสัมผัส ≥768 ปุ่ม 40px, จอใช้เมาส์ปุ่ม/ช่องกรอก/เครื่องมือ 32–36px (ใกล้ปุ่มของ Frappe)
-  หน้าหลักทุกหมวด (`Hero.vue`): มือถือ = hero เต็ม, ≥768 = แถบเตี้ยแถวเดียว
+  ขนาดกระชับของแท็บเล็ต/จอใหญ่อยู่ท้าย `style.css`: จอสัมผัส ≥768 ปุ่ม 40px, จอใช้เมาส์ปุ่ม/ช่องกรอก/เครื่องมือ 32px (ใกล้ปุ่มของ Frappe) ช่องกรอกจอสัมผัส 40px, `Segmented` ขนาดเดียวกับ `.ss-status-pills`
+  แถบบนทุกหน้า (`TopBar.vue`, หน้าหลักหมวดผ่าน `Hero.vue`) แถวเดียว สีพื้นตามหมวด สูงคงที่ 52px / จอ ≥768 48px ซ้ายสุด = ชื่อหมวด (มือถือ = ไอคอน กดเปลี่ยนหมวด) ขวาสุด = แจ้งเตือน จอแท็บเล็ต/จอใหญ่ห้ามมีปุ่มสร้าง/บันทึกในแถบบน เว้นแต่ผู้ใช้สั่งเป็นหน้าๆ (ให้อยู่แถบ tab ของหน้า เช่น `.ss-boq-tabbar`) หน้าเดิมที่ยังใช้ slot `actions` ค่อยย้ายเมื่อสั่ง (`NotificationBell.vue`, `shared/notifications.js` = Notification Log ของ Frappe, เอกสารที่มีหน้าในแอปใหม่เพิ่มใน `APP_PAGES` ของไฟล์นี้) ไม่มีคำทักทาย
+  ตัวอักษรทั้งแอปอยู่ตัวแปร `--ss-fs*` ใน `:root` ของ `shared/style.css` ที่เดียว (จอสัมผัส เนื้อหา 13px / จอใช้เมาส์ 12px, ตัวเล็ก 11px) ห้ามใส่เลข px ตรงๆ ยกเว้นตาราง Gantt ของ `plan-edit` (11px, หัวเวลา 10px)
   จอ ≥1480: รายการ = ตาราง + ตัวอย่างเอกสารขวา (`DocPreview.vue`, คลิก = ดูตัวอย่าง, ↑↓ เลื่อน, ดับเบิลคลิก/Enter = เปิดเต็มหน้า)
   แผงตัวอย่างต้องพอดีจอโน้ตบุ๊ก (สูง ~760px) โดยไม่เลื่อน: รายการ 3 แถวแรก + ยอดสำคัญ (ยอดรวม/ยอดสุทธิ/ค้าง) รายละเอียดอื่นดูในหน้าเต็ม
   ตารางคู่แผงตัวอย่าง (`is-compact`) ซ่อนคอลัมน์ `col-wide` (วันต้องการ/ครบกำหนด, %, วัตถุประสงค์, ค้าง, มอบหมาย, แก้ไขล่าสุด) แผงจึงต้องแสดงข้อมูลเหล่านี้
@@ -261,10 +280,10 @@ pre-commit run --all-files                               # ruff + prettier (ต�
   จอใช้เมาส์ (`hover: hover` + `pointer: fine`) ช่องกรอกเตี้ยลงและมีเส้นขอบ จอสัมผัสคงขนาดใหญ่ แถบล่างปุ่มชิดขวา
   สีหลักตามหมวด: `data-section` ที่ `<html>` (sheet ถูก Teleport ไป body) ทับ `--ss-brand*`
   ชื่อหน้า (view) ห้ามซ้ำข้ามหมวด (`go(view)` หาหมวดจาก `ROUTES`), summary แยกหมวดใน `state.summaries`
-  ควบคุมงาน: หน้าหลัก % จริง/แผน + S-Curve (`SCurve.vue`, ข้อมูล `dashboard.progress_curve`), ปฏิทินรายงาน (`get_site_calendar`)
+  ควบคุมงาน: ภาพรวม % จริง/แผน + S-Curve (`SCurve.vue`, ข้อมูล `dashboard.progress_curve`), ปฏิทินรายงาน (`get_site_calendar`) + tab ตารางรายงาน/ขออนุมัติ เลือกหลายแถวแล้วพิมพ์รวมไฟล์เดียว (`ReportList.vue`, `site_app.get_report_list` / `reports_pdf`)
   เขียน Daily Report / ขอ-อนุมัติ-ไม่อนุมัติ Daily Request ในแอป (`ReportForm.vue` ทีละขั้น, `ReportView.vue`, API `site_app.save_report`)
   แอปส่งเฉพาะช่องใน `FORM_FIELDS` / `ITEM_FIELDS` ค่าอื่นคำนวณใน validate ของเอกสารเหมือนกรอกในระบบเต็ม
-  ฟอร์มใหม่เก็บร่างใน localStorage ระหว่างกรอก (สัญญาณหลุดไม่หาย) ขอตรวจงาน / Punch List ยังสร้างในระบบเต็ม
+  ฟอร์มใหม่เก็บร่างใน localStorage ระหว่างกรอก (สัญญาณหลุดไม่หาย) ขอตรวจงาน / Punch List สร้างใน `views/project_docs/`
   ขออนุมัติได้ทุกวัน (ย้อนหลังได้) PDF/แชร์ไฟล์: `site_app.pdf_url` เลือกตัวสร้าง PDF แบบหน้าพิมพ์ของระบบเต็ม (Print Format → Print Settings)
   ดู PDF ในแอป (`PdfViewer.vue`) วาดด้วย PDF.js ที่ `public/js/lib/pdfjs/` (มือถือแสดง PDF ใน iframe ไม่ได้) โหลดเมื่อเปิดครั้งแรก
   ไม่ใช้ desk: เรียก API ด้วย fetch เอง (`api.js`), router เอง (`<base>/<หมวด>/<view>/<params>`, `website_route_rules`), CSS อยู่ `shared/style.css` (class `ss-`)
@@ -331,6 +350,7 @@ pre-commit run --all-files                               # ruff + prettier (ต�
 
 ## หน้าตา (UI และเอกสารพิมพ์)
 
+- แก้ UI ของแอป ConsERP (`/conserp`) ต้องอ่าน `Design.md` ก่อน: ขนาด/สี/พฤติกรรมของแต่ละ component ห้ามตั้งขนาดทับเป็นรายหน้า ตกลงเรื่องหน้าตาใหม่แล้วแก้ไฟล์นั้นด้วย
 - ฟอนต์: Inter สำหรับอังกฤษ (Frappe ส่งมาเอง), Noto Sans Thai สำหรับไทย (`@font-face` จาก `public/fonts`)
 - เปลี่ยนฟอนต์ทั้งระบบด้วยตัวแปร `--font-stack` ใน `:root` เท่านั้น ห้ามใส่ `font-family ... !important` ทุก element
   (จะทับฟอนต์ที่ Print Designer และ Print Format เลือกไว้)

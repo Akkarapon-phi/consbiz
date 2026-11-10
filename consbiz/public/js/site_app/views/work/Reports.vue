@@ -1,8 +1,17 @@
 <template>
 	<div>
 		<TopBar title="รายงานประจำวัน" :subtitle="state.project?.project_name">
+			<template #search>
+				<HeaderSearch
+					v-if="active_tab !== 'calendar'"
+					:key="active_tab"
+					v-model="txt"
+					placeholder="ค้นหาเลขที่ ผู้จัดทำ หรือปัญหา"
+				/>
+			</template>
 			<template #actions>
 				<button
+					v-if="!wide"
 					type="button"
 					class="ss-icon-btn"
 					:class="{ 'is-spinning': loading }"
@@ -14,14 +23,39 @@
 			</template>
 		</TopBar>
 
-		<div class="ss-content">
+		<div v-if="active_tab !== 'calendar'" class="ss-content">
+			<ReportList
+				:key="active_tab"
+				:kind="active_tab === 'report' ? 'dr' : 'drq'"
+				:tab="active_tab"
+				:tabs="tabs"
+				:search="txt"
+				@update:tab="set_tab"
+			/>
+		</div>
+
+		<div v-else class="ss-content">
+			<div v-if="wide" class="ss-list-head">
+				<StatusTabs :model-value="active_tab" :options="tabs" @update:model-value="set_tab" />
+				<div class="ss-list-tools">
+					<button
+						type="button"
+						class="ss-icon-btn"
+						:class="{ 'is-spinning': loading }"
+						aria-label="โหลดใหม่"
+						@click="load"
+					>
+						<Icon name="refresh" :size="17" />
+					</button>
+				</div>
+			</div>
 			<Empty
 				v-if="data === false"
 				icon="layers"
 				title="โครงการนี้ยังไม่มีแผนงาน"
 				text="รายงานประจำวันต้องอ้างแผนงานก่อสร้างของโครงการ"
 			/>
-			<div v-else class="ss-split">
+			<div v-else class="ss-split ss-split--calendar">
 				<!-- ปฏิทินของเดือน -->
 				<div class="ss-split-main">
 					<div class="ss-cal">
@@ -203,7 +237,10 @@
 
 <script setup>
 import { computed, ref } from "vue";
+import ReportList from "./ReportList.vue";
 import Icon from "../../../shared/components/Icon.vue";
+import HeaderSearch from "../../../shared/components/HeaderSearch.vue";
+import StatusTabs from "../../../shared/components/StatusTabs.vue";
 import TopBar from "../../../shared/components/TopBar.vue";
 import Skeleton from "../../../shared/components/Skeleton.vue";
 import Empty from "../../../shared/components/Empty.vue";
@@ -213,11 +250,13 @@ import {
 	go,
 	iso_date,
 	relative_date,
+	remember_tab,
 	replace_params,
 	show_error,
 	state,
 	today,
 } from "../../../shared/api.js";
+import { use_wide } from "../../../shared/table.js";
 
 const WEEKDAYS = ["อา", "จ", "อ", "พ", "พฤ", "ศ", "ส"];
 const MONTHS = [
@@ -236,9 +275,30 @@ const MONTHS = [
 ];
 
 const today_date = today();
+// URL = /reports/<tab> หรือ /reports/<วันที่> (params ที่ว่างถูกตัดออกจาก URL วันที่จึงมาในตำแหน่ง tab ได้)
+const is_day = (value) => /^\d{4}-\d{2}-\d{2}$/.test(value || "");
+const route_params = state.route.params;
 const selected = ref(
-	/^\d{4}-\d{2}-\d{2}$/.test(state.route.params.day || "") ? state.route.params.day : today_date
+	is_day(route_params.day) ? route_params.day : is_day(route_params.tab) ? route_params.tab : today_date
 );
+
+const tabs = [
+	{ value: "calendar", label: "ปฏิทิน" },
+	...(boot.can.view_daily_report ? [{ value: "report", label: "รายงานประจำวัน" }] : []),
+	...(boot.can.view_daily_request ? [{ value: "request", label: "ขออนุมัติปฏิบัติงาน" }] : []),
+];
+const wide = use_wide();
+const tab = ref(tabs.some((t) => t.value === route_params.tab) ? route_params.tab : "calendar");
+const txt = ref("");
+// มือถือมีแต่ปฏิทิน (ตารางและพิมพ์หลายรายการใช้บนจอ ≥768)
+const active_tab = computed(() => (wide.value ? tab.value : "calendar"));
+
+function set_tab(value) {
+	tab.value = value;
+	txt.value = "";
+	remember_tab("reports", value, "calendar");
+}
+
 const month = ref(`${selected.value.slice(0, 7)}-01`); // วันที่ 1 ของเดือนที่แสดง
 const data = ref(null); // null = กำลังโหลด, false = ไม่มีแผนงาน
 const loading = ref(false);

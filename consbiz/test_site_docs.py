@@ -4,11 +4,15 @@
 # หมวดจัดซื้อ/ขายของแอปหน้างาน (site_docs.py): รายการ ตัวกรอง ขอบเขตโครงการ รายละเอียด และส่งเอกสาร
 
 import json
+from unittest.mock import patch
 
 import frappe
 from frappe.tests import IntegrationTestCase
 
 from consbiz import site_docs, store_app
+from consbiz.consbiz.doctype.construction_management.construction_management import save_tasks
+from consbiz.consbiz.doctype.construction_material_plan.construction_material_plan import empty_supply, with_totals
+from consbiz.test_site_app import make_plan
 from consbiz.test_store_app import ITEM, ITEM_2, SUPPLIER, make_po, setup_store
 
 
@@ -66,6 +70,74 @@ class IntegrationTestSiteDocs(IntegrationTestCase):
 		self.assertTrue(site_docs.get_doc("po", draft.name)["can_submit"])
 		site_docs.submit_doc("po", draft.name)
 		self.assertEqual(frappe.db.get_value("Purchase Order", draft.name, "docstatus"), 1)
+
+	def test_doc_permissions_for_each_kind(self):
+		permissions = site_docs.doc_permissions()
+		self.assertEqual(set(permissions), {*site_docs.DOCS, "boq"})
+		self.assertTrue(permissions["po"]["create"])
+		with patch("consbiz.site_docs.frappe.has_permission", return_value=False):
+			self.assertFalse(site_docs.doc_permissions()["po"]["read"])
+
+	def test_delete_only_draft_or_cancelled_with_permission(self):
+		po = make_po(self.project)
+		self.assertFalse(site_docs.get_doc("po", po.name)["can_delete"])
+		self.assertRaises(frappe.ValidationError, site_docs.delete_doc, "po", po.name)
+
+		po.cancel()
+		self.assertTrue(site_docs.get_doc("po", po.name)["can_delete"])
+		# ไม่มีสิทธิ์ลบ = ไม่เห็นปุ่ม
+		with patch("frappe.model.document.Document.has_permission", return_value=False):
+			self.assertFalse(store_app.can_delete(po))
+		site_docs.delete_doc("po", po.name)
+		self.assertFalse(frappe.db.exists("Purchase Order", po.name))
+
+	def test_plan_request_is_saved_only_by_the_user(self):
+		for name in frappe.get_all("Construction Management", {"project": self.project}, pluck="name"):
+			frappe.db.set_value("Construction Management", name, "project", None)
+		cm = make_plan(self.project)
+		task = frappe.get_doc("Construction Management", cm).tasks[1]
+		save_tasks(
+			cm,
+			frappe.as_json([{"name": task.name, "start_date": "2026-12-20", "end_date": "2026-12-20"}]),
+			str(frappe.db.get_value("Construction Management", cm, "modified")),
+		)
+		# ช่อง company ของ CM ดึงจาก BOQ (ของเทสต์ไม่มี) จึงตั้งหลังบันทึกแผน
+		frappe.db.set_value("Construction Management", cm, "company", frappe.db.get_value("Project", self.project, "company"))
+		plan = frappe.get_doc(
+			{
+				"doctype": "Construction Material Plan",
+				"construction_management": cm,
+				"items": [{"wbs": "1.1", "item_code": ITEM, "qty": 5, "lead_time_days": 0}],
+			}
+		).insert()
+		row = plan.items[0]
+		rows = json.dumps([row.name])
+
+		# ใบขอซื้อของเทสต์อื่นในโครงการเดียวกันนับเป็นยอดที่ขอแล้ว: ตัดออกให้แถวนี้ขาดครบ 5
+		no_supply = {ITEM: with_totals(empty_supply())}
+		plan_module = "consbiz.consbiz.doctype.construction_material_plan.construction_material_plan"
+		supply = patch(f"{plan_module}.get_supply", return_value=no_supply)
+		supply.start()
+		self.addCleanup(supply.stop)
+
+		before = frappe.db.count("Material Request")
+		form = site_docs.get_form("mr", project=self.project, plan_rows=rows)
+		self.assertEqual(frappe.db.count("Material Request"), before)
+		self.assertEqual([(r["item_code"], r["qty"]) for r in form["items"]], [(ITEM, 5)])
+		self.assertFalse(frappe.db.get_value(row.doctype, row.name, "material_request"))
+
+		# ผู้ใช้แก้จำนวนแล้วกดบันทึก: ได้ร่างตามที่แก้ และแถวแผนอ้างเลขใบขอซื้อ
+		form["items"][0]["qty"] = 3
+		data = {**form, "project": self.project, "plan_rows": [row.name]}
+		saved = site_docs.save_doc("mr", json.dumps(data, default=str))
+		mr = frappe.get_doc("Material Request", saved["name"])
+		self.assertEqual((mr.docstatus, mr.items[0].qty), (0, 3))
+		self.assertEqual(frappe.db.get_value(row.doctype, row.name, "material_request"), mr.name)
+
+		# ลบใบขอซื้อที่แถวแผนอ้างอยู่ได้ (ไม่ติด Link) และแถวกลับมาขอใหม่ได้
+		site_docs.delete_doc("mr", mr.name)
+		self.assertFalse(frappe.db.exists("Material Request", mr.name))
+		self.assertFalse(frappe.db.get_value(row.doctype, row.name, "material_request"))
 
 	def test_employer_supplied_progress(self):
 		# ใบขอซื้อผู้ว่าจ้างจัดหา: ERPNext นับของที่รับเข้าใน per_ordered/ordered_qty แอปต้องแสดงเป็นรับของ ไม่มีขั้นสั่งซื้อ

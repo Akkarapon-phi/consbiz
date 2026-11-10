@@ -6,6 +6,7 @@
 // ช่องเวลา (วัน/สัปดาห์/เดือน/ปี) เลือกในหน้าต่างพิมพ์ ค่าเริ่มต้นตามที่ดูบนจอ
 // คอลัมน์ เส้น S-Curve แถบ baseline ข้อความบนแถบ ตารางสรุป และการย่อ/ขยายกลุ่ม ใช้ตามที่แสดงบนจอ
 // ความกว้างคอลัมน์ตารางในงานพิมพ์ใช้ค่าไม่เกิน PRINT_WIDTH (บนจอมักกว้างกว่าที่กระดาษต้องการ)
+import { __, format_number } from "./print_env";
 import {
 	cell_text,
 	format_money,
@@ -29,7 +30,7 @@ import {
 } from "./schedule";
 
 const MM = 96 / 25.4; // พิกเซล CSS ต่อมิลลิเมตร
-const PAPER = { A4: [210, 297], A3: [297, 420] };
+const PAPER = { A4: [210, 297], A3: [297, 420], A2: [420, 594], A1: [594, 841] };
 const MARGIN_MM = 8;
 const HEAD_MM = 20;
 
@@ -78,9 +79,129 @@ const PILL = {
 	green: ["#e4faeb", "#14804d"],
 	blue: ["#e6f4ff", "#0375d3"],
 };
+// กรอบสถานะของงาน (tone จาก task_status ของแอป ConsERP)
+const STATUS_PILL = {
+	green: PILL.green,
+	blue: PILL.blue,
+	teal: ["#e0f7f4", "#0f766e"],
+	amber: ["#fff4e0", "#b45309"],
+	rose: ["#fde8ec", "#be123c"],
+	gray: ["#f0f0f0", "#6b6b6b"],
+};
 // สีแถบตามสถานะ = --green-500 / --orange-500 / --red-500 ของ Frappe
 const STATUS_COLOR = { green: "#43ac79", orange: "#e86c13", red: "#e03434" };
 const PRINT_FONT = `"Noto Sans Thai", system-ui, -apple-system, sans-serif`;
+
+// แบบเอกสาร (options.template) ไม่ระบุ = แบบเดิมของ desk
+// color = สีของแบบ, bar = ทรงแถบงาน (ไม่มี = แบบเดิม), head = ส่วนหัวกระดาษ (page_head), foot_mm = ช่องลงนามท้ายหน้า
+// curve_panel = แยก S-Curve เป็นแถบล่าง สูง (px), summary = app แถวสะสมพื้นทึบตามหน้าจอแผนงาน
+const NAVY = "#1e3a8a";
+const GREEN = "#12a150";
+const RED = "#e5484d";
+const STATUS_BY_TONE = { green: GREEN, blue: "#1f6feb", teal: "#0d9488", amber: "#f59e0b", rose: RED };
+const CLASSIC = { color: COLOR, head: "classic", head_mm: HEAD_MM, foot_mm: 0 };
+const LIGHT = {
+	...COLOR,
+	text: "#1e293b",
+	muted: "#64748b",
+	line: "#e2e8f0",
+	header: "#f1f5fb",
+	group_row: "#eef2f9",
+	holiday: "#f6f8fb",
+	cell_grid: false,
+	frame: "#cbd5e1",
+};
+// Baseline = แผนตามสัญญา (เส้นหลัก) แผนปัจจุบันเป็นเส้นรอง
+const APP_CURVES = { baseline: NAVY, actual: GREEN, plan: "#94a3b8" };
+const THEMES = {
+	app: {
+		color: { ...LIGHT, today: "#1f6feb", status: "#f59e0b", group: NAVY },
+		head: "app",
+		head_mm: 25,
+		foot_mm: 0,
+		frame_rx: 10,
+		bar: {
+			h: 9,
+			rx: 3,
+			bg: 0.34,
+			stroke: 0.55,
+			group: "slim",
+			color: (task, metric, m) =>
+				(metric.actual_pct || 0) >= 99.995 ? GREEN : m.show_critical && metric.critical ? RED : NAVY,
+		},
+		pill_rx: 2,
+		cutoff_flag: true,
+		curve_colors: APP_CURVES,
+		curve_dash: { plan: "4 3" },
+		curve_width: 1.3,
+		summary: "app",
+	},
+	formal: {
+		color: {
+			...COLOR,
+			text: "#111111",
+			muted: "#333333",
+			line: "#8a8a8a",
+			header: "#e8e8e8",
+			group_row: "#f2f2f2",
+			today: "#111111",
+			status: "#555555",
+		},
+		head: "formal",
+		head_mm: 27,
+		foot_mm: 20,
+		bar: {
+			h: 8,
+			rx: 0,
+			bg: 0,
+			stroke: 1,
+			group: "bracket",
+			group_color: "#111111",
+			color: () => "#374151",
+		},
+		pill_plain: true,
+		curve_colors: { baseline: "#111111", actual: "#111111", plan: "#777777" },
+		curve_dash: { actual: "5 3", plan: "1.5 2.5" },
+		curve_width: 1.1,
+	},
+	// แนวเดียวกับหน้าจอ แต่ข้อมูลโครงการอยู่แถบซ้ายของกระดาษ และแยก S-Curve ไว้ใต้แถบงาน
+	sidebar: {
+		color: { ...LIGHT, today: "#1f6feb", status: "#f59e0b", group: NAVY },
+		head: "sidebar",
+		head_mm: 0,
+		side_mm: 46,
+		foot_mm: 0,
+		frame_rx: 10,
+		bar: {
+			h: 9,
+			rx: 4,
+			bg: 0.3,
+			stroke: 0.5,
+			group: "slim",
+			color: (task, metric, m) =>
+				(metric.actual_pct || 0) >= 99.995 ? GREEN : m.show_critical && metric.critical ? RED : NAVY,
+		},
+		pill_rx: 6,
+		cutoff_flag: true,
+		curve_panel: 130,
+		curve_colors: APP_CURVES,
+		curve_dash: { plan: "4 3" },
+		curve_width: 1.6,
+		curve_area: 0.08,
+		curve_points: false,
+		summary: "app",
+	},
+};
+// ค่าของแบบที่กำลังสร้าง ตั้งที่ต้น build_print (สร้างแบบ sync ทีละครั้ง)
+let T = CLASSIC;
+let C = COLOR;
+const SIDE_GAP_MM = 3;
+// แบบ 1 หน้า: แถบ S-Curve กินสัดส่วนตามจำนวนแถว ไม่ถูกย่อจนแบนเมื่อแผนยาว
+const PANEL_SHARE = 0.4;
+const panel_of = (model) => {
+	if (!T.curve_panel || !model.curves.length) return 0;
+	return model.fit ? Math.max(T.curve_panel, model.rows.length * ROW * PANEL_SHARE) : T.curve_panel;
+};
 
 export function open_print_dialog(get_model, saved, on_save) {
 	const { scales, scale } = get_model();
@@ -127,7 +248,7 @@ export function open_print_dialog(get_model, saved, on_save) {
 			{
 				fieldtype: "HTML",
 				options: `<p class="text-muted small">${__(
-					"คอลัมน์ เส้น S-Curve แถบ Baseline ข้อความบนแถบ ตารางสรุป และการย่อ/ขยายหัวข้อ จะพิมพ์ตามที่แสดงบนจออยู่ตอนนี้"
+					"คอลัมน์ เส้น S-Curve แถบแผนสัญญาข้อความบนแถบ ตารางสรุป และการย่อ/ขยายหัวข้อ จะพิมพ์ตามที่แสดงบนจออยู่ตอนนี้"
 				)}</p>`,
 			},
 		],
@@ -144,29 +265,52 @@ export function open_print_dialog(get_model, saved, on_save) {
 }
 
 export function print_gantt(model, options) {
-	const [short, long] = PAPER[options.paper];
+	const result = build_print(model, options);
+	if (result.error) frappe.msgprint(result.error);
+	else print_html(result.html);
+}
+
+// สร้างเอกสารพิมพ์ คืน { html, pages, size } หรือ { error } ใช้ทั้งหน้าต่างพิมพ์ของ desk และ Preview ของแอป (PlanPrint.vue)
+// content_scale (%) = ย่อ/ขยายเนื้อหาทั้งหน้า, period_scale (%) = ความกว้างช่องเวลาของแบบต่อเนื่อง, margin = ระยะขอบ (มม.)
+export function build_print(model, options) {
+	T = THEMES[options.template] || CLASSIC;
+	C = T.color;
+	const size = PAPER[options.paper];
+	const [short, long] = size;
 	const [paper_w, paper_h] = options.orientation === "landscape" ? [long, short] : [short, long];
-	const content_w = (paper_w - 2 * MARGIN_MM) * MM;
-	const content_h = (paper_h - 2 * MARGIN_MM - HEAD_MM) * MM;
+	const margin = options.margin ?? MARGIN_MM;
+	const zoom = (options.content_scale || 100) / 100;
+	const side = T.side_mm ? T.side_mm + SIDE_GAP_MM : 0;
+	const page_px = (paper_w - 2 * margin - side) * MM;
+	const content_w = page_px / zoom;
+	const content_h = ((paper_h - 2 * margin - T.head_mm - T.foot_mm) * MM) / zoom;
 
 	const { top, bottom } = model.scales[options.scale] || model.scales[model.scale];
 	model = {
 		...model,
 		columns: model.columns.map((c) => ({
 			...c,
-			width: Math.min(c.width, PRINT_WIDTH[c.key] || 60),
+			// exact_widths = แอปกำหนดความกว้างเอง (พอดีข้อความ หรือที่ผู้ใช้กรอก)
+			width: model.exact_widths ? c.width : Math.min(c.width, PRINT_WIDTH[c.key] || 60),
 		})),
 	};
 	// งานพิมพ์ใช้ช่วงเวลาเท่าที่มีงาน (บนจอปัดเป็นทั้งเดือน/ทั้งปีเผื่อเลื่อนดู)
-	model = with_range(model, { top, bottom });
+	model = { ...with_range(model, { top, bottom }), page_px };
 	let pages;
 	let layout;
 	if (options.mode === "pages") {
-		model.ppd = PERIOD_PX[bottom] / PERIOD_DAYS[bottom];
+		model.ppd = ((PERIOD_PX[bottom] / PERIOD_DAYS[bottom]) * (options.period_scale || 100)) / 100;
 		layout = new Layout(model);
 		pages = layout.paginate(content_w, content_h);
-		if (!pages) return;
+		if (!pages) {
+			return {
+				error: __(
+					"คอลัมน์ที่เลือกกว้างเกินหน้ากระดาษ ให้ลดคอลัมน์ ลดความกว้างคอลัมน์ หรือเลือกกระดาษแนวนอน/A3"
+				),
+			};
+		}
 	} else {
+		model = { ...model, fit: true };
 		const fit = fit_model(model, content_w, content_h);
 		model = fit.model;
 		layout = new Layout(model);
@@ -184,11 +328,13 @@ export function print_gantt(model, options) {
 		pages.map((page, i) => ({
 			head: page_head(model, page, i, pages.length),
 			svg: layout.render(page, i),
+			foot: page_foot(),
 		})),
 		paper_w,
-		paper_h
+		paper_h,
+		margin
 	);
-	print_html(html);
+	return { html, pages: pages.length, size };
 }
 
 // พอดี 1 หน้า: ย่อ (scale) เท่าที่แถวต้องใช้ให้ลงความสูงหน้า ไม่ขยายเกินขนาดพิมพ์ปกติ
@@ -196,7 +342,7 @@ export function print_gantt(model, options) {
 function fit_model(model, content_w, content_h) {
 	const grid_width = model.columns.reduce((sum, c) => sum + c.width, 0);
 	const summary_h = model.summary_rows.length * SUMMARY_ROW;
-	const height = HEADER + Math.max(model.rows.length, 1) * ROW + summary_h;
+	const height = HEADER + Math.max(model.rows.length, 1) * ROW + summary_h + panel_of(model);
 	const scale = Math.min(content_h / height, 1);
 	const days = model.range.end - model.range.start;
 	const ppd = Math.max((content_w / scale - grid_width) / days, 0.3);
@@ -224,6 +370,7 @@ class Layout {
 		this.summary_height = model.summary_rows.length
 			? model.summary_rows.length * SUMMARY_ROW
 			: 0;
+		this.panel_height = panel_of(model);
 		this.bottom_periods = periods(model.range.start, model.range.end, model.units.bottom);
 		this.top_periods = periods(model.range.start, model.range.end, model.units.top);
 	}
@@ -234,16 +381,9 @@ class Layout {
 		const full = this.model.columns;
 		const compact = full.filter((c) => ["wbs", "item_name"].includes(c.key));
 		const width_of = (columns) => columns.reduce((sum, c) => sum + c.width, 0);
-		if (content_w - width_of(full) < 150) {
-			frappe.msgprint(
-				__(
-					"คอลัมน์ที่เลือกกว้างเกินหน้ากระดาษ ให้ลดคอลัมน์ ลดความกว้างคอลัมน์ หรือเลือกกระดาษแนวนอน/A3"
-				)
-			);
-			return null;
-		}
+		if (content_w - width_of(full) < 150) return null;
 		const rows_per_page = Math.max(
-			Math.floor((content_h - HEADER - this.summary_height) / ROW),
+			Math.floor((content_h - HEADER - this.summary_height - this.panel_height) / ROW),
 			1
 		);
 
@@ -282,7 +422,9 @@ class Layout {
 		const slice_w = page.slice_w || (day_to - day_from) * m.ppd;
 		const gx = columns.reduce((sum, c) => sum + c.width, 0);
 		const clip = `tl${index}`;
-		const band_h = Math.max((row_to - row_from) * ROW, ROW, page.band_h || 0);
+		const rows_h = (row_to - row_from) * ROW;
+		const panel = this.panel_height;
+		const band_h = Math.max(rows_h + panel, ROW, page.band_h || 0);
 		const body_y = HEADER;
 		const summary_y = body_y + band_h;
 		const width = gx + slice_w;
@@ -290,11 +432,15 @@ class Layout {
 		const x = (day) => gx + (day - day_from) * m.ppd;
 		const rows = m.rows.slice(row_from, row_to);
 		const out = [];
+		// มุมมนคงที่บนกระดาษ ไม่ย่อตามเนื้อหา
+		const frame_rx = T.frame_rx ? (T.frame_rx * width) / m.page_px : 0;
 
 		out.push(
 			`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" preserveAspectRatio="xMidYMin meet">`,
-			`<defs><clipPath id="${clip}"><rect x="${gx}" y="0" width="${slice_w}" height="${height}"/></clipPath></defs>`,
-			`<rect x="0" y="0" width="${width}" height="${HEADER}" fill="${COLOR.header}"/>`
+			`<defs><clipPath id="${clip}"><rect x="${gx}" y="0" width="${slice_w}" height="${height}"/></clipPath>` +
+				`<clipPath id="f${clip}"><rect width="${width}" height="${height}" rx="${frame_rx}"/></clipPath></defs>`,
+			`<g clip-path="url(#f${clip})">`,
+			`<rect x="0" y="0" width="${width}" height="${HEADER}" fill="${C.header}"/>`
 		);
 
 		// ---------- ตารางซ้าย ----------
@@ -305,7 +451,7 @@ class Layout {
 		}
 		rows.forEach((task, i) => {
 			const y = body_y + i * ROW;
-			if (task.is_group) out.push(rect(0, y, gx, ROW, COLOR.group_row));
+			if (task.is_group) out.push(rect(0, y, gx, ROW, C.group_row));
 			let cx = 0;
 			for (const column of columns) {
 				const value = cell_text(task, column.key, m.metrics);
@@ -335,8 +481,8 @@ class Layout {
 			out.push(
 				`<rect x="${x(period.start)}" y="0" width="${
 					(period.end - period.start) * m.ppd
-				}" height="${HEADER / 2}" fill="none" stroke="${COLOR.line}" stroke-width="0.5"/>`,
-				text(px + 4, HEADER / 2 - 6, period_label(period, m.units.top, true), {
+				}" height="${HEADER / 2}" fill="none" stroke="${C.line}" stroke-width="0.5"/>`,
+				text(px + 4, HEADER / 2 - 6, fitted_top_label(period, m, Math.min(x(period.end), gx + slice_w) - px - 6), {
 					size: 9,
 					weight: 600,
 				})
@@ -349,7 +495,7 @@ class Layout {
 			out.push(
 				`<rect x="${x(period.start)}" y="${HEADER / 2}" width="${w}" height="${
 					HEADER / 2
-				}" fill="none" stroke="${COLOR.line}" stroke-width="0.5"/>`
+				}" fill="none" stroke="${C.line}" stroke-width="0.5"/>`
 			);
 			if (!narrow) {
 				out.push(
@@ -364,19 +510,19 @@ class Layout {
 					)
 				);
 			}
-			out.push(line(x(period.start), body_y, x(period.start), summary_y, COLOR.line, "2 3"));
+			out.push(line(x(period.start), body_y, x(period.start), summary_y, C.line, "2 3"));
 		}
 		if (m.ppd >= 3) {
 			for (const day of m.holidays) {
 				if (day >= day_from && day < day_to) {
-					out.push(rect(x(day), body_y, m.ppd, band_h, COLOR.holiday));
+					out.push(rect(x(day), body_y, m.ppd, band_h, C.holiday));
 				}
 			}
 		}
 
 		rows.forEach((task, i) => {
 			const y = body_y + i * ROW;
-			out.push(line(gx, y + ROW, gx + slice_w, y + ROW, COLOR.line));
+			out.push(line(gx, y + ROW, gx + slice_w, y + ROW, C.line));
 			const start = to_day(task.start_date);
 			const end = to_day(task.end_date);
 			const base_start = to_day(task.baseline_start_date);
@@ -396,16 +542,22 @@ class Layout {
 			const w = Math.max((end - start + 1) * m.ppd, 1.5);
 			const top = m.show_baseline_bars ? 4 : 5;
 			const h = m.show_baseline_bars ? 9 : ROW - 10;
+			if (T.bar) {
+				out.push(...themed_bar(task, x(start), w, y, m));
+				if (!task.is_group) out.push(...split_texts(task, start, end, x, y + ROW / 2 + 2, m));
+				out.push(...end_texts(task, x(end + 1) + 4, y, m));
+				return;
+			}
 			const status_color = bar_status_color(task, m);
 			if (task.is_group) {
-				const fill = status_color || COLOR.group;
+				const fill = status_color || C.group;
 				out.push(
 					rect(x(start), y + top + 1, w, 5, fill),
 					rect(x(start), y + top + 1, 3, 9, fill),
 					rect(x(start) + w - 3, y + top + 1, 3, 9, fill)
 				);
 			} else {
-				const fill = status_color || COLOR.bar;
+				const fill = status_color || C.bar;
 				const actual = Math.min(m.metrics.get(task.name)?.actual_pct || 0, 100);
 				out.push(
 					`<rect x="${x(start)}" y="${
@@ -425,8 +577,8 @@ class Layout {
 		});
 
 		for (const [day, color] of [
-			[m.today + 1, COLOR.today],
-			[m.status_day + 1, COLOR.status],
+			[m.today + 1, C.today],
+			[m.status_day + 1, C.status],
 		]) {
 			if (day >= day_from && day < day_to) {
 				out.push(
@@ -440,13 +592,23 @@ class Layout {
 						1.2
 					)
 				);
+				if (T.cutoff_flag && color === C.status) {
+					out.push(
+						`<rect x="${x(day) - 14}" y="${HEADER - 10}" width="28" height="10" rx="2" fill="${color}"/>`,
+						text(x(day), HEADER - 2.5, "Cut-off", { size: 6, anchor: "middle", weight: 600, fill: "#fff" })
+					);
+				}
 			}
 		}
 
 		// S-Curve สเกลตามความสูงของแถวในหน้านั้น
 		if (m.curves.length) {
+			// แยกแถบ S-Curve: อยู่ใต้แถวงาน ไม่ทับแถบงาน
+			const curve_top = body_y + (panel ? rows_h : 0);
+			const curve_h = panel ? band_h - rows_h : band_h;
 			const cy = (value) =>
-				body_y + CURVE_MARGIN + (1 - value / 100) * (band_h - 2 * CURVE_MARGIN);
+				curve_top + CURVE_MARGIN + (1 - value / 100) * (curve_h - 2 * CURVE_MARGIN);
+			if (panel) out.push(line(gx, curve_top, gx + slice_w, curve_top, C.frame || C.line, "", 0.8));
 			for (const tick of [0, 25, 50, 75, 100]) {
 				out.push(line(gx, cy(tick), gx + slice_w, cy(tick), "#999999", "4 4", 0.4));
 			}
@@ -454,14 +616,26 @@ class Layout {
 				const points = sample_curve(curve.curve, this.bottom_periods);
 				if (!points.length) continue;
 				const d = smooth_path(points.map((p) => [x(p.day + 1), cy(p.value)]));
+				const color = T.curve_colors?.[curve.key] || curve.color;
+				const dash = T.curve_dash?.[curve.key];
+				if (T.curve_area) {
+					const floor = cy(0);
+					const area = `${d} L${x(points.at(-1).day + 1)} ${floor} L${x(points[0].day + 1)} ${floor} Z`;
+					out.push(`<path d="${area}" fill="${color}" fill-opacity="${T.curve_area}"/>`);
+				}
 				out.push(
-					`<path d="${d}" fill="none" stroke="${curve.color}" stroke-width="1.6"/>`
+					`<path d="${d}" fill="none" stroke="${color}" stroke-width="${T.curve_width || 1.6}"${
+						dash ? ` stroke-dasharray="${dash}"` : ""
+					}/>`
 				);
+				// ช่องเวลาแคบ (พิมพ์แผนยาวใน 1 หน้า) จุดจะถี่จนทึบ แสดงแต่เส้น
+				const period_w = (this.bottom_periods[0].end - this.bottom_periods[0].start) * m.ppd;
+				if (T.curve_points === false || (T.bar && period_w < 14)) continue;
 				for (const p of points) {
 					out.push(
 						`<circle cx="${x(p.day + 1)}" cy="${cy(
 							p.value
-						)}" r="2" fill="#fff" stroke="${curve.color}" stroke-width="1.2"/>`
+						)}" r="2" fill="#fff" stroke="${color}" stroke-width="1.2"/>`
 					);
 				}
 			}
@@ -481,7 +655,7 @@ class Layout {
 		if (this.summary_height) {
 			m.summary_rows.forEach((row, i) => {
 				const y = summary_y + i * SUMMARY_ROW;
-				out.push(rect(gx, y, slice_w, SUMMARY_ROW, COLOR.header));
+				out.push(summary_band(gx, y, slice_w, row));
 			});
 			for (const period of this.bottom_periods) {
 				if (period.end <= day_from || period.start >= day_to) continue;
@@ -496,7 +670,7 @@ class Layout {
 						`<rect x="${x(
 							period.start
 						)}" y="${y}" width="${w}" height="${SUMMARY_ROW}" fill="none" stroke="${
-							COLOR.line
+							C.line
 						}" stroke-width="0.5"/>`
 					);
 					// ช่องที่แคบกว่าตัวเลขไม่แสดง ไม่ให้ตัวเลขล้นทับช่องข้างๆ (เหมือนหน้าจอ)
@@ -516,23 +690,97 @@ class Layout {
 		if (this.summary_height) {
 			m.summary_rows.forEach((row, i) => {
 				const y = summary_y + i * SUMMARY_ROW;
+				if (T.summary && is_cumulative(row)) {
+					out.push(
+						rect(0, y, gx, SUMMARY_ROW, row_color(row)),
+						text(gx - 6, y + SUMMARY_ROW - 5, row.label, { size: 8, weight: 600, anchor: "end", fill: "#fff" })
+					);
+					return;
+				}
 				out.push(
-					rect(0, y, gx, SUMMARY_ROW, COLOR.header),
-					`<rect x="0" y="${y}" width="${gx}" height="${SUMMARY_ROW}" fill="none" stroke="${COLOR.line}" stroke-width="0.5"/>`,
-					`<circle cx="9" cy="${y + SUMMARY_ROW / 2}" r="3" fill="${row.color}"/>`,
-					text(16, y + SUMMARY_ROW - 5, row.label, { size: 8, weight: 600 })
+					summary_band(0, y, gx, row),
+					`<rect x="0" y="${y}" width="${gx}" height="${SUMMARY_ROW}" fill="none" stroke="${C.line}" stroke-width="0.5"/>`,
+					T.summary ? "" : `<circle cx="9" cy="${y + SUMMARY_ROW / 2}" r="3" fill="${row.color}"/>`,
+					text(T.summary ? gx - 6 : 16, y + SUMMARY_ROW - 5, row.label, {
+						size: 8,
+						weight: 600,
+						anchor: T.summary ? "end" : "start",
+					})
 				);
 			});
 		}
 
+		// แถบ S-Curve: ชื่อและคำอธิบายเส้นในช่องตาราง
+		if (panel && m.curves.length) {
+			const top = body_y + rows_h;
+			out.push(
+				line(0, top, gx, top, C.frame || C.line, "", 0.8),
+				text(8, top + 16, "S-Curve", { size: 10, weight: 700 })
+			);
+			m.curves.forEach((curve, i) => {
+				const ly = top + 32 + i * 14;
+				out.push(
+					`<circle cx="12" cy="${ly - 3}" r="3" fill="${T.curve_colors?.[curve.key] || curve.color}"/>`,
+					text(20, ly, curve.label, { size: 8 })
+				);
+			});
+		}
+		const frame = C.frame || C.text;
 		out.push(
-			line(gx, 0, gx, height, COLOR.text, "", 0.8),
-			line(0, HEADER, width, HEADER, COLOR.text, "", 0.8),
-			`<rect x="0" y="0" width="${width}" height="${height}" fill="none" stroke="${COLOR.text}" stroke-width="0.8"/>`,
+			line(gx, 0, gx, height, frame, "", 0.8),
+			line(0, HEADER, width, HEADER, frame, "", 0.8),
+			`</g>`,
+			`<rect x="0" y="0" width="${width}" height="${height}" rx="${frame_rx}" fill="none" stroke="${frame}" stroke-width="0.8"/>`,
 			`</svg>`
 		);
 		return out.join("");
 	}
+}
+
+// ชื่อช่วงเวลาแถวบน: ยาวเกินช่องใช้ชื่อย่อ ยังเกินไม่แสดง (ไม่ให้ซ้อนช่องข้างๆ)
+function fitted_top_label(period, m, room) {
+	const font = `600 9px ${PRINT_FONT}`;
+	const full = period_label(period, m.units.top, true);
+	if (text_width(String(full), font) <= room) return full;
+	const short = period_label(period, m.units.top, false);
+	return text_width(String(short), font) <= room ? short : "";
+}
+
+// แถบงานของแบบเอกสาร (T.bar): พื้นจางแล้วทับด้วยส่วนที่ทำจริง กลุ่ม = เส้นบางมีขีดปิดหัวท้าย
+function themed_bar(task, x0, w, y, m) {
+	const style = T.bar;
+	const metric = m.metrics.get(task.name) || {};
+	const done = (w * Math.min(metric.actual_pct || 0, 100)) / 100;
+	const color = style.color(task, metric, m);
+	if (task.is_group) {
+		const mid = y + ROW / 2 - (m.show_baseline_bars ? 2 : 0);
+		const ink = style.group_color || color;
+		const caps = [rect(x0, mid - 4, 1.5, 8, ink), rect(x0 + w - 1.5, mid - 4, 1.5, 8, ink)];
+		if (style.group === "bracket") return [rect(x0, mid - 1.5, w, 3, ink), ...caps];
+		return [
+			`<rect x="${x0}" y="${mid - 1.5}" width="${w}" height="3" rx="1.5" fill="${ink}" fill-opacity="0.25"/>`,
+			`<rect x="${x0}" y="${mid - 1.5}" width="${done}" height="3" rx="1.5" fill="${ink}"/>`,
+			...caps,
+		];
+	}
+	const h = m.show_baseline_bars ? style.h : style.h + 2;
+	const top = m.show_baseline_bars ? y + 3 : y + (ROW - h) / 2;
+	const shape = `x="${x0}" y="${top}" height="${h}" rx="${style.rx}"`;
+	const out = [
+		`<rect ${shape} width="${w}" fill="${style.bg ? color : "#fff"}" fill-opacity="${style.bg || 1}"${
+			style.stroke ? ` stroke="${color}" stroke-opacity="${style.stroke}" stroke-width="0.7"` : ""
+		}/>`,
+	];
+	if (done) out.push(`<rect ${shape} width="${done}" fill="${color}"/>`);
+	return out;
+}
+
+const is_cumulative = (row) => !row.key.endsWith("_period");
+const row_color = (row) => T.curve_colors?.[row.curve] || row.color;
+function summary_band(x, y, width, row) {
+	if (!T.summary) return rect(x, y, width, SUMMARY_ROW, C.header);
+	const opacity = is_cumulative(row) ? 0.2 : 0.07;
+	return `<rect x="${x}" y="${y}" width="${width}" height="${SUMMARY_ROW}" fill="${row_color(row)}" fill-opacity="${opacity}"/>`;
 }
 
 // % ที่กำหนดเองบนแถบ ตามช่องเวลาของงานพิมพ์ (เฉพาะช่องที่กว้างพอ)
@@ -569,19 +817,31 @@ function end_texts(task, x0, y, m) {
 		out.push(text(x0, y + ROW / 2 + 3, label, { size: 8, weight }));
 		pill_x += text_width(label, `${weight} 8px ${PRINT_FONT}`) + 6;
 	}
-	if (m.show_progress && metrics) {
-		for (const [value, [fill, ink]] of [
-			[`${__("แผน")} ${format_number(metrics.plan_pct, null, 1)}%`, PILL.blue],
-			[`${__("จริง")} ${format_number(metrics.actual_pct, null, 1)}%`, PILL.green],
-		]) {
+	if (metrics) {
+		// show_plan / show_actual / show_status_text: แอปเปิด-ปิดแยกได้ desk ใช้ show_progress
+		const pills = [];
+		if (m.show_status_text && metrics.status) {
+			pills.push([metrics.status.label, STATUS_PILL[metrics.status.tone] || STATUS_PILL.gray]);
+		}
+		if (m.show_plan ?? m.show_progress) {
+			pills.push([`${__("แผน")} ${format_number(metrics.plan_pct, null, 1)}%`, PILL.blue]);
+		}
+		if (m.show_actual ?? m.show_progress) {
+			pills.push([`${__("จริง")} ${format_number(metrics.actual_pct, null, 1)}%`, PILL.green]);
+		}
+		for (const [value, [fill, ink]] of pills) {
 			const width = text_width(value, `600 7px ${PRINT_FONT}`) + 10;
 			out.push(
-				`<rect x="${pill_x}" y="${
-					y + ROW / 2 - 6
-				}" width="${width}" height="12" fill="${fill}"/>`,
+				T.pill_plain
+					? ""
+					: `<rect x="${pill_x}" y="${y + ROW / 2 - 6}" width="${width}" height="12" rx="${
+							T.pill_rx || 0
+					  }" fill="${fill}"/>`,
 				`<text x="${pill_x + width / 2}" y="${
 					y + ROW / 2 + 2.5
-				}" font-size="7" font-weight="600" text-anchor="middle" fill="${ink}">${escape(
+				}" font-size="7" font-weight="600" text-anchor="middle" fill="${
+					T.pill_plain ? C.text : ink
+				}">${escape(
 					value
 				)}</text>`
 			);
@@ -610,11 +870,11 @@ function line(x1, y1, x2, y2, color, dash = "", width = 0.5) {
 	return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${color}" stroke-width="${width}"${dasharray}/>`;
 }
 
-function text(x, y, value, { size = 9, anchor = "start", weight = 400, halo = false } = {}) {
+function text(x, y, value, { size = 9, anchor = "start", weight = 400, halo = false, fill = C.text } = {}) {
 	const outline = halo ? ` paint-order="stroke" stroke="#fff" stroke-width="3"` : "";
-	return `<text x="${x}" y="${y}" font-size="${size}" font-weight="${weight}" text-anchor="${anchor}" fill="${
-		COLOR.text
-	}"${outline}>${escape(value)}</text>`;
+	return `<text x="${x}" y="${y}" font-size="${size}" font-weight="${weight}" text-anchor="${anchor}" fill="${fill}"${outline}>${escape(
+		value
+	)}</text>`;
 }
 
 // ช่องตาราง: svg ซ้อนเพื่อตัดข้อความที่ยาวเกินช่อง
@@ -623,19 +883,29 @@ function cell(x, y, w, h, value, align, bold, header, indent = 0) {
 	const tx = right ? w - 4 : 4 + indent;
 	const ty = header ? h - 6 : h - 6;
 	return (
-		`<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="none" stroke="${COLOR.line}" stroke-width="0.5"/>` +
+		(C.cell_grid === false
+			? line(x, y + h, x + w, y + h, C.line)
+			: `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="none" stroke="${C.line}" stroke-width="0.5"/>`) +
 		`<svg x="${x}" y="${y}" width="${w}" height="${h}">` +
 		`<text x="${tx}" y="${ty}" font-size="${header ? 7 : 8}" font-weight="${
 			bold ? 600 : 400
 		}" text-anchor="${right ? "end" : "start"}" fill="${
-			header ? COLOR.muted : COLOR.text
+			header ? C.muted : C.text
 		}">${escape(value)}</text></svg>`
 	);
 }
 
 // ---------- หน้า HTML ----------
 
+// ช่องลงนาม (แบบทางการ)
+function page_foot() {
+	if (!T.foot_mm) return "";
+	const box = (role) => `<div class="sign"><i></i><span>(........................................)</span><b>${__(role)}</b></div>`;
+	return `<div class="foot">${box("ผู้จัดทำ")}${box("ผู้ตรวจสอบ")}${box("ผู้อนุมัติ")}</div>`;
+}
+
 function page_head(model, page, index, total) {
+	if (T.head !== "classic") return themed_head(model, page, index, total);
 	const legend = model.curves
 		.map((c) => `<span><i style="background:${c.color}"></i>${escape(c.label)}</span>`)
 		.join("");
@@ -665,10 +935,66 @@ function page_head(model, page, index, total) {
 		</div>`;
 }
 
-function page_html(model, pages, paper_w, paper_h) {
+function themed_head(model, page, index, total) {
+	const value = (text) => escape(text || "-");
+	const k = model.kpi || {};
+	const pct = (number) => (number === null || number === undefined ? "-" : `${format_number(number, null, 2)}%`);
+	// ตัวเทียบหลัก = Baseline (แผนตามสัญญา) ยังไม่มี Baseline ใช้แผนปัจจุบัน
+	const has_baseline = k.baseline !== null && k.baseline !== undefined;
+	const base = has_baseline ? k.baseline : k.plan;
+	const base_label = has_baseline ? "แผนสัญญา" : __("แผน");
+	const diff = (k.actual || 0) - (base || 0);
+	const detail =
+		total > 1
+			? ` · ${__("แถว {0}-{1}", [page.rows[0] + 1, page.rows[1]])} · ${escape(
+					model.format_day(page.days[0])
+			  )} - ${escape(model.format_day(page.days[1] - 1))}`
+			: "";
+	const page_no = `${__("หน้า")} ${index + 1}/${total}${detail}`;
+	if (T.head === "formal") {
+		return `<div class="head head-formal"><table>
+			<tr><td class="ttl" rowspan="3"><h1>${__("แผนการดำเนินงานก่อสร้าง")}</h1><div>${escape(model.project_name)}</div></td>
+				<th>${__("ผู้ว่าจ้าง")}</th><td>${value(model.employer)}</td><th>${__("ระยะเวลาสัญญา")}</th><td>${value(model.contract_text)}</td></tr>
+			<tr><th>${__("ผู้รับจ้าง")}</th><td>${value(model.contractor)}</td><th>${__("ความคืบหน้า")}</th><td>${escape(model.status_text)}</td></tr>
+			<tr><th>${__("ผู้ควบคุมงาน")}</th><td>${value(model.supervisor)}</td><th>${__("หน้า")}</th><td>${index + 1}/${total}${detail}</td></tr>
+		</table></div>`;
+	}
+	if (T.head === "sidebar") {
+		const fact = (label, text) => `<div class="fact"><span>${label}</span><b>${text}</b></div>`;
+		const legend = model.curves
+			.map((c) => `<span><i style="background:${T.curve_colors?.[c.key] || c.color}"></i>${escape(c.label)}</span>`)
+			.join("");
+		return `<aside class="head head-side">
+			<h1>${__("แผนงานก่อสร้าง")}</h1>
+			<div class="project">${escape(model.project_name)}</div>
+			<div class="big"><span>${__("ความคืบหน้าจริง")}</span><b>${pct(k.actual)}</b>
+				<div class="track"><i style="width:${Math.min(k.actual || 0, 100)}%"></i><u style="left:${Math.min(base || 0, 100)}%"></u></div></div>
+			${fact(base_label, pct(base))}
+			${fact(__("ส่วนต่าง"), `${diff > 0 ? "+" : ""}${format_number(diff, null, 2)}%`)}
+			${fact(__("ณ วันที่"), escape(k.cutoff || "-"))}
+			<hr>
+			${fact(__("ผู้ว่าจ้าง"), value(model.employer))}
+			${fact(__("ผู้รับจ้าง"), value(model.contractor))}
+			${fact(__("ผู้ควบคุมงาน"), value(model.supervisor))}
+			${fact(__("ระยะเวลาสัญญา"), value(model.contract_text))}
+			<div class="side-foot"><div class="legend">${legend}</div><div>${page_no}</div></div>
+		</aside>`;
+	}
+	const chip = (label, number) => `<span><b>${number}</b>${label}</span>`;
+	const legend = model.curves
+		.map((c) => `<span><i style="background:${T.curve_colors?.[c.key] || c.color}"></i>${escape(c.label)}</span>`)
+		.join("");
+	return `<div class="head head-app">
+		<div class="band"><div><h1>${__("แผนงานก่อสร้าง")}</h1><div class="project">${escape(model.project_name)}</div></div>
+			<div class="chips">${chip(base_label, pct(base))}${chip(__("จริง"), pct(k.actual))}${chip(__("ส่วนต่าง"), `${diff > 0 ? "+" : ""}${format_number(diff, null, 2)}%`)}</div></div>
+		<div class="meta"><span>${__("ผู้ว่าจ้าง")} <b>${value(model.employer)}</b></span><span>${__("ผู้รับจ้าง")} <b>${value(model.contractor)}</b></span><span>${__("ผู้ควบคุมงาน")} <b>${value(model.supervisor)}</b></span><span>${__("สัญญา")} <b>${value(model.contract_text)}</b></span><span class="legend">${legend}</span><span class="pg">${page_no}</span></div>
+	</div>`;
+}
+
+function page_html(model, pages, paper_w, paper_h, margin) {
 	const font = `${window.location.origin}/assets/consbiz/fonts/noto-sans-thai/NotoSansThai-Variable-thai.woff2`;
 	const body = pages
-		.map((page) => `<section class="page">${page.head}${page.svg}</section>`)
+		.map((page) => `<section class="page${T.side_mm ? " page-side" : ""}">${page.head}${page.svg}${page.foot || ""}</section>`)
 		.join("");
 	return `<!doctype html>
 <html><head><meta charset="utf-8"><title>${escape(model.title)}</title>
@@ -679,26 +1005,33 @@ function page_html(model, pages, paper_w, paper_h) {
 	src: url("${font}") format("woff2");
 	unicode-range: U+02D7, U+0303, U+0331, U+0E01-0E5B, U+200C-200D, U+25CC;
 }
-@page { size: ${paper_w}mm ${paper_h}mm; margin: ${MARGIN_MM}mm; }
+@page { size: ${paper_w}mm ${paper_h}mm; margin: ${margin}mm; }
 html, body { margin: 0; padding: 0; }
 body {
 	font-family: "Noto Sans Thai", system-ui, -apple-system, sans-serif;
-	color: ${COLOR.text};
+	color: ${C.text};
 	-webkit-print-color-adjust: exact;
 	print-color-adjust: exact;
 }
 svg text { font-family: "Noto Sans Thai", system-ui, -apple-system, sans-serif; }
 .page {
-	width: ${paper_w - 2 * MARGIN_MM}mm;
-	height: ${paper_h - 2 * MARGIN_MM}mm;
+	width: ${paper_w - 2 * margin}mm;
+	height: ${paper_h - 2 * margin}mm;
 	display: flex;
 	flex-direction: column;
 	overflow: hidden;
 	break-after: page;
 }
 .page:last-child { break-after: auto; }
+/* Preview ของแอป: แสดงแผ่นกระดาษเต็มขนาด ไม่มีผลตอนพิมพ์ ช่องว่าง 16px ตรงกับ GUTTER ใน PlanPrint.vue */
+@media screen {
+	html { background: #dfe3ea; overflow: hidden; }
+	body { box-sizing: border-box; width: calc(${paper_w}mm + 32px); padding: 16px; }
+	.page { box-sizing: content-box; padding: ${margin}mm; margin-bottom: 16px; background: #fff; box-shadow: 0 1px 6px rgba(0, 0, 0, 0.25); }
+	.page:last-child { margin-bottom: 0; }
+}
 .head {
-	flex: 0 0 ${HEAD_MM}mm;
+	flex: 0 0 ${T.side_mm || T.head_mm}mm;
 	box-sizing: border-box;
 	display: flex;
 	justify-content: space-between;
@@ -716,6 +1049,47 @@ svg text { font-family: "Noto Sans Thai", system-ui, -apple-system, sans-serif; 
 .legend span { margin-right: 10px; white-space: nowrap; }
 .legend i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 4px; }
 .page > svg { flex: 1 1 auto; min-height: 0; width: 100%; height: 100%; }
+.head-app, .head-exec { display: block; padding: 0 0 1.5mm; }
+.head-app .band { display: flex; justify-content: space-between; align-items: center; padding: 2mm 4mm; border-radius: 2mm; background: linear-gradient(90deg, #1e3a8a, #0369a1); color: #fff; }
+.head-app h1 { font-size: 16px; }
+.head-app .project { font-size: 10px; font-weight: 500; opacity: 0.9; }
+.head-app .chips { display: flex; gap: 7mm; }
+.head-app .chips span { display: flex; flex-direction: column; align-items: flex-end; font-size: 8px; opacity: 0.95; }
+.head-app .chips b { font-size: 14px; font-weight: 700; line-height: 1.15; }
+.head-app .meta { display: flex; flex-wrap: wrap; gap: 1mm 5mm; margin-top: 1.5mm; font-size: 8px; color: #64748b; }
+.head-app .meta b { color: #1e293b; font-weight: 600; }
+.head-app .legend { display: inline-flex; gap: 3mm; margin-top: 0; }
+.head-app .legend span { margin: 0; }
+.head-app .pg { margin-left: auto; }
+.head-formal { display: block; padding: 0 0 1.5mm; }
+.head-formal table { width: 100%; height: 100%; border-collapse: collapse; font-size: 9px; }
+.head-formal th, .head-formal td { padding: 1px 5px; border: 0.6px solid #111; text-align: left; }
+.head-formal th { width: 18mm; background: #e8e8e8; font-weight: 600; white-space: nowrap; }
+.head-formal .ttl { width: 34%; text-align: center; font-size: 11px; font-weight: 600; }
+.head-formal h1 { font-size: 16px; margin: 0; }
+.page-side { flex-direction: row; }
+.page-side > svg { flex: 1 1 0; min-width: 0; width: auto; }
+.head-side { display: flex; flex-direction: column; align-items: stretch; justify-content: flex-start; gap: 0; margin-right: ${SIDE_GAP_MM}mm; padding: 5mm 4mm; border-radius: 3mm; background: linear-gradient(180deg, #1e3a8a, #0369a1); color: #fff; font-size: 8.5px; }
+.head-side h1 { font-size: 15px; }
+.head-side .project { margin-top: 1mm; font-size: 9.5px; line-height: 1.35; opacity: 0.92; }
+.head-side .big { margin: 5mm 0 3mm; }
+.head-side .big span { font-size: 8.5px; opacity: 0.85; }
+.head-side .big b { display: block; font-size: 25px; font-weight: 700; line-height: 1.15; }
+.head-side .track { position: relative; height: 4px; margin-top: 1mm; border-radius: 2px; background: rgba(255, 255, 255, 0.28); }
+.head-side .track i { position: absolute; top: 0; bottom: 0; left: 0; border-radius: 2px; background: #5eead4; }
+.head-side .track u { position: absolute; top: -2px; bottom: -2px; width: 1.5px; background: #fff; }
+.head-side .fact { margin-top: 2mm; }
+.head-side .fact span { display: block; font-size: 7.5px; opacity: 0.8; }
+.head-side .fact b { font-size: 10px; font-weight: 600; }
+.head-side hr { width: 100%; margin: 4mm 0 2mm; border: 0; border-top: 0.6px solid rgba(255, 255, 255, 0.35); }
+.head-side .side-foot { margin-top: auto; font-size: 7.5px; opacity: 0.9; }
+.head-side .legend { display: flex; flex-wrap: wrap; gap: 1mm 3mm; margin: 0 0 1.5mm; }
+.head-side .legend span { margin: 0; }
+.head-side .legend i { outline: 0.6px solid rgba(255, 255, 255, 0.7); }
+.foot { flex: 0 0 ${T.foot_mm}mm; display: flex; justify-content: space-around; align-items: flex-end; box-sizing: border-box; padding-top: 2mm; font-size: 9px; }
+.sign { display: flex; flex-direction: column; align-items: center; gap: 0.6mm; }
+.sign i { display: block; width: 45mm; border-bottom: 0.6px dotted #111; }
+.sign b { font-weight: 600; }
 </style></head><body>${body}</body></html>`;
 }
 

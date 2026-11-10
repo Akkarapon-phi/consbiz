@@ -169,8 +169,17 @@
 
 		<Teleport to="#ss-layer">
 			<Transition name="ss-bar">
-				<div v-if="setup && !readonly" class="ss-bottom-bar">
+				<div v-if="setup && (!readonly || doc.can_delete)" class="ss-bottom-bar">
 					<button
+						v-if="doc.can_delete"
+						type="button"
+						class="ss-btn ss-btn--ghost-danger ss-btn--lg"
+						@click="deleting = true"
+					>
+						<Icon name="trash" :size="17" /> ลบ
+					</button>
+					<button
+						v-if="!readonly"
 						type="button"
 						class="ss-btn ss-btn--ghost ss-btn--lg"
 						:disabled="saving"
@@ -179,6 +188,7 @@
 						บันทึกร่าง
 					</button>
 					<button
+						v-if="!readonly && boot.can.concrete_submit"
 						type="button"
 						class="ss-btn ss-btn--primary ss-btn--lg ss-grow"
 						:disabled="saving || !doc.tickets.length"
@@ -190,6 +200,16 @@
 				</div>
 			</Transition>
 		</Teleport>
+
+		<DeleteSheet
+			:open="deleting"
+			label="ใบเทคอนกรีต"
+			:name="doc.name"
+			method="consbiz.store_app.delete_concrete"
+			:args="{ name: doc.name }"
+			@close="deleting = false"
+			@deleted="back('concrete')"
+		/>
 
 		<Sheet :open="!!ticket" :title="ticket?._new ? 'เพิ่มตั๋วรถ' : 'ตั๋วรถ'" @close="ticket = null">
 			<div v-if="ticket" class="ss-form">
@@ -319,6 +339,7 @@ import Icon from "../../../shared/components/Icon.vue";
 import TopBar from "../../../shared/components/TopBar.vue";
 import Skeleton from "../../../shared/components/Skeleton.vue";
 import Sheet from "../../../shared/components/Sheet.vue";
+import DeleteSheet from "../../../shared/components/DeleteSheet.vue";
 import Stepper from "../../../shared/components/Stepper.vue";
 import Picker from "../../../shared/components/Picker.vue";
 import {
@@ -335,6 +356,7 @@ import {
 	toast,
 	today,
 	vibrate,
+	boot,
 } from "../../../shared/api.js";
 
 const reload_summary = inject("reload_summary");
@@ -363,7 +385,8 @@ const doc = reactive({
 	tickets: [],
 });
 
-const readonly = computed(() => doc.docstatus === 1);
+const readonly = computed(() => doc.docstatus !== 0 || doc.can_write === false);
+const deleting = ref(false);
 const total = computed(() => doc.tickets.reduce((s, t) => s + (Number(t.qty) || 0), 0));
 
 function new_ticket() {

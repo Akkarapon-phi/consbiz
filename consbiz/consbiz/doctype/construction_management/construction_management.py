@@ -815,20 +815,25 @@ def get_boq_plan(boq):
 		"start_date": boq_doc.date or nowdate(),
 		"holiday_list": boq_doc.company
 		and frappe.get_cached_value("Company", boq_doc.company, "default_holiday_list"),
-		"tasks": [
-			{
-				"wbs": row.wbs,
-				"item_name": row.item_name,
-				"boq_detail": row.name,
-				"quantity": row.quantity,
-				"uom": row.uom,
-				"rate": flt(row.material_rate) + flt(row.labour_rate),
-				"amount": row.total_amount,
-				"duration": 1,
-			}
-			for row in boq_doc.boq_details
-		],
+		"tasks": boq_task_rows(boq_doc),
 	}
+
+
+def boq_task_rows(boq_doc):
+	"""แถวงาน 1 แถวต่อ 1 แถว BOQ (ใช้ตอนสร้างแผนและอัปเดตแผนจาก BOQ)"""
+	return [
+		{
+			"wbs": row.wbs,
+			"item_name": row.item_name,
+			"boq_detail": row.name,
+			"quantity": row.quantity,
+			"uom": row.uom,
+			"rate": flt(row.material_rate) + flt(row.labour_rate),
+			"amount": row.total_amount,
+			"duration": 1,
+		}
+		for row in boq_doc.boq_details
+	]
 
 
 def find_project(value):
@@ -843,6 +848,7 @@ def find_project(value):
 @frappe.whitelist()
 def get_schedule_data(name):
 	from consbiz.consbiz.doctype.construction_management.delay import forecast_finish
+	from consbiz.consbiz.doctype.construction_management.structure import can_unconfirm
 
 	doc = frappe.get_doc("Construction Management", name)
 	doc.check_permission("read")
@@ -871,7 +877,16 @@ def get_schedule_data(name):
 		"is_variation",
 		"counted_from",
 	)
-	return {
+	# เลขเดิมใน BOQ ของแต่ละแถว (เลข WBS ของแผนรันใหม่ได้ระหว่างวางแผน)
+	boq_numbers = dict(
+		frappe.get_all(
+			"BOQ Item Detail",
+			filters={"name": ("in", [row.boq_detail for row in doc.tasks if row.boq_detail])},
+			fields=["name", "wbs"],
+			as_list=True,
+		)
+	)
+	data = {
 		"name": doc.name,
 		"boq": doc.boq,
 		"project": doc.project,
@@ -905,13 +920,31 @@ def get_schedule_data(name):
 		"modified": str(doc.modified),
 		"version": schedule_version(doc.name),
 		"can_write": doc.has_permission("write"),
-		"tasks": [{f: row.get(f) for f in fields} for row in doc.tasks],
+		"can_unconfirm": can_unconfirm(doc),
+		"tasks": [
+			{**{f: row.get(f) for f in fields}, "boq_wbs": boq_numbers.get(row.boq_detail)} for row in doc.tasks
+		],
 		"progress_entries": get_progress_entries(doc.name),
 		# ส่งวันหยุดเสมอเพื่อแรเงาใน timeline แม้จะนับวันแบบปฏิทิน
 		"holidays": get_holiday_dates(doc.holiday_list),
 		# แผนคน/เครื่องจักรและวัสดุ (แผงด้านขวาของงานในหน้า Gantt) resources.py
 		**get_plans(doc.name),
+		"can_view_value": doc.has_permlevel_access_to("budget_cost"),
 	}
+	return data if data["can_view_value"] else hide_values(data)
+
+
+def hide_values(data):
+	"""ผู้ไม่มีสิทธิ์เห็นมูลค่า: ส่งเป็นสัดส่วนของมูลค่าสัญญา (รวม = 100)
+	หน้าจอยังคำนวณ % และ S-Curve ได้เหมือนเดิม โดยไม่มีจำนวนเงินจริงออกจาก server"""
+	base = flt(data["revised_amount"]) or flt(data["total_amount"])
+	factor = 100 / base if base else 0
+	for key in ("total_amount", "revised_amount", "variation_amount"):
+		data[key] = flt(data[key]) * factor
+	for row in data["tasks"]:
+		row["amount"] = flt(row.get("amount")) * factor
+	data["variation_steps"] = [{**step, "amount": flt(step["amount"]) * factor} for step in data["variation_steps"]]
+	return data
 
 
 def get_variation_steps(name):
@@ -1055,7 +1088,7 @@ def apply_baseline(doc, baseline):
 def get_baseline(name, baseline):
 	doc = frappe.get_doc(BASELINE, baseline)
 	if doc.construction_management != name:
-		frappe.throw(_("Baseline {0} ไม่ใช่ของแผนงาน {1}").format(doc.title, name))
+		frappe.throw(_("แผนสัญญา {0} ไม่ใช่ของแผนงาน {1}").format(doc.title, name))
 	return doc
 
 
@@ -1063,6 +1096,8 @@ def get_baseline(name, baseline):
 def save_baseline(name, modified, title, reason=None, activate=1):
 	"""บันทึกแผนปัจจุบันเป็น Baseline ชุดใหม่ activate = ใช้ชุดนี้เทียบกับความคืบหน้าจริงด้วย"""
 	doc = get_doc_for_update(name, modified)
+	if doc.boq and frappe.db.get_value("BOQ", doc.boq, "docstatus") == 0:
+		frappe.throw(_("BOQ {0} ยังเป็นร่าง Submit BOQ ก่อนจึงจะยืนยันแผนด้วยแผนสัญญาได้").format(doc.boq))
 	baseline = frappe.get_doc(
 		{
 			"doctype": BASELINE,

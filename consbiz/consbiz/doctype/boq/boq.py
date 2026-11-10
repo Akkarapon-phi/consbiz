@@ -3,6 +3,8 @@
 
 import math
 
+import frappe
+from frappe import _
 from frappe.model.document import Document
 from frappe.utils import flt
 
@@ -11,6 +13,18 @@ class BOQ(Document):
 	def validate(self):
 		assign_wbs(self.boq_details)
 		self.calculate_totals()
+
+	def before_submit(self):
+		from consbiz.consbiz.doctype.construction_management.boq_sync import check_plan_in_sync
+
+		check_plan_in_sync(self)
+
+	def before_cancel(self):
+		plan = frappe.db.get_value(
+			"Construction Management", {"boq": self.name}, "name", order_by="creation desc"
+		)
+		if plan:
+			frappe.throw(_("BOQ นี้มีแผนงาน {0} แล้ว ยกเลิกไม่ได้ งานเพิ่ม-ลดให้ทำผ่าน Variation Order").format(plan))
 
 	def calculate_totals(self):
 		self.total_material_cost = self.total_labour_cost = self.grand_total = 0

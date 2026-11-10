@@ -4,6 +4,8 @@ import DocsHome from "../shared/docs/DocsHome.vue";
 import DocList from "../shared/docs/DocList.vue";
 import DocView from "../shared/docs/DocView.vue";
 import DocForm from "../shared/docs/DocForm.vue";
+import BoqList from "./views/boq/BoqList.vue";
+import BoqForm from "./views/boq/BoqForm.vue";
 
 export default {
 	buy: DocsHome,
@@ -18,4 +20,6 @@ export default {
 	"sell-doc": DocView,
 	"buy-form": DocForm,
 	"sell-form": DocForm,
+	boq: BoqList,
+	"boq-form": BoqForm,
 };

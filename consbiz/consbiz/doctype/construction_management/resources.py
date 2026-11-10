@@ -47,10 +47,10 @@ def get_plans(name):
 	return {"resource_plan": resource_plan_data(name), "material_plan": material_plan_data(name)}
 
 
-def resource_plan_data(name):
+def resource_plan_data(name, ignore_permissions=False):
 	from consbiz.consbiz.doctype.daily_report.daily_report import get_default_resources
 
-	can_read, can_write = plan_permissions(RESOURCE_PLAN, name)
+	can_read, can_write = (True, False) if ignore_permissions else plan_permissions(RESOURCE_PLAN, name)
 	if not can_read:
 		return None
 	doc = frappe.get_doc(RESOURCE_PLAN, name) if frappe.db.exists(RESOURCE_PLAN, name) else None
@@ -64,7 +64,7 @@ def resource_plan_data(name):
 	}
 
 
-def material_plan_data(name):
+def material_plan_data(name, ignore_permissions=False):
 	"""แถววัสดุ + ยอดที่ขอ/สั่ง/รับแล้วของโครงการต่อ Item (supply) และตัวคูณหน่วยสต็อกของแถว (factor)
 	หน้า Gantt ตัดยอดเอง (allocate_materials ใน schedule.js) เพราะวันที่ต้องการเปลี่ยนตามการลากงาน"""
 	from consbiz.consbiz.doctype.construction_material_plan.construction_material_plan import (
@@ -72,7 +72,7 @@ def material_plan_data(name):
 		get_supply,
 	)
 
-	can_read, can_write = plan_permissions(MATERIAL_PLAN, name)
+	can_read, can_write = (True, False) if ignore_permissions else plan_permissions(MATERIAL_PLAN, name)
 	if not can_read:
 		return None
 	doc = frappe.get_doc(MATERIAL_PLAN, name) if frappe.db.exists(MATERIAL_PLAN, name) else None

@@ -185,6 +185,16 @@
 			</Transition>
 		</Teleport>
 
+		<DeleteSheet
+			:open="deleting"
+			:label="kind.label"
+			:name="params.name"
+			method="consbiz.site_app.delete_report"
+			:args="{ doctype: kind.doctype, name: params.name }"
+			@close="deleting = false"
+			@deleted="after_delete"
+		/>
+
 		<PdfViewer
 			:open="pdf_sheet"
 			:url="setup?.pdf_url"
@@ -229,6 +239,7 @@ import TopBar from "../../../shared/components/TopBar.vue";
 import Skeleton from "../../../shared/components/Skeleton.vue";
 import Sheet from "../../../shared/components/Sheet.vue";
 import PdfViewer from "../../../shared/components/PdfViewer.vue";
+import DeleteSheet from "../../../shared/components/DeleteSheet.vue";
 import { REPORT_KINDS } from "../../sections.js";
 import { call, celebrate, desk_url, go, num, post, show_error, state } from "../../../shared/api.js";
 
@@ -292,11 +303,13 @@ const text_blocks = computed(() => {
 	].filter((b) => b.text);
 });
 
+const deleting = ref(false);
 const actions = computed(() => {
 	const s = setup.value;
 	const d = doc.value;
 	const list = [];
 	if (!s) return list;
+	if (s.can_delete) list.push({ label: "ลบ", danger: true, run: () => (deleting.value = true) });
 	if (s.can_approve) {
 		list.push({ label: "ไม่อนุมัติ", danger: true, run: () => (rejecting.value = true) });
 		list.push({ label: "อนุมัติ", primary: true, run: approve });
@@ -324,6 +337,11 @@ const actions = computed(() => {
 	}
 	return list;
 });
+
+function after_delete() {
+	reload_summary();
+	go("reports", { tab: params.kind === "drq" ? "request" : "report" }, { replace: true });
+}
 
 async function load() {
 	try {

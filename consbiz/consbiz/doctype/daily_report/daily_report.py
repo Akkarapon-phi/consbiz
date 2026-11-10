@@ -49,6 +49,7 @@ class DailyReport(Document):
 						row.idx, row.wbs, self.construction_management
 					)
 				)
+			check_reportable(row, task)
 			if task.name in seen:
 				frappe.throw(_("แถว {0}: งาน {1} ซ้ำกับแถวอื่น").format(row.idx, row.wbs))
 			seen.add(task.name)
@@ -261,6 +262,7 @@ def get_leaf_tasks(construction_management):
 			"is_variation",
 			"source_wbs",
 			"contract_quantity",
+			"boq_detail",
 		],
 		order_by="idx",
 	)
@@ -275,6 +277,16 @@ def get_leaf_tasks(construction_management):
 		row.group_path = " > ".join(f"{g.wbs} {g.item_name}" for g in groups)
 		leaves[row.wbs] = row
 	return leaves
+
+
+def is_planning_task(task):
+	"""งานที่เพิ่มในแผนเอง (ไม่มาจาก BOQ / VO มูลค่า 0) ไม่นับ % หน้างานไม่ต้องรายงาน ผู้วางแผนอัปเดตในหน้าแก้แผน"""
+	return not task.boq_detail and not task.is_variation and not flt(task.amount)
+
+
+def check_reportable(row, task):
+	if is_planning_task(task):
+		frappe.throw(_("แถว {0}: งาน {1} เป็นงานวางแผน ไม่ต้องลงในรายงาน").format(row.idx, row.wbs))
 
 
 def get_task_totals(construction_management, exclude_report=None):
@@ -303,6 +315,8 @@ def get_tasks(construction_management, date=None, report=None):
 	totals = get_task_totals(construction_management, exclude_report=report)
 	tasks = []
 	for task in get_leaf_tasks(construction_management).values():
+		if is_planning_task(task):
+			continue
 		previous_qty, previous_percent = totals.get(task.name, (0, 0))
 		tasks.append(
 			{

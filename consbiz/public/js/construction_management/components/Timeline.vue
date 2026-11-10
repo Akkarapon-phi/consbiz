@@ -195,7 +195,7 @@ const bars = computed(() =>
 					"วัน"
 				)})`,
 				task.baseline_start_date
-					? `${__("Baseline")}: ${frappe.datetime.str_to_user(
+					? `${__("แผนสัญญา")}: ${frappe.datetime.str_to_user(
 							task.baseline_start_date
 					  )} - ${frappe.datetime.str_to_user(task.baseline_end_date)}`
 					: "",

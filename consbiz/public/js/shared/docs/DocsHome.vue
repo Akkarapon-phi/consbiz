@@ -2,10 +2,10 @@
      หมวดของออฟฟิศ (purchase/sales) ใช้ชุดเอกสารตาม sections[].docs -->
 <template>
 	<div>
-		<Hero @pick-project="$emit('pick-project')" />
+		<Hero />
 
-		<div class="ss-content ss-content--lift">
-			<!-- ออฟฟิศ: เลือกโครงการที่ชิปบน hero แล้ว / หน้างาน: ขอบเขต โครงการนี้-ทุกโครงการ -->
+		<div class="ss-content">
+			<!-- ออฟฟิศ: เลือกโครงการที่แถบบนแล้ว / หน้างาน: ขอบเขต โครงการนี้-ทุกโครงการ -->
 			<ScopeSwitch v-if="!app.project_filter" />
 
 			<div class="ss-stats">
@@ -86,7 +86,7 @@ import Hero from "../components/Hero.vue";
 import DocCard from "./DocCard.vue";
 import ScopeSwitch from "./ScopeSwitch.vue";
 import { app } from "../app.js";
-import { DOC_KINDS, in_app } from "./kinds.js";
+import { DOC_KINDS, can_doc, in_app } from "./kinds.js";
 import { go, money, scope_key, state } from "../api.js";
 
 const props = defineProps({ section: String });
@@ -100,7 +100,7 @@ const summary = computed(() => state.summaries[section]);
 const loading = computed(() => !summary.value);
 // เฉพาะชนิดที่แอปนี้ดูแล (หน้างาน = ใบขอซื้อ, ออฟฟิศ = ทุกชนิด)
 const kinds = Object.entries(DOC_KINDS)
-	.filter(([key, k]) => k.section === family && in_app(key))
+	.filter(([key, k]) => k.section === family && in_app(key) && can_doc(key))
 	.map(([key, k]) => ({ key, ...k }));
 
 // ร่างของชนิดที่แอปนี้ดูแล กดแล้วไปรายการร่างของชนิดแรกที่มีร่าง
@@ -110,7 +110,7 @@ const drafts = computed(() => {
 	return { count: own.reduce((sum, k) => sum + by_kind[k.key], 0), kind: own[0]?.key };
 });
 
-const stats = computed(() => all_stats().filter((stat) => in_app(stat.view)));
+const stats = computed(() => all_stats().filter((stat) => in_app(stat.view) && can_doc(stat.view)));
 function all_stats() {
 	const s = summary.value || {};
 	if (family === "buy") {

@@ -10,6 +10,9 @@ import frappe
 from frappe.tests import IntegrationTestCase
 
 from consbiz import site_app
+
+# import ก่อน patch: ถ้า dashboard ถูก import ครั้งแรกระหว่าง patch จะจำ analyse ตัวปลอมไว้ตลอด
+from consbiz.consbiz.doctype.construction_management import dashboard  # noqa: F401
 from consbiz.consbiz.doctype.construction_management.construction_management import create_from_boq
 from consbiz.test_store_app import setup_store
 from consbiz.tests.utils import insert_boq
@@ -41,24 +44,35 @@ class IntegrationTestSiteApp(IntegrationTestCase):
 	def test_sections_follow_permissions(self):
 		# หน้างาน: ขอซื้ออย่างเดียว (สั่งซื้อ/แจ้งหนี้/ขาย อยู่แอปออฟฟิศ)
 		boot = site_app.boot_data()
-		self.assertEqual(boot["sections"], ["store", "work", "pm", "buy"])
+		self.assertEqual(boot["sections"], ["store", "work", "pm", "resources", "buy"])
 		self.assertTrue(boot["can"]["daily_report"])
+		self.assertTrue(boot["can"]["finance"])
 		self.assertEqual([a["key"] for a in boot["apps"]], ["site", "office"])
 
 		office = site_app.office_boot_data()
-		self.assertEqual(office["sections"], ["purchase", "sales"])
+		self.assertEqual(office["sections"], ["purchase", "sales", "boq"])
 		self.assertTrue(office["companies"])
 		self.assertEqual([a["key"] for a in office["apps"]], ["site", "office"])
-		# Desktop: หมวดของทุกแอป ขอซื้อของหน้างานซ้ำกับจัดซื้อของออฟฟิศ จึงไม่แสดง
+		# Desktop: หมวดของทุกแอป มีทั้งขอซื้อของหน้างานและจัดซื้อของออฟฟิศ
 		modules = [(m["app"], m["section"]) for m in office["modules"]]
-		self.assertEqual(modules, [m for m in modules if m != ("site", "buy")])
+		self.assertIn(("site", "buy"), modules)
 		self.assertIn(("office", "purchase"), modules)
 		self.assertIn({"app": "office", "section": "sales", "url": "/conserp/sales"}, office["modules"])
 		self.assertIn({"app": "site", "section": "store", "url": "/conserp/store"}, boot["modules"])
 		self.assertEqual(boot["modules"], office["modules"])
 
+	def test_my_profile_returns_session_user(self):
+		self.addCleanup(frappe.set_user, frappe.session.user)
+		frappe.set_user("test@example.com")
+		profile = site_app.get_my_profile()
+		self.assertEqual(profile.email, "test@example.com")
+		# คืนเฉพาะช่องที่กำหนด ไม่มีช่องอื่นของ User ติดมา
+		self.assertEqual(set(profile), set(site_app.PROFILE_FIELDS))
+
 	def test_apps_follow_permissions(self):
-		# ไม่มีสิทธิ์เอกสารซื้อ-ขายเลย = ไม่เห็นแอปออฟฟิศ และขอซื้อของหน้างานกลับมาแสดง
+		# มีจัดซื้อของออฟฟิศก็ยังเห็นขอซื้อของหน้างาน
+		self.assertIn("buy", [m["section"] for m in site_app.app_modules(site_app.sections_by_app())])
+		# ไม่มีสิทธิ์เอกสารซื้อ-ขายเลย = ไม่เห็นแอปออฟฟิศ
 		# ไม่มีหมวดหน้างานเลย = ไม่เห็นแอปหน้างาน
 		with patch.dict(site_app.APP_SECTIONS, {"office": lambda: []}):
 			by_app = site_app.sections_by_app()
@@ -102,6 +116,111 @@ class IntegrationTestSiteApp(IntegrationTestCase):
 		self.assertIsNone(site_app.get_plan(self.project))
 		self.assertEqual(site_app.get_inspections(self.project, "punch"), [])
 		self.assertRaises(frappe.ValidationError, site_app.get_report_form, self.project, "Daily Report")
+
+	def test_late_tasks_are_not_truncated(self):
+		"""ภาพรวมแบ่งหน้าตารางในเครื่อง: API ต้องส่งงานที่ช้าครบ เรียงงานวิกฤตและช้ามากก่อน"""
+		make_plan(self.project)
+		base = {"status": "behind", "variance": -10, "actual_pct": 10, "plan_pct": 20}
+		tasks = [
+			frappe._dict(base, wbs=f"1.{i}", item_name=f"งาน {i}", delay_days=i, critical=0)
+			for i in range(1, 9)
+		]
+		tasks.append(frappe._dict(base, wbs="2.1", item_name="งานวิกฤต", delay_days=1, critical=1))
+		tasks.append(frappe._dict(base, wbs="3.1", item_name="เสร็จแล้ว", status="done", delay_days=9, critical=1))
+		with patch(
+			"consbiz.consbiz.doctype.construction_management.delay.analyse", return_value={"tasks": tasks}
+		):
+			summary = site_app.get_work_summary(self.project)
+		self.assertEqual(summary["late_count"], 9)
+		self.assertEqual(len(summary["late_tasks"]), 9)
+		self.assertEqual([t["wbs"] for t in summary["late_tasks"][:2]], ["2.1", "1.8"])
+
+	def test_pm_summary_matches_work_summary(self):
+		"""ภาพรวมของแผนงานใช้งานที่ช้ากว่าแผน/ความคืบหน้าหมวดชุดเดียวกับควบคุมงาน"""
+		make_plan(self.project)
+		tasks = [
+			frappe._dict(
+				status="behind",
+				variance=-10,
+				actual_pct=10,
+				plan_pct=20,
+				wbs="1.1",
+				item_name="งานช้า",
+				delay_days=3,
+				critical=1,
+			)
+		]
+		rows = dashboard.late_tasks(tasks)
+		self.assertEqual([(r["wbs"], r["delay_days"]) for r in rows], [("1.1", 3)])
+		work = site_app.get_work_summary(self.project)
+		pm = site_app.get_pm_summary(self.project)
+		self.assertEqual([c["wbs"] for c in pm["categories"]], ["1"])
+		self.assertEqual(pm["categories"], work["categories"])
+		self.assertEqual(pm["late_tasks"], work["late_tasks"])
+
+	def test_category_progress(self):
+		def row(name, wbs, indent, amount=0, is_group=0, **kw):
+			return frappe._dict(
+				name=name, wbs=wbs, item_name=wbs, indent=indent, amount=amount, is_group=is_group, **kw
+			)
+
+		doc = frappe._dict(
+			name="plan",
+			tasks=[
+				row("a", "1", 0, is_group=1),
+				row("b", "1.1", 1, 100),
+				row("c", "1.2", 1, 300),
+				row("d", "2", 0, is_group=1),
+				row("e", "2.1", 1),
+				row("f", "2.2", 1),
+				row("g", "VO", 0, is_group=1),
+				row("h", "VO.1", 1, 500, is_variation=1),
+				row("i", "VO.2", 1, 500, is_variation=1, counted_from="2026-12-01"),
+				row("j", "3", 0, 200),
+			],
+		)
+		done = {"b": {"percent": 100}, "e": {"percent": 50}, "i": {"percent": 100}, "j": {"percent": 10}}
+		with patch(
+			"consbiz.consbiz.doctype.construction_management.dashboard.actual_by_task", return_value=done
+		):
+			result = dashboard.category_progress(doc, frappe.utils.getdate("2026-11-10"))
+		# งานเพิ่มยังไม่อนุมัติ/ยังไม่ถึงวันอนุมัติไม่นับ จึงไม่มีหมวด VO
+		self.assertEqual([(c["wbs"], c["percent"]) for c in result], [("1", 25), ("2", 25), ("3", 10)])
+
+	def test_report_list_and_bulk_print(self):
+		make_plan(self.project)
+		form = site_app.get_report_form(self.project, "Daily Request", date="2026-11-02")
+		doc = form["doc"]
+		doc.update({"approver": "Administrator", "items": [{"wbs": "1.1", "qty": 3}]})
+		first = self.save("Daily Request", doc)["name"]
+		doc.update({"date": "2026-11-03"})
+		second = self.save("Daily Request", doc)["name"]
+
+		result = site_app.get_report_list(self.project, "drq")
+		self.assertEqual([r.name for r in result["rows"]], [second, first])
+		self.assertEqual(result["rows"][0].status_label, "รออนุมัติ")
+		self.assertEqual(result["print_limit"], site_app.BULK_PRINT_LIMIT)
+		self.assertEqual(site_app.get_report_list(self.project, "dr")["rows"], [])
+		self.assertRaises(frappe.ValidationError, site_app.get_report_list, self.project, "x")
+
+		# รวมเป็นไฟล์เดียวตามลำดับที่ส่งมา ด้วย Print Format ของเอกสาร
+		names = json.dumps([first, second])
+		with (
+			patch("frappe.utils.print_format.validate_print_permission") as permission,
+			patch("frappe.get_print") as get_print,
+		):
+			site_app.reports_pdf("Daily Request", names)
+		self.assertEqual(permission.call_count, 2)
+		self.assertEqual([c.args[:3] for c in get_print.call_args_list], [
+			("Daily Request", first, "Daily Request"),
+			("Daily Request", second, "Daily Request"),
+		])
+		self.assertEqual(frappe.local.response.type, "pdf")
+
+		self.assertRaises(frappe.ValidationError, site_app.reports_pdf, "Sales Invoice", names)
+		self.assertRaises(frappe.ValidationError, site_app.reports_pdf, "Daily Request", "[]")
+		too_many = json.dumps(["x"] * (site_app.BULK_PRINT_LIMIT + 1))
+		self.assertRaises(frappe.ValidationError, site_app.reports_pdf, "Daily Request", too_many)
 
 	def save(self, doctype, data, submit=0):
 		return site_app.save_report(self.project, doctype, json.dumps(data, default=str), submit=submit)
@@ -174,6 +293,20 @@ class IntegrationTestSiteApp(IntegrationTestCase):
 		report["name"] = result["name"]
 		self.assertRaises(frappe.ValidationError, self.save, "Daily Report", report)
 
+	def test_doc_project_for_notifications(self):
+		make_plan(self.project)
+		doc = site_app.get_report_form(self.project, "Daily Request", date="2026-11-02")["doc"]
+		doc.update({"approver": "Administrator", "items": [{"wbs": "1.1", "qty": 3}]})
+		name = self.save("Daily Request", doc)["name"]
+		self.assertEqual(site_app.get_doc_project("Daily Request", name), self.project)
+
+		# โครงการปิดแล้วไม่อยู่ในตัวเลือกของแอป = ให้เปิดระบบเต็ม
+		frappe.db.set_value("Project", self.project, "status", "Completed")
+		self.assertIsNone(site_app.get_doc_project("Daily Request", name))
+		frappe.db.set_value("Project", self.project, "status", "Open")
+
+		self.assertRaises(frappe.ValidationError, site_app.get_doc_project, "User", "Administrator")
+
 	def test_report_over_quantity(self):
 		make_plan(self.project)
 		doc = site_app.get_report_form(self.project, "Daily Report", date="2026-11-02")["doc"]
@@ -191,7 +324,33 @@ class IntegrationTestSiteApp(IntegrationTestCase):
 		self.assertIn(task["status"], ("done", "not_due", "on_track", "behind", "not_started", "overdue"))
 		self.assertEqual(site_app.get_pm_summary(self.project)["construction_management"], plan)
 		self.assertIn("groups", site_app.get_lookahead(self.project, date="2026-11-02"))
-		self.assertIn("materials", site_app.get_resources(self.project))
+		self.assertIn("material_plan", site_app.get_resource_board(self.project))
+		self.assertIn("months", site_app.get_project_finance(self.project))
+
+	def test_document_tabs(self):
+		self.assertRaises(frappe.PermissionError, site_app.get_pm_document_rows, self.project, "User")
+		self.assertEqual(site_app.get_pm_document_rows(self.project, "Variation Order"), [])
+
+		plan = make_plan(self.project)
+		for doctype, values in (
+			("Variation Order", {"title": "งานเพิ่ม", "date": "2026-11-03", "net_amount": 500}),
+			("Extension of Time", {"title": "ฝนตก", "date": "2026-11-03", "cause": "Other", "requested_days": 3}),
+		):
+			doc = frappe.new_doc(doctype)
+			doc.update({"construction_management": plan, "project": self.project, **values})
+			doc.naming_series = doc.meta.get_field("naming_series").options.split("\n")[0]
+			doc.flags.ignore_validate = True
+			doc.insert(ignore_mandatory=True)
+			self.assertEqual(site_app.get_pm_document_rows(self.project, doctype)[0].status_label, "ร่าง")
+			frappe.db.set_value(doctype, doc.name, {"docstatus": 1, "employer_status": "Approved"})
+			self.assertEqual(site_app.get_pm_document_rows(self.project, doctype)[0].status_label, "อนุมัติแล้ว")
+
+		self.assertEqual(site_app.get_pm_document_rows(self.project, "Variation Order")[0].net_amount, 500)
+		# ผู้ไม่เห็นงบต้นทุนไม่ได้รับมูลค่างานเพิ่ม-ลด
+		with patch("consbiz.site_app.can_view_finance", return_value=False):
+			self.assertNotIn("net_amount", site_app.get_pm_document_rows(self.project, "Variation Order")[0])
+		# เอกสารที่ไม่มีขั้นตอน Submit ไม่มีป้ายสถานะ
+		self.assertEqual(site_app.get_pm_document_rows(self.project, "Construction Baseline"), [])
 
 	def test_status_labels(self):
 		rows = [

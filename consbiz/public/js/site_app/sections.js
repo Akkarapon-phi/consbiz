@@ -13,16 +13,23 @@ export const SECTIONS = {
 		// badge(summary) = ตัวเลขบนเมนู, alert(summary) = แดง
 		tabs: [
 			{ view: "home", label: "หน้าหลัก", icon: "home" },
-			{ view: "receive", label: "รับของ", icon: "receive", badge: (s) => s?.pending_count },
-			{ view: "issue", label: "เบิก", icon: "issue" },
+			{
+				view: "receive",
+				label: "รับของ",
+				icon: "receive",
+				badge: (s) => s?.pending_count,
+				when: (b) => b.can.receive || b.can.receive_employer || b.can.view_receive,
+			},
+			{ view: "issue", label: "เบิก", icon: "issue", when: (b) => b.can.issue || b.can.view_stock },
 			{
 				view: "borrow",
 				label: "ยืม-คืน",
 				icon: "wrench",
+				when: (b) => b.can.borrow || b.can.view_borrow,
 				badge: (s) => s?.borrow_count,
 				alert: (s) => s?.overdue_count,
 			},
-			{ view: "stock", label: "คลัง", icon: "warehouse" },
+			{ view: "stock", label: "คลัง", icon: "warehouse", when: (b) => b.can.view_stock },
 		],
 		// ตัวเลขบนปุ่มสลับหมวด (งานที่รอทำในหมวดนั้น)
 		badge: (s) => s?.pending_count,
@@ -32,12 +39,19 @@ export const SECTIONS = {
 		...MODULE_META.site.work,
 		home: "work",
 		tabs: [
-			{ view: "work", label: "หน้าหลัก", icon: "home" },
-			{ view: "reports", label: "รายงาน", icon: "clipboard", badge: (s) => s?.requests_pending },
-			{ view: "concrete", label: "คอนกรีต", icon: "concrete" },
+			{ view: "work", label: "ภาพรวม", icon: "home" },
+			{
+				view: "reports",
+				label: "รายงาน",
+				icon: "clipboard",
+				badge: (s) => s?.requests_pending,
+				when: (b) => b.can.view_daily_report || b.can.view_daily_request,
+			},
+			{ view: "concrete", label: "คอนกรีต", icon: "truck", when: (b) => b.can.concrete || b.can.view_concrete },
 			{
 				view: "inspections",
 				label: "ตรวจงาน",
+				when: (b) => b.can.inspection || b.can.punch_list,
 				icon: "search-check",
 				badge: (s) => (s?.inspections_pending || 0) + (s?.inspections_failed || 0),
 				alert: (s) => s?.inspections_failed,
@@ -55,8 +69,21 @@ export const SECTIONS = {
 			{ view: "pm", label: "ภาพรวม", icon: "home" },
 			{ view: "plan", label: "แผนงาน", icon: "gantt" },
 			{ view: "lookahead", label: "Look-ahead", icon: "calendar" },
-			{ view: "resources", label: "ทรัพยากร", icon: "users" },
-			{ view: "pm-docs", label: "เอกสาร", icon: "file", wide_only: true },
+			// เฉพาะผู้ที่เห็นงบต้นทุน (site_app.can_view_finance) Cash Flow / ต้นทุน / Earned Value เป็น tab ในหน้า
+			{ view: "finance", label: "การเงิน", icon: "trending", when: (boot) => boot.can?.finance },
+			{ view: "pm-docs", label: "เอกสาร", icon: "file" },
+		],
+	},
+	resources: {
+		key: "resources",
+		...MODULE_META.site.resources,
+		home: "resources",
+		tabs: [
+			{ view: "resources", label: "ต้องสั่ง", icon: "cart" },
+			{ view: "resource-supply", label: "ยอดวัสดุ", icon: "package" },
+			{ view: "resource-people", label: "คน/เครื่อง", icon: "users" },
+			{ view: "resource-gantt", label: "Gantt", icon: "gantt" },
+			{ view: "resource-monthly", label: "รายเดือน", icon: "calendar" },
 		],
 	},
 	// ขอซื้อ: หน้างานสร้าง/ติดตามใบขอซื้อ สั่งซื้อ/แจ้งหนี้/ขาย ทำที่แอปออฟฟิศ (/office)
@@ -87,20 +114,33 @@ export const ROUTES = {
 	stock: { section: "store", params: [] },
 	// ควบคุมงาน
 	work: { section: "work", params: [] },
-	reports: { section: "work", params: ["day"] },
+	reports: { section: "work", params: ["tab", "day"] },
 	// kind = dr (Daily Report) / drq (Daily Request), name = new: เอกสารใหม่ (date, from = Daily Request ที่อนุมัติแล้ว)
 	"report-form": { section: "work", params: ["kind", "name", "date", "from"] },
 	"report-view": { section: "work", params: ["kind", "name"] },
 	inspections: { section: "work", params: ["tab"] },
+	"site-doc": { section: "work", params: ["kind", "name"] },
+	"site-form": { section: "work", params: ["kind", "name", "source"] },
 	concrete: { section: "work", params: [] },
 	"concrete-form": { section: "work", params: ["name"] },
-	// บริหารโครงการ
+	// แผนงาน
 	pm: { section: "pm", params: [] },
 	plan: { section: "pm", params: [] },
+	// แก้แผนงาน (Gantt ของระบบเต็มใน iframe) cm = ชื่อ Construction Management (ว่าง = ของโครงการที่เลือก)
+	"plan-edit": { section: "pm", params: ["cm"] },
 	lookahead: { section: "pm", params: ["week"] },
-	"pm-docs": { section: "pm", params: [] },
-	// tab = labour (คน/เครื่องจักร) / material (แผนจัดซื้อวัสดุ)
-	resources: { section: "pm", params: ["tab"] },
+	"pm-docs": { section: "pm", params: ["tab"] },
+	// งานลด-เพิ่ม / EOT (kind = vo / eot, name = new: เอกสารใหม่) ขอตรวจงาน/Punch List ใช้ site-doc / site-form ของหมวดควบคุมงาน
+	"pm-doc": { section: "pm", params: ["kind", "name"] },
+	"pm-doc-form": { section: "pm", params: ["kind", "name", "source"] },
+	// การเงิน (tab = cost / evm ว่าง = Cash Flow)
+	finance: { section: "pm", params: ["tab"] },
+	// ทรัพยากร
+	resources: { section: "resources", params: [] },
+	"resource-supply": { section: "resources", params: [] },
+	"resource-people": { section: "resources", params: [] },
+	"resource-gantt": { section: "resources", params: [] },
+	"resource-monthly": { section: "resources", params: [] },
 	// ขอซื้อ: รายการ (filter) รายละเอียด และฟอร์ม (kind = mr เท่านั้น ชนิดอื่นเปิดในแอปออฟฟิศ)
 	buy: { section: "buy", params: [] },
 	mr: { section: "buy", params: ["filter"] },
@@ -117,6 +157,11 @@ export const PARENT_TAB = {
 	"borrow-new": "borrow",
 	"report-form": "reports",
 	"report-view": "reports",
+	"plan-edit": "plan",
+	"pm-doc": "pm-docs",
+	"pm-doc-form": "pm-docs",
+	"site-doc": "inspections",
+	"site-form": "inspections",
 };
 
 export const REPORT_KINDS = {

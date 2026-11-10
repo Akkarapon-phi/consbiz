@@ -33,7 +33,7 @@ def is_issue(row):
 
 def get_columns(baseline=False):
 	# เทียบกับ Baseline ถ้าตั้งไว้แล้ว ไม่งั้นแผนปัจจุบัน (delay.target_dates)
-	basis = _("Baseline") if baseline else _("แผน")
+	basis = _("แผนสัญญา") if baseline else _("แผน")
 
 	def column(fieldname, label, fieldtype, width, **extra):
 		return {"fieldname": fieldname, "label": label, "fieldtype": fieldtype, "width": width, **extra}

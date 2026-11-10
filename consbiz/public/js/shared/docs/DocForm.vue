@@ -8,6 +8,15 @@
 			<Skeleton v-if="!form" :rows="3" />
 			<div v-else class="ss-docform-body" :class="{ 'has-insight': xl }">
 				<div class="ss-docform-main">
+					<div v-if="from_plan" class="ss-banner tone-blue">
+						<Icon name="info" :size="22" />
+						<div>
+							<div class="ss-banner-title">รายการจากแผนวัสดุ</div>
+							<div class="ss-banner-text">
+								ดึงเฉพาะส่วนที่ยังขาดมาให้แล้ว ยังไม่บันทึก ตรวจ แก้ไข แล้วกดบันทึกเอง
+							</div>
+						</div>
+					</div>
 					<div v-if="form.source" class="ss-banner tone-blue">
 						<Icon name="info" :size="22" />
 						<div>
@@ -495,7 +504,7 @@ import MoneyInput from "../components/MoneyInput.vue";
 import RichEditor from "../components/RichEditor.vue";
 import SelectBox from "../components/SelectBox.vue";
 import DateInput from "../components/DateInput.vue";
-import { DOC_KINDS } from "./kinds.js";
+import { DOC_KINDS, PLAN_SOURCE, clear_plan_request, plan_request } from "./kinds.js";
 import { app } from "../app.js";
 import { boot, call, celebrate, go, money, post, show_error, state, toast } from "../api.js";
 
@@ -513,6 +522,10 @@ const kind = DOC_KINDS[params.kind] ? params.kind : "po";
 const config = DOC_KINDS[kind];
 const is_mr = kind === "mr";
 const is_new = !params.name || params.name === "new";
+// ขอซื้อจากแผนวัสดุ: รายการมาจากแถวที่ติ๊กในหมวดทรัพยากร (ไม่ใช่เอกสารต้นทาง)
+const from_plan = kind === "mr" && params.source === PLAN_SOURCE;
+const plan = from_plan ? plan_request() : null;
+const source_doc = from_plan ? null : params.source || null;
 
 // ---------------------------------------------------------------- โครงการ / บริษัท (แอปออฟฟิศ)
 const editable_project = computed(() => app.project_filter && !!config.project);
@@ -625,9 +638,11 @@ const subtitle = computed(() =>
 	is_new ? form.value?.project_name || state.project?.project_name || "" : params.name
 );
 const source_label = computed(() => DOC_KINDS[SOURCE_KIND[kind]]?.label || "");
-const back_view = computed(() => (is_new && !params.source ? kind : `${config.section}-doc`));
+const back_view = computed(() =>
+	from_plan ? "resources" : is_new && !params.source ? kind : `${config.section}-doc`
+);
 const back_params = computed(() =>
-	is_new && !params.source
+	from_plan || (is_new && !params.source)
 		? {}
 		: { kind: is_new ? SOURCE_KIND[kind] : kind, name: is_new ? params.source : params.name }
 );
@@ -669,18 +684,28 @@ function with_uid(items) {
 }
 
 async function load() {
+	if (from_plan && !plan) {
+		toast("เลือกวัสดุจากหน้าทรัพยากรอีกครั้ง", "warning");
+		go("resources", {}, { replace: true });
+		return;
+	}
 	try {
 		const data = await call("consbiz.site_docs.get_form", {
 			kind,
 			name: is_new ? null : params.name,
-			source: params.source || null,
+			source: source_doc,
 			// เอกสารใหม่: โครงการ (หน้างาน = ที่ทำงานอยู่, ออฟฟิศ = ตัวกรอง) / บริษัท (ออฟฟิศ)
-			project: state.project?.name || null,
+			project: plan?.project || state.project?.name || null,
 			company: company_override.value || state.company || null,
+			plan_rows: plan ? JSON.stringify(plan.rows) : null,
 		});
 		data.items = with_uid(data.items);
-		const restored = is_new && restore_draft(data);
+		// รายการมาจากแผนที่เลือกครั้งนี้ ไม่กู้ร่างเก่าในเครื่องมาทับ
+		const restored = is_new && !from_plan && restore_draft(data);
 		form.value = data;
+		if (data.plan_others) {
+			toast(`รายการผู้ว่าจ้างจัดหาอีก ${data.plan_others} รายการต้องแยกใบ บันทึกใบนี้แล้วเลือกต่อที่หน้าทรัพยากร`, "info");
+		}
 		// ร่างที่กู้คืนยังไม่มียอดของรายการที่กรอกค้างไว้: คำนวณใหม่ทันที
 		if (restored) preview();
 	} catch (error) {
@@ -705,6 +730,7 @@ function payload() {
 	const f = form.value;
 	// โครงการ/บริษัทของเอกสาร (ออฟฟิศแก้โครงการได้ในฟอร์ม บริษัทเลือกได้เฉพาะเอกสารใหม่)
 	const out = { name: f.name, source: f.source, project: f.project || null, company: f.company || null };
+	if (plan) out.plan_rows = plan.rows;
 	// ช่องหัวเอกสารที่ server รับ (FORM ใน site_docs.py ที่ DocType มีจริง)
 	for (const field of [...(f.fields || []), party_field, remarks_field]) {
 		if (field) out[field] = f[field] ?? null;
@@ -732,7 +758,7 @@ watch(
 	() => form.value && JSON.stringify(payload()),
 	(value, old) => {
 		if (!value || !old) return;
-		if (is_new) {
+		if (is_new && !from_plan) {
 			clearTimeout(draft_timer);
 			draft_timer = setTimeout(() => {
 				try {
@@ -893,6 +919,7 @@ async function save(submit) {
 	saving.value = true;
 	try {
 		const result = await post("consbiz.site_docs.save_doc", { kind, data: payload(), submit });
+		if (from_plan) clear_plan_request();
 		try {
 			localStorage.removeItem(draft_key);
 		} catch {

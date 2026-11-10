@@ -21,11 +21,7 @@
 		<!-- แท็บเล็ต/จอใหญ่: Dock แถบเดียว (กว้างเท่า Dock ของ Frappe) หมวดของกลุ่มแอปนี้
 		     เมนูของหมวดอยู่บนแถบบนของหน้า (SectionTabs.vue) พับ = ไอคอน, ปักหมุด = ไอคอน + ชื่อ -->
 		<Transition name="ss-rail">
-			<aside
-				v-if="has_shell"
-				class="ss-rail"
-				aria-label="เมนูหลัก"
-			>
+			<aside v-if="has_shell" class="ss-rail" aria-label="เมนูหลัก">
 				<button
 					type="button"
 					class="ss-rail-row ss-rail-logo"
@@ -43,7 +39,10 @@
 							:type="m.local ? 'button' : undefined"
 							:href="m.local ? undefined : m.url"
 							class="ss-rail-row ss-rail-mod"
-							:class="{ 'is-open': is_open(m), 'is-active': is_open(m) && active_view === section.home }"
+							:class="{
+								'is-open': is_open(m),
+								'is-active': is_open(m) && active_view === section.home,
+							}"
 							:style="{ '--sw': m.colors[0], '--sw2': m.colors[1] }"
 							:title="m.title"
 							@click="m.local && switch_section(m.section)"
@@ -60,12 +59,33 @@
 				</nav>
 				<!-- ท้าย Dock: บริษัท (ออฟฟิศ) + ผู้ใช้ (เมนู: ระบบเต็ม / ออกจากระบบ) แบบ Dock ของ Frappe -->
 				<div class="ss-rail-foot">
+					<!-- ปุ่มพับ/กาง Dock: แถวบนสุดของโซนท้าย Dock -->
+					<button
+						type="button"
+						class="ss-rail-row ss-rail-toggle"
+						:title="pin_label"
+						:aria-pressed="side === 'expanded' || peek"
+						@click="toggle_side"
+					>
+						<span class="ss-rail-icon">
+							<Icon
+								:name="side === 'expanded' || peek ? 'chevrons-left' : 'chevron-right'"
+								:size="18"
+								:stroke="2.1"
+							/>
+						</span>
+						<span class="ss-rail-text">{{ pin_label }}</span>
+					</button>
 					<button
 						v-if="app.project_filter && companies.length > 1"
+						ref="company_button"
 						type="button"
 						class="ss-rail-row ss-rail-ctx"
+						:class="{ 'is-open': dock_menu === 'company' }"
 						:title="`บริษัท: ${company_label}`"
-						@click="company_sheet = true"
+						aria-haspopup="menu"
+						:aria-expanded="dock_menu === 'company'"
+						@click="toggle_dock_menu('company')"
 					>
 						<span class="ss-avatar" :class="`tone-${tone(state.company || 'all')}`">{{
 							state.company ? initials(company_label) : "ทั้ง"
@@ -76,17 +96,23 @@
 						</span>
 					</button>
 					<button
+						ref="user_button"
 						type="button"
 						class="ss-rail-row ss-rail-ctx ss-rail-user"
-						:class="{ 'is-open': user_menu }"
+						:class="{ 'is-open': dock_menu === 'user' }"
 						:title="boot.full_name"
 						aria-haspopup="menu"
-						:aria-expanded="user_menu"
-						@click="user_menu = !user_menu"
+						:aria-expanded="dock_menu === 'user'"
+						@click="toggle_dock_menu('user')"
 					>
-						<span class="ss-avatar ss-user-avatar" :class="`tone-${tone(boot.user || '')}`">
+						<span
+							class="ss-avatar ss-user-avatar"
+							:class="`tone-${tone(boot.user || '')}`"
+						>
 							<img v-if="boot.user_image" :src="boot.user_image" alt="" />
-							<template v-else>{{ initials(boot.full_name || boot.user || "") }}</template>
+							<template v-else>{{
+								initials(boot.full_name || boot.user || "")
+							}}</template>
 						</span>
 						<span class="ss-rail-text ss-rail-ctx-text">
 							<span>{{ boot.full_name }}</span>
@@ -97,33 +123,22 @@
 			</aside>
 		</Transition>
 
-		<!-- ปุ่มพับ/กาง Dock: ปุ่มกลมเล็กที่ขอบขวาของ Dock (ไม่กินแถว) จอใช้เมาส์แสดงเมื่อชี้ที่ Dock -->
-		<button
-			v-if="has_shell"
-			type="button"
-			class="ss-rail-toggle"
-			:title="pin_label"
-			:aria-label="pin_label"
-			:aria-pressed="side === 'expanded' || peek"
-			@click="toggle_side"
-		>
-			<Icon :name="side === 'expanded' || peek ? 'chevron-left' : 'chevron-right'" :size="14" :stroke="2.6" />
-		</button>
+		<AppTooltip />
+		<ProfileSheet :open="profile_open" @close="profile_open = false" />
+		<SettingsDialog v-if="boot.can?.settings" :open="settings_open" @close="settings_open = false" />
 
-		<Transition name="ss-pop">
-			<div v-if="user_menu" class="ss-user-menu" role="menu">
-				<div class="ss-user-menu-head">
-					<span class="ss-user-menu-name">{{ boot.full_name }}</span>
-					<span class="ss-user-menu-mail">{{ boot.user }}</span>
-				</div>
-				<a v-if="boot.desk" class="ss-user-menu-item" role="menuitem" href="/app">
-					<Icon name="monitor" :size="16" /> ระบบเต็ม
-				</a>
-				<button type="button" class="ss-user-menu-item is-danger" role="menuitem" @click="logout">
-					<Icon name="external" :size="16" /> ออกจากระบบ
-				</button>
-			</div>
-		</Transition>
+		<DockMenu
+			:open="dock_menu === 'company'"
+			:anchor="company_button"
+			:groups="company_groups"
+			@close="dock_menu = ''"
+		/>
+		<DockMenu
+			:open="dock_menu === 'user'"
+			:anchor="user_button"
+			:groups="user_groups"
+			@close="dock_menu = ''"
+		/>
 
 		<!-- มือถือ: แถบเมนูล่างของหมวด (เฉพาะหน้าหลักของแต่ละเมนู) -->
 		<Transition name="ss-nav">
@@ -145,7 +160,11 @@
 					@click="open_tab(tab.view)"
 				>
 					<span class="ss-nav-icon">
-						<Icon :name="tab.icon" :size="22" :stroke="tab.view === active_view ? 2.4 : 2" />
+						<Icon
+							:name="tab.icon"
+							:size="22"
+							:stroke="tab.view === active_view ? 2.4 : 2"
+						/>
 						<Transition name="ss-pop">
 							<span
 								v-if="tab.badge"
@@ -165,16 +184,24 @@
 			:open="picker"
 			title="เลือกโครงการ"
 			:subtitle="
-				app.project_filter ? 'แสดงเอกสารเฉพาะโครงการที่เลือก' : 'ข้อมูลทุกหน้าเป็นของโครงการที่เลือก'
+				app.project_filter
+					? 'แสดงเอกสารเฉพาะโครงการที่เลือก'
+					: 'ข้อมูลทุกหน้าเป็นของโครงการที่เลือก'
 			"
 			half
 			@close="close_picker"
 		>
 			<div class="ss-search">
 				<Icon name="search" :size="18" />
-				<input v-model="project_txt" type="search" placeholder="ค้นหาชื่อหรือรหัสโครงการ" />
+				<input
+					v-model="project_txt"
+					type="search"
+					placeholder="ค้นหาชื่อหรือรหัสโครงการ"
+				/>
 			</div>
-			<div v-if="projects === null" class="ss-options-note"><span class="ss-spinner"></span></div>
+			<div v-if="projects === null" class="ss-options-note">
+				<span class="ss-spinner"></span>
+			</div>
 			<div v-else class="ss-options">
 				<!-- ออฟฟิศ: ไม่กรองโครงการ -->
 				<button
@@ -203,7 +230,7 @@
 					@click="choose_project(p)"
 				>
 					<span class="ss-avatar" :class="`tone-${tone(p.name)}`">{{
-						initials(p.project_name || p.name)
+						project_abbr(p)
 					}}</span>
 					<span class="ss-option-main">
 						<span class="ss-option-label">{{ p.project_name || p.name }}</span>
@@ -211,34 +238,9 @@
 					</span>
 					<Icon v-if="p.name === state.project?.name" name="check" :size="18" />
 				</button>
-				<div v-if="!filtered_projects.length" class="ss-options-note">ไม่พบโครงการที่เปิดอยู่</div>
-			</div>
-		</Sheet>
-
-		<!-- ออฟฟิศ: เลือกบริษัท -->
-		<Sheet
-			:open="company_sheet"
-			title="เลือกบริษัท"
-			subtitle="กรองเอกสาร/ตัวเลข และใช้เป็นบริษัทของเอกสารใหม่"
-			half
-			@close="company_sheet = false"
-		>
-			<div class="ss-options">
-				<button
-					v-for="c in company_options"
-					:key="c.value"
-					type="button"
-					class="ss-option ss-option--project"
-					:class="{ 'is-active': c.value === state.company }"
-					@click="choose_company(c.value)"
-				>
-					<span class="ss-avatar" :class="`tone-${tone(c.value || 'all')}`">{{ c.short }}</span>
-					<span class="ss-option-main">
-						<span class="ss-option-label">{{ c.label }}</span>
-						<span v-if="c.desc" class="ss-option-desc">{{ c.desc }}</span>
-					</span>
-					<Icon v-if="c.value === state.company" name="check" :size="18" />
-				</button>
+				<div v-if="!filtered_projects.length" class="ss-options-note">
+					ไม่พบโครงการที่เปิดอยู่
+				</div>
 			</div>
 		</Sheet>
 
@@ -246,9 +248,16 @@
 
 		<div class="ss-toasts" aria-live="polite">
 			<TransitionGroup name="ss-toast">
-				<div v-for="t in state.toasts" :key="t.id" class="ss-toast" :class="`is-${t.type}`">
+				<div
+					v-for="t in state.toasts"
+					:key="t.id"
+					class="ss-toast"
+					:class="`is-${t.type}`"
+				>
 					<Icon
-						:name="t.type === 'error' ? 'alert' : t.type === 'warning' ? 'info' : 'check'"
+						:name="
+							t.type === 'error' || t.type === 'warning' ? 'alert' : 'check'
+						"
 						:size="18"
 					/>
 					<span>{{ t.message }}</span>
@@ -280,6 +289,10 @@
 import { computed, onBeforeUnmount, onMounted, provide, ref, watch } from "vue";
 import Icon from "./components/Icon.vue";
 import Sheet from "./components/Sheet.vue";
+import DockMenu from "./components/DockMenu.vue";
+import AppTooltip from "./components/AppTooltip.vue";
+import ProfileSheet from "./components/ProfileSheet.vue";
+import SettingsDialog from "./components/SettingsDialog.vue";
 import SectionLauncher from "./components/SectionLauncher.vue";
 import Desktop from "./components/Desktop.vue";
 import { app, is_desktop, is_tab } from "./app.js";
@@ -290,6 +303,7 @@ import {
 	go,
 	init_app,
 	initials,
+	project_abbr,
 	remember_project,
 	remembered_project,
 	scope_key,
@@ -316,14 +330,19 @@ const route_key = computed(
 const desktop = computed(() => is_desktop(state.section));
 // ออฟฟิศ / หน้าแรก: แสดงทั้งเปลือกแอปและหน้าโดยไม่ต้องเลือกโครงการ
 const has_shell = computed(() => !!(state.project || app.project_filter || desktop.value));
-const ready = computed(() => has_shell.value || state.route.view === SECTIONS[state.section]?.home);
+const ready = computed(
+	() => has_shell.value || state.route.view === SECTIONS[state.section]?.home
+);
 
 // มือถือ: แถบล่างเฉพาะหน้าหลักของเมนู (หน้าแรกไม่มี)
 const show_nav = computed(() => is_tab(state.route.view) && has_shell.value && !desktop.value);
 
+// tab.when(boot) = เมนูที่เห็นตามสิทธิ์ (ไม่มี when = ทุกคน)
+const visible_tabs = (s) => s.tabs.filter((tab) => !tab.when || tab.when(boot));
+
 const tabs = computed(() => {
 	const summary = state.summaries[state.section];
-	return section.value.tabs.map((tab) => ({
+	return visible_tabs(section.value).map((tab) => ({
 		...tab,
 		badge: tab.badge?.(summary) || 0,
 		badge_tone: tab.alert?.(summary) ? "is-danger" : "",
@@ -339,7 +358,13 @@ const rail_modules = computed(() => {
 		return ALL_MODULES;
 	const meta = MODULE_META[app.key]?.[state.section];
 	if (!meta) return ALL_MODULES;
-	const current = { ...meta, app: app.key, section: state.section, key: `${app.key}:${state.section}`, local: true };
+	const current = {
+		...meta,
+		app: app.key,
+		section: state.section,
+		key: `${app.key}:${state.section}`,
+		local: true,
+	};
 	const at = ALL_MODULES.findLastIndex((m) => m.app === app.key) + 1;
 	return [...ALL_MODULES.slice(0, at), current, ...ALL_MODULES.slice(at)];
 });
@@ -374,7 +399,6 @@ const picker = ref(false);
 const projects = ref(null);
 const project_txt = ref("");
 
-
 const filtered_projects = computed(() => {
 	const q = project_txt.value.trim().toLowerCase();
 	// ออฟฟิศ: เฉพาะโครงการของบริษัทที่เลือก
@@ -382,7 +406,11 @@ const filtered_projects = computed(() => {
 		(p) => !app.project_filter || !state.company || p.company === state.company
 	);
 	return q
-		? list.filter((p) => `${p.name} ${p.project_name} ${p.company}`.toLowerCase().includes(q))
+		? list.filter((p) =>
+				`${p.name} ${p.project_name} ${p.company} ${p.custom_abbr || ""}`
+					.toLowerCase()
+					.includes(q)
+		  )
 		: list;
 });
 
@@ -407,29 +435,47 @@ function choose_project(project) {
 function close_picker() {
 	picker.value = false;
 	// หน้างานยังไม่เลือกโครงการ: กลับหน้าแรก
-	if (!state.project && !app.project_filter && !desktop.value) go("desktop", {}, { replace: true });
+	if (!state.project && !app.project_filter && !desktop.value)
+		go("desktop", {}, { replace: true });
 }
 // เปิดหมวดของหน้างานโดยยังไม่เลือกโครงการ: ถามโครงการ
 watch(
 	() => state.section,
 	(section) => {
-		if (projects.value && !app.project_filter && !state.project && !is_desktop(section)) picker.value = true;
+		if (projects.value && !app.project_filter && !state.project && !is_desktop(section))
+			picker.value = true;
 	}
 );
 
 // ---------------------------------------------------------------- บริษัท (ออฟฟิศ)
 
-const company_sheet = ref(false);
 const companies = boot.companies || [];
 const company_label = computed(() => state.company || "ทุกบริษัท");
-const company_options = [
-	{ value: "", label: "ทุกบริษัท", short: "ทั้ง", desc: "รวมเอกสารของทุกบริษัท" },
-	...companies.map((c) => ({ value: c.name, label: c.name, short: c.abbr || initials(c.name), desc: "" })),
-];
+const company_groups = computed(() => [
+	{
+		label: "เปลี่ยนบริษัท",
+		items: [
+			{
+				key: "",
+				label: "ทุกบริษัท",
+				icon: "layers",
+				selected: !state.company,
+				onclick: () => choose_company(""),
+			},
+			...companies.map((c) => ({
+				key: c.name,
+				label: c.name,
+				image: c.company_logo,
+				icon: "building",
+				selected: c.name === state.company,
+				onclick: () => choose_company(c.name),
+			})),
+		],
+	},
+]);
 function choose_company(company) {
 	const changed = company !== state.company;
 	set_company(company);
-	company_sheet.value = false;
 	if (!changed) return;
 	// โครงการที่กรองอยู่เป็นของบริษัทอื่น: เลิกกรอง
 	if (state.project && company && state.project.company !== company) {
@@ -439,7 +485,6 @@ function choose_company(company) {
 	state.summaries = {};
 	load_summaries();
 }
-provide("open_company_picker", () => (company_sheet.value = true));
 
 // summary ของแต่ละหมวด (ตัวเลขบนเมนูและบนปุ่มสลับหมวด) ตาม app.summary_api
 const SUMMARY_API = app.summary_api;
@@ -476,8 +521,8 @@ const launcher = ref(false);
 
 // Dock แท็บเล็ต/จอใหญ่ (ความกว้างใน --ss-side ดู style.css)
 // - พับ (ค่าเริ่มต้น): ไอคอนอย่างเดียว (ชี้แล้วไม่กางเอง ชื่อเมนูดูจาก tooltip)
-//   จอสัมผัส = กดปุ่มล่างสุดแล้วกางทับเนื้อหา (html[data-peek]) เลือกเมนู/แตะนอกแถบแล้วพับ
-// - ปักหมุด (expanded): กางค้างและดันเนื้อหา (ปุ่มล่างสุด) จำในเครื่อง
+//   จอสัมผัส = กดปุ่มพับ/กางในโซนท้าย Dock แล้วกางทับเนื้อหา (html[data-peek]) เลือกเมนู/แตะนอกแถบแล้วพับ
+// - ปักหมุด (expanded): กางค้างและดันเนื้อหา (ปุ่มพับ/กาง) จำในเครื่อง
 // ทุกแอปใน ConsERP ใช้ค่าเดียวกัน (สลับหมวดข้าม bundle แล้ว Dock ไม่เปลี่ยนสถานะ)
 const SIDE_KEY = "consbiz.conserp.sidebar";
 const can_hover = window.matchMedia("(hover: hover) and (pointer: fine)").matches;
@@ -488,7 +533,9 @@ function saved_side() {
 		return null;
 	}
 }
-const side = ref(["expanded", "collapsed"].includes(saved_side()) ? saved_side() : app.side_default);
+const side = ref(
+	["expanded", "collapsed"].includes(saved_side()) ? saved_side() : app.side_default
+);
 const peek = ref(false);
 document.documentElement.dataset.side = side.value;
 
@@ -523,13 +570,43 @@ watch(
 	() => (peek.value = false)
 );
 function close_peek(event) {
-	if (peek.value && !event.target.closest?.(".ss-rail, .ss-rail-toggle")) peek.value = false;
-	if (user_menu.value && !event.target.closest?.(".ss-user-menu, .ss-rail-user")) user_menu.value = false;
+	if (peek.value && !event.target.closest?.(".ss-rail, .ss-menu")) peek.value = false;
 }
 
-// ---------------------------------------------------------------- ผู้ใช้
+// ---------------------------------------------------------------- เมนูท้าย Dock (บริษัท / ผู้ใช้)
 
-const user_menu = ref(false);
+const dock_menu = ref("");
+const company_button = ref(null);
+const user_button = ref(null);
+function toggle_dock_menu(name) {
+	dock_menu.value = dock_menu.value === name ? "" : name;
+}
+const profile_open = ref(false);
+const settings_open = ref(false);
+const user_groups = [
+	{
+		items: [
+			{
+				key: "profile",
+				label: boot.full_name,
+				sub: boot.user,
+				avatar: {
+					image: boot.user_image,
+					text: initials(boot.full_name || boot.user || ""),
+					tone: tone(boot.user || ""),
+				},
+				onclick: () => (profile_open.value = true),
+			},
+		],
+	},
+	...(boot.can?.settings
+		? [{ items: [{ key: "settings", label: "ตั้งค่า", icon: "sliders", onclick: () => (settings_open.value = true) }] }]
+		: []),
+	...(boot.desk
+		? [{ items: [{ key: "desk", label: "ระบบเต็ม", icon: "monitor", href: "/app" }] }]
+		: []),
+	{ items: [{ key: "logout", label: "ออกจากระบบ", icon: "log-out", onclick: logout }] },
+];
 async function logout() {
 	try {
 		await call("frappe.handler.logout", {}, { post: true });
@@ -541,26 +618,32 @@ async function logout() {
 document.addEventListener("pointerdown", close_peek);
 onBeforeUnmount(() => document.removeEventListener("pointerdown", close_peek));
 provide("open_launcher", () => (launcher.value = true));
-// เมนูของหมวดบนแถบบน (SectionTabs.vue ใน TopBar / Hero จอ ≥768)
+// เมนูของหมวดบนแถบบน (SectionTabs.vue ใน TopBar จอ ≥768)
 provide("section_nav", { tabs, active_view, open_tab });
 
 onMounted(async () => {
-	// ?project=<รหัส> เลือกโครงการให้เลย (ลิงก์จากฟอร์ม Project / CM)
+	// ?project=<รหัส> เลือกโครงการให้เลย (ลิงก์จากฟอร์ม Project / CM, กดการแจ้งเตือน)
 	const wanted = new URLSearchParams(location.search).get("project");
+	const remembered = remembered_project();
 	start_router();
-	state.project = remembered_project();
+	// มี ?project: ยังไม่แสดงหน้าจนรู้โครงการ ไม่งั้นหน้าเอกสารโหลดด้วยโครงการเดิมแล้ว error
+	state.project = wanted ? null : remembered;
 	await load_projects();
 	const linked = wanted && projects.value.find((p) => p.name === wanted);
 	if (linked) {
 		choose_project(linked);
 		return;
 	}
-	if (state.project && !projects.value.some((p) => p.name === state.project.name)) {
-		state.project = null;
+	state.project = remembered;
+	// ค่าที่จำในเครื่องอาจเก่า (เช่น เพิ่งตั้งตัวย่อโครงการ): ใช้ข้อมูลล่าสุด
+	if (state.project) {
+		state.project = projects.value.find((p) => p.name === state.project.name) || null;
+		remember_project(state.project);
 	}
 	// ออฟฟิศ: โครงการเป็นแค่ตัวกรอง ไม่ต้องเลือกก่อน (ตัวกรองต้องเป็นของบริษัทที่เลือก)
 	if (app.project_filter) {
-		if (state.project && state.company && state.project.company !== state.company) state.project = null;
+		if (state.project && state.company && state.project.company !== state.company)
+			state.project = null;
 		load_summaries();
 	} else if (!state.project && projects.value.length === 1) {
 		choose_project(projects.value[0]);

@@ -44,7 +44,7 @@ const icon = (name, size = "sm") => frappe.utils.icon(name, size);
 // ---------- ความคืบหน้า ----------
 
 const plan_label = computed(() =>
-	data.value.progress.basis === "Baseline" ? __("Baseline") : __("แผน")
+	data.value.progress.basis === "Baseline" ? __("แผนสัญญา") : __("แผน")
 );
 
 const variance = computed(() => {
@@ -136,7 +136,7 @@ const stats = computed(() => {
 			label: __("งานลด-งานเพิ่ม รออนุมัติ"),
 			icon: "git-pull-request",
 			value: d.contract.pending_count,
-			note: d.contract.pending_count ? fmt_money(d.contract.pending_total) : __("ไม่มีค้าง"),
+			note: d.contract.pending_count && d.show_values ? fmt_money(d.contract.pending_total) : __("ไม่มีค้าง"),
 			color: d.contract.pending_count ? "orange" : "gray",
 			route: () => open_list("Variation Order", { docstatus: 1, employer_status: "Pending" }),
 		},
@@ -324,11 +324,11 @@ const index_color = (value) =>
 						</div>
 					</div>
 					<div class="pd-facts">
-						<div>
+						<div v-if="data.show_values">
 							<span>{{ __("มูลค่าสัญญาปรับปรุง") }}</span>
 							<strong>{{ fmt_money(data.contract.revised_amount) }}</strong>
 						</div>
-						<div v-if="data.contract.variation_amount">
+						<div v-if="data.show_values && data.contract.variation_amount">
 							<span>{{ __("งานเพิ่ม-ลดที่อนุมัติ") }}</span>
 							<strong>{{ fmt_money(data.contract.variation_amount) }}</strong>
 						</div>
@@ -391,7 +391,7 @@ const index_color = (value) =>
 					</template>
 					<div v-else class="pd-empty-note">{{ __("ยังไม่ได้กำหนดวันเริ่ม-สิ้นสุดสัญญา") }}</div>
 					<div class="pd-facts pd-facts-inline">
-						<div>
+						<div v-if="data.show_values">
 							<span>{{ __("ค่าปรับคาดการณ์") }}</span>
 							<strong :class="{ 'pd-text-red': data.schedule.penalty }">
 								{{ fmt_money(data.schedule.penalty) }}

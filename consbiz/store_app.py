@@ -82,6 +82,16 @@ def attach_files(files, doctype, name):
 # ---------------------------------------------------------------- ข้อมูลเริ่มต้น
 
 
+def can_delete(doc):
+	"""ลบได้เฉพาะร่างและเอกสารที่ยกเลิกแล้ว ตามสิทธิ์ลบของผู้ใช้ (กติกาเดียวกับปุ่ม Delete ของระบบเต็ม)"""
+	return bool(doc.docstatus != 1 and doc.has_permission("delete"))
+
+
+def delete_document(doc):
+	"""Document.delete ตรวจสิทธิ์ลบ, สถานะเอกสาร และเอกสารอื่นที่อ้างถึงให้เอง"""
+	doc.delete()
+
+
 def boot_data():
 	user = frappe.get_cached_doc("User", frappe.session.user)
 	can = {
@@ -90,6 +100,12 @@ def boot_data():
 		"issue": bool(frappe.has_permission("Stock Entry", "create")),
 		"concrete": bool(frappe.has_permission("Concrete Usage", "create")),
 		"borrow": bool(frappe.has_permission("Equipment Borrowing", "create")),
+		"concrete_submit": bool(frappe.has_permission("Concrete Usage", "submit")),
+		# view_* = เห็นเมนู/รายการ (สิทธิ์อ่าน) ปุ่มทำรายการใช้สิทธิ์สร้างด้านบน
+		"view_receive": bool(frappe.has_permission("Purchase Receipt", "read") or frappe.has_permission("Stock Entry", "read")),
+		"view_stock": bool(frappe.has_permission("Stock Entry", "read")),
+		"view_borrow": bool(frappe.has_permission("Equipment Borrowing", "read")),
+		"view_concrete": bool(frappe.has_permission("Concrete Usage", "read")),
 	}
 	return {
 		"user": user.name,
@@ -106,7 +122,7 @@ def get_projects():
 	return frappe.get_list(
 		"Project",
 		filters={"status": "Open"},
-		fields=["name", "project_name", "company"],
+		fields=["name", "project_name", "company", "custom_abbr"],
 		order_by="modified desc",
 		limit_page_length=300,
 	)
@@ -174,7 +190,8 @@ def get_summary(project):
 
 
 def pending_purchase_orders(project):
-	if not frappe.has_permission("Purchase Order", "read"):
+	# รายการรอรับ = งานที่ต้องกดรับ จึงเห็นเฉพาะผู้ที่สร้างใบรับได้
+	if not (frappe.has_permission("Purchase Order", "read") and frappe.has_permission("Purchase Receipt", "create")):
 		return []
 	po = frappe.qb.DocType("Purchase Order")
 	poi = frappe.qb.DocType("Purchase Order Item")
@@ -209,7 +226,7 @@ def pending_purchase_orders(project):
 
 
 def pending_employer_requests(project):
-	if not frappe.has_permission("Material Request", "read"):
+	if not (frappe.has_permission("Material Request", "read") and frappe.has_permission("Stock Entry", "create")):
 		return []
 	mr = frappe.qb.DocType("Material Request")
 	mri = frappe.qb.DocType("Material Request Item")
@@ -739,11 +756,18 @@ def get_concrete_doc(name):
 	doc = frappe.get_doc("Concrete Usage", name)
 	doc.check_permission("read")
 	out = doc.as_dict(no_default_fields=True)
+	out["can_write"] = bool(doc.has_permission("write"))
+	out["can_delete"] = can_delete(doc)
 	out["concrete_item_name"] = frappe.db.get_value("Item", doc.concrete_item, "item_name")
 	out["supplier_name"] = doc.supplier and frappe.db.get_value("Supplier", doc.supplier, "supplier_name")
 	out["docstatus"] = doc.docstatus
 	out["name"] = doc.name
 	return out
+
+
+@frappe.whitelist(methods=["POST"])
+def delete_concrete(name):
+	delete_document(frappe.get_doc("Concrete Usage", name))
 
 
 CONCRETE_FIELDS = ("wbs", "location", "date", "concrete_item", "strength", "supplier", "employer_supplied", "planned_qty", "remarks")
@@ -902,6 +926,7 @@ def get_borrowing(name):
 		"date": doc.date,
 		"due_date": doc.due_date,
 		"status": doc.status,
+		"can_return": bool(doc.docstatus == 1 and doc.has_permission("write")),
 		"overdue": bool(doc.due_date and getdate(doc.due_date) < getdate(nowdate()) and doc.status != "Returned"),
 		"items": [
 			{
@@ -935,6 +960,7 @@ SEARCH = {
 	"Employee": {"label": "employee_name", "filters": {"status": "Active"}},
 	"Supplier": {"label": "supplier_name", "filters": {"disabled": 0}},
 	"Item": {"label": "item_name", "filters": {"disabled": 0, "has_variants": 0}},
+	"UOM": {"label": "uom_name", "filters": {"enabled": 1}},
 }
 
 

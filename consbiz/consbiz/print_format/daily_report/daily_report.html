@@ -13,7 +13,7 @@
 {%- set money = "{:,.2f}" -%}
 {%- set pct = "{:,.3f}" -%}
 {%- set variance = (doc.progress_variance or 0) | round(3) -%}
-{%- set plan_label = "Baseline" if doc.plan_basis == "Baseline" else "แผนปัจจุบัน" -%}
+{%- set plan_label = "แผนสัญญา" if doc.plan_basis == "Baseline" else "แผนปัจจุบัน" -%}
 
 {% include "consbiz/templates/print/print_style.html" %}
 
@@ -127,7 +127,7 @@
 								<td class="pf-v">{{ pct.format(doc.cumulative_progress or 0) }}%</td>
 							</tr>
 							<tr>
-								<td class="pf-k">แผนสะสม ({{ plan_label }})</td>
+								<td class="pf-k">{{ plan_label }}สะสม</td>
 								<td class="pf-v">{{ pct.format(doc.baseline_progress or 0) }}%</td>
 								<td class="pf-k">เทียบกับแผน</td>
 								<td class="pf-v">

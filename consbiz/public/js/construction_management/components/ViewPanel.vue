@@ -24,7 +24,7 @@ const emit = defineEmits([
 
 const TABS = [
 	{ key: "general", label: __("ทั่วไป") },
-	{ key: "baseline", label: __("Baseline") },
+	{ key: "baseline", label: __("แผนสัญญา") },
 ];
 const viewed = computed(() => props.baselines.find((b) => b.name === props.viewedBaseline) || null);
 const date = (value) => frappe.datetime.str_to_user(value);
@@ -57,7 +57,7 @@ const general = computed(() => [
 ]);
 
 const bars = [
-	{ key: "show_baseline_bars", label: __("แถบ Baseline"), title: __("แถบบางใต้แถบงาน") },
+	{ key: "show_baseline_bars", label: __("แถบแผนสัญญา"), title: __("แถบบางใต้แถบงาน") },
 	{ key: "show_split", label: __("% แผนที่แบ่ง"), title: __("แสดง % แผนที่กำหนดเองบนแถบงาน") },
 	{
 		key: "show_links",
@@ -131,11 +131,11 @@ const icon = (name, size = "sm") => frappe.utils.icon(name, size);
 					</span>
 					<span v-if="baseline.name === activeBaseline" class="indicator-pill blue">{{ __("ใช้เทียบ") }}</span>
 				</button>
-				<div v-if="!baselines.length" class="cs-view-hint">{{ __("ยังไม่มี Baseline") }}</div>
+				<div v-if="!baselines.length" class="cs-view-hint">{{ __("ยังไม่มีแผนสัญญา") }}</div>
 				<template v-if="canWrite">
 					<div class="cs-view-title">{{ __("จัดการ") }}</div>
 					<button type="button" class="cs-view-row" @click="emit('save-baseline')">
-						<span v-html="icon('plus')" />{{ __("บันทึก Baseline ใหม่...") }}
+						<span v-html="icon('plus')" />{{ __("บันทึกแผนสัญญาใหม่...") }}
 					</button>
 					<button
 						type="button"

@@ -5,11 +5,13 @@
 
 - store (สโตร์): รับของ / เบิก / ยืม-คืน / คลัง  API อยู่ที่ consbiz/store_app.py
 - buy (ขอซื้อ): ใบขอซื้อ + ติดตามสถานะ (consbiz/site_docs.py) สั่งซื้อ/แจ้งหนี้/ขายอยู่แอปออฟฟิศ (/office)
-- pm (บริหารโครงการ): ภาพรวมสัญญา/ความล่าช้า, แผนงาน (Gantt ดูอย่างเดียว), Look-ahead, เอกสารโครงการ
+- pm (แผนงาน): ภาพรวมสัญญา/ความล่าช้า, แผนงาน (Gantt ดูอย่างเดียว), Look-ahead, เอกสารโครงการ,
+  การเงิน (Cash Flow, ต้นทุนตามหมวด, Earned Value) เฉพาะผู้ที่เห็นงบต้นทุน (budget_cost permlevel 1)
   ข้อมูลชุดเดียวกับ Tab ของ Construction Management (dashboard.py / lookahead.py) แก้แผนที่หน้า Gantt ในระบบเต็ม
 - work (ควบคุมงาน): โฟร์แมน/วิศวกร ความคืบหน้า + S-Curve, ปฏิทินรายงานประจำวัน, บันทึกคอนกรีต (API ที่ store_app.py),
   กรอก/ส่ง Daily Report และขอ/อนุมัติ Daily Request ในแอป (ทีละขั้น), ดูขอตรวจงาน / Punch List
-  API อยู่ในไฟล์นี้ (ขอตรวจงาน / Punch List สร้างในระบบเต็ม)
+  API อยู่ในไฟล์นี้ (ฟอร์มขอตรวจงาน / Punch List / งานลด-เพิ่ม / EOT อยู่ project_docs.py)
+- resources (ทรัพยากร): วัสดุที่ต้องสั่ง/ยอดวัสดุ/คนและเครื่องจักร ทุกคนที่เข้าหมวดหน้างานได้ ไม่มีมูลค่างาน
 หมวดที่ผู้ใช้เห็น = หมวดที่มีสิทธิ์อ่าน/สร้างเอกสารอย่างน้อย 1 ชนิด (SECTIONS) ทุก API ยังตรวจสิทธิ์ของเอกสารเอง
 """
 
@@ -17,11 +19,10 @@ import frappe
 from frappe import _
 from frappe.utils import cint, flt, getdate, nowdate
 
-from consbiz import store_app
+from consbiz import app_settings, store_app
 from consbiz.site_stock import construction_management_of
 
 LIST_LIMIT = 60
-LATE_TASKS = 6
 WORK_DOCTYPES = ("Daily Report", "Daily Request", "Inspection Request", "Punch List")
 
 
@@ -46,7 +47,17 @@ def office_sections():
 		sections.append("purchase")
 	if readable_any(SELL_DOCTYPES):
 		sections.append("sales")
+	if frappe.has_permission("BOQ", "read"):
+		sections.append("boq")
 	return sections
+
+
+def can_view_finance():
+	"""เมนูการเงินของหมวดแผนงานใช้เกณฑ์เดียวกับ EVM/งบต้นทุน: ต้องเห็นช่อง budget_cost (permlevel 1 ของ Construction Management)"""
+	if not frappe.has_permission("Construction Management", "read"):
+		return False
+	meta = frappe.get_meta("Construction Management")
+	return meta.get_field("budget_cost").permlevel in meta.get_permlevel_access("read")
 
 
 def site_sections(can=None):
@@ -59,8 +70,12 @@ def site_sections(can=None):
 		sections.append("work")
 	if frappe.has_permission("Construction Management", "read"):
 		sections.append("pm")
+	can_buy = frappe.has_permission("Material Request", "read")
+	# ทรัพยากรดูได้ทุกคนที่เข้าหมวดหน้างานได้ (API ไม่ส่งมูลค่างาน)
+	if sections or can_buy:
+		sections.append("resources")
 	# หน้างานขอซื้อได้อย่างเดียว (สั่งซื้อ/แจ้งหนี้/ขาย ทำที่แอปออฟฟิศ)
-	if frappe.has_permission("Material Request", "read"):
+	if can_buy:
 		sections.append("buy")
 	return sections
 
@@ -82,21 +97,51 @@ def available_apps(by_app):
 
 
 def app_modules(by_app):
-	"""หมวดของทุกแอปเรียงตาม APPS (หน้า Desktop / Dock ของแอป ConsERP ที่ติดตั้งตัวเดียว)
-	ขอซื้อของหน้างานซ้ำกับจัดซื้อของออฟฟิศ: มีจัดซื้อแล้วไม่แสดงขอซื้อ"""
+	"""หมวดของทุกแอปเรียงตาม APPS (หน้า Desktop / Dock ของแอป ConsERP ที่ติดตั้งตัวเดียว)"""
 	modules = []
 	for config in APPS:
 		for section in by_app[config["key"]]:
-			if config["key"] == "site" and section == "buy" and "purchase" in by_app.get("office", []):
-				continue
 			modules.append({"app": config["key"], "section": section, "url": f"{config['url']}/{section}"})
 	return modules
 
 
 def add_apps(boot, current):
+	from consbiz.site_docs import doc_permissions
+
 	by_app = sections_by_app(current)
+	boot["docs"] = doc_permissions()
+	boot["can"]["settings"] = app_settings.can_manage()
 	boot["apps"] = available_apps(by_app)
 	boot["modules"] = app_modules(by_app)
+
+
+PROFILE_FIELDS = (
+	"first_name",
+	"middle_name",
+	"last_name",
+	"email",
+	"username",
+	"language",
+	"time_zone",
+	"gender",
+	"birth_date",
+	"phone",
+	"mobile_no",
+	"location",
+	"interest",
+	"bio",
+)
+
+
+@frappe.whitelist()
+def get_my_profile():
+	"""ข้อมูลส่วนตัวของผู้ใช้ที่ล็อกอิน (popup จาก avatar) ไม่รับชื่อผู้ใช้จากภายนอก จึงอ่านได้แค่ของตัวเอง"""
+	profile = frappe.db.get_value("User", frappe.session.user, PROFILE_FIELDS, as_dict=True)
+	if profile.language:
+		profile.language = (
+			frappe.db.get_value("Language", profile.language, "language_name") or profile.language
+		)
+	return profile
 
 
 def office_boot_data():
@@ -109,7 +154,7 @@ def office_boot_data():
 			"desk": bool(sections),
 			# ตัวเลือกบริษัท (กรองรายการ/ตัวเลข + บริษัทของเอกสารใหม่) เฉพาะบริษัทที่ผู้ใช้มีสิทธิ์
 			"companies": frappe.get_list(
-				"Company", fields=["name", "abbr"], order_by="name asc", limit_page_length=0
+				"Company", fields=["name", "abbr", "company_logo"], order_by="name asc", limit_page_length=0
 			),
 			"default_company": frappe.defaults.get_user_default("Company"),
 		}
@@ -123,10 +168,15 @@ def boot_data():
 	can_work = {doctype: bool(frappe.has_permission(doctype, "read")) for doctype in WORK_DOCTYPES}
 	boot["can"].update(
 		{
-			"daily_report": can_work["Daily Report"],
-			"daily_request": can_work["Daily Request"],
+			"daily_report": bool(frappe.has_permission("Daily Report", "create")),
+			"daily_request": bool(frappe.has_permission("Daily Request", "create")),
+			"view_daily_report": can_work["Daily Report"],
+			"view_daily_request": can_work["Daily Request"],
 			"inspection": can_work["Inspection Request"],
 			"punch_list": can_work["Punch List"],
+			"finance": can_view_finance(),
+			"create_inspection": bool(frappe.has_permission("Inspection Request", "create")),
+			"create_punch_list": bool(frappe.has_permission("Punch List", "create")),
 		}
 	)
 	sections = site_sections(boot["can"])
@@ -145,6 +195,33 @@ def readable(doctype):
 	return bool(frappe.has_permission(doctype, "read"))
 
 
+# เอกสารที่หน้าในแอปผูกกับโครงการ (ตรงกับ APP_PAGES ที่ project = true ใน shared/notifications.js)
+PROJECT_PAGE_DOCTYPES = (
+	"Daily Report",
+	"Daily Request",
+	"Variation Order",
+	"Extension of Time",
+	"Inspection Request",
+	"Punch List",
+	"Concrete Usage",
+	"Equipment Borrowing",
+)
+
+
+@frappe.whitelist()
+def get_doc_project(doctype, name):
+	"""โครงการของเอกสาร ให้แอปสลับไปโครงการนั้นก่อนเปิด (กดการแจ้งเตือน)
+	None = แอปเลือกโครงการนั้นไม่ได้ (ไม่อยู่ในรายการของ get_projects) ให้เปิดระบบเต็มแทน"""
+	if doctype not in PROJECT_PAGE_DOCTYPES:
+		frappe.throw(_("ไม่รองรับ {0}").format(doctype))
+	frappe.has_permission(doctype, "read", name, throw=True)
+	project = frappe.db.get_value(doctype, name, "project")
+	if not project:
+		return None
+	names = frappe.get_list("Project", filters={"name": project, "status": "Open"}, pluck="name", limit_page_length=1)
+	return names[0] if names else None
+
+
 # ---------------------------------------------------------------- หน้าหลักของหมวดควบคุมงาน
 
 
@@ -160,6 +237,7 @@ def get_work_summary(project):
 		"curve": [],
 		"late_tasks": [],
 		"late_count": 0,
+		"categories": [],
 		"reports_today": 0,
 		"report_drafts": 0,
 		"requests_pending": 0,
@@ -237,16 +315,17 @@ def plan_status(cm, day):
 		actual_progress_at,
 		target_progress,
 	)
-	from consbiz.consbiz.doctype.construction_management.dashboard import LATE_STATUSES, progress_curve
-	from consbiz.consbiz.doctype.construction_management.delay import STATUS, analyse
+	from consbiz.consbiz.doctype.construction_management.dashboard import (
+		category_progress,
+		late_tasks,
+		progress_curve,
+	)
+	from consbiz.consbiz.doctype.construction_management.delay import analyse
 
 	doc = frappe.get_doc("Construction Management", cm)
 	delay = analyse(doc, day)
 	plan, basis = target_progress(doc, day)
-	late = sorted(
-		(t for t in delay["tasks"] if t.status != "done" and (t.delay_days > 0 or t.status in LATE_STATUSES)),
-		key=lambda t: (not t.critical, -t.delay_days, t.variance),
-	)
+	late = late_tasks(delay["tasks"])
 	return {
 		"curve": progress_curve(doc, day),
 		"progress": {
@@ -255,25 +334,20 @@ def plan_status(cm, day):
 			"basis": basis,
 			"finish_date": doc.revised_finish_date or doc.finish_date,
 		},
+		"categories": category_progress(doc, day),
 		"late_count": len(late),
-		"late_tasks": [
-			{
-				"wbs": t.wbs,
-				"item_name": t.item_name,
-				"status_label": _(STATUS[t.status][0]),
-				"delay_days": t.delay_days,
-				"critical": t.critical,
-				"actual_pct": flt(t.actual_pct, 1),
-				"plan_pct": flt(t.plan_pct, 1),
-			}
-			for t in late[:LATE_TASKS]
-		],
+		"late_tasks": late,
 	}
 
 
 # ---------------------------------------------------------------- รายการเอกสาร
 
 
+EMPLOYER_STATUS = {
+	"Pending": ("รออนุมัติ", "amber"),
+	"Approved": ("อนุมัติแล้ว", "green"),
+	"Rejected": ("ไม่อนุมัติ", "rose"),
+}
 # สถานะของแต่ละชนิด → (ป้าย, tone ของแอป)
 STATUS_LABELS = {
 	"Daily Request": {
@@ -292,6 +366,8 @@ STATUS_LABELS = {
 		"Open": ("ยังแก้ไม่ครบ", "amber"),
 		"Closed": ("ปิดแล้ว", "green"),
 	},
+	"Variation Order": EMPLOYER_STATUS,
+	"Extension of Time": EMPLOYER_STATUS,
 }
 
 
@@ -310,6 +386,53 @@ def with_status(doctype, rows, status_field=None):
 	return rows
 
 
+# ชนิดเอกสารที่แสดงเป็นรายการ -> (ช่องของรายการ, ช่องสถานะ, ช่องวันที่ที่ใช้เรียง)
+DOCUMENT_LISTS = {
+	"Variation Order": (("title", "reference_no", "date", "extension_days", "employer_status"), "employer_status", "date"),
+	"Extension of Time": (
+		("title", "cause", "date", "requested_days", "approved_days", "revised_finish_date", "employer_status"),
+		"employer_status",
+		"date",
+	),
+	"Inspection Request": (
+		("title", "wbs", "item_name", "location", "request_date", "inspection_date", "inspector", "result"),
+		"result",
+		"request_date",
+	),
+	"Punch List": (("title", "date", "status", "open_items", "inspection_request"), "status", "date"),
+	"Daily Report": (("date", "supervisor_name", "today_progress", "cumulative_progress"), None, "date"),
+	"Daily Request": (("date", "requested_by", "status"), "status", "date"),
+	"Construction Baseline": (("title", "baseline_date"), None, "baseline_date"),
+}
+
+
+def document_rows(cm, doctype):
+	"""รายการเอกสารของแผนงาน ล่าสุดก่อน มูลค่างานเพิ่ม-ลดเฉพาะผู้ที่เห็นงบต้นทุน (เกณฑ์เดียวกับเมนูการเงิน)"""
+	fields, status_field, date_field = DOCUMENT_LISTS[doctype]
+	fields = ["name", "docstatus", *fields]
+	if doctype == "Variation Order" and can_view_finance():
+		fields.append("net_amount")
+	rows = frappe.get_list(
+		doctype,
+		filters={"construction_management": cm, "docstatus": ("<", 2)},
+		fields=fields,
+		order_by=f"{date_field} desc, creation desc",
+		limit_page_length=LIST_LIMIT,
+	)
+	return with_status(doctype, rows, status_field) if frappe.get_meta(doctype).is_submittable else rows
+
+
+@frappe.whitelist()
+def get_pm_document_rows(project, doctype):
+	"""tab ของเมนูเอกสาร (หมวดแผนงาน) 1 tab = 1 ชนิดเอกสาร"""
+	if doctype not in DOCUMENT_LISTS:
+		frappe.throw(_("ไม่รองรับเอกสารชนิดนี้"), frappe.PermissionError)
+	_info, cm = check_project(project)
+	if not cm or not readable(doctype):
+		return []
+	return document_rows(cm, doctype)
+
+
 @frappe.whitelist()
 def get_inspections(project, kind="inspection"):
 	"""kind = inspection (Inspection Request) / punch (Punch List) ล่าสุดก่อน"""
@@ -317,35 +440,7 @@ def get_inspections(project, kind="inspection"):
 	doctype = "Punch List" if kind == "punch" else "Inspection Request"
 	if not cm or not readable(doctype):
 		return []
-	filters = {"construction_management": cm, "docstatus": ("<", 2)}
-	if doctype == "Inspection Request":
-		rows = frappe.get_list(
-			doctype,
-			filters=filters,
-			fields=[
-				"name",
-				"title",
-				"wbs",
-				"item_name",
-				"location",
-				"request_date",
-				"inspection_date",
-				"inspector",
-				"result",
-				"docstatus",
-			],
-			order_by="request_date desc, creation desc",
-			limit_page_length=LIST_LIMIT,
-		)
-		return with_status(doctype, rows, "result")
-	rows = frappe.get_list(
-		doctype,
-		filters=filters,
-		fields=["name", "title", "date", "status", "open_items", "inspection_request", "docstatus"],
-		order_by="date desc, creation desc",
-		limit_page_length=LIST_LIMIT,
-	)
-	return with_status(doctype, rows, "status")
+	return document_rows(cm, doctype)
 
 
 # ---------------------------------------------------------------- ปฏิทินรายงานประจำวัน
@@ -366,6 +461,80 @@ def get_calendar(project, month):
 		row.owner_name = frappe.utils.get_fullname(row.owner)
 	data["construction_management"] = cm
 	return data
+
+
+REPORT_KINDS = {"dr": "Daily Report", "drq": "Daily Request"}
+REPORT_LIST_FIELDS = {
+	"Daily Report": ("today_progress", "cumulative_progress", "weather", "problems"),
+	"Daily Request": ("status", "expected_progress", "requested_by"),
+}
+# ไฟล์เดียวสร้างในคำขอเดียว ต้องเสร็จก่อน web worker หมดเวลา
+BULK_PRINT_LIMIT = 50
+
+
+def bulk_print_limit():
+	from frappe.utils.print_format import get_max_bulk_print_docs
+
+	return min(BULK_PRINT_LIMIT, get_max_bulk_print_docs())
+
+
+@frappe.whitelist()
+def get_report_list(project, kind):
+	"""ตารางรายงานประจำวัน / ขออนุมัติปฏิบัติงานของโครงการ (ครบทุกฉบับ แอปแบ่งหน้าและกรองในเครื่อง)"""
+	_info, cm = check_project(project)
+	if not cm:
+		return None
+	doctype = REPORT_KINDS.get(kind)
+	if not doctype:
+		frappe.throw(_("ไม่รองรับ {0}").format(kind))
+	rows = []
+	if readable(doctype):
+		rows = frappe.get_list(
+			doctype,
+			filters={"construction_management": cm, "docstatus": ("<", 2)},
+			fields=["name", "date", "docstatus", "owner", *REPORT_LIST_FIELDS[doctype]],
+			order_by="date desc, creation desc",
+			limit_page_length=0,
+		)
+	with_status(doctype, rows, "status" if doctype == "Daily Request" else None)
+	for row in rows:
+		row.owner_name = frappe.utils.get_fullname(row.owner)
+	return {
+		"rows": rows,
+		"can_print_draft": bool(cint(frappe.db.get_single_value("Print Settings", "allow_print_for_draft"))),
+		"print_limit": bulk_print_limit(),
+	}
+
+
+@frappe.whitelist()
+def reports_pdf(doctype, names):
+	"""รวมเอกสารหลายฉบับเป็น PDF ไฟล์เดียว ใช้ Print Format และตัวสร้าง PDF ชุดเดียวกับ pdf_url
+	(download_multi_pdf ของ Frappe ไม่รับตัวสร้าง PDF จึงไม่ตรงกับปุ่มพิมพ์ทีละฉบับ)"""
+	from io import BytesIO
+
+	from frappe.utils.print_format import validate_print_permission
+	from pypdf import PdfWriter
+
+	check_doctype(doctype)
+	names = frappe.parse_json(names)
+	if not isinstance(names, list) or not names:
+		frappe.throw(_("กรุณาเลือกเอกสาร"))
+	limit = bulk_print_limit()
+	if len(names) > limit:
+		frappe.throw(_("พิมพ์ได้ครั้งละไม่เกิน {0} รายการ").format(limit))
+	print_format, generator = print_options(doctype)
+	writer = PdfWriter()
+	for name in names:
+		doc = frappe.get_doc(doctype, name)
+		validate_print_permission(doc)
+		frappe.get_print(
+			doctype, name, print_format, doc=doc, as_pdf=True, output=writer, pdf_generator=generator
+		)
+	frappe.local.response.filename = f"{doctype.replace(' ', '-')}.pdf"
+	output = BytesIO()
+	writer.write(output)
+	frappe.local.response.filecontent = output.getvalue()
+	frappe.local.response.type = "pdf"
 
 
 # ---------------------------------------------------------------- ฟอร์มรายงาน / ขออนุมัติ (กรอกในแอป)
@@ -430,17 +599,22 @@ ROW_VIEW_FIELDS = (
 )
 
 
-def pdf_url(doctype, name):
-	"""PDF ของ Print Format ชื่อเดียวกับ DocType ตัวสร้าง PDF เลือกแบบเดียวกับปุ่ม PDF ของหน้าพิมพ์ในระบบเต็ม
+def print_options(doctype):
+	"""Print Format ชื่อเดียวกับ DocType และตัวสร้าง PDF แบบปุ่ม PDF ของหน้าพิมพ์ในระบบเต็ม
 	(ของ Print Format ถ้าตั้งไว้ ไม่งั้นของ Print Settings)"""
-	from urllib.parse import urlencode
-
 	print_format = doctype if frappe.db.exists("Print Format", doctype) else None
 	generator = (
 		(print_format and frappe.db.get_value("Print Format", print_format, "pdf_generator"))
 		or frappe.db.get_single_value("Print Settings", "pdf_generator")
 		or "wkhtmltopdf"
 	)
+	return print_format, generator
+
+
+def pdf_url(doctype, name):
+	from urllib.parse import urlencode
+
+	print_format, generator = print_options(doctype)
 	params = {"doctype": doctype, "name": name, "no_letterhead": 0, "pdf_generator": generator}
 	if print_format:
 		params["format"] = print_format
@@ -575,6 +749,7 @@ def get_report_form(project, doctype, name=None, date=None, from_request=None, v
 	}
 	if not doc.is_new():
 		result["pdf_url"] = pdf_url(doctype, doc.name)
+		result["can_delete"] = store_app.can_delete(doc)
 	if doctype == "Daily Request" and not doc.is_new():
 		result.update(request_flags(doc))
 	if cint(view):
@@ -658,6 +833,12 @@ def save_report(project, doctype, data, submit=0):
 
 
 @frappe.whitelist(methods=["POST"])
+def delete_report(doctype, name):
+	check_doctype(doctype)
+	store_app.delete_document(frappe.get_doc(doctype, name))
+
+
+@frappe.whitelist(methods=["POST"])
 def submit_report(name):
 	doc = frappe.get_doc("Daily Report", name)
 	doc.submit()
@@ -680,7 +861,7 @@ def reject_request(name, reason):
 	return {"name": name, "status": "Rejected"}
 
 
-# ---------------------------------------------------------------- บริหารโครงการ (ดูอย่างเดียว)
+# ---------------------------------------------------------------- แผนงาน (ดูอย่างเดียว)
 
 
 def plan_of(project):
@@ -811,16 +992,59 @@ def get_pm_documents(project):
 	return data
 
 
-@frappe.whitelist()
-def get_resources(project):
-	"""แผนทรัพยากร (คน/เครื่องจักรที่ต้องจอง) และแผนจัดซื้อวัสดุ (ต้องสั่งเมื่อไร ขอ/สั่ง/รับแล้วเท่าไร)
-	ชุดเดียวกับ Tab ทรัพยากรของ CM (resources.get_overview)"""
-	from consbiz.consbiz.doctype.construction_management.resources import get_overview
+BOARD_TASK_FIELDS = ("name", "wbs", "item_name", "is_group", "indent", "start_date", "end_date", "duration", "plan_distribution")
 
+
+@frappe.whitelist()
+def get_resource_board(project):
+	"""หมวดทรัพยากร: ข้อมูลรูปแบบเดียวกับ get_schedule_data แต่มีแค่รายการและวันที่
+	ผู้ใช้อาจไม่มีสิทธิ์อ่านแผนงาน จึงใช้สิทธิ์เข้าหมวดแทน และไม่ส่งมูลค่างาน/น้ำหนัก"""
+	from consbiz.consbiz.doctype.construction_management.construction_management import (
+		get_holiday_dates,
+		schedule_version,
+	)
+	from consbiz.consbiz.doctype.construction_management.resources import material_plan_data, resource_plan_data
+
+	_info, cm = check_project(project)
+	if not cm:
+		return None
+	if "resources" not in site_sections():
+		frappe.throw(_("ไม่มีสิทธิ์ดูทรัพยากร"), frappe.PermissionError)
+	doc = frappe.get_doc("Construction Management", cm)
+	return {
+		"name": doc.name,
+		"project": doc.project,
+		"finish_date": doc.finish_date,
+		"revised_finish_date": doc.revised_finish_date,
+		"use_working_days": doc.use_working_days,
+		"week_by_month": doc.week_by_month,
+		"holidays": get_holiday_dates(doc.holiday_list),
+		"modified": str(doc.modified),
+		"version": schedule_version(doc.name),
+		"can_write": False,
+		# ฟอร์มขอซื้ออยู่หมวด buy ต้องเปิดหมวดนั้นได้ด้วย
+		"can_request": bool(
+			frappe.has_permission("Material Request", "create") and frappe.has_permission("Material Request", "read")
+		),
+		"baselines": [],
+		"active_baseline": None,
+		"progress_entries": [],
+		"tasks": [{field: row.get(field) for field in BOARD_TASK_FIELDS} for row in doc.tasks],
+		"resource_plan": resource_plan_data(cm, ignore_permissions=True),
+		"material_plan": material_plan_data(cm, ignore_permissions=True),
+	}
+
+
+@frappe.whitelist()
+def get_project_finance(project, date=None):
+	"""เมนูการเงิน = Tab การเงินของ CM (finance.get_finance) เฉพาะผู้ที่เห็นงบต้นทุน"""
+	from consbiz.consbiz.doctype.construction_management.finance import get_finance
+
+	if not can_view_finance():
+		frappe.throw(_("ไม่มีสิทธิ์ดูข้อมูลการเงินของโครงการ"), frappe.PermissionError)
 	cm = plan_of(project)
 	if not cm:
 		return None
-	data = get_overview(cm)
-	data.pop("chart", None)
+	data = get_finance(cm, date)
 	data["construction_management"] = cm
 	return data

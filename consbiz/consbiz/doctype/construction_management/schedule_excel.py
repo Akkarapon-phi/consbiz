@@ -38,8 +38,8 @@ COLUMNS = (
 	("end_date", "วันจบ", 11, "date"),
 	("duration", "จำนวนวัน", 8, "int"),
 	("predecessors", "งานก่อนหน้า", 16, "text"),
-	("baseline_start_date", "เริ่ม (Baseline)", 11, "date"),
-	("baseline_end_date", "จบ (Baseline)", 11, "date"),
+	("baseline_start_date", "เริ่ม (แผนสัญญา)", 11, "date"),
+	("baseline_end_date", "จบ (แผนสัญญา)", 11, "date"),
 	("progress", "% จริง", 8, "percent"),
 )
 # คอลัมน์ที่อ่านตอนนำเข้า และชื่อหัวคอลัมน์อื่นที่รับ (เช่น ไฟล์จาก MS Project)

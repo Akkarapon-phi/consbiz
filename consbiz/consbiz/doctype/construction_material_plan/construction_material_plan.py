@@ -272,21 +272,32 @@ def set_item_project(doc, method=None):
 			row.project = project
 
 
-def due_lines(plan, days):
-	"""ส่วนที่ยังขาดของแถวที่ต้องสั่งภายใน days วันนับจากวันนี้ (รวมที่เลยกำหนดแล้ว) รวมต่อ Item
+def shortfall_lines(plan, include):
+	"""ส่วนที่ยังขาดของแถวที่ include(row) เป็นจริง รวมตาม Item
 	[{item_code, stock_qty, required_by (เร็วสุด), rows}]"""
-	limit = getdate(add_days(nowdate(), cint(days)))
 	coverage, _supply = plan_coverage(plan)
 	lines = {}
 	for row in plan.items:
 		shortfall = coverage[row.name]["shortfall"]
-		if shortfall <= EPSILON or not row.order_by or getdate(row.order_by) > limit:
+		if shortfall <= EPSILON or not include(row):
 			continue
 		line = lines.setdefault(row.item_code, {"item_code": row.item_code, "stock_qty": 0.0, "required_by": row.required_by, "rows": []})
 		line["stock_qty"] += shortfall
 		line["required_by"] = min(getdate(line["required_by"]), getdate(row.required_by))
 		line["rows"].append(row)
 	return list(lines.values())
+
+
+def due_lines(plan, days):
+	"""ส่วนที่ยังขาดของแถวที่ต้องสั่งภายใน days วันนับจากวันนี้"""
+	limit = getdate(add_days(nowdate(), cint(days)))
+	return shortfall_lines(plan, lambda row: row.order_by and getdate(row.order_by) <= limit)
+
+
+def selected_lines(plan, row_names):
+	"""ส่วนที่ยังขาดของแถวที่ผู้ใช้ติ๊กเลือก แถวของแผนอื่นไม่นับ"""
+	names = set(row_names)
+	return shortfall_lines(plan, lambda row: row.name in names and row.required_by)
 
 
 def clear_missing_user_links(doc):
@@ -374,16 +385,34 @@ def make_material_request(name, days=14):
 	lines = due_lines(plan, days)
 	if not lines:
 		frappe.throw(_("ไม่มีวัสดุที่ต้องสั่งเพิ่มภายใน {0} วัน").format(cint(days)))
+	return create_requests(plan, lines)
+
+
+def create_requests(plan, lines):
+	"""บันทึก MR ฉบับร่าง และเก็บเลข MR ล่าสุดไว้ที่แถวของแผน"""
 	names = []
 	for request in build_material_requests(plan, lines):
 		request.insert()
 		names.append(request.name)
-		codes = {row.item_code for row in request.items}
-		for line in lines:
-			if line["item_code"] in codes:
-				for row in line["rows"]:
-					row.db_set("material_request", request.name)
+		link_request_rows(request, lines)
 	return names
+
+
+def link_request_rows(request, lines):
+	"""เก็บเลข MR ล่าสุดไว้ที่แถวของแผน (เฉพาะรายการที่อยู่ใน MR นั้นจริง)"""
+	codes = {row.item_code for row in request.items}
+	for line in lines:
+		if line["item_code"] in codes:
+			for row in line["rows"]:
+				row.db_set("material_request", request.name)
+
+
+def requests_for_rows(plan, row_names):
+	"""MR ที่ยังไม่บันทึกของแถวที่เลือก (หมวดทรัพยากรเปิดเป็นฟอร์มให้ผู้ใช้ตรวจแล้วกดบันทึกเอง) คืน (requests, lines)"""
+	lines = selected_lines(plan, row_names)
+	if not lines:
+		frappe.throw(_("รายการที่เลือกขอครบแล้ว"))
+	return build_material_requests(plan, lines), lines
 
 
 

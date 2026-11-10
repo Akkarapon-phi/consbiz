@@ -144,6 +144,15 @@ STATUS = {
 }
 
 
+def doc_permissions():
+	"""สิทธิ์ต่อชนิดเอกสารของผู้ใช้ (boot.docs) หน้าจอซ่อนเมนู/ปุ่มตามนี้ ส่วน API ตรวจซ้ำทุกคำขอ"""
+	doctypes = {**{kind: config["doctype"] for kind, config in DOCS.items()}, "boq": "BOQ"}
+	return {
+		kind: {ptype: bool(frappe.has_permission(doctype, ptype)) for ptype in ("read", "create", "submit", "export")}
+		for kind, doctype in doctypes.items()
+	}
+
+
 def status_of(status, docstatus):
 	if cint(docstatus) == 0:
 		return STATUS["Draft"]
@@ -398,6 +407,7 @@ def get_docs(
 	for row in rows:
 		row.pdf_url = base_pdf.replace("__NAME__", quote_plus(row.name))
 	if cint(export):
+		frappe.has_permission(doctype, "export", throw=True)
 		return {"rows": rows}
 
 	sum_fields = [f for f in (config["amount"], config.get("outstanding")) if f]
@@ -426,6 +436,17 @@ def get_docs(
 		"sums": sums,
 		"counts": counts,
 	}
+
+
+@frappe.whitelist(methods=["POST"])
+def delete_doc(kind, name):
+	"""ลบเอกสาร (ร่าง/ยกเลิกแล้ว) แถวแผนวัสดุเก็บเลขใบขอซื้อไว้อ้างอิง (Link) ล้างก่อน ไม่งั้นลบไม่ได้"""
+	doc = doc_for(kind, name)
+	if kind == "mr" and store_app.can_delete(doc):
+		frappe.db.set_value(
+			"Construction Material Plan Item", {"material_request": doc.name}, "material_request", None
+		)
+	store_app.delete_document(doc)
 
 
 @frappe.whitelist(methods=["POST"])
@@ -826,6 +847,7 @@ def get_doc(kind, name):
 		"after": after,
 		"can_submit": bool(doc.docstatus == 0 and frappe.has_permission(doc.doctype, "submit", doc)),
 		"can_edit": bool(doc.docstatus == 0 and frappe.has_permission(doc.doctype, "write", doc)),
+		"can_delete": store_app.can_delete(doc),
 		"after_submit": after_submit_info(doc, kind),
 		"next_kind": next_of(doc, kind),
 		"pdf_url": pdf_url(doc.doctype, doc.name),
@@ -1160,8 +1182,28 @@ def new_doc(kind, project, company=None):
 	return doc
 
 
-def load_doc(kind, name=None, source=None, project=None, company=None):
-	"""เอกสารร่างเดิม / เอกสารใหม่จาก mapper / เอกสารใหม่เปล่า ยังไม่บันทึก"""
+def plan_request(project, plan_rows):
+	"""ใบขอซื้อใหม่จากแถวแผนวัสดุที่ติ๊กในหมวดทรัพยากร ยังไม่บันทึก
+	ซื้อเอง/ผู้ว่าจ้างจัดหาปนกัน = ทำทีละใบ (ใบแรกก่อน รายการที่เหลือยังค้างให้ขอต่อ) จำนวนที่เหลืออยู่ใน flags.plan_others"""
+	from consbiz.consbiz.doctype.construction_material_plan.construction_material_plan import requests_for_rows
+	from consbiz.site_app import check_project
+
+	_info, cm = check_project(project)
+	if not cm or not frappe.db.exists("Construction Material Plan", cm):
+		frappe.throw(_("โครงการนี้ยังไม่มีแผนวัสดุ"))
+	rows = frappe.parse_json(plan_rows) if isinstance(plan_rows, str) else plan_rows
+	requests, lines = requests_for_rows(frappe.get_doc("Construction Material Plan", cm), rows)
+	doc = requests[0]
+	# ราคาแนะนำเหมือนตอนเลือกสินค้าในฟอร์มเอง (search_items)
+	for row in doc.items:
+		row.rate = flt(frappe.db.get_value("Item", row.item_code, "last_purchase_rate"))
+	doc.flags.plan_lines = lines
+	doc.flags.plan_others = sum(len(request.items) for request in requests[1:])
+	return doc
+
+
+def load_doc(kind, name=None, source=None, project=None, company=None, plan_rows=None):
+	"""เอกสารร่างเดิม / เอกสารใหม่จาก mapper / จากแผนวัสดุ / เอกสารใหม่เปล่า ยังไม่บันทึก"""
 	config = config_of(kind)
 	doctype = config["doctype"]
 	if name:
@@ -1171,6 +1213,8 @@ def load_doc(kind, name=None, source=None, project=None, company=None):
 			frappe.throw(_("{0} ส่งแล้ว แก้ไขไม่ได้").format(name))
 		return doc
 	frappe.has_permission(doctype, "create", throw=True)
+	if plan_rows and kind == "mr":
+		return plan_request(project, plan_rows)
 	if source:
 		doc = mapped_doc(kind, source)
 		if config["project"] and project and not doc.get(config["project"]):
@@ -1400,12 +1444,13 @@ def item_uoms(item_code):
 
 
 @frappe.whitelist()
-def get_form(kind, name=None, source=None, project=None, company=None):
+def get_form(kind, name=None, source=None, project=None, company=None, plan_rows=None):
 	"""ข้อมูลฟอร์มสร้าง/แก้ไข: เอกสาร (ยังไม่บันทึก) + ตัวเลือกภาษี"""
-	doc = load_doc(kind, name=name, source=source, project=project, company=company)
+	doc = load_doc(kind, name=name, source=source, project=project, company=company, plan_rows=plan_rows)
 	apply_form(doc, kind, {"items": serialize_form(doc, kind)["items"]})
 	out = serialize_form(doc, kind)
 	out["source"] = source
+	out["plan_others"] = doc.flags.plan_others or 0
 	out["fields"] = [field for field in FORM[kind]["header"] if doc.meta.has_field(field)]
 	out["tax_templates"] = tax_templates(doc)
 	out["can_submit"] = frappe.has_permission(doc.doctype, "submit")
@@ -1426,6 +1471,7 @@ def preview_doc(kind, data):
 		source=data.get("source"),
 		project=data.get("project"),
 		company=data.get("company"),
+		plan_rows=data.get("plan_rows"),
 	)
 	# ERPNext อาจเขียนข้อมูลระหว่างเติมค่า (เช่น สร้าง Item Price อัตโนมัติ) ตัวอย่างยอดต้องไม่บันทึกอะไร
 	# ย้อนเฉพาะส่วนนี้ด้วย savepoint (ไม่ย้อนทั้ง transaction ที่อาจมีงานอื่นอยู่ก่อน)
@@ -1464,6 +1510,7 @@ def save_doc(kind, data, submit=0):
 		source=data.get("source"),
 		project=data.get("project"),
 		company=data.get("company"),
+		plan_rows=data.get("plan_rows"),
 	)
 	apply_form(doc, kind, data)
 	if not doc.get("items"):
@@ -1472,6 +1519,10 @@ def save_doc(kind, data, submit=0):
 	doc.save()
 	if wanted:
 		keep_request_rates(doc, wanted)
+	if doc.flags.plan_lines:
+		from consbiz.consbiz.doctype.construction_material_plan.construction_material_plan import link_request_rows
+
+		link_request_rows(doc, doc.flags.plan_lines)
 	if cint(submit):
 		doc.submit()
 	return {"name": doc.name, "docstatus": doc.docstatus}
