@@ -37,9 +37,23 @@ function contract_text(data) {
 
 function status_text(p) {
 	const { plan, actual, baseline } = p.summary;
+	const pct = (value) => (Number(value) || 0).toFixed(3);
 	const head = `ณ วันที่ ${date_text(p.cutoff)}:`;
-	const base = baseline === null ? "" : ` แผนสัญญา ${percent(baseline)}% ·`;
-	return `${head}${base} แผน ${percent(plan)}% · จริง ${percent(actual)}%`;
+	const base = baseline === null ? "" : ` แผนสัญญา ${pct(baseline)}% ·`;
+	return `${head}${base} แผน ${pct(plan)}% · จริง ${pct(actual)}%`;
+}
+
+// ชื่อไฟล์ PDF: แผนงาน_ปี พ.ศ.-เดือน-วัน ของ Cut-off_ชื่อโครงการ (เรียงตามชื่อไฟล์แล้วได้ตามวันที่) (ชื่อยาวตัดคำ)
+const MAX_NAME = 40;
+export function print_file_name(p) {
+	const [year, month, day] = String(p.cutoff).slice(0, 10).split("-");
+	const clean = String(p.data.project_name || p.data.name || "")
+		.replace(/[\\/:*?"<>|\u0000-\u001f]/g, " ")
+		.replace(/\s+/g, " ")
+		.trim();
+	const letters = [...new Intl.Segmenter("th", { granularity: "grapheme" }).segment(clean)].map((s) => s.segment);
+	const project = letters.slice(0, MAX_NAME).join("").trim();
+	return `แผนงาน_${Number(year) + 543}-${month}-${day}_${project}`;
 }
 
 function extent_of(p) {
@@ -91,7 +105,7 @@ export function build_print_model(p, settings, rows, options, fit) {
 		curve: p.curves[c.key],
 	}));
 	return {
-		title: data.project_name || data.name,
+		title: print_file_name(p),
 		project_name: data.project_name || "",
 		employer: data.employer,
 		contractor: data.contractor,

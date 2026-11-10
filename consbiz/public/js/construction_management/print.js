@@ -22,6 +22,7 @@ import {
 	next_of,
 	parse_distribution,
 	period_shares,
+	segments,
 	periods,
 	sample_curve,
 	smooth_path,
@@ -119,7 +120,7 @@ const THEMES = {
 		head: "app",
 		head_mm: 25,
 		foot_mm: 0,
-		frame_rx: 10,
+		frame_rx: 4,
 		bar: {
 			h: 9,
 			rx: 3,
@@ -171,7 +172,7 @@ const THEMES = {
 		head_mm: 0,
 		side_mm: 46,
 		foot_mm: 0,
-		frame_rx: 10,
+		frame_rx: 4,
 		bar: {
 			h: 9,
 			rx: 4,
@@ -274,6 +275,7 @@ export function print_gantt(model, options) {
 // content_scale (%) = ย่อ/ขยายเนื้อหาทั้งหน้า, period_scale (%) = ความกว้างช่องเวลาของแบบต่อเนื่อง, margin = ระยะขอบ (มม.)
 export function build_print(model, options) {
 	T = THEMES[options.template] || CLASSIC;
+	clip_seq = 0;
 	C = T.color;
 	const size = PAPER[options.paper];
 	const [short, long] = size;
@@ -296,6 +298,7 @@ export function build_print(model, options) {
 	};
 	// งานพิมพ์ใช้ช่วงเวลาเท่าที่มีงาน (บนจอปัดเป็นทั้งเดือน/ทั้งปีเผื่อเลื่อนดู)
 	model = { ...with_range(model, { top, bottom }), page_px };
+	model.tail = tail_width(model);
 	let pages;
 	let layout;
 	if (options.mode === "pages") {
@@ -319,6 +322,7 @@ export function build_print(model, options) {
 				rows: [0, model.rows.length],
 				days: [model.range.start, model.range.end],
 				band_h: fit.band_h,
+				slice_w: fit.slice_w,
 			},
 		];
 	}
@@ -345,10 +349,12 @@ function fit_model(model, content_w, content_h) {
 	const height = HEADER + Math.max(model.rows.length, 1) * ROW + summary_h + panel_of(model);
 	const scale = Math.min(content_h / height, 1);
 	const days = model.range.end - model.range.start;
-	const ppd = Math.max((content_w / scale - grid_width) / days, 0.3);
+	const tail = model.tail || 0;
+	const ppd = Math.max((content_w / scale - grid_width - tail) / days, 0.3);
 	return {
 		model: { ...model, ppd },
 		band_h: content_h / scale - HEADER - summary_h,
+		slice_w: tail ? days * ppd + tail : undefined,
 	};
 }
 
@@ -398,7 +404,9 @@ class Layout {
 		};
 		for (const period of this.bottom_periods) {
 			const slice_w = content_w - width_of(columns);
-			if ((period.end - from) * this.model.ppd > slice_w && period.start > from) {
+			// ช่องสุดท้ายต้องเหลือที่ว่างท้าย Timeline
+			const tail = period === this.bottom_periods.at(-1) ? this.model.tail || 0 : 0;
+			if ((period.end - from) * this.model.ppd + tail > slice_w && period.start > from) {
 				close(period.start);
 			}
 		}
@@ -543,9 +551,8 @@ class Layout {
 			const top = m.show_baseline_bars ? 4 : 5;
 			const h = m.show_baseline_bars ? 9 : ROW - 10;
 			if (T.bar) {
-				out.push(...themed_bar(task, x(start), w, y, m));
-				if (!task.is_group) out.push(...split_texts(task, start, end, x, y + ROW / 2 + 2, m));
-				out.push(...end_texts(task, x(end + 1) + 4, y, m));
+				out.push(...themed_bar(task, x(start), w, y, m, start, end, x));
+				out.push(...placed_end_texts(task, x(start), x(end + 1), y, m, gx, gx + slice_w));
 				return;
 			}
 			const status_color = bar_status_color(task, m);
@@ -747,7 +754,7 @@ function fitted_top_label(period, m, room) {
 }
 
 // แถบงานของแบบเอกสาร (T.bar): พื้นจางแล้วทับด้วยส่วนที่ทำจริง กลุ่ม = เส้นบางมีขีดปิดหัวท้าย
-function themed_bar(task, x0, w, y, m) {
+function themed_bar(task, x0, w, y, m, start, end, x) {
 	const style = T.bar;
 	const metric = m.metrics.get(task.name) || {};
 	const done = (w * Math.min(metric.actual_pct || 0, 100)) / 100;
@@ -771,8 +778,47 @@ function themed_bar(task, x0, w, y, m) {
 			style.stroke ? ` stroke="${color}" stroke-opacity="${style.stroke}" stroke-width="0.7"` : ""
 		}/>`,
 	];
+	// % ที่แบ่ง แบบหน้าแผนงาน: ตัวเข้มบนพื้นอ่อน ตัวขาวบนส่วนที่ทำจริง ตัดไม่ให้ล้นแถบ
+	const shares = bar_shares(task, start, end, x, m);
+	const mid = top + h / 2 + SHARE_FONT * 0.36;
+	const labels = (fill) =>
+		shares.labels.map((part) => text(part.x, mid, part.text, { size: SHARE_FONT, anchor: "middle", weight: 600, fill }));
+	const clip = (width, content) => {
+		const id = `s${++clip_seq}`;
+		return `<clipPath id="${id}"><rect ${shape} width="${width}"/></clipPath><g clip-path="url(#${id})">${content}</g>`;
+	};
+	if (shares.labels.length) out.push(clip(w, labels(C.text).join("")));
 	if (done) out.push(`<rect ${shape} width="${done}" fill="${color}"/>`);
+	if (done && shares.labels.length) out.push(clip(done, labels("#fff").join("")));
+	for (const left of shares.dividers) {
+		out.push(`<rect x="${left - 0.25}" y="${top}" width="0.5" height="${h}" fill="#fff" fill-opacity="0.8"/>`);
+	}
 	return out;
+}
+
+const SHARE_FONT = 6.5;
+let clip_seq = 0;
+
+// เส้นแบ่งช่วงและ % ของแต่ละช่อง (ตรงกับ splits ใน PlanSheet.vue) แสดงเฉพาะช่องที่ตัวเลขลงพอดี
+function bar_shares(task, start, end, x, m) {
+	const none = { labels: [], dividers: [] };
+	const distribution = parse_distribution(task.plan_distribution);
+	if (!distribution || !distribution_fits(start, end, distribution)) return none;
+	const font = `600 ${SHARE_FONT}px ${PRINT_FONT}`;
+	return {
+		dividers: segments(start, end, distribution.unit)
+			.slice(1)
+			.map((part) => x(part.start)),
+		labels: m.show_split
+			? period_shares(start, end, distribution, m.counting_holidays, m.units.bottom)
+					.map((part) => ({
+						x: (x(part.start) + x(part.end + 1)) / 2,
+						width: x(part.end + 1) - x(part.start),
+						text: format_share(part.percent),
+					}))
+					.filter((part) => text_width(part.text, font) <= part.width - 2)
+			: [],
+	};
 }
 
 const is_cumulative = (row) => !row.key.endsWith("_period");
@@ -807,48 +853,120 @@ function bar_status_color(task, m) {
 }
 
 // ท้ายแถบ: ชื่องาน แล้วตามด้วยกรอบ 2 ช่อง % แผน (ฟ้า) | % จริง (เขียว) เหมือนบนจอ
-function end_texts(task, x0, y, m) {
-	const out = [];
+function end_items(task, m) {
 	const metrics = m.metrics.get(task.name);
 	const weight = task.is_group ? 600 : 400;
-	const label = m.show_labels ? `${task.wbs || ""} ${task.item_name || ""}`.trim() : "";
-	let pill_x = x0;
-	if (label) {
-		out.push(text(x0, y + ROW / 2 + 3, label, { size: 8, weight }));
-		pill_x += text_width(label, `${weight} 8px ${PRINT_FONT}`) + 6;
-	}
+	const name = m.show_labels ? `${task.wbs || ""} ${task.item_name || ""}`.trim() : "";
+	const pills = [];
 	if (metrics) {
 		// show_plan / show_actual / show_status_text: แอปเปิด-ปิดแยกได้ desk ใช้ show_progress
-		const pills = [];
 		if (m.show_status_text && metrics.status) {
-			pills.push([metrics.status.label, STATUS_PILL[metrics.status.tone] || STATUS_PILL.gray]);
+			pills.push(["status", metrics.status.label, STATUS_PILL[metrics.status.tone] || STATUS_PILL.gray]);
 		}
 		if (m.show_plan ?? m.show_progress) {
-			pills.push([`${__("แผน")} ${format_number(metrics.plan_pct, null, 1)}%`, PILL.blue]);
+			pills.push(["plan", `${__("แผน")} ${format_number(metrics.plan_pct, null, 1)}%`, PILL.blue]);
 		}
 		if (m.show_actual ?? m.show_progress) {
-			pills.push([`${__("จริง")} ${format_number(metrics.actual_pct, null, 1)}%`, PILL.green]);
-		}
-		for (const [value, [fill, ink]] of pills) {
-			const width = text_width(value, `600 7px ${PRINT_FONT}`) + 10;
-			out.push(
-				T.pill_plain
-					? ""
-					: `<rect x="${pill_x}" y="${y + ROW / 2 - 6}" width="${width}" height="12" rx="${
-							T.pill_rx || 0
-					  }" fill="${fill}"/>`,
-				`<text x="${pill_x + width / 2}" y="${
-					y + ROW / 2 + 2.5
-				}" font-size="7" font-weight="600" text-anchor="middle" fill="${
-					T.pill_plain ? C.text : ink
-				}">${escape(
-					value
-				)}</text>`
-			);
-			pill_x += width;
+			pills.push(["actual", `${__("จริง")} ${format_number(metrics.actual_pct, null, 1)}%`, PILL.green]);
 		}
 	}
+	return {
+		name,
+		weight,
+		pills: pills.map(([key, value, [fill, ink]]) => ({ key, value, fill, ink, width: pill_width(value) })),
+	};
+}
+
+const pill_width = (value) => text_width(value, `600 7px ${PRINT_FONT}`) + 10;
+const name_font = (weight) => `${weight} 8px ${PRINT_FONT}`;
+const total_width = (pills) => pills.reduce((sum, pill) => sum + pill.width, 0);
+
+function draw_end(x0, y, name, weight, pills) {
+	const out = [];
+	let pill_x = x0;
+	if (name) {
+		out.push(text(x0, y + ROW / 2 + 3, name, { size: 8, weight }));
+		pill_x += text_width(name, name_font(weight)) + NAME_GAP;
+	}
+	for (const { value, fill, ink, width } of pills) {
+		out.push(
+			T.pill_plain
+				? ""
+				: `<rect x="${pill_x}" y="${y + ROW / 2 - 6}" width="${width}" height="12" rx="${
+						T.pill_rx || 0
+				  }" fill="${fill}"/>`,
+			`<text x="${pill_x + width / 2}" y="${
+				y + ROW / 2 + 2.5
+			}" font-size="7" font-weight="600" text-anchor="middle" fill="${
+				T.pill_plain ? C.text : ink
+			}">${escape(value)}</text>`
+		);
+		pill_x += width;
+	}
 	return out;
+}
+
+// ท้ายแถบ: ชื่องาน แล้วตามด้วยกรอบ % เหมือนบนจอ (แบบเดิมของ desk ไม่จัดตำแหน่ง)
+function end_texts(task, x0, y, m) {
+	const { name, weight, pills } = end_items(task, m);
+	return draw_end(x0, y, name, weight, pills);
+}
+
+// แบบเอกสารของแอป: ขวาพอ = ขวา, ไม่พอ = ซ้ายของแถบ, ไม่พอทั้งสองด้าน = ฝั่งที่กว้างกว่า ตัดชื่อด้วย …
+// แล้วตัด % แผน กับ % จริง ตามลำดับ สถานะอยู่ท้ายสุด
+const LABEL_GAP = 4;
+const LABEL_EDGE = 2;
+const NAME_GAP = 6;
+const MIN_NAME = 24;
+const DROP_ORDER = ["plan", "actual", "status"];
+
+function placed_end_texts(task, bar_x, bar_end, y, m, left, right) {
+	// ปลายแถบอยู่หน้าอื่น (แบบต่อเนื่อง) ป้ายไปอยู่หน้านั้น
+	if (bar_end > right || bar_end <= left) return [];
+	const { name, weight, pills } = end_items(task, m);
+	const name_w = name ? text_width(name, name_font(weight)) : 0;
+	const width_of = (text_w, list) => text_w + (text_w && list.length ? NAME_GAP : 0) + total_width(list);
+	const right_room = right - bar_end - LABEL_GAP - LABEL_EDGE;
+	const left_room = bar_x - left - LABEL_GAP - LABEL_EDGE;
+	const full = width_of(name_w, pills);
+	if (full <= right_room) return draw_end(bar_end + LABEL_GAP, y, name, weight, pills);
+	if (full <= left_room) return draw_end(bar_x - LABEL_GAP - full, y, name, weight, pills);
+
+	const on_right = right_room >= left_room;
+	const room = Math.max(right_room, left_room);
+	let kept = pills;
+	for (const key of DROP_ORDER) {
+		if (total_width(kept) > room) kept = kept.filter((pill) => pill.key !== key);
+	}
+	const name_room = room - total_width(kept) - (kept.length ? NAME_GAP : 0);
+	const short_name = name && name_room >= MIN_NAME ? shorten(name, name_font(weight), name_room) : "";
+	if (!short_name && !kept.length) return [];
+	const used = width_of(short_name ? text_width(short_name, name_font(weight)) : 0, kept);
+	return draw_end(on_right ? bar_end + LABEL_GAP : bar_x - LABEL_GAP - used, y, short_name, weight, kept);
+}
+
+// ตัดข้อความให้พอดีความกว้าง ตัดทีละตัวอักษรรวมสระ/วรรณยุกต์ ไม่ให้สระลอยแยกจากพยัญชนะ
+function shorten(value, font, room) {
+	if (text_width(value, font) <= room) return value;
+	const letters = [...new Intl.Segmenter("th", { granularity: "grapheme" }).segment(value)].map((s) => s.segment);
+	let low = 0;
+	let high = letters.length;
+	while (low < high) {
+		const mid = Math.ceil((low + high) / 2);
+		if (text_width(`${letters.slice(0, mid).join("")}…`, font) <= room) low = mid;
+		else high = mid - 1;
+	}
+	return low ? `${letters.slice(0, low).join("").trimEnd()}…` : "";
+}
+
+// ที่ว่างท้าย Timeline พอดีป้ายสถานะ (ปิดสถานะ = ป้ายแรกที่เปิดอยู่) งานที่จบท้ายแผนจึงยังเห็นป้าย
+function tail_width(model) {
+	if (!T.bar) return 0;
+	const widest = model.rows.reduce((max, task) => {
+		const first = end_items(task, model).pills[0];
+		return Math.max(max, first ? first.width : 0);
+	}, 0);
+	return widest ? widest + LABEL_GAP + LABEL_EDGE : 0;
 }
 
 // ---------- ชิ้นส่วน SVG ----------
@@ -938,7 +1056,8 @@ function page_head(model, page, index, total) {
 function themed_head(model, page, index, total) {
 	const value = (text) => escape(text || "-");
 	const k = model.kpi || {};
-	const pct = (number) => (number === null || number === undefined ? "-" : `${format_number(number, null, 2)}%`);
+	const pct = (number) => (number === null || number === undefined ? "-" : `${format_number(number, null, 3)}%`);
+	const diff_text = (number) => `${number > 0 ? "+" : ""}${format_number(number, null, 3)}%`;
 	// ตัวเทียบหลัก = Baseline (แผนตามสัญญา) ยังไม่มี Baseline ใช้แผนปัจจุบัน
 	const has_baseline = k.baseline !== null && k.baseline !== undefined;
 	const base = has_baseline ? k.baseline : k.plan;
@@ -970,7 +1089,7 @@ function themed_head(model, page, index, total) {
 			<div class="big"><span>${__("ความคืบหน้าจริง")}</span><b>${pct(k.actual)}</b>
 				<div class="track"><i style="width:${Math.min(k.actual || 0, 100)}%"></i><u style="left:${Math.min(base || 0, 100)}%"></u></div></div>
 			${fact(base_label, pct(base))}
-			${fact(__("ส่วนต่าง"), `${diff > 0 ? "+" : ""}${format_number(diff, null, 2)}%`)}
+			${fact(__("ส่วนต่าง"), diff_text(diff))}
 			${fact(__("ณ วันที่"), escape(k.cutoff || "-"))}
 			<hr>
 			${fact(__("ผู้ว่าจ้าง"), value(model.employer))}
@@ -986,7 +1105,7 @@ function themed_head(model, page, index, total) {
 		.join("");
 	return `<div class="head head-app">
 		<div class="band"><div><h1>${__("แผนงานก่อสร้าง")}</h1><div class="project">${escape(model.project_name)}</div></div>
-			<div class="chips">${chip(base_label, pct(base))}${chip(__("จริง"), pct(k.actual))}${chip(__("ส่วนต่าง"), `${diff > 0 ? "+" : ""}${format_number(diff, null, 2)}%`)}</div></div>
+			<div class="chips">${chip(base_label, pct(base))}${chip(__("จริง"), pct(k.actual))}${chip(__("ส่วนต่าง"), diff_text(diff))}</div></div>
 		<div class="meta"><span>${__("ผู้ว่าจ้าง")} <b>${value(model.employer)}</b></span><span>${__("ผู้รับจ้าง")} <b>${value(model.contractor)}</b></span><span>${__("ผู้ควบคุมงาน")} <b>${value(model.supervisor)}</b></span><span>${__("สัญญา")} <b>${value(model.contract_text)}</b></span><span class="legend">${legend}</span><span class="pg">${page_no}</span></div>
 	</div>`;
 }
