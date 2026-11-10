@@ -14,7 +14,7 @@ const variance = computed(() => {
 	const target = baseline ?? plan;
 	if (target === null || actual === null) return null;
 	const diff = actual - target;
-	const label = baseline !== null ? "Baseline" : __("แผน");
+	const label = baseline !== null ? "แผนสัญญา" : __("แผน");
 	if (Math.abs(diff) < 0.005) return { short: "±0%", text: __("ตาม{0}", [label]), color: "gray" };
 	return diff > 0
 		? { short: "▲ " + percent(diff), text: __("เร็วกว่า{0} {1}", [label, percent(diff)]), color: "green" }

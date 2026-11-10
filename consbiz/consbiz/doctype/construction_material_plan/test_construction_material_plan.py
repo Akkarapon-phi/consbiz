@@ -1,7 +1,7 @@
 # Copyright (c) 2026, Siricons and Contributors
 # See license.txt
 
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import frappe
 from frappe.tests import IntegrationTestCase
@@ -16,10 +16,14 @@ from consbiz.consbiz.doctype.construction_material_plan.construction_material_pl
 	allocate,
 	build_material_requests,
 	due_lines,
+	link_request_rows,
+	requests_for_rows,
+	selected_lines,
 	empty_supply,
 	set_item_project,
 	with_totals,
 )
+from consbiz.site_app import get_resource_board
 from consbiz.tests.utils import insert_boq
 
 EXTRA_TEST_RECORD_DEPENDENCIES = []
@@ -104,6 +108,46 @@ class IntegrationTestConstructionMaterialPlan(IntegrationTestCase):
 				self.assertEqual(due_lines(doc, 9)[0]["stock_qty"], 2)
 			with patch(f"{MODULE}.get_supply", return_value={"_Test Item": supply_of({"ordered": 5})}):
 				self.assertEqual(due_lines(doc, 30), [])
+
+	def test_selected_rows_only(self):
+		doc = self.make_plan()
+		doc.append("items", {"wbs": "1.1", "item_code": "_Test Item 2", "qty": 2, "lead_time_days": 0})
+		doc.flags.ignore_links = True
+		doc.save()
+		first, second = doc.items
+
+		(line,) = selected_lines(doc, [first.name, "row-of-other-plan"])
+		self.assertEqual(line["item_code"], first.item_code)
+		self.assertEqual(line["stock_qty"], 5)
+		self.assertEqual([row.name for row in line["rows"]], [first.name])
+
+		# แถวไม่ถึงกำหนดก็ขอได้ถ้าติ๊กเอง และบันทึกเลขใบขอซื้อไว้ที่แถว
+		request = MagicMock(items=[frappe._dict(item_code=second.item_code)])
+		request.name = "MR-TEST"
+		with patch(f"{MODULE}.build_material_requests", return_value=[request]):
+			requests, lines = requests_for_rows(doc, [second.name])
+		self.assertEqual(requests, [request])
+		request.insert.assert_not_called()  # ยังไม่บันทึก ผู้ใช้กดเองในฟอร์ม
+		link_request_rows(request, lines)
+		self.assertEqual(frappe.db.get_value(second.doctype, second.name, "material_request"), "MR-TEST")
+		self.assertFalse(frappe.db.get_value(first.doctype, first.name, "material_request"))
+
+		# ขอครบแล้วขอซ้ำไม่ได้
+		with patch(f"{MODULE}.get_supply", return_value={first.item_code: supply_of({"requested": 5})}):
+			self.assertRaises(frappe.ValidationError, requests_for_rows, doc, [first.name])
+
+	def test_resource_board_hides_amounts(self):
+		self.make_plan()
+		with patch("consbiz.site_app.check_project", return_value=({}, self.plan)):
+			data = get_resource_board("ANY")
+			self.assertFalse(data["can_write"])
+			self.assertTrue(data["material_plan"]["items"])
+			self.assertFalse({"amount", "weight", "progress"} & set(data["tasks"][1]))
+			self.assertNotIn("total_amount", data)
+
+			frappe.set_user("Guest")
+			self.addCleanup(frappe.set_user, "Administrator")
+			self.assertRaises(frappe.PermissionError, get_resource_board, "ANY")
 
 	def test_allocate_earliest_first(self):
 		# MR ล็อตเดียว 150 ตัดให้งานที่ต้องการก่อนก่อน

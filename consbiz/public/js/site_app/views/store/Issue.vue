@@ -1,8 +1,18 @@
 <template>
 	<div :class="{ 'ss-has-bar': tab === 'new' && cart.length }">
 		<TopBar title="เบิกวัสดุ" :subtitle="state.project?.project_name">
+			<template #search>
+				<HeaderSearch
+					v-if="wide"
+					v-model="txt"
+					:placeholder="
+						tab === 'new' ? 'ค้นหาวัสดุในคลัง' : 'ค้นหาเลขที่ ผู้เบิก หรือวัสดุ'
+					"
+				/>
+			</template>
 			<template #actions>
 				<button
+					v-if="!wide"
 					type="button"
 					class="ss-icon-btn"
 					:class="{ 'is-spinning': loading }"
@@ -15,17 +25,25 @@
 		</TopBar>
 
 		<div class="ss-content">
-			<Segmented
-				v-model="tab"
-				:options="[
-					{ value: 'new', label: 'เบิกใหม่' },
-					{ value: 'history', label: 'ประวัติการเบิก' },
-				]"
-			/>
+			<div v-if="wide" class="ss-list-head">
+				<StatusTabs v-model="tab" :options="TABS" />
+				<div class="ss-list-tools">
+					<button
+						type="button"
+						class="ss-icon-btn"
+						:class="{ 'is-spinning': loading }"
+						aria-label="โหลดใหม่"
+						@click="load"
+					>
+						<Icon name="refresh" :size="17" />
+					</button>
+				</div>
+			</div>
+			<Segmented v-else v-model="tab" :options="TABS" />
 
 			<Transition name="ss-fade" mode="out-in">
 				<div v-if="tab === 'new'" key="new">
-					<div class="ss-search ss-search--sticky">
+					<div v-if="!wide" class="ss-search ss-search--sticky">
 						<Icon name="search" :size="18" />
 						<input v-model="txt" type="search" placeholder="ค้นหาวัสดุในคลัง" />
 						<button v-if="txt" type="button" class="ss-search-clear" @click="txt = ''">
@@ -39,6 +57,31 @@
 						:title="txt ? 'ไม่พบวัสดุ' : 'คลังว่าง'"
 						:text="txt ? 'ลองค้นด้วยคำอื่น' : 'ยังไม่มีวัสดุคงเหลือในคลังของโครงการ'"
 					/>
+					<DataTable
+						v-else-if="wide"
+						:rows="available"
+						:columns="STOCK_COLUMNS"
+						row_key="item_code"
+						@open="pick"
+					>
+						<template #item_name="{ row }">
+							<span class="ss-cell-main" :title="row.item_name">{{
+								row.item_name
+							}}</span>
+							<small>{{ row.item_code }}</small>
+						</template>
+						<template #balance="{ row }"
+							><b>{{ num(row.balance) }}</b></template
+						>
+						<template #employer="{ row }">{{
+							row.employer ? num(row.employer) : "—"
+						}}</template>
+						<template #cart="{ row }">
+							<span v-if="in_cart(row)" class="ss-tag tone-blue">{{
+								num(in_cart(row).qty)
+							}}</span>
+						</template>
+					</DataTable>
 					<div v-else class="ss-list">
 						<button
 							v-for="(item, i) in available.slice(0, limit)"
@@ -91,6 +134,41 @@
 						title="ยังไม่มีการเบิก"
 						text="ใบเบิก 90 วันล่าสุดจะแสดงที่นี่"
 					/>
+					<Empty
+						v-else-if="!history_filtered.length"
+						icon="search"
+						title="ไม่พบรายการ"
+					/>
+					<DataTable
+						v-else-if="wide"
+						:rows="history_filtered"
+						:columns="HISTORY_COLUMNS"
+						:clickable="false"
+					>
+						<template #name="{ row }"
+							><span class="ss-doc-no">{{ row.name }}</span></template
+						>
+						<template #issuer="{ row }">
+							<span class="ss-cell-main" :title="issuer(row)">{{
+								issuer(row)
+							}}</span>
+						</template>
+						<template #items="{ row }">
+							<span v-for="(r, j) in row.items" :key="j" class="ss-cell-line">
+								<span class="ss-cell-main" :title="r.item_name"
+									>{{ r.item_name
+									}}<em v-if="r.wbs" class="ss-wbs">{{ r.wbs }}</em></span
+								>
+								<b
+									>{{ num(r.qty) }} <small>{{ r.uom }}</small></b
+								>
+							</span>
+						</template>
+						<template #date="{ row }">
+							{{ thai_date(row.date, { year: true }) }}
+							<small>{{ short_time(row.time) }}</small>
+						</template>
+					</DataTable>
 					<template v-else>
 						<template v-for="group in history_groups" :key="group.date">
 							<div class="ss-day">{{ relative_date(group.date) }}</div>
@@ -107,7 +185,9 @@
 										/></span>
 										<span class="ss-card-main">
 											<span class="ss-card-title">{{ issuer(d) }}</span>
-											<span class="ss-card-meta">{{ d.name }} · {{ d.owner }}</span>
+											<span class="ss-card-meta"
+												>{{ d.name }} · {{ d.owner }}</span
+											>
 										</span>
 										<span class="ss-time">{{ short_time(d.time) }}</span>
 									</div>
@@ -115,7 +195,9 @@
 										<div v-for="(r, j) in d.items" :key="j" class="ss-line">
 											<span
 												>{{ r.item_name
-												}}<em v-if="r.wbs" class="ss-wbs">{{ r.wbs }}</em></span
+												}}<em v-if="r.wbs" class="ss-wbs">{{
+													r.wbs
+												}}</em></span
 											>
 											<b
 												>{{ num(r.qty) }} <small>{{ r.uom }}</small></b
@@ -142,7 +224,11 @@
 						<span>รายการเบิก</span>
 						<Icon name="chevron-down" :size="18" style="transform: rotate(180deg)" />
 					</button>
-					<button type="button" class="ss-btn ss-btn--primary ss-btn--lg" @click="cart_open = true">
+					<button
+						type="button"
+						class="ss-btn ss-btn--primary ss-btn--lg"
+						@click="cart_open = true"
+					>
 						ตรวจและเบิก
 					</button>
 				</div>
@@ -157,7 +243,12 @@
 			@close="editing = null"
 		>
 			<div v-if="editing" class="ss-qty-sheet">
-				<Stepper v-model="edit_qty" :max="editing.balance" :min="0" class="ss-stepper--xl" />
+				<Stepper
+					v-model="edit_qty"
+					:max="editing.balance"
+					:min="0"
+					class="ss-stepper--xl"
+				/>
 				<div class="ss-quick">
 					<button
 						v-for="q in quick_qty"
@@ -208,7 +299,9 @@
 					<div v-for="line in cart" :key="line.item_code" class="ss-card ss-card--row">
 						<span class="ss-card-main">
 							<span class="ss-card-title">{{ line.item_name }}</span>
-							<span class="ss-card-meta">คงเหลือ {{ num(line.balance) }} {{ line.uom }}</span>
+							<span class="ss-card-meta"
+								>คงเหลือ {{ num(line.balance) }} {{ line.uom }}</span
+							>
 						</span>
 						<Stepper v-model="line.qty" :max="line.balance" :min="0" />
 					</div>
@@ -239,7 +332,9 @@
 					@click="submit"
 				>
 					<span v-if="saving" class="ss-spinner"></span>
-					<template v-else>ยืนยันเบิก {{ cart.filter((l) => l.qty > 0).length }} รายการ</template>
+					<template v-else
+						>ยืนยันเบิก {{ cart.filter((l) => l.qty > 0).length }} รายการ</template
+					>
 				</button>
 			</template>
 		</Sheet>
@@ -256,6 +351,10 @@ import Empty from "../../../shared/components/Empty.vue";
 import Sheet from "../../../shared/components/Sheet.vue";
 import Stepper from "../../../shared/components/Stepper.vue";
 import Picker from "../../../shared/components/Picker.vue";
+import DataTable from "../../../shared/components/DataTable.vue";
+import StatusTabs from "../../../shared/components/StatusTabs.vue";
+import HeaderSearch from "../../../shared/components/HeaderSearch.vue";
+import { matches, use_wide } from "../../../shared/table.js";
 import {
 	call,
 	celebrate,
@@ -266,11 +365,37 @@ import {
 	short_time,
 	show_error,
 	state,
+	thai_date,
 	vibrate,
+	boot,
 } from "../../../shared/api.js";
 
+const TABS = [
+	...(boot.can.issue ? [{ value: "new", label: "เบิกใหม่" }] : []),
+	{ value: "history", label: "ประวัติการเบิก" },
+];
+const STOCK_COLUMNS = [
+	{ key: "item_name", label: "วัสดุ", sort: true, class: "col-subject" },
+	{ key: "employer", label: "ของผู้ว่าจ้าง", sort: true, class: "is-num" },
+	{ key: "balance", label: "คงเหลือ", sort: true, class: "is-num" },
+	{ key: "uom", label: "หน่วย", class: "col-date" },
+	{ key: "cart", label: "ในรายการเบิก", class: "col-date is-num" },
+];
+const HISTORY_COLUMNS = [
+	{ key: "name", label: "เลขที่", sort: true, class: "col-no" },
+	{ key: "issuer", label: "ผู้เบิก", sort: (row) => issuer(row), class: "col-party" },
+	{ key: "items", label: "รายการ", class: "col-subject" },
+	{ key: "owner", label: "ผู้บันทึก", sort: true, class: "col-date col-wide" },
+	{
+		key: "date",
+		label: "วันที่เบิก",
+		sort: (row) => `${row.date} ${row.time}`,
+		class: "col-date is-date",
+	},
+];
+
 const reload_summary = inject("reload_summary");
-const tab = ref(state.route.params.tab === "history" ? "history" : "new");
+const tab = ref(state.route.params.tab === "history" || !boot.can.issue ? "history" : "new");
 const stock = ref(null);
 const history_rows = ref(null);
 const wbs_options = ref([]);
@@ -286,6 +411,7 @@ const wbs = ref(null);
 const issued_to = ref("");
 const remarks = ref("");
 const saving = ref(false);
+const wide = use_wide();
 
 const available = computed(() => {
 	const q = txt.value.trim().toLowerCase();
@@ -295,9 +421,14 @@ const available = computed(() => {
 });
 const quick_qty = computed(() => [1, 5, 10, 50].filter((q) => q < (editing.value?.balance || 0)));
 
+const history_filtered = computed(() =>
+	(history_rows.value || []).filter((d) =>
+		matches(txt.value, d.name, issuer(d), d.owner, ...d.items.map((r) => r.item_name))
+	)
+);
 const history_groups = computed(() => {
 	const groups = [];
-	for (const row of history_rows.value || []) {
+	for (const row of history_filtered.value) {
 		const date = String(row.date);
 		let group = groups.find((g) => g.date === date);
 		if (!group) groups.push((group = { date, rows: [] }));

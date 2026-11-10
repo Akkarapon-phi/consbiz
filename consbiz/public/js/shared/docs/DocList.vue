@@ -4,24 +4,17 @@
 <template>
 	<div :class="{ 'ss-has-bar': selected.size }">
 		<TopBar :title="config.label" :subtitle="subtitle" no_project>
-			<template #actions>
-				<!-- จอ ≥768: ค้นหาอยู่ขวาของแถบบน (มือถืออยู่ในแถบเครื่องมือ) -->
-				<label v-if="wide" class="ss-toolbar-search ss-topbar-search">
-					<Icon name="search" :size="17" />
-					<input ref="search_input" v-model="search" type="search" :placeholder="search_placeholder" />
-				</label>
-				<button
+			<template #search>
+				<HeaderSearch
 					v-if="wide"
-					type="button"
-					class="ss-icon-btn"
-					:disabled="exporting"
-					aria-label="ส่งออก CSV"
-					title="ส่งออก CSV (ตามตัวกรอง)"
-					@click="export_csv()"
-				>
-					<Icon name="receive" :size="19" />
-				</button>
+					ref="search_input"
+					v-model="search"
+					:placeholder="search_placeholder"
+				/>
+			</template>
+			<template #actions>
 				<button
+					v-if="!wide"
 					type="button"
 					class="ss-icon-btn"
 					:class="{ 'is-spinning': loading }"
@@ -32,6 +25,7 @@
 					<Icon name="refresh" :size="20" />
 				</button>
 				<button
+					v-if="!wide && can_create"
 					type="button"
 					class="ss-btn ss-btn--primary ss-list-create"
 					:aria-label="`สร้าง${config.label}`"
@@ -45,7 +39,7 @@
 
 		<div class="ss-content ss-list-page">
 			<!-- แท็บสถานะ พร้อมจำนวนตามตัวกรองปัจจุบัน -->
-			<!-- มือถือ: แท็บสถานะ / จอ ≥768: ปุ่มสถานะอยู่ต้นแถวตัวกรอง -->
+			<!-- มือถือ: แท็บสถานะ / จอ ≥768: แท็บอยู่ในหัวรายการ ต่อเป็นการ์ดเดียวกับตาราง -->
 			<nav v-if="!wide" class="ss-tabs" aria-label="สถานะ">
 				<button
 					v-for="f in tabs"
@@ -61,76 +55,123 @@
 			</nav>
 
 			<!-- แถบเครื่องมือ -->
-			<div class="ss-toolbar">
+			<div :class="wide ? 'ss-list-head' : 'ss-toolbar'">
 				<label v-if="!wide" class="ss-toolbar-search">
 					<Icon name="search" :size="17" />
-					<input ref="search_input" v-model="search" type="search" :placeholder="search_placeholder" />
+					<input
+						ref="search_input"
+						v-model="search"
+						type="search"
+						:placeholder="search_placeholder"
+					/>
 				</label>
 				<template v-if="wide">
-					<div class="ss-status-pills" role="tablist" aria-label="สถานะ">
+					<StatusTabs v-model="filter" :options="status_options" />
+					<div class="ss-list-tools">
+						<!-- กันที่ไว้เสมอ (ซ่อนด้วย visibility) ความกว้างของแถวตัวกรองจึงไม่เปลี่ยนตามปุ่มนี้ -->
 						<button
-							v-for="f in tabs"
-							:key="f.value"
 							type="button"
-							role="tab"
-							class="ss-status-pill"
-							:class="{ 'is-active': filter === f.value }"
-							:aria-selected="filter === f.value"
-							@click="filter = f.value"
+							class="ss-tool ss-tool--filter"
+							:class="{ 'is-active': filter_count }"
+							:style="{ visibility: filters_hidden ? 'visible' : 'hidden' }"
+							aria-label="ตัวกรองเพิ่มเติม"
+							title="ตัวกรองเพิ่มเติม"
+							@click="filter_sheet = true"
 						>
-							{{ f.label }}
-							<span v-if="counts" class="ss-tab-count">{{ counts[f.value] ?? 0 }}</span>
+							<Icon name="sliders" :size="17" />
+							<span v-if="filter_count" class="ss-tab-count">{{
+								filter_count
+							}}</span>
+						</button>
+						<div ref="filters_box" class="ss-list-filters">
+							<SelectBox
+								v-model="range"
+								variant="tool"
+								label="ช่วงวันที่"
+								:options="RANGES"
+								placeholder="ทุกวันที่"
+							>
+								<template #prefix><Icon name="calendar" :size="15" /></template>
+							</SelectBox>
+							<template v-if="range === 'custom'">
+								<DateInput
+									v-model="date_from"
+									variant="tool"
+									label="ตั้งแต่"
+									placeholder="ตั้งแต่"
+									clearable
+								/>
+								<DateInput
+									v-model="date_to"
+									variant="tool"
+									label="ถึง"
+									placeholder="ถึง"
+									clearable
+								/>
+							</template>
+							<Picker
+								v-if="config.party"
+								v-model="party"
+								class="ss-tool-picker"
+								:label="config.party"
+								:placeholder="`${config.party}ทั้งหมด`"
+								:display_value="party_label"
+								:remote_fn="search_parties"
+								clearable
+								@select="(o) => (party_label = o.label)"
+							/>
+							<button
+								v-if="config.due"
+								type="button"
+								class="ss-tool ss-tool--toggle"
+								:class="{ 'is-active': overdue }"
+								:aria-pressed="overdue"
+								@click="overdue = !overdue"
+							>
+								<Icon name="alert" :size="15" /> เกินกำหนด
+							</button>
+							<ProjectFilter v-if="app.project_filter && config.project" />
+							<SelectBox
+								v-else-if="config.project"
+								:model-value="state.doc_scope"
+								variant="tool"
+								label="ขอบเขต"
+								:options="SCOPES"
+								@update:model-value="set_doc_scope"
+							/>
+						</div>
+						<button
+							v-if="can_export"
+							type="button"
+							class="ss-icon-btn"
+							:disabled="exporting"
+							aria-label="ส่งออก CSV"
+							title="ส่งออก CSV (ตามตัวกรอง)"
+							@click="export_csv()"
+						>
+							<Icon name="receive" :size="19" />
+						</button>
+						<button
+							v-if="can_create"
+							type="button"
+							class="ss-btn ss-btn--primary ss-list-create"
+							:aria-label="`สร้าง${config.label}`"
+							@click="go(`${config.section}-form`, { kind, name: 'new' })"
+						>
+							<Icon name="plus" :size="18" :stroke="2.6" />
+							<span>สร้าง{{ config.label }}</span>
+						</button>
+						<button
+							type="button"
+							class="ss-icon-btn"
+							:class="{ 'is-spinning': loading }"
+							aria-label="โหลดใหม่"
+							title="โหลดใหม่"
+							@click="reload"
+						>
+							<Icon name="refresh" :size="17" />
 						</button>
 					</div>
-					<SelectBox
-						v-model="range"
-						variant="tool"
-						label="ช่วงวันที่"
-						:options="RANGES"
-						placeholder="ทุกวันที่"
-					>
-						<template #prefix><Icon name="calendar" :size="15" /></template>
-					</SelectBox>
-					<template v-if="range === 'custom'">
-						<DateInput
-							v-model="date_from"
-							variant="tool"
-							label="ตั้งแต่"
-							placeholder="ตั้งแต่"
-							clearable
-						/>
-						<DateInput v-model="date_to" variant="tool" label="ถึง" placeholder="ถึง" clearable />
-					</template>
-					<Picker
-						v-if="config.party"
-						v-model="party"
-						class="ss-tool-picker"
-						:label="config.party"
-						:placeholder="`${config.party}ทั้งหมด`"
-						:display_value="party_label"
-						:remote_fn="search_parties"
-						clearable
-						@select="(o) => (party_label = o.label)"
-					/>
-					<button
-						v-if="config.due"
-						type="button"
-						class="ss-tool ss-tool--toggle"
-						:class="{ 'is-active': overdue }"
-						:aria-pressed="overdue"
-						@click="overdue = !overdue"
-					>
-						<Icon name="alert" :size="15" /> เกินกำหนด
-					</button>
-					<ProjectFilter v-if="app.project_filter && config.project" />
-					<SelectBox
-						v-else-if="config.project"
-						:model-value="state.doc_scope"
-						variant="tool"
-						label="ขอบเขต"
-						:options="SCOPES"
-						@update:model-value="set_doc_scope"
-					/>
 				</template>
 				<button
 					v-else
@@ -140,12 +181,14 @@
 					@click="filter_sheet = true"
 				>
 					<Icon name="sliders" :size="17" />
-					<span v-if="active_filters.length" class="ss-tab-count">{{ active_filters.length }}</span>
+					<span v-if="active_filters.length" class="ss-tab-count">{{
+						active_filters.length
+					}}</span>
 				</button>
 			</div>
 
 			<!-- ตัวกรองที่ใช้อยู่ -->
-			<div v-if="active_filters.length" class="ss-active-filters">
+			<div v-if="!wide && active_filters.length" class="ss-active-filters">
 				<span v-for="f in active_filters" :key="f.key" class="ss-filter-chip">
 					{{ f.label }}
 					<button type="button" :aria-label="`ล้าง ${f.label}`" @click="f.clear()">
@@ -191,7 +234,8 @@
 					<!-- ท้ายรายการ: ยอดรวมทั้งชุด + แบ่งหน้า (มือถือ = โหลดเพิ่ม) -->
 					<footer v-if="wide" class="ss-list-foot">
 						<span class="ss-list-range">
-							แสดง <b>{{ start + 1 }}–{{ start + rows.length }}</b> จาก <b>{{ total }}</b>
+							แสดง <b>{{ start + 1 }}–{{ start + rows.length }}</b> จาก
+							<b>{{ total }}</b>
 						</span>
 						<span v-if="sums.amount != null" class="ss-list-sum">
 							ยอดรวม <b>{{ money(sums.amount) }}</b>
@@ -206,7 +250,9 @@
 								v-model="page_size"
 								variant="tool"
 								label="แถวต่อหน้า"
-								:options="[30, 50, 100].map((n) => ({ value: n, label: String(n) }))"
+								:options="
+									[30, 50, 100].map((n) => ({ value: n, label: String(n) }))
+								"
 							/>
 						</label>
 						<div class="ss-pager">
@@ -262,13 +308,23 @@
 						เลือก <b>{{ selected.size }}</b> รายการ
 						<template v-if="selected_sum"> · {{ money(selected_sum) }}</template>
 					</span>
-					<button type="button" class="ss-btn ss-btn--ghost" @click="selected = new Set()">
+					<button
+						type="button"
+						class="ss-btn ss-btn--ghost"
+						@click="selected = new Set()"
+					>
 						ยกเลิกเลือก
 					</button>
-					<button type="button" class="ss-btn ss-btn--ghost" @click="export_csv(selected_rows)">
+					<button
+						v-if="can_export"
+						type="button"
+						class="ss-btn ss-btn--ghost"
+						@click="export_csv(selected_rows)"
+					>
 						<Icon name="receive" :size="16" /> ส่งออก
 					</button>
 					<button
+						v-if="can_submit"
 						type="button"
 						class="ss-btn ss-btn--primary"
 						:disabled="!selected_drafts.length"
@@ -328,7 +384,7 @@
 			</template>
 		</Sheet>
 
-		<!-- มือถือ: ตัวกรองและการเรียง -->
+		<!-- ตัวกรองทั้งหมด (มือถือ + ปุ่มตัวกรองเมื่อแถวหัวรายการไม่พอ) มือถือมีการเรียงด้วย -->
 		<Sheet :open="filter_sheet" title="ตัวกรอง" @close="filter_sheet = false">
 			<div class="ss-form">
 				<div class="ss-field">
@@ -346,7 +402,12 @@
 						</button>
 					</div>
 					<div v-if="range === 'custom'" class="ss-form-row">
-						<DateInput v-model="date_from" label="ตั้งแต่" placeholder="ตั้งแต่" clearable />
+						<DateInput
+							v-model="date_from"
+							label="ตั้งแต่"
+							placeholder="ตั้งแต่"
+							clearable
+						/>
 						<DateInput v-model="date_to" label="ถึง" placeholder="ถึง" clearable />
 					</div>
 				</div>
@@ -360,7 +421,7 @@
 					clearable
 					@select="(o) => (party_label = o.label)"
 				/>
-				<div class="ss-field">
+				<div v-if="!wide" class="ss-field">
 					<span class="ss-field-label">เรียงตาม</span>
 					<div class="ss-choices">
 						<button
@@ -389,8 +450,14 @@
 				<ScopeSwitch v-else-if="config.project" />
 			</div>
 			<template #footer>
-				<button type="button" class="ss-btn ss-btn--ghost" @click="clear_filters">ล้าง</button>
-				<button type="button" class="ss-btn ss-btn--primary ss-grow" @click="filter_sheet = false">
+				<button type="button" class="ss-btn ss-btn--ghost" @click="clear_filters">
+					ล้าง
+				</button>
+				<button
+					type="button"
+					class="ss-btn ss-btn--primary ss-grow"
+					@click="filter_sheet = false"
+				>
 					ดู {{ total ?? "" }} รายการ
 				</button>
 			</template>
@@ -416,6 +483,9 @@ import Picker from "../components/Picker.vue";
 import Sheet from "../components/Sheet.vue";
 import PdfViewer from "../components/PdfViewer.vue";
 import SelectBox from "../components/SelectBox.vue";
+import StatusTabs from "../components/StatusTabs.vue";
+import { use_overflow_row } from "../table.js";
+import HeaderSearch from "../components/HeaderSearch.vue";
 import DateInput from "../components/DateInput.vue";
 import DocCard from "./DocCard.vue";
 import DocTable from "./DocTable.vue";
@@ -424,7 +494,7 @@ import ScopeSwitch from "./ScopeSwitch.vue";
 import ProjectFilter from "./ProjectFilter.vue";
 import { use_shortcuts } from "../shortcuts.js";
 import { app } from "../app.js";
-import { DOC_KINDS } from "./kinds.js";
+import { DOC_KINDS, can_doc } from "./kinds.js";
 import {
 	call,
 	go,
@@ -481,7 +551,9 @@ const prefs = (() => {
 	}
 })();
 
-const filter = ref(FILTERS.includes(state.route.params.filter) ? state.route.params.filter : "todo");
+const filter = ref(
+	FILTERS.includes(state.route.params.filter) ? state.route.params.filter : "todo"
+);
 const search = ref("");
 const range = ref("");
 const date_from = ref("");
@@ -497,10 +569,16 @@ const start = ref(0);
 const rows = ref(null);
 const total = ref(null);
 const counts = ref(null);
+const status_options = computed(() =>
+	tabs.map((f) => ({ ...f, count: counts.value ? counts.value[f.value] ?? 0 : undefined }))
+);
 const sums = ref({});
 const more = ref(false);
 const loading = ref(false);
 const exporting = ref(false);
+const can_create = can_doc(kind, "create");
+const can_submit = can_doc(kind, "submit");
+const can_export = can_doc(kind, "export");
 const selected = ref(new Set());
 const filter_sheet = ref(false);
 const bulk_sheet = ref(false);
@@ -530,7 +608,8 @@ onBeforeUnmount(() => mq_wide.removeEventListener("change", on_media));
 
 const subtitle = computed(() => {
 	const { scope, company } = scope_args();
-	const project = config.project && scope === "project" ? state.project?.project_name : "ทุกโครงการ";
+	const project =
+		config.project && scope === "project" ? state.project?.project_name : "ทุกโครงการ";
 	return company ? `${project} · ${company}` : project;
 });
 const page_no = computed(() => Math.floor(start.value / page_size.value) + 1);
@@ -548,10 +627,13 @@ const dates = computed(() => {
 	const now = new Date();
 	const y = now.getFullYear();
 	const m = now.getMonth();
-	if (range.value === "month") return [iso_date(new Date(y, m, 1)), iso_date(new Date(y, m + 1, 0))];
-	if (range.value === "last_month") return [iso_date(new Date(y, m - 1, 1)), iso_date(new Date(y, m, 0))];
+	if (range.value === "month")
+		return [iso_date(new Date(y, m, 1)), iso_date(new Date(y, m + 1, 0))];
+	if (range.value === "last_month")
+		return [iso_date(new Date(y, m - 1, 1)), iso_date(new Date(y, m, 0))];
 	if (range.value === "90") return [iso_date(new Date(y, m, now.getDate() - 90)), iso_date(now)];
-	if (range.value === "year") return [iso_date(new Date(y, 0, 1)), iso_date(new Date(y, 11, 31))];
+	if (range.value === "year")
+		return [iso_date(new Date(y, 0, 1)), iso_date(new Date(y, 11, 31))];
 	if (range.value === "custom") return [date_from.value || null, date_to.value || null];
 	return [null, null];
 });
@@ -575,9 +657,27 @@ const active_filters = computed(() => {
 			clear: () => ((party.value = null), (party_label.value = "")),
 		});
 	}
-	if (overdue.value) out.push({ key: "overdue", label: "เกินกำหนด", clear: () => (overdue.value = false) });
+	if (overdue.value)
+		out.push({ key: "overdue", label: "เกินกำหนด", clear: () => (overdue.value = false) });
 	return out;
 });
+
+// จอ ≥768: นับรวมโครงการที่เลือก เพราะตัวกรองที่พับอยู่มองไม่เห็นบนหัวรายการ
+const filter_count = computed(
+	() =>
+		active_filters.value.length +
+		(app.project_filter && config.project && state.project ? 1 : 0)
+);
+const filters_box = ref(null);
+const filters_hidden = use_overflow_row(filters_box, [
+	range,
+	date_from,
+	date_to,
+	party_label,
+	overdue,
+	() => state.project,
+	() => state.doc_scope,
+]);
 
 function clear_filters() {
 	range.value = "";
@@ -680,7 +780,9 @@ watch([sort, order, page_size], () => {
 
 const selected_rows = computed(() => (rows.value || []).filter((r) => selected.value.has(r.name)));
 const selected_drafts = computed(() => selected_rows.value.filter((r) => r.docstatus === 0));
-const selected_sum = computed(() => selected_rows.value.reduce((s, r) => s + (Number(r.amount) || 0), 0));
+const selected_sum = computed(() =>
+	selected_rows.value.reduce((s, r) => s + (Number(r.amount) || 0), 0)
+);
 
 function toggle(name) {
 	const next = new Set(selected.value);
@@ -704,7 +806,10 @@ async function bulk_submit() {
 		});
 		bulk_results.value = results;
 		const ok = results.filter((r) => r.ok).length;
-		toast(`ส่งแล้ว ${ok} จาก ${results.length} ใบ`, ok === results.length ? "success" : "error");
+		toast(
+			`ส่งแล้ว ${ok} จาก ${results.length} ใบ`,
+			ok === results.length ? "success" : "error"
+		);
 		selected.value = new Set();
 		load();
 	} catch (error) {
@@ -763,7 +868,9 @@ async function export_csv(only = null) {
 // มือถือ: แท็บที่เลือกอยู่ต้องเห็น (แถบแท็บเลื่อนข้างได้)
 onMounted(async () => {
 	await nextTick();
-	document.querySelector(".ss-tab.is-active")?.scrollIntoView({ block: "nearest", inline: "center" });
+	document
+		.querySelector(".ss-tab.is-active")
+		?.scrollIntoView({ block: "nearest", inline: "center" });
 });
 
 load();
@@ -771,10 +878,12 @@ load();
 // คีย์ลัด (แอปออฟฟิศ): / ค้นหา, n สร้างใหม่, j/k เลื่อนแถว (Enter เปิด)
 const search_input = ref(null);
 // ค้นได้: เลขที่ / คู่ค้า / เลขที่บิลผู้ขาย (PI) / ชื่อหรือรหัสสินค้า (site_docs.search_filters)
-const search_placeholder = `ค้นหาเลขที่${config.party ? ` / ${config.party}` : ""}${kind === "pi" ? " / เลขที่บิล" : ""} / สินค้า`;
+const search_placeholder = `ค้นหาเลขที่${config.party ? ` / ${config.party}` : ""}${
+	kind === "pi" ? " / เลขที่บิล" : ""
+} / สินค้า`;
 use_shortcuts({
 	"/": () => search_input.value?.focus(),
-	n: () => go(`${config.section}-form`, { kind, name: "new" }),
+	n: () => can_create && go(`${config.section}-form`, { kind, name: "new" }),
 	j: () => document.querySelector(".ss-table--list tbody tr")?.focus(),
 	k: () => document.querySelector(".ss-table--list tbody tr:last-child")?.focus(),
 });

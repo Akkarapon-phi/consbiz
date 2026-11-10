@@ -1,8 +1,12 @@
 <template>
 	<div>
 		<TopBar title="คลังวัสดุ" :subtitle="data?.warehouse || state.project?.project_name">
+			<template #search>
+				<HeaderSearch v-if="wide" v-model="txt" :placeholder="'ค้นหาวัสดุ'" />
+			</template>
 			<template #actions>
 				<button
+					v-if="!wide"
 					type="button"
 					class="ss-icon-btn"
 					:class="{ 'is-spinning': loading }"
@@ -15,14 +19,28 @@
 		</TopBar>
 
 		<div class="ss-content">
-			<div class="ss-search ss-search--sticky">
+			<div v-if="wide" class="ss-list-head">
+				<StatusTabs v-model="filter" :options="filter_options" />
+				<div class="ss-list-tools">
+					<button
+						type="button"
+						class="ss-icon-btn"
+						:class="{ 'is-spinning': loading }"
+						aria-label="โหลดใหม่"
+						@click="load"
+					>
+						<Icon name="refresh" :size="17" />
+					</button>
+				</div>
+			</div>
+			<div v-else class="ss-search ss-search--sticky">
 				<Icon name="search" :size="18" />
 				<input v-model="txt" type="search" placeholder="ค้นหาวัสดุ" />
 				<button v-if="txt" type="button" class="ss-search-clear" @click="txt = ''">
 					<Icon name="x" :size="16" />
 				</button>
 			</div>
-			<div class="ss-filters">
+			<div v-if="!wide" class="ss-filters">
 				<button
 					v-for="f in FILTERS"
 					:key="f.value"
@@ -37,7 +55,32 @@
 			</div>
 
 			<Skeleton v-if="data === null" :rows="6" />
-			<Empty v-else-if="!rows.length" icon="warehouse" :title="txt ? 'ไม่พบวัสดุ' : 'ไม่มีรายการ'" />
+			<Empty
+				v-else-if="!rows.length"
+				icon="warehouse"
+				:title="txt ? 'ไม่พบวัสดุ' : 'ไม่มีรายการ'"
+			/>
+			<DataTable
+				v-else-if="wide"
+				:rows="rows"
+				:columns="COLUMNS"
+				row_key="item_code"
+				@open="(item) => (detail = item)"
+			>
+				<template #item_name="{ row }">
+					<span class="ss-cell-main" :title="row.item_name">{{ row.item_name }}</span>
+					<small>{{ row.item_code }}</small>
+				</template>
+				<template #balance="{ row }">
+					<b :class="{ 'ss-text-danger': row.balance <= 0 }">{{ num(row.balance) }}</b>
+				</template>
+				<template #received="{ row }">{{ dash(row.received) }}</template>
+				<template #used="{ row }">{{ dash(row.used) }}</template>
+				<template #company="{ row }">{{ dash(row.company) }}</template>
+				<template #employer="{ row }">{{ dash(row.employer) }}</template>
+				<template #pending="{ row }">{{ dash(row.pending) }}</template>
+				<template #need="{ row }">{{ dash(row.need) }}</template>
+			</DataTable>
 			<div v-else class="ss-list">
 				<button
 					v-for="(item, i) in rows.slice(0, limit)"
@@ -126,7 +169,7 @@
 			</div>
 			<template #footer>
 				<button
-					v-if="detail?.balance > 0"
+					v-if="detail?.balance > 0 && boot.can.issue"
 					type="button"
 					class="ss-btn ss-btn--primary ss-btn--block ss-btn--lg"
 					@click="issue"
@@ -145,7 +188,23 @@ import TopBar from "../../../shared/components/TopBar.vue";
 import Skeleton from "../../../shared/components/Skeleton.vue";
 import Empty from "../../../shared/components/Empty.vue";
 import Sheet from "../../../shared/components/Sheet.vue";
-import { call, go, num, show_error, state } from "../../../shared/api.js";
+import DataTable from "../../../shared/components/DataTable.vue";
+import StatusTabs from "../../../shared/components/StatusTabs.vue";
+import HeaderSearch from "../../../shared/components/HeaderSearch.vue";
+import { matches, use_wide } from "../../../shared/table.js";
+import { boot, call, go, num, show_error, state } from "../../../shared/api.js";
+
+const COLUMNS = [
+	{ key: "item_name", label: "วัสดุ", sort: true, class: "col-subject" },
+	{ key: "balance", label: "คงเหลือ", sort: true, class: "is-num" },
+	{ key: "uom", label: "หน่วย", class: "col-date" },
+	{ key: "received", label: "รับเข้า", sort: true, class: "is-num" },
+	{ key: "used", label: "ใช้ไป", sort: true, class: "is-num" },
+	{ key: "company", label: "ของบริษัท", sort: true, class: "is-num col-wide" },
+	{ key: "employer", label: "ผู้ว่าจ้างจัดหา", sort: true, class: "is-num col-wide" },
+	{ key: "pending", label: "ค้างส่ง", sort: true, class: "is-num" },
+	{ key: "need", label: "ต้องใช้ตามแผน", sort: true, class: "is-num col-wide" },
+];
 
 const FILTERS = [
 	{ value: "stock", label: "มีของ" },
@@ -161,6 +220,8 @@ const txt = ref("");
 const filter = ref("stock");
 const detail = ref(null);
 const limit = ref(80);
+const wide = use_wide();
+const dash = (value) => (value ? num(value) : "—");
 
 const match = {
 	stock: (i) => i.balance > 0,
@@ -170,11 +231,14 @@ const match = {
 	empty: (i) => i.balance <= 0 && i.received > 0,
 };
 const count = (f) => (data.value?.items || []).filter(match[f]).length;
+const filter_options = computed(() =>
+	FILTERS.map((f) => ({ ...f, count: data.value ? count(f.value) : undefined }))
+);
 
 const rows = computed(() => {
 	const q = txt.value.trim().toLowerCase();
 	return (data.value?.items || []).filter(
-		(i) => match[filter.value](i) && (!q || `${i.item_name} ${i.item_code}`.toLowerCase().includes(q))
+		(i) => match[filter.value](i) && matches(q, i.item_name, i.item_code)
 	);
 });
 

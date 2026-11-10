@@ -17,12 +17,18 @@ import Reports from "./views/work/Reports.vue";
 import Inspections from "./views/work/Inspections.vue";
 import Concrete from "./views/work/Concrete.vue";
 import ConcreteForm from "./views/work/ConcreteForm.vue";
-// บริหารโครงการ
+// แผนงาน
 import PmHome from "./views/pm/PmHome.vue";
 import Plan from "./views/pm/Plan.vue";
+import PlanEdit from "./views/pm/PlanEdit.vue";
 import Lookahead from "./views/pm/Lookahead.vue";
 import PmDocs from "./views/pm/PmDocs.vue";
-import Resources from "./views/pm/Resources.vue";
+import ProjectDocForm from "./views/project_docs/ProjectDocForm.vue";
+import ProjectDocView from "./views/project_docs/ProjectDocView.vue";
+// ทรัพยากร
+import Resources from "./views/resources/Resources.vue";
+// การเงิน
+import Finance from "./views/finance/Finance.vue";
 // ขอซื้อ (ชุดเดียวกับแอปออฟฟิศ เฉพาะ kind = mr)
 import DocsHome from "../shared/docs/DocsHome.vue";
 import DocList from "../shared/docs/DocList.vue";
@@ -48,9 +54,19 @@ export default {
 	inspections: Inspections,
 	pm: PmHome,
 	plan: Plan,
+	"plan-edit": PlanEdit,
 	lookahead: Lookahead,
 	"pm-docs": PmDocs,
+	"pm-doc": ProjectDocView,
+	"pm-doc-form": ProjectDocForm,
+	"site-doc": ProjectDocView,
+	"site-form": ProjectDocForm,
 	resources: Resources,
+	"resource-supply": Resources,
+	"resource-people": Resources,
+	"resource-gantt": Resources,
+	"resource-monthly": Resources,
+	finance: Finance,
 	buy: DocsHome,
 	mr: DocList,
 	"buy-doc": DocView,

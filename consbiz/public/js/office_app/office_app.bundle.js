@@ -17,7 +17,7 @@ configure({
 	sections: SECTIONS,
 	routes: ROUTES,
 	views: VIEWS,
-	parent_tab: {},
+	parent_tab: { "boq-form": "boq" },
 	kind_pages: ["buy-doc", "sell-doc", "buy-form", "sell-form"],
 	summary_api: {
 		purchase: () => ["consbiz.site_docs.get_summary", { section: "buy", ...scope_args() }],

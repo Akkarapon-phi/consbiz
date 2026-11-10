@@ -514,6 +514,8 @@ class IntegrationTestConstructionProgress(IntegrationTestCase):
 			boq.append("boq_details", row)
 		insert_boq(boq)
 		self.doc = frappe.get_doc("Construction Management", create_from_boq(boq.name))
+		# Baseline ต้องการ BOQ ที่ Submit แล้ว (submit จริงจะคิดยอดงานเหมาใหม่เป็น 0)
+		frappe.db.set_value("BOQ", boq.name, "docstatus", 1)
 		self.group, self.qty_task, self.lump_task = self.doc.tasks
 
 	def save(self, progress, tasks=None):
@@ -586,6 +588,18 @@ class IntegrationTestConstructionProgress(IntegrationTestCase):
 		self.assertTrue(
 			all(row["actual"] is None for row in data["months"] if str(row["month"]) > "2026-11-30")
 		)
+
+	def test_finance_section_needs_cost_access(self):
+		# พนักงาน (Projects User) อ่านแผนได้แต่ไม่เห็นงบต้นทุน: ไม่เห็นเมนูการเงินและเรียก API ไม่ได้
+		from consbiz.site_app import boot_data, can_view_finance, get_project_finance
+
+		with patch("frappe.get_roles", return_value=["Projects User"]):
+			self.assertFalse(can_view_finance())
+			self.assertFalse(boot_data()["can"]["finance"])
+			self.assertRaises(frappe.PermissionError, get_project_finance, "ANY")
+		with patch("frappe.get_roles", return_value=["Projects Manager"]):
+			self.assertTrue(can_view_finance())
+			self.assertTrue(boot_data()["can"]["finance"])
 
 	def test_lookahead(self):
 		from consbiz.consbiz.doctype.construction_management.construction_management import save_tasks
@@ -754,7 +768,7 @@ class IntegrationTestConstructionProgress(IntegrationTestCase):
 		report.submit()
 		html = frappe.get_print("Daily Report", report.name, "Daily Report", doc=report)
 		self.assertIn("ช้ากว่าแผน 77.500%", html)
-		self.assertIn("แผนสะสม (Baseline)", html)
+		self.assertIn("แผนสัญญาสะสม", html)
 
 		# รายการหลังวันที่รายงานไม่นับในยอดสะสม 1.2 ทำ 50% x 25% = 12.5%
 		self.save([{"task": self.lump_task.name, "date": "2026-11-10", "percent": 20}])

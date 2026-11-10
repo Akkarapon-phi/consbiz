@@ -161,7 +161,7 @@ const icon = (name) => frappe.utils.icon(name, "sm");
 							type="button"
 							class="btn btn-default btn-sm cs-tb-btn"
 							:class="{ 'cs-pressed': open }"
-							:title="__('มุมมอง: การแสดงผลและ Baseline')"
+							:title="__('มุมมอง: การแสดงผลและแผนสัญญา')"
 						>
 							<span v-html="icon('sliders-horizontal')" />
 							<span class="cs-text-lg">{{ __("มุมมอง") }}</span>

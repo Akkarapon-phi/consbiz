@@ -12,7 +12,7 @@
 {%- set approver = name_with_title(doc.approver_name or doc.approver or "", doc.approver) -%}
 {%- set sign_date = thai_date(frappe.utils.add_days(doc.date, -1)) if doc.date else "......../......../........" -%}
 {%- set variance = doc.progress_variance or 0 -%}
-{%- set plan_label = "Baseline" if doc.plan_basis == "Baseline" else "แผน" -%}
+{%- set plan_label = "แผนสัญญา" if doc.plan_basis == "Baseline" else "แผน" -%}
 {%- set pct = "{:,.2f}" -%}
 
 {% include "consbiz/templates/print/print_style.html" %}

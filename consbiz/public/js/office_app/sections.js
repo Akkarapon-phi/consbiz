@@ -14,11 +14,12 @@ export const SECTIONS = {
 		home: "buy",
 		tabs: [
 			{ view: "buy", label: "หน้าหลัก", icon: "home" },
-			{ view: "mr", label: "ขอซื้อ", icon: "clipboard", badge: (s) => s?.mr_todo?.count },
-			{ view: "po", label: "สั่งซื้อ", icon: "cart" },
+			{ view: "mr", label: "ขอซื้อ", icon: "clipboard", badge: (s) => s?.mr_todo?.count, when: (b) => b.docs?.mr?.read },
+			{ view: "po", label: "สั่งซื้อ", icon: "cart", when: (b) => b.docs?.po?.read },
 			{
 				view: "pi",
 				label: "แจ้งหนี้",
+				when: (b) => b.docs?.pi?.read,
 				icon: "file",
 				alert: (s) => s?.pi_overdue?.count,
 				badge: (s) => s?.pi_overdue?.count,
@@ -33,17 +34,24 @@ export const SECTIONS = {
 		home: "sell",
 		tabs: [
 			{ view: "sell", label: "หน้าหลัก", icon: "home" },
-			{ view: "qtn", label: "เสนอราคา", icon: "file", badge: (s) => s?.qtn_open?.count },
-			{ view: "so", label: "สั่งขาย", icon: "clipboard-check" },
+			{ view: "qtn", label: "เสนอราคา", icon: "file", badge: (s) => s?.qtn_open?.count, when: (b) => b.docs?.qtn?.read },
+			{ view: "so", label: "สั่งขาย", icon: "clipboard-check", when: (b) => b.docs?.so?.read },
 			{
 				view: "si",
 				label: "แจ้งหนี้",
+				when: (b) => b.docs?.si?.read,
 				icon: "receive",
 				alert: (s) => s?.si_overdue?.count,
 				badge: (s) => s?.si_overdue?.count,
 			},
 		],
 		badge: (s) => s?.si_overdue?.count,
+	},
+	boq: {
+		key: "boq",
+		...MODULE_META.office.boq,
+		home: "boq",
+		tabs: [{ view: "boq", label: "BOQ", icon: "calculator" }],
 	},
 };
 
@@ -63,4 +71,6 @@ export const ROUTES = {
 	si: { section: "sales", params: ["filter"] },
 	"sell-doc": { section: "sales", params: ["kind", "name"] },
 	"sell-form": { section: "sales", params: ["kind", "name", "source"] },
+	boq: { section: "boq", params: ["filter"] },
+	"boq-form": { section: "boq", params: ["name"] },
 };

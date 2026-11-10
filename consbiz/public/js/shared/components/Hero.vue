@@ -1,75 +1,21 @@
-<!-- หัวหน้าหลักของทุกหมวด: หมวดงาน (มือถือ) / ทักทาย / ปุ่มระบบเต็ม / โครงการที่เลือก
-     แท็บเล็ต/จอใหญ่: แถบเตี้ยแถวเดียว (ชื่อหมวด + ทักทาย | โครงการ | ระบบเต็ม) ไม่กินพื้นที่เนื้อหา -->
+<!-- หัวหน้าหลักของทุกหมวด = แถบบนแถวเดียวแบบเดียวกับทุกหน้า (TopBar.vue) ปุ่มจึงอยู่ที่เดิมเมื่อเปลี่ยนหน้า -->
 <template>
-	<section class="ss-hero">
-		<div class="ss-hero-glow"></div>
-		<div class="ss-hero-top">
-			<button
-				v-if="has_more"
-				type="button"
-				class="ss-hero-section"
-				aria-label="เปลี่ยนหมวดงาน"
-				@click="open_launcher()"
-			>
-				<span class="ss-hero-section-icon"
-					><Icon :name="section.icon" :size="18" :stroke="2.2"
-				/></span>
-				<span>{{ section.title }}</span>
-				<Icon name="grid" :size="16" />
-				<span v-if="others" class="ss-hero-section-dot">{{ others }}</span>
-			</button>
-			<span v-else></span>
-			<a v-if="boot.desk" class="ss-icon-btn ss-icon-btn--glass" href="/app" aria-label="เปิดระบบเต็ม">
-				<Icon name="monitor" :size="20" />
-			</a>
-		</div>
-		<div class="ss-hero-greet">
-			<div class="ss-hero-title">{{ section.title }}</div>
-			<div class="ss-hero-hello">{{ greeting }}</div>
-			<div class="ss-hero-name">{{ boot.full_name }}</div>
-		</div>
-		<!-- จอ ≥768: เมนูของหมวด -->
-		<SectionTabs variant="hero" />
-		<button type="button" class="ss-project-chip" @click="$emit('pick-project')">
-			<span class="ss-project-chip-icon"><Icon name="building" :size="20" /></span>
-			<span class="ss-project-chip-text">
-				<span class="ss-project-chip-label">โครงการ</span>
-				<span class="ss-project-chip-name">{{
-					state.project?.project_name || state.project?.name || "แตะเพื่อเลือกโครงการ"
-				}}</span>
-			</span>
-			<Icon name="swap" :size="18" />
-		</button>
-	</section>
+	<TopBar :title="section.title" />
+	<div v-if="state.project" class="ss-home-project">
+		<Icon name="building" :size="14" />
+		<b :title="state.project.project_name">{{
+			state.project.project_name || state.project.name
+		}}</b>
+		<span>{{ state.project.name }}</span>
+	</div>
 </template>
 
 <script setup>
-import { computed, inject } from "vue";
+import { computed } from "vue";
 import Icon from "./Icon.vue";
-import SectionTabs from "./SectionTabs.vue";
+import TopBar from "./TopBar.vue";
 import { app } from "../app.js";
-import { boot, state } from "../api.js";
-import { module_list } from "../modules.js";
+import { state } from "../api.js";
 
-const SECTIONS = app.sections;
-// มีหมวดอื่น (รวมของแอปอื่น) หรือระบบเต็ม: ปุ่มหมวดเปิดตารางหมวด
-const has_more = module_list().length > 1 || boot.desk;
-
-defineEmits(["pick-project"]);
-const open_launcher = inject("open_launcher");
-
-const section = computed(() => SECTIONS[state.section]);
-// งานที่รอในหมวดอื่น (เตือนให้สลับไปดู)
-const others = computed(() =>
-	boot.sections
-		.filter((key) => key !== state.section)
-		.reduce((sum, key) => sum + (SECTIONS[key].badge?.(state.summaries[key]) || 0), 0)
-);
-
-const greeting = computed(() => {
-	const h = new Date().getHours();
-	if (h < 11) return "อรุณสวัสดิ์";
-	if (h < 16) return "สวัสดีตอนบ่าย";
-	return "สวัสดีตอนเย็น";
-});
+const section = computed(() => app.sections[state.section]);
 </script>

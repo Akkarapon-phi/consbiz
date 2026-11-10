@@ -1,5 +1,6 @@
 <!-- ช่องวันที่ของแอป: แสดงวันที่ไทย (พ.ศ.) เปิดปฏิทินเลือกวัน (แทน <input type="date"> ของเบราว์เซอร์)
      ค่า = "YYYY-MM-DD" (ค.ศ. แบบที่ server ใช้) variant: field / cell
+     กดชื่อเดือน = เลือกเดือน, กดปี = เลือกปี (ลูกศรเลื่อนทีละเดือน / ปี / ทศวรรษตามหน้าที่เปิด)
      คีย์บอร์ด: Enter/Space/↓ เปิด, ลูกศรเลื่อนวัน, PageUp/PageDown เลื่อนเดือน, Enter เลือก, Esc ปิด -->
 <template>
 	<button
@@ -31,22 +32,83 @@
 					<button
 						type="button"
 						class="ss-icon-btn ss-icon-btn--sm"
-						aria-label="เดือนก่อน"
-						@click="shift(-1)"
+						aria-label="ก่อนหน้า"
+						@click="page(-1)"
 					>
 						<Icon name="chevron-left" :size="17" />
 					</button>
-					<b>{{ MONTHS[view.getMonth()] }} {{ view.getFullYear() + 543 }}</b>
+					<div class="ss-cal-pop-title">
+						<b v-if="mode === 'years'">{{ decade + 543 }} – {{ decade + 552 }}</b>
+						<template v-else>
+							<button
+								v-if="mode === 'days'"
+								type="button"
+								class="ss-cal-pop-part"
+								aria-label="เลือกเดือน"
+								@mousedown.prevent="mode = 'months'"
+							>
+								{{ MONTHS[view.getMonth()] }}
+							</button>
+							<button
+								type="button"
+								class="ss-cal-pop-part"
+								aria-label="เลือกปี"
+								@mousedown.prevent="mode = 'years'"
+							>
+								{{ view.getFullYear() + 543 }}
+							</button>
+						</template>
+					</div>
 					<button
 						type="button"
 						class="ss-icon-btn ss-icon-btn--sm"
-						aria-label="เดือนถัดไป"
-						@click="shift(1)"
+						aria-label="ถัดไป"
+						@click="page(1)"
 					>
 						<Icon name="chevron-right" :size="17" />
 					</button>
 				</div>
-				<div class="ss-cal-pop-grid" role="grid">
+				<div v-if="mode === 'months'" class="ss-cal-pop-pick">
+					<button
+						v-for="c in month_cells"
+						:key="c.month"
+						type="button"
+						class="ss-cal-pop-day"
+						:class="{
+							'is-today': c.today,
+							'is-selected': c.selected,
+							'is-focus': c.month === view.getMonth(),
+							'is-off': c.off,
+						}"
+						:aria-label="MONTHS[c.month]"
+						:aria-pressed="c.selected"
+						:disabled="c.off"
+						@mousedown.prevent="pick_month(c.month)"
+					>
+						{{ SHORT[c.month] }}
+					</button>
+				</div>
+				<div v-else-if="mode === 'years'" class="ss-cal-pop-pick">
+					<button
+						v-for="c in year_cells"
+						:key="c.year"
+						type="button"
+						class="ss-cal-pop-day"
+						:class="{
+							'is-other': c.other,
+							'is-today': c.today,
+							'is-selected': c.selected,
+							'is-focus': c.year === view.getFullYear(),
+							'is-off': c.off,
+						}"
+						:aria-pressed="c.selected"
+						:disabled="c.off"
+						@mousedown.prevent="pick_year(c.year)"
+					>
+						{{ c.year + 543 }}
+					</button>
+				</div>
+				<div v-else class="ss-cal-pop-grid" role="grid">
 					<span v-for="d in DAYS" :key="d" class="is-dow">{{ d }}</span>
 					<button
 						v-for="c in cells"
@@ -136,6 +198,7 @@ const DAYS = ["อา", "จ", "อ", "พ", "พฤ", "ศ", "ส"];
 const trigger = ref(null);
 const panel = ref(null);
 const open = ref(false);
+const mode = ref("days"); // days | months | years
 const view = ref(new Date());
 const focus_iso = ref(null);
 const pop_style = ref({});
@@ -162,6 +225,35 @@ const cells = computed(() => {
 	});
 });
 
+const selected_date = computed(() => (props.modelValue ? parse(props.modelValue) : null));
+const today_date = parse(today_iso);
+const min_date = computed(() => (props.min ? parse(props.min) : null));
+
+const month_cells = computed(() => {
+	const y = view.value.getFullYear();
+	return Array.from({ length: 12 }, (_, month) => ({
+		month,
+		today: today_date.getFullYear() === y && today_date.getMonth() === month,
+		selected: selected_date.value?.getFullYear() === y && selected_date.value?.getMonth() === month,
+		off: !!min_date.value && new Date(y, month + 1, 0) < min_date.value,
+	}));
+});
+
+// ทศวรรษ พ.ศ. + ปีก่อน/หลังอย่างละปี 12 ช่องเท่าปฏิทินของ Frappe
+const decade = computed(() => Math.floor((view.value.getFullYear() + 543) / 10) * 10 - 543);
+const year_cells = computed(() =>
+	Array.from({ length: 12 }, (_, i) => {
+		const year = decade.value - 1 + i;
+		return {
+			year,
+			other: i === 0 || i === 11,
+			today: today_date.getFullYear() === year,
+			selected: selected_date.value?.getFullYear() === year,
+			off: !!min_date.value && year < min_date.value.getFullYear(),
+		};
+	})
+);
+
 function place() {
 	const box = trigger.value?.getBoundingClientRect();
 	if (!box) return;
@@ -179,6 +271,7 @@ function show() {
 	const base = props.modelValue ? parse(props.modelValue) : new Date();
 	view.value = new Date(base.getFullYear(), base.getMonth(), 1);
 	focus_iso.value = props.modelValue || today_iso;
+	mode.value = "days";
 	place();
 	open.value = true;
 	window.addEventListener("pointerdown", outside, true);
@@ -202,6 +295,19 @@ function outside(event) {
 
 function shift(months) {
 	view.value = new Date(view.value.getFullYear(), view.value.getMonth() + months, 1);
+}
+
+// ลูกศรของหัวปฏิทิน: ทีละเดือน / ปี / ทศวรรษ ตามหน้าที่เปิด
+const PAGE_MONTHS = { days: 1, months: 12, years: 120 };
+const page = (step) => shift(step * PAGE_MONTHS[mode.value]);
+
+function pick_month(month) {
+	view.value = new Date(view.value.getFullYear(), month, 1);
+	mode.value = "days";
+}
+function pick_year(year) {
+	view.value = new Date(year, view.value.getMonth(), 1);
+	mode.value = "days";
 }
 
 function choose(iso) {
@@ -228,12 +334,27 @@ function on_key(event) {
 		}
 		return;
 	}
+	if (mode.value !== "days") return on_pick_key(event);
 	const steps = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -7, ArrowDown: 7 };
 	if (steps[event.key]) move_focus(steps[event.key]);
-	else if (event.key === "PageUp") shift(-1);
-	else if (event.key === "PageDown") shift(1);
+	else if (event.key === "PageUp") page(-1);
+	else if (event.key === "PageDown") page(1);
 	else if (event.key === "Enter" || event.key === " ") choose(focus_iso.value);
 	else if (event.key === "Escape" || event.key === "Tab") return hide(event.key === "Escape");
+	else return;
+	event.preventDefault();
+}
+
+// หน้าเลือกเดือน/ปี: ลูกศรเลื่อนช่อง (ตาราง 3 คอลัมน์), Enter เลือก, Esc กลับหน้าวัน
+function on_pick_key(event) {
+	const unit = mode.value === "months" ? 1 : 12;
+	const steps = { ArrowLeft: -unit, ArrowRight: unit, ArrowUp: -3 * unit, ArrowDown: 3 * unit };
+	if (steps[event.key]) shift(steps[event.key]);
+	else if (event.key === "PageUp") page(-1);
+	else if (event.key === "PageDown") page(1);
+	else if (event.key === "Enter" || event.key === " ") mode.value = "days";
+	else if (event.key === "Escape") mode.value = "days";
+	else if (event.key === "Tab") return hide(false);
 	else return;
 	event.preventDefault();
 }

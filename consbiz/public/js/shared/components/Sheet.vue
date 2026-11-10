@@ -7,7 +7,7 @@
 			<div
 				v-if="open"
 				class="ss-sheet"
-				:class="{ 'ss-sheet--full': full, 'ss-sheet--half': half }"
+				:class="{ 'ss-sheet--full': full, 'ss-sheet--half': half, 'ss-sheet--wide': wide }"
 				:style="drag ? { transform: `translateY(${drag}px)`, transition: 'none' } : null"
 				role="dialog"
 				aria-modal="true"
@@ -46,6 +46,7 @@ const props = defineProps({
 	subtitle: String,
 	full: Boolean,
 	half: Boolean,
+	wide: Boolean,
 });
 const emit = defineEmits(["close"]);
 const drag = ref(0);

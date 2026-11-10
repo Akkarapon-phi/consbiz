@@ -1,16 +1,24 @@
 <template>
 	<div>
-		<Hero @pick-project="$emit('pick-project')" />
+		<Hero />
 
-		<div v-if="!state.project" class="ss-content ss-content--lift">
-			<Empty icon="building" title="ยังไม่ได้เลือกโครงการ" text="เลือกโครงการที่ดูแลเพื่อเริ่มใช้งาน">
-				<button type="button" class="ss-btn ss-btn--primary" @click="$emit('pick-project')">
+		<div v-if="!state.project" class="ss-content">
+			<Empty
+				icon="building"
+				title="ยังไม่ได้เลือกโครงการ"
+				text="เลือกโครงการที่ดูแลเพื่อเริ่มใช้งาน"
+			>
+				<button
+					type="button"
+					class="ss-btn ss-btn--primary"
+					@click="$emit('pick-project')"
+				>
 					เลือกโครงการ
 				</button>
 			</Empty>
 		</div>
 
-		<div v-else class="ss-content ss-content--lift">
+		<div v-else class="ss-content ss-pm-content">
 			<div v-if="!loaded" class="ss-plan ss-plan--loading">
 				<span class="ss-sk ss-sk-number"></span>
 				<span class="ss-sk ss-sk-line"></span>
@@ -21,9 +29,10 @@
 				title="โครงการนี้ยังไม่มีแผนงาน"
 				text="สร้างแผนงานก่อสร้าง (Construction Management) ของโครงการในระบบเต็มก่อน"
 			/>
-			<template v-else>
+			<!-- มือถือเรียงตามลำดับนี้ แท็บเล็ต/จอใหญ่จัดตำแหน่งด้วยกริดใน style.css -->
+			<div v-else class="ss-pm-board" :class="{ 'has-curve': d.curve?.length > 1 }">
 				<!-- เวลาเทียบงาน -->
-				<div class="ss-plan">
+				<div class="ss-plan ss-pm-progress">
 					<div class="ss-plan-head">
 						<div class="ss-plan-figure">
 							<span>งานเสร็จ</span>
@@ -69,26 +78,32 @@
 							<small v-else>{{ days_left }}</small>
 						</div>
 					</div>
-					<div v-if="d.schedule.penalty > 0 || d.schedule.warning" class="ss-banner tone-rose">
+					<div
+						v-if="d.show_values && (d.schedule.penalty > 0 || d.schedule.warning)"
+						class="ss-banner tone-rose"
+					>
 						<Icon name="alert" :size="22" />
 						<div>
-							<div class="ss-banner-title">ค่าปรับคาดการณ์ {{ money(d.schedule.penalty) }}</div>
+							<div class="ss-banner-title">
+								ค่าปรับคาดการณ์ {{ money(d.schedule.penalty) }}
+							</div>
 							<div class="ss-banner-text">
 								{{
-									d.schedule.warning || `${pct(d.schedule.penalty_percent)}% ของมูลค่าสัญญา`
+									d.schedule.warning ||
+									`${pct(d.schedule.penalty_percent)}% ของมูลค่าสัญญา`
 								}}
 							</div>
 						</div>
 					</div>
 				</div>
 
-				<div v-if="d.curve?.length > 1" class="ss-plan ss-plan--curve">
+				<div v-if="d.curve?.length > 1" class="ss-plan ss-plan--curve ss-pm-curve">
 					<h2 class="ss-section-title ss-section-title--first">S-Curve</h2>
-					<SCurve :points="d.curve" :basis="d.progress.basis" />
+					<SCurve :points="d.curve" :basis="d.progress.basis" fill />
 				</div>
 
 				<!-- สถานะงาน -->
-				<div class="ss-plan">
+				<div class="ss-plan ss-pm-status">
 					<h2 class="ss-section-title ss-section-title--first">
 						สถานะงาน <span class="ss-section-total">{{ d.tasks.total }} งาน</span>
 					</h2>
@@ -119,7 +134,7 @@
 				</div>
 
 				<div class="ss-stats">
-					<div class="ss-stat tone-blue" style="--i: 0">
+					<div v-if="d.show_values" class="ss-stat tone-blue" style="--i: 0">
 						<span class="ss-stat-icon"><Icon name="file" :size="20" /></span>
 						<span class="ss-stat-value ss-stat-value--money">{{
 							money_short(d.contract.revised_amount)
@@ -131,7 +146,7 @@
 							>VO รอ {{ d.contract.pending_count }}</span
 						>
 					</div>
-					<div class="ss-stat tone-violet" style="--i: 1">
+					<div v-if="d.show_values" class="ss-stat tone-violet" style="--i: 1">
 						<span class="ss-stat-icon"><Icon name="layers" :size="20" /></span>
 						<span class="ss-stat-value ss-stat-value--money"
 							>{{ d.contract.variation_amount > 0 ? "+" : ""
@@ -165,73 +180,40 @@
 					<div v-if="d.materials" class="ss-stat tone-orange" style="--i: 5">
 						<span class="ss-stat-icon"><Icon name="cart" :size="20" /></span>
 						<span class="ss-stat-value">{{ d.materials.late + d.materials.due }}</span>
-						<span class="ss-stat-label">วัสดุต้องสั่งใน {{ d.materials.days }} วัน</span>
+						<span class="ss-stat-label"
+							>วัสดุต้องสั่งใน {{ d.materials.days }} วัน</span
+						>
 						<span v-if="d.materials.late" class="ss-stat-alert"
 							>เลยกำหนด {{ d.materials.late }}</span
 						>
 					</div>
 				</div>
 
-				<template v-if="d.tasks.worst.length">
-					<h2 class="ss-section-title">
-						งานที่ล่าช้ามากที่สุด
-						<button type="button" class="ss-link" @click="go('plan')">ดูแผนงาน</button>
-					</h2>
-					<div class="ss-list">
-						<div
-							v-for="(t, i) in d.tasks.worst"
-							:key="t.wbs"
-							class="ss-card ss-late"
-							:style="{ '--i': i }"
-						>
-							<div class="ss-card-head">
-								<span class="ss-card-main">
-									<span class="ss-card-title">{{ t.item_name }}</span>
-									<span class="ss-card-meta">
-										<i class="ss-wbs">{{ t.wbs }}</i>
-										{{ t.status_label }}
-										<span v-if="t.critical" class="ss-tag tone-rose"
-											><Icon name="flag" :size="12" /> วิกฤต</span
-										>
-									</span>
-								</span>
-								<span v-if="t.delay_days > 0" class="ss-due is-late"
-									>ช้า {{ t.delay_days }} วัน</span
-								>
-							</div>
-							<div class="ss-plan-bar ss-plan-bar--sm">
-								<span
-									class="ss-plan-bar-plan"
-									:style="{ width: `${clamp(t.plan_pct)}%` }"
-								></span>
-								<span
-									class="ss-plan-bar-actual"
-									:style="{ width: `${clamp(t.actual_pct)}%` }"
-								></span>
-							</div>
-							<div class="ss-late-foot">
-								<span>จริง {{ pct(t.actual_pct) }}%</span
-								><span>แผน {{ pct(t.plan_pct) }}%</span>
-							</div>
-						</div>
-					</div>
-				</template>
+				<PlanPanels
+					v-if="d.categories?.length"
+					:tasks="d.late_tasks"
+					:categories="d.categories"
+				/>
 
-				<button
-					type="button"
-					class="ss-btn ss-btn--ghost ss-btn--lg ss-btn--block"
-					@click="go('pm-docs')"
-				>
-					<Icon name="file" :size="17" /> เอกสารโครงการ
-				</button>
-				<a
-					v-if="d.can_edit_plan"
-					class="ss-btn ss-btn--soft ss-btn--lg ss-btn--block"
-					:href="`/app/construction-gantt/${encodeURIComponent(d.construction_management)}`"
-				>
-					<Icon name="pen" :size="17" /> แก้แผนงาน (ระบบเต็ม)
-				</a>
-			</template>
+				<div class="ss-pm-links">
+					<button
+						type="button"
+						class="ss-btn ss-btn--ghost ss-btn--lg ss-btn--block"
+						@click="go('pm-docs')"
+					>
+						<Icon name="file" :size="17" /> เอกสารโครงการ
+					</button>
+					<a
+						v-if="d.can_edit_plan"
+						class="ss-btn ss-btn--soft ss-btn--lg ss-btn--block"
+						:href="`/app/construction-gantt/${encodeURIComponent(
+							d.construction_management
+						)}`"
+					>
+						<Icon name="pen" :size="17" /> แก้แผนงาน (ระบบเต็ม)
+					</a>
+				</div>
+			</div>
 		</div>
 	</div>
 </template>
@@ -241,6 +223,7 @@ import { computed, inject, onMounted } from "vue";
 import Icon from "../../../shared/components/Icon.vue";
 import Empty from "../../../shared/components/Empty.vue";
 import Hero from "../../../shared/components/Hero.vue";
+import PlanPanels from "../../../shared/components/PlanPanels.vue";
 import SCurve from "../../../shared/components/SCurve.vue";
 import { go, state, thai_date, today } from "../../../shared/api.js";
 
@@ -254,11 +237,14 @@ const d = computed(() => state.summaries.pm);
 const pct = (v) => (Number(v) || 0).toLocaleString("th-TH", { maximumFractionDigits: 1 });
 const clamp = (v) => Math.max(0, Math.min(100, Number(v) || 0));
 const ratio = (v) => (v === null || v === undefined ? "–" : Number(v).toFixed(2));
-const money = (v) => `${(Number(v) || 0).toLocaleString("th-TH", { maximumFractionDigits: 2 })} บาท`;
+const money = (v) =>
+	`${(Number(v) || 0).toLocaleString("th-TH", { maximumFractionDigits: 2 })} บาท`;
 function money_short(v) {
 	const n = Number(v) || 0;
-	if (Math.abs(n) >= 1e6) return `${(n / 1e6).toLocaleString("th-TH", { maximumFractionDigits: 2 })} ล้าน`;
-	if (Math.abs(n) >= 1e3) return `${(n / 1e3).toLocaleString("th-TH", { maximumFractionDigits: 1 })} พัน`;
+	if (Math.abs(n) >= 1e6)
+		return `${(n / 1e6).toLocaleString("th-TH", { maximumFractionDigits: 2 })} ล้าน`;
+	if (Math.abs(n) >= 1e3)
+		return `${(n / 1e3).toLocaleString("th-TH", { maximumFractionDigits: 1 })} พัน`;
 	return n.toLocaleString("th-TH");
 }
 
@@ -267,7 +253,8 @@ const time_used = computed(() => {
 	const s = d.value?.schedule;
 	if (!s?.start_date || !s.contract_finish) return 0;
 	return (
-		(days_between(s.start_date, today()) / Math.max(1, days_between(s.start_date, s.contract_finish))) *
+		(days_between(s.start_date, today()) /
+			Math.max(1, days_between(s.start_date, s.contract_finish))) *
 		100
 	);
 });

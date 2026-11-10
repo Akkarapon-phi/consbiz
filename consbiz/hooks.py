@@ -41,7 +41,7 @@ app_include_js = [
 
 # แอป ConsERP: ทุกหมวดอยู่ระดับเดียวกันใต้ /conserp/<หมวด> (PWA ตัวเดียว scope /conserp)
 # หมวดจัดซื้อ/ขาย = bundle ออฟฟิศ (www/office.html, ชื่อหมวดตรงกับ site_app.office_sections) ที่เหลือ = bundle หน้างาน (www/site.html)
-_OFFICE_SECTIONS = ("purchase", "sales")
+_OFFICE_SECTIONS = ("purchase", "sales", "boq")
 website_route_rules = [
 	*(
 		rule
@@ -67,6 +67,10 @@ website_redirects = [
 	_redirect(r"(?:conserp/)?office/buy(/.*)?", r"/conserp/purchase\1"),
 	_redirect(r"(?:conserp/)?office/sell(/.*)?", r"/conserp/sales\1"),
 	_redirect(r"(?:conserp/)?office(/.*)?", r"/conserp/purchase"),
+	# การเงินเคยเป็นหมวดของตัวเอง ย้ายเป็นเมนูในแผนงาน (ต้นทุน/EV เป็น tab)
+	_redirect(r"(?:conserp|site)/finance/finance-cost", r"/conserp/pm/finance/cost"),
+	_redirect(r"(?:conserp|site)/finance/finance-evm", r"/conserp/pm/finance/evm"),
+	_redirect(r"(?:conserp|site)/finance(/.*)?", r"/conserp/pm/finance"),
 	_redirect(r"site/sell(/.*)?", r"/conserp/sales\1"),
 	_redirect(r"site/buy/(po|pi)(/.*)?", r"/conserp/purchase/\1\2"),
 	_redirect(r"site/buy/(buy-doc|buy-form)/(po|pi)(/.*)?", r"/conserp/purchase/\1/\2\3"),

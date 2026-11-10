@@ -99,7 +99,10 @@ export async function call(method, args = {}, { post = false } = {}) {
 	}
 	const options = {
 		method: post ? "POST" : "GET",
-		headers: { Accept: "application/json", "X-Frappe-CSRF-Token": window.frappe?.csrf_token || "" },
+		headers: {
+			Accept: "application/json",
+			"X-Frappe-CSRF-Token": window.frappe?.csrf_token || "",
+		},
 		credentials: "same-origin",
 	};
 	let request = url;
@@ -130,7 +133,9 @@ export async function call(method, args = {}, { post = false } = {}) {
 			window.location.href = `/login?redirect-to=${encodeURIComponent(location.pathname)}`;
 		}
 		const messages = server_messages(data);
-		throw new ApiError(messages.join("\n") || data.exception || `เกิดข้อผิดพลาด (${response.status})`);
+		throw new ApiError(
+			messages.join("\n") || data.exception || `เกิดข้อผิดพลาด (${response.status})`
+		);
 	}
 	const notes = server_messages(data);
 	if (notes.length) notes.forEach((m) => toast(m, "warning"));
@@ -154,7 +159,10 @@ export async function upload(file, attach = null) {
 	const response = await fetch("/api/method/upload_file", {
 		method: "POST",
 		body: form,
-		headers: { Accept: "application/json", "X-Frappe-CSRF-Token": window.frappe?.csrf_token || "" },
+		headers: {
+			Accept: "application/json",
+			"X-Frappe-CSRF-Token": window.frappe?.csrf_token || "",
+		},
 		credentials: "same-origin",
 	});
 	const data = await response.json().catch(() => ({}));
@@ -166,7 +174,8 @@ export async function upload(file, attach = null) {
 
 // ย่อรูปจากกล้องมือถือ (หลาย MB) เหลือด้านยาว 1600px
 function shrink_image(file, max = 1600) {
-	if (!file.type?.startsWith("image/") || file.type === "image/gif") return Promise.resolve(file);
+	if (!file.type?.startsWith("image/") || file.type === "image/gif")
+		return Promise.resolve(file);
 	return new Promise((resolve) => {
 		const img = new Image();
 		const url = URL.createObjectURL(file);
@@ -281,9 +290,10 @@ export function switch_section(section) {
 	}
 	const last = state.last_tab[section] || { view: app.sections[section].home, params: {} };
 	// จากหน้าแรกเพิ่มประวัติ (ย้อนกลับมาหน้าแรกได้)
-	go(last.view, last.params, { replace: is_tab(state.route.view) && !is_desktop(state.section) });
+	go(last.view, last.params, {
+		replace: is_tab(state.route.view) && !is_desktop(state.section),
+	});
 }
-
 
 // ---------------------------------------------------------------- เริ่มแอป
 
@@ -354,6 +364,9 @@ export function parse_path(pathname = location.pathname) {
 	if (!allowed(section)) section = boot.sections[0];
 	let view = parts[0];
 	if (!app.routes[view] || section_of(view) !== section) view = app.sections[section].home;
+	// เมนูที่ไม่มีสิทธิ์ (tab.when) เปิดจาก URL ตรงไม่ได้
+	const tab = app.sections[section].tabs.find((t) => t.view === view);
+	if (tab?.when && !tab.when(boot)) view = app.sections[section].home;
 	const params = {};
 	app.routes[view].params.forEach((key, i) => {
 		if (parts[i + 1] !== undefined) params[key] = parts[i + 1];
@@ -365,11 +378,30 @@ function apply_route(route, direction) {
 	const section = section_of(route.view);
 	state.direction = section !== state.section ? "section" : direction;
 	set_section(section);
-	if (is_tab(route.view)) state.last_tab[section] = { view: route.view, params: { ...route.params } };
+	if (is_tab(route.view))
+		state.last_tab[section] = { view: route.view, params: { ...route.params } };
 	state.route = route;
 }
 
+// ด่านก่อนออกจากหน้า (เช่น หน้าแก้แผนงาน: บันทึกงานค้างก่อน) fn() คืน Promise<boolean> (true = ออกได้)
+// ใช้กับ go / back / ปุ่มย้อนกลับของเบราว์เซอร์ ส่วนการโหลดหน้าใหม่ (ข้ามแอป) หน้านั้นใช้ beforeunload เอง
+let leave_guard = null;
+let skip_popstate = false;
+export function set_leave_guard(fn) {
+	leave_guard = fn;
+}
+async function can_leave() {
+	if (!leave_guard) return true;
+	const ok = await leave_guard();
+	if (ok) leave_guard = null;
+	return ok;
+}
+
 export function go(view, params = {}, { replace = false } = {}) {
+	if (leave_guard) {
+		can_leave().then((ok) => ok && go(view, params, { replace }));
+		return;
+	}
 	const route = { view, params: { ...params } };
 	apply_route(route, is_tab(view) && is_tab(state.route.view) ? "fade" : "forward");
 	const depth = (history.state?.depth || 0) + (replace ? 0 : 1);
@@ -378,6 +410,10 @@ export function go(view, params = {}, { replace = false } = {}) {
 }
 
 export function back(fallback = "home", params = {}) {
+	if (leave_guard) {
+		can_leave().then((ok) => ok && back(fallback, params));
+		return;
+	}
 	if ((history.state?.depth || 0) > 0) {
 		history.back();
 	} else {
@@ -403,10 +439,9 @@ export function replace_params(view, params) {
 
 export function iso_date(date) {
 	const d = new Date(date);
-	return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(
-		2,
-		"0"
-	)}`;
+	return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+		d.getDate()
+	).padStart(2, "0")}`;
 }
 
 export function start_router() {
@@ -416,6 +451,19 @@ export function start_router() {
 	apply_route(route, "fade");
 	history.replaceState({ route, depth: 0 }, "", to_path(route));
 	window.addEventListener("popstate", (event) => {
+		if (skip_popstate) {
+			skip_popstate = false;
+		} else if (leave_guard) {
+			// เบราว์เซอร์ย้อนไปแล้ว: ใส่หน้าเดิมคืนก่อน ผ่านด่านแล้วจึงย้อนจริง
+			const route = JSON.parse(JSON.stringify(state.route));
+			history.pushState({ route, depth: (event.state?.depth || 0) + 1 }, "", to_path(route));
+			can_leave().then((ok) => {
+				if (!ok) return;
+				skip_popstate = true;
+				history.back();
+			});
+			return;
+		}
 		apply_route(event.state?.route || parse_path(), "back");
 	});
 }
@@ -477,6 +525,11 @@ export function now_time() {
 	return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 }
 
+// ตัวย่อของโครงการในกล่องสี: Project.custom_abbr ไม่ได้ตั้ง = ตัวย่อจากชื่อ
+export function project_abbr(project) {
+	return project.custom_abbr || initials(project.project_name || project.name);
+}
+
 export function initials(text) {
 	const clean = String(text || "?").replace(
 		/^(บริษัท|บจก\.|หจก\.|ห้างหุ้นส่วนจำกัด|นาย|นาง|นางสาว)\s*/u,
@@ -516,7 +569,9 @@ const RICH_TAGS = new Set(
 		" "
 	)
 );
-const DROP_TAGS = new Set("SCRIPT STYLE IFRAME OBJECT EMBED LINK META svg MATH TEMPLATE".split(" "));
+const DROP_TAGS = new Set(
+	"SCRIPT STYLE IFRAME OBJECT EMBED LINK META svg MATH TEMPLATE".split(" ")
+);
 
 function clean_node(node) {
 	for (const child of [...node.childNodes]) {
@@ -526,7 +581,11 @@ function clean_node(node) {
 		}
 		if (child.nodeType !== Node.ELEMENT_NODE) continue;
 		const tag = child.tagName.toUpperCase();
-		if (DROP_TAGS.has(child.tagName) || DROP_TAGS.has(tag) || child.classList.contains("ql-ui")) {
+		if (
+			DROP_TAGS.has(child.tagName) ||
+			DROP_TAGS.has(tag) ||
+			child.classList.contains("ql-ui")
+		) {
 			child.remove();
 			continue;
 		}
@@ -540,7 +599,9 @@ function clean_node(node) {
 			const keep =
 				(name === "data-list" && tag === "LI") ||
 				(name === "class" && /^(ql-(align|indent)-[\w-]+\s*)+$/.test(attr.value)) ||
-				(name === "href" && tag === "A" && /^(https?:|mailto:|tel:)/i.test(attr.value.trim()));
+				(name === "href" &&
+					tag === "A" &&
+					/^(https?:|mailto:|tel:)/i.test(attr.value.trim()));
 			if (!keep) child.removeAttribute(attr.name);
 		}
 		if (tag === "A") {

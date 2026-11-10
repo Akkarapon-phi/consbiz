@@ -1,7 +1,7 @@
 {
  "app": "consbiz",
  "bg_color": "gray",
- "creation": "2026-11-07 23:41:41.995247",
+ "creation": "2026-11-10 22:14:40.259913",
  "docstatus": 0,
  "doctype": "Desktop Icon",
  "hidden": 0,
@@ -11,7 +11,7 @@
  "link": "/conserp/purchase",
  "link_type": "External",
  "logo_url": "/assets/consbiz/site_app/conserp-round-192.png",
- "modified": "2026-11-07 23:41:41.995247",
+ "modified": "2026-11-10 22:14:40.259913",
  "modified_by": "Administrator",
  "name": "ConsOffice",
  "owner": "Administrator",

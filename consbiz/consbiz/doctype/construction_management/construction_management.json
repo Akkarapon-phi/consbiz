@@ -251,6 +251,7 @@
    "fieldtype": "Currency",
    "label": "Total Amount",
    "options": "Company:company:default_currency",
+   "permlevel": 1,
    "read_only": 1
   },
   {
@@ -394,6 +395,7 @@
    "label": "Variation Amount",
    "no_copy": 1,
    "options": "Company:company:default_currency",
+   "permlevel": 1,
    "read_only": 1
   },
   {
@@ -403,6 +405,7 @@
    "label": "Revised Contract Amount",
    "no_copy": 1,
    "options": "Company:company:default_currency",
+   "permlevel": 1,
    "read_only": 1
   },
   {
@@ -416,7 +419,8 @@
    "fieldname": "penalty_per_day",
    "fieldtype": "Currency",
    "label": "ค่าปรับรายวัน",
-   "options": "Company:company:default_currency"
+   "options": "Company:company:default_currency",
+   "permlevel": 1
   },
   {
    "default": "10",
@@ -446,7 +450,7 @@
  ],
  "grid_page_length": 50,
  "links": [],
- "modified": "2026-11-04 21:00:00.000000",
+ "modified": "2026-11-09 18:00:00.000000",
  "modified_by": "Administrator",
  "module": "ConsBiz",
  "name": "Construction Management",

@@ -23,6 +23,7 @@ from consbiz.consbiz.doctype.construction_management.construction_management imp
 	target_progress,
 )
 from consbiz.consbiz.doctype.daily_report.daily_report import (
+	check_reportable,
 	fit_to_remaining,
 	get_leaf_tasks,
 	get_task_totals,
@@ -46,6 +47,7 @@ class DailyRequest(Document):
 						row.idx, row.wbs, self.construction_management
 					)
 				)
+			check_reportable(row, task)
 			if task.name in seen:
 				frappe.throw(_("แถว {0}: งาน {1} ซ้ำกับแถวอื่น").format(row.idx, row.wbs))
 			seen.add(task.name)

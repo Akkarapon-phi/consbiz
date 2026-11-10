@@ -417,6 +417,14 @@
 			<Transition name="ss-bar">
 				<div v-if="has_bar" class="ss-bottom-bar">
 					<button
+						v-if="doc.can_delete"
+						type="button"
+						class="ss-btn ss-btn--ghost-danger ss-btn--lg"
+						@click="deleting = true"
+					>
+						<Icon name="trash" :size="17" /> ลบ
+					</button>
+					<button
 						v-if="doc.can_edit"
 						type="button"
 						class="ss-btn ss-btn--ghost ss-btn--lg"
@@ -480,6 +488,16 @@
 			</template>
 		</Sheet>
 
+		<DeleteSheet
+			:open="deleting"
+			:label="config.label"
+			:name="params.name"
+			method="consbiz.site_docs.delete_doc"
+			:args="{ kind: params.kind, name: params.name }"
+			@close="deleting = false"
+			@deleted="after_delete"
+		/>
+
 		<PdfViewer
 			:open="pdf"
 			:url="doc?.pdf_url"
@@ -497,6 +515,7 @@ import TopBar from "../components/TopBar.vue";
 import Skeleton from "../components/Skeleton.vue";
 import Sheet from "../components/Sheet.vue";
 import PdfViewer from "../components/PdfViewer.vue";
+import DeleteSheet from "../components/DeleteSheet.vue";
 import RichText from "../components/RichText.vue";
 import DocActivity from "./DocActivity.vue";
 import InlineEdit from "../components/InlineEdit.vue";
@@ -647,8 +666,14 @@ const next_kind = computed(() =>
 );
 
 const has_bar = computed(
-	() => !!(doc.value && (doc.value.can_edit || doc.value.can_submit || next_kind.value))
+	() => !!(doc.value && (doc.value.can_edit || doc.value.can_submit || doc.value.can_delete || next_kind.value))
 );
+
+const deleting = ref(false);
+function after_delete() {
+	reload_summary();
+	go(params.kind, {}, { replace: true });
+}
 
 const progress = computed(() =>
 	doc.value?.docstatus === 1

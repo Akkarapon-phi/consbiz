@@ -1,11 +1,13 @@
 <!-- S-Curve: % แผนสะสม (เส้นประ) เทียบ % จริงสะสม (เส้นทึบสีหมวด) จุด = วันเริ่ม/สิ้นเดือน/วันนี้/วันจบ
      ข้อมูลจาก dashboard.progress_curve ชุดเดียวกับ Tab ภาพรวมของ CM แตะ/ชี้ดูค่าแต่ละจุด -->
 <template>
-	<div class="ss-curve">
+	<div class="ss-curve" :class="{ 'is-fill': fill }">
 		<div class="ss-curve-head">
 			<div class="ss-curve-legend">
 				<span class="is-actual"><i></i>จริง</span>
-				<span class="is-plan"><i></i>{{ basis === "Baseline" ? "แผน (Baseline)" : "แผน" }}</span>
+				<span class="is-plan"
+					><i></i>{{ basis === "Baseline" ? "แผนสัญญา" : "แผน" }}</span
+				>
 			</div>
 			<button type="button" class="ss-link" @click="table = !table">
 				{{ table ? "ดูกราฟ" : "ดูตาราง" }}
@@ -16,9 +18,11 @@
 			<svg
 				v-if="width"
 				:width="width"
-				:height="HEIGHT"
+				:height="height"
 				role="img"
-				:aria-label="`S-Curve จริง ${fmt(last_actual?.actual)}% แผน ${fmt(last_actual?.plan)}%`"
+				:aria-label="`S-Curve จริง ${fmt(last_actual?.actual)}% แผน ${fmt(
+					last_actual?.plan
+				)}%`"
 				@pointermove="move"
 				@pointerdown="move"
 			>
@@ -34,7 +38,13 @@
 						<line :x1="PAD.l" :x2="width - PAD.r" :y1="y(v)" :y2="y(v)" />
 						<text :x="PAD.l - 8" :y="y(v) + 4" text-anchor="end">{{ v }}%</text>
 					</g>
-					<text v-for="t in x_ticks" :key="t.i" :x="x(t.i)" :y="HEIGHT - 6" text-anchor="middle">
+					<text
+						v-for="t in x_ticks"
+						:key="t.i"
+						:x="x(t.i)"
+						:y="height - 6"
+						text-anchor="middle"
+					>
 						{{ t.label }}
 					</text>
 				</g>
@@ -114,9 +124,10 @@ import { thai_date } from "../api.js";
 const props = defineProps({
 	points: { type: Array, default: () => [] }, // [{date, plan, actual|null}]
 	basis: String,
+	fill: Boolean, // สูงเต็มพื้นที่ของการ์ด (อย่างน้อย MIN_HEIGHT) เมื่อการ์ดถูกยืดด้วยกริด
 });
 
-const HEIGHT = 210;
+const MIN_HEIGHT = 210;
 const PAD = { t: 12, r: 14, b: 26, l: 42 };
 const uid = `curve-${Math.random().toString(36).slice(2, 8)}`;
 const MONTHS = [
@@ -136,14 +147,20 @@ const MONTHS = [
 
 const box = ref(null);
 const width = ref(0);
+const height = ref(MIN_HEIGHT);
 const hover = ref(null);
 const table = ref(false);
 
 const fmt = (v) => (Number(v) || 0).toLocaleString("th-TH", { maximumFractionDigits: 1 });
 // แกน x ตามลำดับจุด (ระยะห่างเท่ากัน: จุดเป็นสิ้นเดือน อ่านง่ายกว่าตามวันจริงบนจอมือถือ)
 const x = (i) =>
-	PAD.l + (props.points.length > 1 ? (i / (props.points.length - 1)) * (width.value - PAD.l - PAD.r) : 0);
-const y = (v) => PAD.t + (1 - Math.max(0, Math.min(100, Number(v) || 0)) / 100) * (HEIGHT - PAD.t - PAD.b);
+	PAD.l +
+	(props.points.length > 1
+		? (i / (props.points.length - 1)) * (width.value - PAD.l - PAD.r)
+		: 0);
+const y = (v) =>
+	PAD.t +
+	(1 - Math.max(0, Math.min(100, Number(v) || 0)) / 100) * (height.value - PAD.t - PAD.b);
 
 const line = (key) =>
 	props.points
@@ -154,7 +171,8 @@ const line = (key) =>
 const plan_path = computed(() => width.value && line("plan"));
 const actual_path = computed(() => width.value && line("actual"));
 const last_index = computed(() => {
-	for (let i = props.points.length - 1; i >= 0; i--) if (props.points[i].actual !== null) return i;
+	for (let i = props.points.length - 1; i >= 0; i--)
+		if (props.points[i].actual !== null) return i;
 	return -1;
 });
 const last_actual = computed(() => props.points[last_index.value]);
@@ -170,7 +188,9 @@ const x_ticks = computed(() => {
 	if (!n || !width.value) return [];
 	const room = Math.max(1, Math.floor((width.value - PAD.l - PAD.r) / 52));
 	const step = Math.max(1, Math.ceil(n / room));
-	const ticks = props.points.map((p, i) => ({ i, date: String(p.date) })).filter((t) => t.i % step === 0);
+	const ticks = props.points
+		.map((p, i) => ({ i, date: String(p.date) }))
+		.filter((t) => t.i % step === 0);
 	// จุดสุดท้าย (วันจบ) ใส่เมื่อห่างจากป้ายก่อนหน้าพอ
 	if (ticks[ticks.length - 1].i !== n - 1 && n - 1 - ticks[ticks.length - 1].i >= step * 0.7) {
 		ticks.push({ i: n - 1, date: String(props.points[n - 1].date) });
@@ -200,8 +220,14 @@ let observer = null;
 function observe() {
 	observer?.disconnect();
 	if (!box.value) return;
-	width.value = box.value.clientWidth;
-	observer = new ResizeObserver(([entry]) => (width.value = Math.round(entry.contentRect.width)));
+	const measure = (w, h) => {
+		width.value = Math.round(w);
+		if (props.fill) height.value = Math.max(MIN_HEIGHT, Math.round(h));
+	};
+	measure(box.value.clientWidth, box.value.clientHeight);
+	observer = new ResizeObserver(([entry]) =>
+		measure(entry.contentRect.width, entry.contentRect.height)
+	);
 	observer.observe(box.value);
 }
 onMounted(observe);

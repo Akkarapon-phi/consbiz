@@ -583,7 +583,10 @@ export function next_of(day, unit) {
 }
 
 export function today() {
-	return to_day(frappe.datetime.get_today());
+	// แอป ConsERP (/conserp/pm/plan-edit) ไม่มี frappe.datetime: ใช้วันที่ของเครื่อง
+	if (globalThis.frappe?.datetime) return to_day(frappe.datetime.get_today());
+	const now = new Date();
+	return Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()) / DAY_MS;
 }
 
 // ---------- สิ่งที่ต้องเตรียมก่อนเริ่มงาน (ตรงกับ construction_management/resources.py) ----------

@@ -140,6 +140,14 @@
 				</a>
 				<span class="ss-toolbar-gap"></span>
 				<button
+					v-if="doc.can_delete"
+					type="button"
+					class="ss-btn ss-btn--ghost-danger ss-btn--sm"
+					@click="deleting = true"
+				>
+					<Icon name="trash" :size="15" /> ลบ
+				</button>
+				<button
 					v-if="doc.can_edit"
 					type="button"
 					class="ss-btn ss-btn--ghost ss-btn--sm"
@@ -166,6 +174,15 @@
 			</template>
 		</footer>
 
+		<DeleteSheet
+			:open="deleting"
+			:label="config.label"
+			:name="name"
+			method="consbiz.site_docs.delete_doc"
+			:args="{ kind, name }"
+			@close="deleting = false"
+			@deleted="after_delete"
+		/>
 		<PdfViewer :open="pdf" :url="doc?.pdf_url" :name="name" :title="config.label" @close="pdf = false" />
 	</aside>
 </template>
@@ -175,6 +192,7 @@ import { computed, ref, watch } from "vue";
 import Icon from "../components/Icon.vue";
 import Skeleton from "../components/Skeleton.vue";
 import PdfViewer from "../components/PdfViewer.vue";
+import DeleteSheet from "../components/DeleteSheet.vue";
 import { DOC_KINDS, in_app } from "./kinds.js";
 import { call, celebrate, desk_url, go, money, num, post, show_error, thai_date } from "../api.js";
 
@@ -188,7 +206,13 @@ const doc = ref(null);
 const pdf = ref(false);
 const confirm = ref(false);
 const busy = ref(false);
+const deleting = ref(false);
 let request = 0;
+
+function after_delete() {
+	emit("close");
+	emit("changed");
+}
 
 async function load() {
 	const id = ++request;

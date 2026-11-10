@@ -1,8 +1,8 @@
 <template>
 	<div>
-		<Hero @pick-project="$emit('pick-project')" />
+		<Hero />
 
-		<div v-if="state.project" class="ss-content ss-content--lift">
+		<div v-if="state.project" class="ss-content">
 			<div class="ss-stats">
 				<button
 					v-for="(s, i) in stats"
@@ -23,8 +23,8 @@
 				</button>
 			</div>
 
-			<h2 class="ss-section-title">ทำรายการ</h2>
-			<div class="ss-actions">
+			<h2 v-if="actions.length" class="ss-section-title">ทำรายการ</h2>
+			<div v-if="actions.length" class="ss-actions">
 				<button
 					v-for="(a, i) in actions"
 					:key="a.label"
@@ -75,7 +75,7 @@
 			</template>
 		</div>
 
-		<div v-else class="ss-content ss-content--lift">
+		<div v-else class="ss-content">
 			<Empty icon="building" title="ยังไม่ได้เลือกโครงการ" text="เลือกโครงการที่ดูแลเพื่อเริ่มใช้งาน">
 				<button type="button" class="ss-btn ss-btn--primary" @click="$emit('pick-project')">
 					เลือกโครงการ
@@ -90,7 +90,7 @@ import { computed, inject, onMounted } from "vue";
 import Icon from "../../../shared/components/Icon.vue";
 import Empty from "../../../shared/components/Empty.vue";
 import Hero from "../../../shared/components/Hero.vue";
-import { go, initials, num, relative_date, state, toast, tone } from "../../../shared/api.js";
+import { boot, go, initials, num, relative_date, state, toast, tone } from "../../../shared/api.js";
 
 defineEmits(["pick-project"]);
 const reload_summary = inject("reload_summary");
@@ -100,9 +100,11 @@ const loading = computed(() => !state.summary);
 
 const stats = computed(() => {
 	const s = summary.value || {};
+	const can = boot.can;
 	return [
 		{
 			key: "pending",
+			when: can.receive || can.receive_employer,
 			label: "รอรับของ",
 			value: s.pending_count ?? 0,
 			icon: "receive",
@@ -111,6 +113,7 @@ const stats = computed(() => {
 		},
 		{
 			key: "borrow",
+			when: can.borrow || can.view_borrow,
 			label: "อุปกรณ์ค้างคืน",
 			value: s.borrow_count ?? 0,
 			icon: "wrench",
@@ -120,6 +123,7 @@ const stats = computed(() => {
 		},
 		{
 			key: "issue",
+			when: can.issue || can.view_stock,
 			label: "ใบเบิกวันนี้",
 			value: s.issues_today ?? 0,
 			icon: "issue",
@@ -129,6 +133,7 @@ const stats = computed(() => {
 		},
 		{
 			key: "received",
+			when: can.receive || can.receive_employer || can.view_receive,
 			label: "รับของวันนี้ (ใบ)",
 			value: s.receipts_today ?? 0,
 			icon: "package",
@@ -136,26 +141,28 @@ const stats = computed(() => {
 			view: "receive",
 			params: { tab: "done" },
 		},
-	];
+	].filter((stat) => stat.when);
 });
 
 const actions = computed(() => [
 	{
+		when: boot.can.receive || boot.can.receive_employer,
 		label: "รับของ",
 		note: "ตรวจรับตามใบสั่งซื้อ",
 		icon: "receive",
 		tone: "blue",
 		run: () => go("receive"),
 	},
-	{ label: "เบิกวัสดุ", note: "ตัดของผู้ว่าจ้างก่อน", icon: "issue", tone: "teal", run: () => go("issue") },
+	{ when: boot.can.issue, label: "เบิกวัสดุ", note: "ตัดของผู้ว่าจ้างก่อน", icon: "issue", tone: "teal", run: () => go("issue") },
 	{
+		when: boot.can.borrow,
 		label: "ยืมอุปกรณ์",
 		note: "ผู้ยืมเซ็นรับ",
 		icon: "wrench",
 		tone: "amber",
 		run: () => go("borrow-new"),
 	},
-]);
+].filter((action) => action.when));
 
 onMounted(() => {
 	if (state.project) reload_summary();

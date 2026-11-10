@@ -2,6 +2,8 @@
 // editor = fieldtype ของ Frappe control ที่ใช้แก้ค่าในช่อง (ไม่มี = แก้ไม่ได้)
 // plan_pct / actual_pct / actual_qty เป็นค่า ณ วันที่ที่เลือกดู, predecessors เป็นข้อความ WBS (metrics จาก App)
 
+import { __, format_number, str_to_user } from "./print_env";
+
 export const COLUMNS = [
 	{ key: "wbs", label: __("WBS"), width: 64 },
 	{ key: "item_name", label: __("รายการ"), width: 260 },
@@ -14,8 +16,8 @@ export const COLUMNS = [
 	{ key: "duration", label: __("จำนวนวัน"), width: 72, align: "right", editor: "Int" },
 	{ key: "predecessors", label: __("งานก่อนหน้า"), width: 110, editor: "Data" },
 	{ key: "total_float", label: __("Float (วัน)"), width: 72, align: "right" },
-	{ key: "baseline_start_date", label: __("เริ่ม (Baseline)"), width: 112 },
-	{ key: "baseline_end_date", label: __("จบ (Baseline)"), width: 112 },
+	{ key: "baseline_start_date", label: __("เริ่ม (แผนสัญญา)"), width: 112 },
+	{ key: "baseline_end_date", label: __("จบ (แผนสัญญา)"), width: 112 },
 	{ key: "plan_pct", label: __("% แผน"), width: 72, align: "right" },
 	{ key: "actual_qty", label: __("ปริมาณจริง"), width: 90, align: "right", editor: "Float" },
 	{ key: "actual_pct", label: __("% จริง"), width: 72, align: "right", editor: "Float" },
@@ -78,7 +80,7 @@ export function cell_text(task, key, metrics) {
 		case "end_date":
 		case "baseline_start_date":
 		case "baseline_end_date":
-			return value ? frappe.datetime.str_to_user(value) : "";
+			return value ? str_to_user(value) : "";
 		case "quantity":
 			return task.is_group || !value ? "" : format_number(value, null, 2);
 		case "actual_qty":
@@ -100,7 +102,8 @@ export function cell_text(task, key, metrics) {
 	}
 }
 
-const locale = frappe.boot.lang === "th" ? "th-TH" : frappe.boot.lang || "en";
+const lang = globalThis.frappe?.boot?.lang || "th";
+const locale = lang === "th" ? "th-TH" : lang;
 const compact = new Intl.NumberFormat(locale, { notation: "compact", maximumFractionDigits: 1 });
 
 // % ในตารางสรุป (หน้าจอและงานพิมพ์) แสดง 3 ตำแหน่ง

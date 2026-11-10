@@ -254,7 +254,7 @@ async function load() {
 	try {
 		const data = await call("get_borrowing", { name: params.name });
 		doc.value = data;
-		open_items.value = data.items
+		open_items.value = (data.can_return ? data.items : [])
 			.filter((i) => i.outstanding_qty > 0 && data.status !== "Cancelled")
 			.map((i) => ({ ...i, qty_borrowed: i.qty, qty: 0, condition: "Good" }));
 	} catch (error) {

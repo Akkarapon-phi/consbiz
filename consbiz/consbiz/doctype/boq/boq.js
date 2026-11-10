@@ -26,6 +26,9 @@ frappe.ui.form.on("BOQ", {
 					frm.add_custom_button(__("แผนงานก่อสร้าง"), () =>
 						frappe.set_route("construction-gantt", schedule)
 					);
+					if (frm.doc.docstatus === 0) {
+						frm.add_custom_button(__("อัปเดตแผนงาน"), () => update_plan_from_boq(frm));
+					}
 				} else if (frappe.model.can_create("Construction Management")) {
 					frm.add_custom_button(__("สร้างแผนงาน"), () =>
 						frappe
@@ -40,6 +43,69 @@ frappe.ui.form.on("BOQ", {
 			});
 	},
 });
+
+// อัปเดตแผนงานจาก BOQ ฉบับร่าง: แสดงสรุปก่อน แล้วค่อยบันทึก (boq_sync.py)
+const BOQ_SYNC_METHOD = "consbiz.consbiz.doctype.construction_management.boq_sync";
+
+function boq_sync_list(title, rows) {
+	if (!rows.length) return "";
+	const items = rows
+		.map((row) => {
+			const fields = row.fields ? ` (${row.fields.join(", ")})` : "";
+			return `<li>${frappe.utils.escape_html(`${row.wbs} ${row.item_name}${fields}`)}</li>`;
+		})
+		.join("");
+	return `<p><b>${title}</b></p><ul>${items}</ul>`;
+}
+
+async function update_plan_from_boq(frm) {
+	if (frm.is_dirty()) {
+		frappe.msgprint(__("บันทึก BOQ ก่อนอัปเดตแผนงาน"));
+		return;
+	}
+	const { message: sync } = await frappe.call({
+		method: `${BOQ_SYNC_METHOD}.preview_boq_sync`,
+		args: { boq: frm.doc.name },
+		freeze: true,
+	});
+	if (sync.reason || sync.in_sync) {
+		frappe.msgprint(sync.reason || __("แผนงานตรงกับ BOQ แล้ว"));
+		return;
+	}
+	const blockers = sync.blockers.length
+		? `<div class="alert alert-danger">${sync.blockers
+				.map((text) => frappe.utils.escape_html(text))
+				.join("<br>")}</div>`
+		: "";
+	const moved = sync.moved ? `<p>${__("เลข WBS เปลี่ยน {0} แถว", [sync.moved])}</p>` : "";
+	const dialog = new frappe.ui.Dialog({
+		title: __("อัปเดตแผนงานจาก BOQ"),
+		fields: [
+			{
+				fieldname: "summary",
+				fieldtype: "HTML",
+				options: `${blockers}<p class="text-muted">${__(
+					"แถวเดิมคงวันที่และงานก่อนหน้าไว้ แถวใหม่เริ่มที่วันเริ่มแผน ต้องกำหนดวันเอง"
+				)}</p>${boq_sync_list(__("รายการที่จะลบ"), sync.removed)}${boq_sync_list(
+					__("รายการใหม่"),
+					sync.added
+				)}${boq_sync_list(__("รายการที่แก้"), sync.changed)}${moved}`,
+			},
+		],
+		primary_action_label: __("อัปเดตแผนงาน"),
+		primary_action: async () => {
+			await frappe.call({
+				method: `${BOQ_SYNC_METHOD}.apply_boq_sync`,
+				args: { boq: frm.doc.name, modified: sync.modified },
+				freeze: true,
+			});
+			dialog.hide();
+			frappe.show_alert({ message: __("อัปเดตแผนงานแล้ว"), indicator: "green" });
+		},
+	});
+	if (!sync.can_apply) dialog.get_primary_btn().prop("disabled", true);
+	dialog.show();
+}
 
 // ดึงชื่อ หน่วย กลุ่ม จาก BOQ Item ครั้งเดียวตอนเลือกรหัส (ไม่ใช้ fetch_from เพราะ fetch_from
 // ดึงทับทุกครั้งที่บันทึก ค่าที่แก้หรือนำเข้าจาก Excel จะหาย) ราคาดึงในส่วน "BOQ Calulation" ท้ายไฟล์

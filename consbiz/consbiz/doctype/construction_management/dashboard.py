@@ -9,7 +9,7 @@
 import frappe
 from frappe import _
 from frappe.query_builder.functions import Count
-from frappe.utils import add_days, add_months, flt, getdate, nowdate
+from frappe.utils import add_days, add_months, cint, flt, getdate, nowdate
 
 from consbiz.consbiz.doctype.construction_management.construction_management import (
 	EXTENSION_OF_TIME,
@@ -17,15 +17,71 @@ from consbiz.consbiz.doctype.construction_management.construction_management imp
 	actual_progress_at,
 	floor_period,
 	get_holiday_dates,
+	is_counted,
 	next_period,
 	target_progress,
 )
-from consbiz.consbiz.doctype.construction_management.delay import STATUS, analyse, penalty_warning
+from consbiz.consbiz.doctype.construction_management.delay import (
+	STATUS,
+	actual_by_task,
+	analyse,
+	penalty_warning,
+)
 from consbiz.consbiz.doctype.construction_management.evm import evm_series
 
 MATERIAL_DUE_DAYS = 14
 WORST_TASKS = 8
 LATE_STATUSES = ("behind", "not_started", "overdue")
+
+
+def late_tasks(tasks):
+	"""งานที่ช้ากว่าแผนทุกแถว (หน้าภาพรวมแบ่งหน้าในเครื่อง) เรียงงานวิกฤตและช้ามากก่อน"""
+	late = sorted(
+		(t for t in tasks if t.status != "done" and (t.delay_days > 0 or t.status in LATE_STATUSES)),
+		key=lambda t: (not t.critical, -t.delay_days, t.variance),
+	)
+	return [
+		{
+			"wbs": t.wbs,
+			"item_name": t.item_name,
+			"status_label": _(STATUS[t.status][0]),
+			"delay_days": t.delay_days,
+			"critical": t.critical,
+			"actual_pct": flt(t.actual_pct, 1),
+			"plan_pct": flt(t.plan_pct, 1),
+		}
+		for t in late
+	]
+
+
+def category_progress(doc, day):
+	"""% จริงของแต่ละหมวด (แถวระดับบนสุดของ WBS) ณ สิ้นวัน day ถ่วงด้วยมูลค่างานย่อย แบบเดียวกับ % รวมของโครงการ
+	งานเพิ่มนับตั้งแต่วันที่อนุมัติ หมวดที่ยังไม่มีงานให้นับไม่แสดง หมวดที่ไม่มีมูลค่าเฉลี่ยเท่ากันทุกงาน"""
+	progress = actual_by_task(doc.name, day)
+	categories, current = [], None
+	for row in doc.tasks:
+		if not cint(row.indent):
+			current = {"wbs": row.wbs, "item_name": row.item_name, "leaves": []}
+			categories.append(current)
+		if (
+			current
+			and not row.is_group
+			and is_counted(row)
+			and (not row.counted_from or getdate(row.counted_from) <= day)
+		):
+			current["leaves"].append(row)
+
+	result = []
+	for category in categories:
+		leaves = category.pop("leaves")
+		if not leaves:
+			continue
+		weights = [flt(row.amount) for row in leaves]
+		if not sum(weights):
+			weights = [1] * len(leaves)
+		done = sum(w * progress.get(row.name, {}).get("percent", 0) for w, row in zip(weights, leaves, strict=True))
+		result.append({**category, "percent": flt(done / sum(weights), 1)})
+	return result
 
 
 @frappe.whitelist()
@@ -43,7 +99,7 @@ def get_dashboard(name, date=None):
 	show_cost = doc.has_permlevel_access_to("budget_cost")
 	series = evm_series(doc, day) if show_cost and (doc.start_date or tasks) else []
 
-	return {
+	data = {
 		"date": day,
 		"currency": frappe.db.get_value("Company", doc.company, "default_currency") if doc.company else None,
 		"progress": {"plan": plan, "actual": actual_progress_at(doc, day)[1], "basis": basis},
@@ -78,6 +134,8 @@ def get_dashboard(name, date=None):
 				)[:WORST_TASKS]
 			],
 		},
+		"late_tasks": late_tasks(tasks),
+		"categories": category_progress(doc, day),
 		# S-Curve รายเดือนให้ทุกคน (แผนถึงวันจบ 100%) มูลค่า (PV/EV/AC) เฉพาะผู้ที่เห็นงบต้นทุน
 		"curve": progress_curve(doc, day),
 		"evm": evm_values(series) if show_cost and series else None,
@@ -91,7 +149,18 @@ def get_dashboard(name, date=None):
 		"quality": quality(doc.name),
 		"materials": materials(doc.name, day),
 		"retention": retention(doc.project),
+		"show_values": show_cost,
 	}
+	return data if show_cost else hide_money(data)
+
+
+def hide_money(data):
+	"""ผู้ไม่มีสิทธิ์เห็นมูลค่า (เกณฑ์เดียวกับ EVM): ตัดจำนวนเงินทั้งหมด จำนวนเอกสารและวันยังเห็น"""
+	for key in ("total_amount", "revised_amount", "variation_amount", "pending_total"):
+		data["contract"][key] = None
+	data["schedule"]["penalty"] = data["schedule"]["penalty_per_day"] = None
+	data["retention"] = None
+	return data
 
 
 def progress_curve(doc, day):
