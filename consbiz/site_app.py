@@ -30,6 +30,7 @@ WORK_DOCTYPES = ("Daily Report", "Daily Request", "Inspection Request", "Punch L
 APPS = (
 	{"key": "site", "title": "ConsERP", "label": "หน้างาน", "url": "/conserp", "icon": "hardhat"},
 	{"key": "office", "title": "ConsOffice", "label": "ออฟฟิศ", "url": "/conserp", "icon": "briefcase"},
+	{"key": "self", "title": "Self Service", "label": "พนักงาน", "url": "/conserp", "icon": "user"},
 )
 BUY_DOCTYPES = ("Material Request", "Purchase Order", "Purchase Invoice")
 SELL_DOCTYPES = ("Quotation", "Sales Order", "Sales Invoice")
@@ -49,6 +50,10 @@ def office_sections():
 		sections.append("sales")
 	if frappe.has_permission("BOQ", "read"):
 		sections.append("boq")
+	# บุคคล: สรุปวันทำงาน / Attendance (consbiz/hr_attendance.py) เฉพาะ HR
+	from consbiz import hr_attendance
+
+	sections += hr_attendance.hr_sections()
 	return sections
 
 
@@ -80,7 +85,13 @@ def site_sections(can=None):
 	return sections
 
 
-APP_SECTIONS = {"site": site_sections, "office": office_sections}
+def self_sections():
+	from consbiz.self_service import self_sections
+
+	return self_sections()
+
+
+APP_SECTIONS = {"site": site_sections, "office": office_sections, "self": self_sections}
 
 
 def sections_by_app(current=None):
@@ -159,6 +170,9 @@ def office_boot_data():
 			"default_company": frappe.defaults.get_user_default("Company"),
 		}
 	)
+	from consbiz import hr_payroll
+
+	boot["can"]["payroll"] = "hr" in sections and hr_payroll.can_manage()
 	add_apps(boot, ("office", sections))
 	return boot
 

@@ -82,3 +82,23 @@ def thai_baht_text(amount):
 	text = (_thai_number(baht) or "ศูนย์") + "บาท"
 	text += _thai_number(satang) + "สตางค์" if satang else "ถ้วน"
 	return prefix + text
+
+
+def image_data_uri(file_url):
+	"""รูปจากไฟล์ในระบบ (รวม private เช่นโลโก้บริษัท) เป็น data URI ให้ Print Format/PDF แสดงได้โดยไม่ต้องล็อกอิน (ใช้ผ่าน jinja)"""
+	import base64
+	import mimetypes
+
+	if not file_url:
+		return ""
+	name = frappe.db.get_value("File", {"file_url": file_url}, "name")
+	if not name:
+		return ""
+	try:
+		content = frappe.get_doc("File", name).get_content()
+	except Exception:
+		return ""
+	if isinstance(content, str):
+		content = content.encode()
+	mime = mimetypes.guess_type(file_url)[0] or "image/png"
+	return f"data:{mime};base64,{base64.b64encode(content).decode()}"

@@ -14,6 +14,7 @@
 // fallback   หมวดที่เปิดเมื่อผู้ใช้ไม่มีสิทธิ์หมวดไหนเลย (หน้าแจ้งสิทธิ์เอง)
 // project_filter  true = โครงการเป็นแค่ตัวกรอง (ไม่บังคับเลือก, ว่าง = ทุกโครงการ) + ตัวเลือกบริษัท (แอปออฟฟิศ)
 //            false = ต้องเลือกโครงการก่อนใช้งาน (แอปหน้างาน)
+// no_project true = แอปไม่ใช้โครงการเลย (Self Service) ไม่โหลดรายชื่อโครงการ ไม่มีปุ่มโครงการ
 // project_key  key ที่จำโครงการที่เลือกในเครื่อง
 // side_default sidebar เริ่มต้น "collapsed" (ไอคอน) / "expanded" (กาง) ผู้ใช้ปักหมุด/พับเองแล้วจำในเครื่อง
 // shortcuts  คีย์ลัดของรายการ/หน้าดูเอกสาร (จอใช้คีย์บอร์ด)
@@ -35,6 +36,7 @@ export const app = {
 	fallback: null,
 	doc_kinds: [],
 	project_filter: false,
+	no_project: false,
 	project_key: "consbiz.store.project",
 	side_default: "collapsed",
 	shortcuts: false,

@@ -22,6 +22,7 @@ configure({
 	summary_api: {
 		purchase: () => ["consbiz.site_docs.get_summary", { section: "buy", ...scope_args() }],
 		sales: () => ["consbiz.site_docs.get_summary", { section: "sell", ...scope_args() }],
+		hr: () => ["consbiz.hr_attendance.get_summary", scope_args()],
 	},
 	fallback: "purchase",
 	doc_kinds: ["mr", "po", "pi", "qtn", "so", "si"],

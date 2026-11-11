@@ -1,0 +1,137 @@
+{
+ "actions": [],
+ "autoname": "",
+ "creation": "2026-11-11 12:00:00.000000",
+ "description": "วันหยุดประจำสัปดาห์ของพนักงาน (หยุดเสาร์หรืออาทิตย์ 1 วันต่อสัปดาห์) พนักงานเลือกเองในแอป Self Service ใครลงก่อนได้ก่อนตามโควตาของโครงการ HR แก้ได้ทุกเวลา",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "employee",
+  "employee_name",
+  "company",
+  "column_break_main",
+  "project",
+  "week_start",
+  "day_off",
+  "off_date"
+ ],
+ "fields": [
+  {
+   "fieldname": "employee",
+   "fieldtype": "Link",
+   "options": "Employee",
+   "label": "พนักงาน",
+   "reqd": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "search_index": 1
+  },
+  {
+   "fetch_from": "employee.employee_name",
+   "fieldname": "employee_name",
+   "fieldtype": "Data",
+   "label": "ชื่อพนักงาน",
+   "read_only": 1,
+   "in_list_view": 1
+  },
+  {
+   "fetch_from": "employee.company",
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "options": "Company",
+   "label": "บริษัท",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_main",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "project",
+   "fieldtype": "Link",
+   "options": "Project",
+   "label": "โครงการ",
+   "in_standard_filter": 1,
+   "search_index": 1,
+   "description": "โครงการที่ประจำตอนลงวันหยุด (ใช้นับโควตาเสาร์/อาทิตย์)"
+  },
+  {
+   "fieldname": "week_start",
+   "fieldtype": "Date",
+   "label": "สัปดาห์ที่เริ่ม (วันจันทร์)",
+   "reqd": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "day_off",
+   "fieldtype": "Select",
+   "options": "Saturday\nSunday",
+   "label": "วันหยุด",
+   "reqd": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "off_date",
+   "fieldtype": "Date",
+   "label": "วันที่หยุด",
+   "read_only": 1,
+   "in_list_view": 1,
+   "search_index": 1
+  }
+ ],
+ "grid_page_length": 50,
+ "links": [],
+ "modified": "2026-11-11 12:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "ConsBiz",
+ "name": "Weekly Day Off",
+ "naming_rule": "By script",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "read": 1,
+   "role": "System Manager",
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "create": 1,
+   "write": 1,
+   "delete": 1,
+   "share": 1,
+   "email": 1
+  },
+  {
+   "read": 1,
+   "role": "HR Manager",
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "create": 1,
+   "write": 1,
+   "delete": 1,
+   "share": 1,
+   "email": 1
+  },
+  {
+   "read": 1,
+   "role": "HR User",
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "create": 1,
+   "write": 1,
+   "delete": 1,
+   "share": 1,
+   "email": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "week_start",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "employee_name",
+ "track_changes": 1
+}
