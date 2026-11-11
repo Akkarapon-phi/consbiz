@@ -53,6 +53,23 @@ const APP_PAGES = {
 	"Equipment Borrowing": { section: "store", view: "borrow-detail", args: {}, project: true },
 	"Purchase Receipt": { section: "store", view: "receipt", args: { doctype: "Purchase Receipt" } },
 	BOQ: { section: "boq", view: "boq-form", args: {} },
+	// งาน HR: ผู้อนุมัติ = โมดูลอนุมัติ (เปิดใบนั้น) ไม่มีสิทธิ์ = หน้าของตัวเองใน Self Service (หน้าแรกที่เข้าหมวดได้)
+	"Employee Checkin": [
+		{ section: "approve", view: "approve", args: {} },
+		{ section: "self", view: "checkin", args: {}, no_name: true },
+	],
+	"Leave Application": [
+		{ section: "approve", view: "approve", args: {} },
+		{ section: "self", view: "leave", args: {}, no_name: true },
+	],
+	"Employee Advance": [
+		{ section: "approve", view: "approve", args: {} },
+		{ section: "self", view: "advances", args: {}, no_name: true },
+	],
+	"Expense Claim": [
+		{ section: "approve", view: "approve", args: {} },
+		{ section: "self", view: "advances", args: {}, no_name: true },
+	],
 };
 
 // เปิดเอกสารจากการแจ้งเตือน: ในแอปถ้ามีหน้าและผู้ใช้เข้าหมวดนั้นได้ ที่เหลือเปิดระบบเต็มในแท็บใหม่
@@ -60,8 +77,11 @@ export async function open_document(doctype, name) {
 	const kind = Object.keys(DOC_KINDS).find((key) => DOC_KINDS[key].doctype === doctype);
 	if (kind) return open_doc(kind, name);
 
-	const page = APP_PAGES[doctype];
-	if (!page || !(boot.modules || []).some((m) => m.section === page.section)) {
+	// หลายหน้า = หน้าแรกที่ผู้ใช้เข้าหมวดนั้นได้
+	const can_open = (p) => (boot.modules || []).some((m) => m.section === p.section);
+	const pages = [APP_PAGES[doctype]].flat().filter(Boolean);
+	const page = pages.find(can_open);
+	if (!page) {
 		window.open(desk_url(doctype, name), "_blank", "noopener");
 		return;
 	}
@@ -74,7 +94,7 @@ export async function open_document(doctype, name) {
 			return;
 		}
 	}
-	const args = { ...page.args, name };
+	const args = page.no_name ? { ...page.args } : { ...page.args, name };
 	if (app.routes[page.view] && (!project || state.project?.name === project)) {
 		go(page.view, args);
 		return;

@@ -145,19 +145,19 @@
 			<nav
 				v-if="show_nav"
 				class="ss-nav"
-				:style="{ '--count': mobile_tabs.length }"
+				:style="{ '--count': nav_tabs.length }"
 				aria-label="เมนูของหมวด"
 			>
 				<span class="ss-nav-pill" :style="{ '--tab': tab_index }"></span>
 				<button
-					v-for="(tab, i) in mobile_tabs"
+					v-for="(tab, i) in nav_tabs"
 					:key="`${state.section}:${tab.view}`"
 					type="button"
 					class="ss-nav-item"
-					:class="{ 'is-active': tab.view === active_view }"
+					:class="{ 'is-active': tab.view === MORE ? more_active : tab.view === active_view }"
 					:title="tab.label"
 					:style="{ '--i': i }"
-					@click="open_tab(tab.view)"
+					@click="tab.view === MORE ? (more_open = true) : open_tab(tab.view)"
 				>
 					<span class="ss-nav-icon">
 						<Icon
@@ -179,6 +179,24 @@
 				</button>
 			</nav>
 		</Transition>
+
+		<!-- มือถือ: เมนูที่เกินแถบล่าง (เกิน NAV_MAX) -->
+		<Sheet :open="more_open" title="เมนูอื่นๆ" @close="more_open = false">
+			<div class="ss-list">
+				<button
+					v-for="tab in more_tabs"
+					:key="tab.view"
+					type="button"
+					class="ss-card ss-card--row"
+					:class="{ 'is-active': tab.view === active_view }"
+					@click="(more_open = false), open_tab(tab.view)"
+				>
+					<span class="ss-nav-icon"><Icon :name="tab.icon" :size="22" /></span>
+					<span class="ss-card-main"><span class="ss-card-title">{{ tab.label }}</span></span>
+					<span v-if="tab.badge" class="ss-badge" :class="tab.badge_tone">{{ tab.badge }}</span>
+				</button>
+			</div>
+		</Sheet>
 
 		<Sheet
 			:open="picker"
@@ -329,7 +347,9 @@ const route_key = computed(
 );
 const desktop = computed(() => is_desktop(state.section));
 // ออฟฟิศ / หน้าแรก: แสดงทั้งเปลือกแอปและหน้าโดยไม่ต้องเลือกโครงการ
-const has_shell = computed(() => !!(state.project || app.project_filter || desktop.value));
+const has_shell = computed(
+	() => !!(state.project || app.project_filter || app.no_project || desktop.value)
+);
 const ready = computed(
 	() => has_shell.value || state.route.view === SECTIONS[state.section]?.home
 );
@@ -349,6 +369,24 @@ const tabs = computed(() => {
 	}));
 });
 const mobile_tabs = computed(() => tabs.value.filter((t) => !t.wide_only));
+// แถบล่างมีได้ NAV_MAX ช่อง เกินแล้วช่องสุดท้ายเป็น "อื่นๆ" (เปิด sheet เลือกเมนูที่เหลือ)
+const NAV_MAX = 5;
+const MORE = "__more";
+const more_open = ref(false);
+const more_tabs = computed(() => (mobile_tabs.value.length > NAV_MAX ? mobile_tabs.value.slice(NAV_MAX - 1) : []));
+const more_active = computed(() => more_tabs.value.some((t) => t.view === active_view.value));
+const nav_tabs = computed(() => {
+	if (!more_tabs.value.length) return mobile_tabs.value;
+	const badge = more_tabs.value.reduce((sum, t) => sum + (Number(t.badge) || 0), 0);
+	const more = {
+		view: MORE,
+		label: "อื่นๆ",
+		icon: "more",
+		badge,
+		badge_tone: more_tabs.value.some((t) => t.badge_tone) ? "is-danger" : "",
+	};
+	return [...mobile_tabs.value.slice(0, NAV_MAX - 1), more];
+});
 
 // Dock: เฉพาะหมวดของกลุ่มแอปนี้ (กลุ่มอื่นเปิดจากหน้าแรก) + หมวดที่เปิดอยู่ถ้าไม่อยู่ในรายการ
 // (เช่น ขอซื้อของหน้างานที่ซ่อนเพราะมีจัดซื้อของออฟฟิศ)
@@ -380,7 +418,7 @@ const active_view = computed(
 const tab_index = computed(() =>
 	Math.max(
 		0,
-		mobile_tabs.value.findIndex((t) => t.view === active_view.value)
+		more_active.value ? NAV_MAX - 1 : nav_tabs.value.findIndex((t) => t.view === active_view.value)
 	)
 );
 
@@ -442,7 +480,7 @@ function close_picker() {
 watch(
 	() => state.section,
 	(section) => {
-		if (projects.value && !app.project_filter && !state.project && !is_desktop(section))
+		if (projects.value && !app.project_filter && !app.no_project && !state.project && !is_desktop(section))
 			picker.value = true;
 	}
 );
@@ -490,8 +528,8 @@ function choose_company(company) {
 const SUMMARY_API = app.summary_api;
 
 async function load_summary(key = state.section) {
-	// หน้างานต้องมีโครงการ / ออฟฟิศ: โครงการเป็นตัวกรอง (ไม่มี = ทุกโครงการ)
-	if ((!state.project && !app.project_filter) || !SUMMARY_API[key]) return;
+	// หน้างานต้องมีโครงการ / ออฟฟิศ: โครงการเป็นตัวกรอง (ไม่มี = ทุกโครงการ) / Self Service: ไม่ใช้โครงการ
+	if ((!state.project && !app.project_filter && !app.no_project) || !SUMMARY_API[key]) return;
 	const stamp = scope_key();
 	try {
 		const [method, args] = SUMMARY_API[key]();
@@ -626,6 +664,11 @@ onMounted(async () => {
 	const wanted = new URLSearchParams(location.search).get("project");
 	const remembered = remembered_project();
 	start_router();
+	// Self Service: ไม่มีโครงการ (ผู้ใช้อาจไม่มีสิทธิ์อ่าน Project)
+	if (app.no_project) {
+		load_summaries();
+		return;
+	}
 	// มี ?project: ยังไม่แสดงหน้าจนรู้โครงการ ไม่งั้นหน้าเอกสารโหลดด้วยโครงการเดิมแล้ว error
 	state.project = wanted ? null : remembered;
 	await load_projects();

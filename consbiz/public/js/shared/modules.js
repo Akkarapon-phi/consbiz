@@ -5,7 +5,7 @@
 import { app } from "./app.js";
 import { boot } from "./api.js";
 
-export const APP_LABELS = { site: "หน้างาน", office: "ออฟฟิศ" };
+export const APP_LABELS = { site: "หน้างาน", office: "ออฟฟิศ", self: "พนักงาน" };
 
 export const MODULE_META = {
 	site: {
@@ -74,6 +74,34 @@ export const MODULE_META = {
 			icon: "calculator",
 			theme: "#b45309",
 			colors: ["#b45309", "#a16207"],
+		},
+		// ฝ่ายบุคคล: สรุปวันทำงาน → Attendance (consbiz/hr_attendance.py) เฉพาะ HR
+		hr: {
+			label: "บุคคล",
+			title: "ฝ่ายบุคคล",
+			note: "สรุปวันทำงาน บันทึก Attendance",
+			icon: "users",
+			theme: "#be123c",
+			colors: ["#be123c", "#c2410c"],
+		},
+	},
+	self: {
+		self: {
+			label: "Self Service",
+			title: "Self Service",
+			note: "ลงเวลา ขอลา สลิปเงินเดือน",
+			icon: "user",
+			theme: "#15803d",
+			colors: ["#15803d", "#0f766e"],
+		},
+		// รวมเอกสารที่รออนุมัติทุกชนิดไว้ที่เดียว (ตอนนี้งาน HR) consbiz/approvals.py
+		approve: {
+			label: "อนุมัติ",
+			title: "อนุมัติ",
+			note: "ใบลา ลงเวลา เบิกเงิน เคลียร์ค่าใช้จ่าย",
+			icon: "clipboard-check",
+			theme: "#4338ca",
+			colors: ["#4338ca", "#7c3aed"],
 		},
 	},
 };

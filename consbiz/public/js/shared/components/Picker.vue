@@ -50,7 +50,9 @@
 					</span>
 				</button>
 				<div v-if="loading" class="ss-options-note">กำลังค้นหา…</div>
-				<div v-else-if="!shown.length && !allow_text" class="ss-options-note">ไม่พบรายการ</div>
+				<div v-else-if="!shown.length && !allow_text" class="ss-options-note">
+					{{ empty_text || "ไม่พบรายการ" }}
+				</div>
 			</div>
 			<template v-if="modelValue && clearable" #footer>
 				<button
@@ -84,6 +86,8 @@ const props = defineProps({
 	required: Boolean,
 	clearable: Boolean,
 	allow_text: Boolean,
+	// ข้อความเมื่อไม่มีรายการ (ค่าเริ่มต้น "ไม่พบรายการ")
+	empty_text: String,
 });
 const emit = defineEmits(["update:modelValue", "select"]);
 

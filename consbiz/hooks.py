@@ -26,6 +26,8 @@ fixtures = [
     {"doctype": "Report", "filters": [["name", "in", ["Salary Slip Report"]]]},
     # หน้าแรก (Workspace ConsBiz) มีแค่ตัวเรียก consbiz.render_home ใน public/js/home.js
     {"doctype": "Custom HTML Block", "filters": [["name", "in", ["ConsBiz Home"]]]},
+    # ผู้บริหาร: อนุมัติเบิกเงินเดือนล่วงหน้าที่เกินวงเงิน (consbiz/self_advance.py)
+    {"doctype": "Role", "filters": [["name", "in", ["Executive Approver"]]]},
 ]
 
 
@@ -41,8 +43,18 @@ app_include_js = [
 
 # แอป ConsERP: ทุกหมวดอยู่ระดับเดียวกันใต้ /conserp/<หมวด> (PWA ตัวเดียว scope /conserp)
 # หมวดจัดซื้อ/ขาย = bundle ออฟฟิศ (www/office.html, ชื่อหมวดตรงกับ site_app.office_sections) ที่เหลือ = bundle หน้างาน (www/site.html)
-_OFFICE_SECTIONS = ("purchase", "sales", "boq")
+_OFFICE_SECTIONS = ("purchase", "sales", "boq", "hr")
+# bundle self_app (www/self.html): Self Service ของพนักงานทุกคน (consbiz/self_service.py) + โมดูลอนุมัติ (consbiz/approvals.py)
+_SELF_SECTIONS = ("self", "approve")
 website_route_rules = [
+	*(
+		rule
+		for section in _SELF_SECTIONS
+		for rule in (
+			{"from_route": f"/conserp/{section}", "to_route": "self"},
+			{"from_route": f"/conserp/{section}/<path:app_path>", "to_route": "self"},
+		)
+	),
 	*(
 		rule
 		for section in _OFFICE_SECTIONS
@@ -105,7 +117,16 @@ auto_cancel_exempted_doctypes = ["Retention Receivable", "Retention Payable"]
 
 doc_events = {
     "Payment Entry": {
-        "on_submit": "consbiz.api.update_si_tax" 
+        "on_submit": [
+            "consbiz.api.update_si_tax",
+            # จ่ายใบเบิกจากแอป Self Service: หักเงินเดือนล่วงหน้าเป็นงวด / ตั้งกำหนดเคลียร์เงินสำรองจ่าย
+            "consbiz.self_advance.on_payment_entry_submit"
+        ]
+    },
+
+    # ใบเบิกจากแอปต้องผ่านผู้อนุมัติ (Expense Approver) เกินวงเงินต้องผู้บริหาร (consbiz/self_advance.py)
+    "Employee Advance": {
+        "before_submit": "consbiz.self_advance.guard_advance_submit"
     },
 
     # เงินประกันผลงาน (consbiz/retention.py): JE ที่ผูกกับ Retention Invoice / Release (ช่อง journal_entry)
@@ -166,13 +187,22 @@ doc_events = {
     "Sales Invoice": {
         "on_submit": "consbiz.retention.create_from_invoice",
         "before_cancel": "consbiz.retention.cancel_from_invoice"
+    },
+
+    # พนักงานลงเวลาเองได้ผ่านแอป Self Service เท่านั้น (GPS + เซลฟี่) HR แก้ได้ตามปกติ (consbiz/self_service.py)
+    "Employee Checkin": {
+        "validate": "consbiz.self_service.guard_checkin"
     }
 }
 
 scheduler_events = {
     "daily": [
         # เงินประกันผลงาน: Active → Overdue เมื่อเลยวันครบกำหนด
-        "consbiz.retention.update_overdue"
+        "consbiz.retention.update_overdue",
+        # ลบรูปเซลฟี่ของการลงเวลาเมื่อ Salary Slip ของงวดนั้นผ่านไป 90 วัน (ยกเว้นติ๊กเก็บหลักฐาน)
+        "consbiz.self_service.purge_selfies",
+        # เงินสำรองจ่ายเลยกำหนดเคลียร์: แจ้งเตือนพนักงาน
+        "consbiz.self_advance.remind_overdue_clearing"
     ]
 }
 
@@ -253,6 +283,8 @@ jinja = {
 		"consbiz.utils.thai_date",
 		"consbiz.consbiz.doctype.bar_cut_plan.bar_cut_plan.shape_svg",
 		"consbiz.utils.name_with_title",
+		"consbiz.utils.thai_baht_text",
+		"consbiz.utils.image_data_uri",
 	]
 }
 # jinja = {

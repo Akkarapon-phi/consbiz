@@ -37,7 +37,7 @@ def base_columns():
 def usage_columns():
 	return base_columns() + [
 		{"fieldname": "concrete_item", "label": _("คอนกรีต"), "fieldtype": "Link", "options": "Item", "width": 120},
-		{"fieldname": "strength", "label": _("กำลังอัด"), "fieldtype": "Data", "width": 110},
+		{"fieldname": "concrete_item_name", "label": _("ชื่อคอนกรีต"), "fieldtype": "Data", "width": 220},
 		{"fieldname": "supplier", "label": _("ผู้ขาย"), "fieldtype": "Link", "options": "Supplier", "width": 140},
 		{"fieldname": "trucks", "label": _("จำนวนรถ"), "fieldtype": "Int", "width": 80},
 		{"fieldname": "qty", "label": _("ใช้จริง (คิว)"), "fieldtype": "Float", "width": 100},
@@ -65,10 +65,13 @@ def ticket_columns():
 def fetch_tickets(filters):
 	parent = frappe.qb.DocType("Concrete Usage")
 	child = frappe.qb.DocType("Concrete Usage Ticket")
+	item = frappe.qb.DocType("Item")
 	query = (
 		frappe.qb.from_(child)
 		.join(parent)
 		.on(child.parent == parent.name)
+		.left_join(item)
+		.on(item.name == parent.concrete_item)
 		.select(
 			parent.name.as_("concrete_usage"),
 			parent.date,
@@ -77,7 +80,7 @@ def fetch_tickets(filters):
 			parent.task_name,
 			parent.location,
 			parent.concrete_item,
-			parent.strength,
+			item.item_name.as_("concrete_item_name"),
 			parent.supplier,
 			parent.planned_qty,
 			child.ticket_no,
@@ -123,7 +126,7 @@ def usage_rows(filters):
 		row = result.get(ticket.concrete_usage)
 		if not row:
 			row = result[ticket.concrete_usage] = frappe._dict(
-				{key: ticket[key] for key in ("concrete_usage", "date", "project", "wbs", "task_name", "location", "concrete_item", "strength", "supplier", "planned_qty")},
+				{key: ticket[key] for key in ("concrete_usage", "date", "project", "wbs", "task_name", "location", "concrete_item", "concrete_item_name", "supplier", "planned_qty")},
 				trucks=0,
 				qty=0.0,
 				company_qty=0.0,

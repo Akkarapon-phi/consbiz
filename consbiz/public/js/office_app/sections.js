@@ -53,6 +53,26 @@ export const SECTIONS = {
 		home: "boq",
 		tabs: [{ view: "boq", label: "BOQ", icon: "calculator" }],
 	},
+	hr: {
+		key: "hr",
+		...MODULE_META.office.hr,
+		home: "hr-attendance",
+		tabs: [
+			{
+				view: "hr-attendance",
+				label: "สรุปวันทำงาน",
+				icon: "calendar",
+				badge: (s) => s?.flag,
+				alert: (s) => s?.flag,
+			},
+			{ view: "hr-adjustments", label: "เพิ่ม/หัก", icon: "list", when: (b) => b.can?.payroll },
+			{ view: "hr-payroll", label: "เงินเดือน", icon: "receive", when: (b) => b.can?.payroll },
+			{ view: "hr-salaries", label: "ค่าจ้างพนักงาน", icon: "users", when: (b) => b.can?.payroll },
+			{ view: "hr-advances", label: "เบิกเงิน", icon: "swap" },
+			{ view: "hr-setup", label: "ตั้งค่า HR", icon: "sliders" },
+		],
+		badge: (s) => s?.flag,
+	},
 };
 
 // view → หมวด + ชื่อ params ตามลำดับใน URL
@@ -73,4 +93,11 @@ export const ROUTES = {
 	"sell-form": { section: "sales", params: ["kind", "name", "source"] },
 	boq: { section: "boq", params: ["filter"] },
 	"boq-form": { section: "boq", params: ["name"] },
+	// month = YYYY-MM (ว่าง = เดือนนี้)
+	"hr-attendance": { section: "hr", params: ["month"] },
+	"hr-payroll": { section: "hr", params: ["month"] },
+	"hr-setup": { section: "hr", params: [] },
+	"hr-adjustments": { section: "hr", params: ["month"] },
+	"hr-salaries": { section: "hr", params: ["filter"] },
+	"hr-advances": { section: "hr", params: ["filter"] },
 };

@@ -172,7 +172,7 @@ pre-commit run --all-files                               # ruff + prettier (ต�
   |---|---|---|
   | `/conserp` | หน้างาน (มือถือ) | ควบคุมงาน, สโตร์, แผนงาน, ทรัพยากร, การเงิน, ขอซื้อ/ขอเบิก + ติดตามสถานะ |
   | `/conserp/purchase`, `/conserp/sales`, ... | ออฟฟิศ (จอใหญ่) | ซื้อ, ขาย, บัญชี, ประกันผลงาน, แอดมิน (หนังสือเข้า-ออก, สัญญา ผรม., ใบนำส่ง, ใบปะหน้า, ค่าแรงรายวัน) |
-  | `/hr-app` | พนักงานทุกคน | ลงเวลา, ลา, เบิกล่วงหน้า, สลิป (หน้าจอครอบ HRMS) ชื่อไอคอน "ConsHR" |
+  | `/conserp/self` | พนักงานทุกคน | Self Service: ลงเวลา, ลา, สลิป, วันหยุดประจำสัปดาห์ + ตารางทีม, เบิกเงินเดือนล่วงหน้า/เงินสำรองจ่าย/เบิกคืน + อนุมัติ หน้าจอครอบ HRMS (แทนแผน `/hr-app` เดิม) |
   | `/contractor` | ผู้รับเหมาช่วง (คนนอก) | อัปเดตผลงาน, ดูสัญญา/งวดของตัวเอง API แยกและตรวจสิทธิ์ทุกคำขอ |
   ห้ามใช้ `/me` (หน้า My Account ของ Frappe), `/hr/...` (Roster ของ HRMS), `/hrms` (ESS ของ HRMS)
   โค้ดหน้าจอกลางอยู่ `public/js/shared/`: `AppShell.vue` (Dock/แถบล่าง/เลือกโครงการ/toast), `api.js` (เรียก API, router, state, รูปแบบ),
@@ -286,7 +286,7 @@ pre-commit run --all-files                               # ruff + prettier (ต�
   ฟอร์มใหม่เก็บร่างใน localStorage ระหว่างกรอก (สัญญาณหลุดไม่หาย) ขอตรวจงาน / Punch List สร้างใน `views/project_docs/`
   ขออนุมัติได้ทุกวัน (ย้อนหลังได้) PDF/แชร์ไฟล์: `site_app.pdf_url` เลือกตัวสร้าง PDF แบบหน้าพิมพ์ของระบบเต็ม (Print Format → Print Settings)
   ดู PDF ในแอป (`PdfViewer.vue`) วาดด้วย PDF.js ที่ `public/js/lib/pdfjs/` (มือถือแสดง PDF ใน iframe ไม่ได้) โหลดเมื่อเปิดครั้งแรก
-  ไม่ใช้ desk: เรียก API ด้วย fetch เอง (`api.js`), router เอง (`<base>/<หมวด>/<view>/<params>`, `website_route_rules`), CSS อยู่ `shared/style.css` (class `ss-`)
+  ไม่ใช้ desk: เรียก API ด้วย fetch เอง (`api.js`), router เอง (`<base>/<หมวด>/<view>/<params>`, หน้าหลักของหมวดไม่มี `<view>` ใน URL params เริ่มต่อจากหมวด, `website_route_rules`), CSS อยู่ `shared/style.css` (class `ss-`)
   `/store/...` เดิมเด้งไป `/conserp/store/...` (`website_redirects` ใน hooks.py) ไอคอนที่ติดตั้งไว้แล้วยังใช้ได้
   CSS ต้อง `@import` ใน `<style>` ของ `AppShell.vue` (Frappe ฝัง CSS เข้า bundle เฉพาะที่มาจาก .vue ถ้า import .css ตรงๆ ไฟล์ JS ถูกลบตอน build)
   ห้ามวาง comment ระดับ root ใน `<template>` (ข้าง root element) ให้วางเหนือ `<template>` หรือในตัว element:
@@ -298,6 +298,73 @@ pre-commit run --all-files                               # ruff + prettier (ต�
   สโตร์ รับของ: PO ของโครงการ → Purchase Receipt (บัญชีทำ PI ต่อจาก PR), MR ผู้ว่าจ้างจัดหา → Stock Entry Material Receipt
   ตีกลับที่หน้างาน = ไม่รับเข้า ยอดค้างที่ PO/MR เก็บใน `custom_site_rejected_qty` / `custom_site_reject_reason` ของแถว
   ตีกลับทั้งหมด = ไม่มีใบรับ บันทึก Comment ที่ PO/MR, รูปอัปโหลดก่อนแล้ว server ผูกกับเอกสาร (`attach_files`)
+- Self Service (`/conserp/self`, bundle `public/js/self_app/`, www `self.html`, API `consbiz/self_service.py`, หมวด `self` ใน `_SELF_SECTIONS` ของ hooks.py):
+  ทุก API หาพนักงานจาก `Employee.user_id` = ผู้ใช้ที่ล็อกอิน ไม่รับรหัสพนักงานจากภายนอก (เขียนด้วย ignore_permissions หลังตรวจเจ้าของแล้ว) ไม่ผูก Employee = ไม่เห็นหมวด
+  `configure({ no_project: true })` = AppShell ไม่โหลด/ไม่แสดงโครงการ (พนักงานอาจไม่มีสิทธิ์อ่าน Project)
+  ลงเวลา = `Employee Checkin` ต้องมีเซลฟี่ถ่ายสด (`shared/components/LiveCamera.vue` getUserMedia ไม่มีเลือกไฟล์, 480px JPEG 0.6 ส่งเป็น data URL ในคำขอเดียว, ไฟล์ private) + อยู่ในรัศมี `Shift Location` (รัศมี 0 = ยังไม่ตั้ง ลงไม่ได้)
+  ของ `Employee.custom_checkin_location` ถ้าไม่ตั้งใช้ของ `Project.custom_checkin_location` ของโครงการที่ประจำ (`Employee.custom_project`) ห้ามลงซ้ำใน 60 วินาที
+  พนักงานสร้าง/แก้ Checkin เองนอกแอปไม่ได้ (doc_events `guard_checkin`, HR/Administrator ได้) ช่องของแอปบน Checkin เป็น permlevel 1 (Employee อ่านอย่างเดียว)
+  รูปเซลฟี่: ดูผ่าน `self_service.selfie` (เจ้าตัว + HR) scheduler รายวัน `purge_selfies` ลบเฉพาะไฟล์ เมื่อ Salary Slip (Submit) ที่ครอบวันนั้น posting_date เกิน 90 วัน
+  เว้นแต่ HR ติ๊ก `custom_keep_evidence` (ตกลง 2026-11-11) เวลา/พิกัดไม่ลบ
+  ต้องยืนยัน (ตกลง 2026-11-11): นอกรัศมี หรือ GPS คลาดเกิน `ACCURACY_LIMIT` (100 ม.) ลงได้แต่ต้องมีเหตุผล / ลืมลงเวลาออก แจ้งย้อนหลังได้ `MISSING_OUT_DAYS` (7) วัน (`request_checkout`, ไม่มี GPS/รูป)
+  ทั้งสองแบบ = `custom_approval_status` Pending + `skip_auto_attendance` (HRMS ไม่นับจนกว่ายืนยัน)
+  ผู้อนุมัติใบลา + ลงเวลา = Role `Leave Approver` (`APPROVER_ROLE`, ไม่ใช้ Reports To / `leave_approver` ของพนักงาน, ตกลง 2026-11-11)
+  ผู้อนุมัติที่ประจำโครงการ (`Employee.custom_project`) เห็นเฉพาะพนักงานโครงการเดียวกัน ไม่ประจำ = ทุกคน (`scope_employees` / `can_approve_employee`), HR เห็นทุกคน
+  แจ้งเตือนส่งหาทุกคนในขอบเขต (`approvers_of`) ช่อง `custom_approver` ของ Checkin เลิกใช้
+  ยืนยันในโมดูลอนุมัติ (ด้านล่าง) ไม่ยืนยันต้องมีเหตุผล ยืนยันของตัวเองไม่ได้ แจ้งเตือนผ่าน Notification Log ทั้งผู้ยืนยันและเจ้าของ
+  ลืมลงเวลาออกแล้วไม่แจ้ง/ไม่ได้รับยืนยัน: ไม่สร้าง Attendance อัตโนมัติ ให้ HR ตัดสินในหน้าสรุปวันทำงาน (หมวด `hr`) กะข้ามเที่ยงคืนยังไม่รองรับ
+  ลา = `Leave Application` สถานะ Open (`leave_approver` = ผู้อนุมัติคนแรกในขอบเขตไว้ก่อน อนุมัติแล้วเปลี่ยนเป็นผู้อนุมัติจริง) ถอนได้เฉพาะร่าง Open สลิป = Salary Slip ที่ Submit แล้ว PDF ผ่าน `slip_pdf` (ข้ามสิทธิ์พิมพ์หลังตรวจเจ้าของ)
+  วันหยุดประจำสัปดาห์ = DocType `Weekly Day Off` (ชื่อ `WDO-<พนักงาน>-<วันจันทร์>`, 1 ใบต่อคนต่อสัปดาห์) หยุดเสาร์หรืออาทิตย์ ใครลงก่อนได้ก่อน มีผลทันที (ตกลง 2026-11-11)
+  โควตาต่อโครงการ: เสาร์ = ceil(ทีม x `Project.custom_day_off_saturday_percent`% (ค่าเริ่มต้น 50)), อาทิตย์ = ceil(ส่วนที่เหลือ) ทีม = Employee Active ที่ `custom_project` เดียวกัน
+  `book_day_off` ล็อกแถว Project (for_update) กันแย่งพร้อมกัน ลงได้สัปดาห์นี้ + `DAY_OFF_WEEKS` สัปดาห์ เปลี่ยน/ยกเลิกได้ถึงวันหยุดนั้น HR แก้ในระบบได้ทุกเวลา (เกินโควตาแค่เตือน) คนอื่นแก้นอกแอปไม่ได้
+  ไม่ผูกกับ Holiday List: หน้าสรุปวันทำงาน (`hr_attendance.py`) อ่าน Weekly Day Off เอง
+  เบิกเงิน (`consbiz/self_advance.py`, หน้า `advances`, อนุมัติในโมดูลอนุมัติ, ตกลง 2026-11-11): `Employee Advance.custom_advance_type` = Salary Advance (เบิกเงินเดือนล่วงหน้า) / Expense Advance (เงินสำรองจ่าย)
+  ผู้อนุมัติ = Role `Expense Approver` (ไม่ใช้ Reports To) อนุมัติในแอป = Submit ไม่อนุมัติ = คงร่าง + เหตุผล อนุมัติของตัวเองไม่ได้ จ่ายเงิน/รับเงินคืน ฝ่ายบัญชีทำ Payment Entry ในระบบเต็ม
+  เงินเดือนล่วงหน้า: วงเงิน `Company.custom_salary_advance_limit_percent` (50%) ของ base ใน Salary Structure Assignment รวมใบที่ยังหักคืนไม่ครบ เกิน = Role `Executive Approver` (fixtures `role.json`) อนุมัติอีกขั้น (`Pending Executive`)
+  `guard_advance_submit` (before_submit) บังคับกติกาเดียวกันเมื่อ Submit จากระบบเต็ม หักคืน 1-6 งวด: Payment Entry on_submit สร้าง Additional Salary (`Company.custom_salary_advance_component`) งวดละเดือน งวดแรก = เดือนที่จ่าย (สลิปเดือนนั้นออกแล้ว = เดือนถัดไป)
+  เงินสำรองจ่าย: จ่ายแล้ว `custom_clear_due_date` = วันจ่าย + `Company.custom_expense_clear_days` (15) เคลียร์ด้วย Expense Claim ที่ตัดยอด Advance (`get_expense_claim_advances` ของ HRMS) เลยกำหนดแจ้งเตือนพนักงานทุก 3 วัน (ไม่หักเงินเอง)
+  เบิกค่าใช้จ่ายคืน = Expense Claim ไม่มี Advance ทุกแถวต้องมีรูปบิล (`Expense Claim Detail.custom_receipt`, ดูผ่าน `self_advance.receipt`) บริษัทต้องตั้ง Default Expense Claim Payable Account
+  บัญชีเงินทดรองจ่ายพนักงานต้องเป็น Receivable (HRMS หายอดที่จ่ายจาก Advance Payment Ledger Entry ตามชนิดบัญชี)
+- โมดูลอนุมัติ (`/conserp/approve`, หมวด `approve` ของ bundle self_app, `consbiz/approvals.py`, `self_app/views/ApproveInbox.vue`, ตกลง 2026-11-11):
+  เป็นแค่ที่รวม (ตกลง 2026-11-11): แต่ละโมดูลอนุมัติในหน้าของตัวเองได้ถ้ามีสิทธิ์ ใช้ `shared/approvals/ApprovalSheet.vue` + `kinds.js` (KINDS/MODULES/`find_pending`) ชุดเดียวกัน
+  เมนูย่อย = โมดูล: `approve` = ทั้งหมด, `approve-<โมดูล>` (ตอนนี้ `approve-hr`) tab = ชนิดเอกสาร ปุ่มสลับ รออนุมัติ / พิจารณาแล้ว (31 วัน) อยู่ขวาของแถบ tab (มือถือ = เหนือ tab)
+  `approvals.MODULES` ตรงกับ `MODULES` ใน kinds.js, `get_inbox(module, quiet)` / `get_summary` คืนจำนวนรายโมดูล โมดูลใหม่: เพิ่ม MODULES + เมนูใน self_app/sections.js
+  ในหมวดบุคคลอนุมัติได้ที่หน้าเบิกเงิน (ใบรออนุมัติ) และแผงวันของสรุปวันทำงาน (ลงเวลารอยืนยัน/ใบลา Open)
+  ชนิด = `KINDS` ทั้งใน approvals.py และ ApproveInbox.vue: ใบลา (`review_leave`, Role Leave Approver ตามขอบเขตโครงการ หรือ HR) / ลงเวลา (`self_service.review_checkin`) / ใบเบิก + ใบเคลียร์ (`self_advance.review_*`)
+  ผู้อนุมัติทุกชนิดกำหนดด้วย Role (ใบลา/ลงเวลา = Leave Approver, ใบเบิก/เคลียร์ = Expense Approver + Executive Approver) เห็นหมวดเมื่ออนุมัติได้อย่างน้อย 1 ชนิด (`approve_sections`, `boot.can.approve_<ชนิด>`) กลุ่มแอป self ใน Desktop ชื่อ "พนักงาน"
+  หน้ารายละเอียดมีข้อมูลประกอบ (`shared/components/EmployeeContext.vue`, `approvals.get_context`): ใบลา/ลงเวลา = สิทธิ์วันลา ประวัติลา คนในโครงการที่ลาชนวัน การเข้างานเดือนนี้
+  (ผู้อนุมัติที่ดูแลคนนั้น) ใบเบิก/ใบเคลียร์ = เงินเดือน วงเงิน ยอดค้างหักคืน (`repayment_of`) เฉพาะ Role การเบิก/HR หัวหน้าหน้างานไม่เห็นเงินเดือน (ตกลง 2026-11-11)
+  การแจ้งเตือนของเอกสาร HR เปิดโมดูลอนุมัติถ้ามีสิทธิ์ ไม่งั้นเปิดหน้าของตัวเองใน Self Service (`APP_PAGES` รับหลายหน้า ใช้หน้าแรกที่เข้าหมวดได้)
+  คนงานรายวันไม่อยู่ใน Self Service (จะอยู่โมดูลธุรการ)
+- ฝ่ายบุคคล (`/conserp/hr`, หมวด `hr` ของ bundle ออฟฟิศ, `consbiz/hr_attendance.py`, `office_app/views/hr/HrAttendance.vue`, เฉพาะ HR ที่ Submit Attendance ได้, ตกลง 2026-11-11):
+  Payroll คิดตาม Attendance (patch `set_payroll_based_on_attendance`, วันที่ยังไม่บันทึกนับมาทำงาน `consider_unmarked_attendance_as` = Present)
+  เงินเดือน (หน้า `hr-payroll`, `consbiz/hr_payroll.py`, `HrPayroll.vue`, `boot.can.payroll`): รายเดือนอย่างเดียว 1 งวด (Payroll Entry) ต่อบริษัทต่อเดือน
+  วันหยุด = Holiday List Assignment ของ HRMS v16 (ของพนักงาน > ของบริษัท, ไม่มีจึงใช้ `Employee.holiday_list`) บริษัทต้องมี ไม่งั้นออกสลิปไม่ได้
+  Holiday List ของบริษัทใส่เฉพาะวันหยุดนักขัตฤกษ์ ห้ามใส่วันหยุดประจำสัปดาห์ (มาจาก Weekly Day Off ไม่งั้นได้หยุด 2 วัน)
+  ขั้นตอน ตรวจการเข้างาน (วันรอตัดสิน + วันที่ผ่านมายังไม่บันทึก Attendance ต้องเป็น 0 ของพนักงานในงวด) → สร้างสลิป (Payroll Entry Submit, HRMS สร้างสลิปร่าง)
+  → ตรวจ/คำนวณใหม่ → ยืนยันสลิป (`submit_slips` ตรวจการเข้างานซ้ำ + คำนวณใหม่ก่อน, HRMS ลงบัญชีค้างจ่าย) ยกเลิกงวดได้ก่อนยืนยันเท่านั้น
+  สลิปเงินเดือน = Print Format standard `Salary Slip TH` (`consbiz/consbiz/print_format/salary_slip_th/`, ค่าเริ่มต้นผ่าน Property Setter) A4 หน้าเดียวไหลตามเนื้อหา
+  โลโก้ฝังด้วย jinja `image_data_uri` (ไฟล์ private) เงินได้สะสม = รวม year_to_date ของแถวรายได้ (year_to_date ของสลิปเป็นยอดสุทธิ) "Salary Slip" แบบ Print Designer เดิมเลิกใช้
+  บันทึกจ่ายเงิน (Bank Entry) เป็นของฝ่ายบัญชี (โมดูลบัญชีของแอปภายหลัง ตอนนี้ระบบเต็ม) ต้องตั้ง `salary_slip_based_on_timesheet` = 0 เอง (ว่าง = HRMS หาโครงสร้างไม่เจอ)
+  ตั้งค่า HR (หน้า `hr-setup`, `consbiz/hr_setup.py` `CHECKS`/`FIXES`, `HrSetup.vue`): ตรวจการตั้งค่าของบริษัท (วันหยุด บัญชี รายการหัก Payroll Settings
+  เงินเดือนตามวันทำงาน ประกันสังคม `SSO_FORMULA` = 5% ของ (base x payment_days/total_working_days + OT) ฐาน 1,650-17,500 ขั้นภาษีต่อเนื่อง Payroll Period
+  นโยบาย/รอบ/โควตาวันลา `STATUTORY_LEAVES` ลาป่วย 30 ลากิจ 3 พักร้อน 6 (ลาป่วย/ลากิจไม่ลดตามเดือนที่เข้างาน `FULL_YEAR_LEAVES`) Role) แก้อัตโนมัติ = HR Manager/System Manager รันซ้ำได้
+  ข้อที่ต้องเลือกบัญชีเอง = ลิงก์ไประบบเต็ม ใช้หลังขึ้นเซิร์ฟเวอร์จริงทุกครั้ง (ค่าตั้งเหล่านี้เป็นข้อมูล ไม่ได้มากับโค้ด)
+  เพิ่ม/หัก (หน้า `hr-adjustments`, `consbiz/hr_salary.py`) = Additional Salary งวด = วันสุดท้ายของเดือน ห้ามรายการที่ระบบคำนวณ (`managed_components`: สูตรในโครงสร้าง, SAL/SSF/WHT/SAD/UNP, รายการของบริษัท)
+  ค่าจ้างพนักงาน (หน้า `hr-salaries`) = Salary Structure Assignment ใบใหม่ต่อการปรับ (ประวัติคงอยู่) ขั้นภาษีจากใบล่าสุดของโครงสร้าง
+  เบิกเงิน (หน้า `hr-advances`, `consbiz/hr_advances.py`) ใบเบิก/ใบเคลียร์ทั้งบริษัทแยกตามขั้น (`stage_of`) ดูอย่างเดียว
+  สรุปวันทำงานรายเดือน: แถว = พนักงานของบริษัท (กรองโครงการได้) ช่อง = วัน สถานะ (`employee_days`): Attendance ที่มีอยู่ชนะเสมอ > วันหยุด (Holiday List) > หยุดประจำสัปดาห์
+  (Weekly Day Off, สัปดาห์ที่ไม่ได้ลง = เสาร์/อาทิตย์ที่ไม่ได้ลงเวลา อาทิตย์ก่อน) > ชั่วโมง (`work_hours` = ช่วงเข้า-ออกที่อยู่ใน 08:00-17:00 หักพักเที่ยง 12-13)
+  ≥ 4 = มาทำงาน (ไม่ตัดครึ่งวันเพราะสาย: พ.ร.บ.คุ้มครองแรงงาน ม.76), น้อยกว่า 4 = รอพิจารณา / ไม่มีลงเวลา = ขาด (ตกลง 2026-11-11)
+  สาย = เข้าหลัง 08:05 นับนาทีจาก 08:00 (08:10 = 10 นาที), กลับก่อน = นาทีถึง 17:00 ไม่มีผ่อนผัน, หลัง 17:00 ไม่เป็น OT (ยังไม่มีนโยบาย) ใส่ `late_entry`/`early_exit` ของ Attendance
+  จ่ายค่าจ้างเต็มเสมอ นาทีสาย/กลับก่อนไว้ใช้ทางวินัย สายเกินเหตุ/บ่อย HR กด "ไม่จ่ายเวลาที่ไม่ได้ทำงาน" รายเดือน (`set_unpaid_time`, No Work No Pay)
+  = Additional Salary (Salary Component จาก `Company.custom_unpaid_time_component`) ยอด = นาทีรวม x เงินเดือน ÷ 30 ÷ 8 ÷ 60 เดือนละ 1 ใบ ยกเลิกได้จนกว่าจะออกสลิป
+  ที่เหลือ = รอ HR ตัดสิน (มีรายการรอยืนยัน, ใบลารออนุมัติ, เข้า/ออกอย่างเดียว, ทั้งเดือนไม่ลงเวลาเลย แนะนำมาทำงาน) ยังไม่คิดสาย/OT
+  มือถือ: การ์ดต่อคน แตะ = ปฏิทินเดือนของคนนั้น + รายการวันรอตัดสิน (จอใหญ่คลิกชื่อคนเปิดแผงเดียวกัน) เลือกเดือน/ปี = `DateInput picker="month"`
+  ตัดสิน (`decide_days`, หลายวันของคนเดียวได้) = สร้าง Attendance ทันที (ครึ่งวัน = Half Day + half_day_status Absent) แก้ = ยกเลิกของเดิมสร้างใหม่ วันลาแก้ที่ใบลา งวดที่ออกสลิปแล้วแก้ไม่ได้
+  ช่องติ๊ก "ไม่หักเงิน (ตักเตือน)" แยกจากสถานะ (ขาด/ครึ่งวัน, `WAIVABLE`): บันทึกเป็น Present ให้จ่ายค่าจ้าง สถานะจริงใน `Attendance.custom_waived_status`
+  นับแยก (`totals.waived`) ไว้ใช้ทางวินัย ขาดบ่อยเกิน HR กด "หักเงินวันที่ยกเว้นไว้" (`charge_waived` = บันทึกเป็นสถานะจริง) ก่อนยืนยันสลิป
+  "บันทึก Attendance" (`close_period`) = สร้างของวันมาทำงาน/ขาดถึงเมื่อวาน ต้องไม่มีวันรอตัดสิน ผูก `Employee Checkin.attendance` ของวันนั้น
 - แผนตัดเหล็ก: `Bar Cut Plan` ใช้ `Rebar Type` และ `Bar Shape` (สูตรความยาว + รูป SVG) ตัวจัดตัดอยู่ใน `bar_cut_plan/optimizer.py`
   ด้าน A-F, R (มม.), N (รอบ), T (องศา) สูตรใช้ `sqrt` และ `sin`/`cos`/`tan` (องศา) ได้
   ข้อมูลมาตรฐานสร้างด้วย patch `seed_bar_cut_masters`, `seed_more_bar_shapes`, `seed_more_rebar_types` (ข้ามที่มีอยู่แล้ว) รหัสรูปทรงไม่ใช่รหัส BS 8666
@@ -328,7 +395,7 @@ pre-commit run --all-files                               # ruff + prettier (ต�
 
 - DocType: ชื่ออังกฤษ Title Case คำเต็ม (เช่น `Daily Report`, `Retention Release`)
 - เอกสารที่ submit ได้: `autoname = naming_series:` ใช้ `.ABBR.` ถ้าต้องการตัวย่อบริษัท/โครงการ
-- prefix ที่ใช้แล้ว ห้ามใช้ซ้ำ: `BCP-` Bar Cut Plan, `CM-` Construction Management, `CU-` Concrete Usage, `DR-` Daily Report, `DRQ-` Daily Request, `EB-` Equipment Borrowing, `EOT-` Extension of Time, `IR-` Inspection Request, `OPO-` Material Request ผู้ว่าจ้างจัดหา, `PL-` Punch List, `TX-` Transmittal, `VO-` Variation Order, `WHTE-` WHT Employee
+- prefix ที่ใช้แล้ว ห้ามใช้ซ้ำ: `BCP-` Bar Cut Plan, `CM-` Construction Management, `CU-` Concrete Usage, `DR-` Daily Report, `DRQ-` Daily Request, `EB-` Equipment Borrowing, `EOT-` Extension of Time, `IR-` Inspection Request, `OPO-` Material Request ผู้ว่าจ้างจัดหา, `PL-` Punch List, `TX-` Transmittal, `VO-` Variation Order, `WDO-` Weekly Day Off (ตั้งชื่อด้วยโค้ด), `WHTE-` WHT Employee
 - master ที่ตั้งชื่อตามค่า field ใช้ `field:<fieldname>` (เช่น Rebar Type, Bar Shape)
 - fieldname ของ Custom Field ขึ้นต้นด้วย `custom_`
 - CSS ของ Print Format ใช้ class ขึ้นต้น `pf-` สีใหม่ใน `style.css` ใช้ตัวแปร `--consbiz-*`

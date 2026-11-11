@@ -47,12 +47,13 @@ class IntegrationTestSiteApp(IntegrationTestCase):
 		self.assertEqual(boot["sections"], ["store", "work", "pm", "resources", "buy"])
 		self.assertTrue(boot["can"]["daily_report"])
 		self.assertTrue(boot["can"]["finance"])
-		self.assertEqual([a["key"] for a in boot["apps"]], ["site", "office"])
+		# Administrator มี System Manager = เห็นโมดูลอนุมัติ (กลุ่มแอป self)
+		self.assertEqual([a["key"] for a in boot["apps"]], ["site", "office", "self"])
 
 		office = site_app.office_boot_data()
-		self.assertEqual(office["sections"], ["purchase", "sales", "boq"])
+		self.assertEqual(office["sections"], ["purchase", "sales", "boq", "hr"])
 		self.assertTrue(office["companies"])
-		self.assertEqual([a["key"] for a in office["apps"]], ["site", "office"])
+		self.assertEqual([a["key"] for a in office["apps"]], ["site", "office", "self"])
 		# Desktop: หมวดของทุกแอป มีทั้งขอซื้อของหน้างานและจัดซื้อของออฟฟิศ
 		modules = [(m["app"], m["section"]) for m in office["modules"]]
 		self.assertIn(("site", "buy"), modules)
@@ -74,11 +75,12 @@ class IntegrationTestSiteApp(IntegrationTestCase):
 		self.assertIn("buy", [m["section"] for m in site_app.app_modules(site_app.sections_by_app())])
 		# ไม่มีสิทธิ์เอกสารซื้อ-ขายเลย = ไม่เห็นแอปออฟฟิศ
 		# ไม่มีหมวดหน้างานเลย = ไม่เห็นแอปหน้างาน
-		with patch.dict(site_app.APP_SECTIONS, {"office": lambda: []}):
+		with patch.dict(site_app.APP_SECTIONS, {"office": lambda: [], "self": lambda: []}):
 			by_app = site_app.sections_by_app()
 			self.assertEqual([a["key"] for a in site_app.available_apps(by_app)], ["site"])
 			self.assertIn("buy", [m["section"] for m in site_app.app_modules(by_app)])
-		by_app = site_app.sections_by_app(("site", []))
+		with patch.dict(site_app.APP_SECTIONS, {"self": lambda: []}):
+			by_app = site_app.sections_by_app(("site", []))
 		self.assertEqual([a["key"] for a in site_app.available_apps(by_app)], ["office"])
 		self.assertTrue(all(m["app"] == "office" for m in site_app.app_modules(by_app)))
 

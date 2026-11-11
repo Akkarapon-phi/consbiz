@@ -85,6 +85,7 @@ MODULES = (
 		),
 	),
 	("office", "boq", (("BOQ", "BOQ", 0),)),
+	("office", "hr", (("Attendance", "การเข้างาน (Attendance)", 0),)),
 )
 TARGETS = {(row[0], row[2]) for _app, _section, rows in MODULES for row in rows}
 

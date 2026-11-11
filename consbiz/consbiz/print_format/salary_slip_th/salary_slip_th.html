@@ -1,0 +1,322 @@
+{#-
+	สลิปเงินเดือน (Salary Slip) A4 หน้าเดียว ไหลตามเนื้อหา ไม่จัดตำแหน่งตายตัว (แทน Print Designer "Salary Slip" ที่ท้ายกระดาษตกหน้า)
+	- หัว: โลโก้ (image_data_uri ฝังรูป private) + ข้อมูลบริษัท / ชื่อเอกสาร + งวดเดือน
+	- รายได้ | รายการหัก แสดงเฉพาะรายการที่มียอด (ไม่รวม statistical) รวม + สุทธิ + ตัวอักษร (thai_baht_text)
+	- การทำงาน (วันทำงาน/ขาด/ลาไม่รับค่าจ้าง) + ยอดสะสมทั้งปี (เงินได้ ประกันสังคม SSF ภาษี WHT จาก year_to_date)
+-#}
+{%- set money = "{:,.2f}" -%}
+{%- set company = frappe.db.get_value("Company", doc.company, ["company_name", "tax_id", "email", "website", "phone_no", "company_logo"], as_dict=True) or {} -%}
+{%- set address_names = frappe.get_all("Dynamic Link", filters={"link_doctype": "Company", "link_name": doc.company, "parenttype": "Address"}, pluck="parent") -%}
+{%- set address_fields = ["address_title", "address_line1", "address_line2", "city", "state", "pincode"] -%}
+{%- set address = frappe.db.get_value("Address", {"name": ["in", address_names or [""]], "is_primary_address": 1}, address_fields, as_dict=True)
+	or frappe.db.get_value("Address", {"name": ["in", address_names or [""]]}, address_fields, as_dict=True) or {} -%}
+{%- set emp = frappe.db.get_value("Employee", doc.employee, ["salutation", "bank_name", "bank_ac_no"], as_dict=True) or {} -%}
+{%- set earnings = doc.earnings | rejectattr("statistical_component") | selectattr("amount") | list -%}
+{%- set deductions = doc.deductions | rejectattr("statistical_component") | selectattr("amount") | list -%}
+{%- set rows = [earnings | length, deductions | length, 1] | max -%}
+{#- เงินได้สะสม = รวมรายได้ (ก่อนหัก) สะสมทั้งปี: year_to_date ของ Salary Slip เป็นยอดสุทธิ จึงรวมจากแถวรายได้ -#}
+{%- set ns = namespace(sso=0, wht=0, gross=0) -%}
+{%- for e in doc.earnings | rejectattr("statistical_component") -%}
+	{%- set ns.gross = ns.gross + (e.year_to_date or 0) -%}
+{%- endfor -%}
+{%- for d in doc.deductions -%}
+	{%- if d.abbr == "SSF" %}{% set ns.sso = ns.sso + (d.year_to_date or 0) %}{% endif -%}
+	{%- if d.abbr == "WHT" %}{% set ns.wht = ns.wht + (d.year_to_date or 0) %}{% endif -%}
+{%- endfor -%}
+{%- set start = frappe.utils.getdate(doc.start_date) -%}
+{%- set end = frappe.utils.getdate(doc.end_date) -%}
+{%- set months = ["มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"] -%}
+{%- set net = doc.rounded_total if doc.rounded_total else doc.net_pay -%}
+{#- งวดแบบสั้น: เดือนเดียวกัน = 1–31 ตุลาคม 2569 -#}
+{%- set period = (start.day ~ "–" ~ end.day ~ " " ~ months[end.month - 1] ~ " " ~ (end.year + 543)) if (start.month == end.month and start.year == end.year)
+	else (thai_date(doc.start_date) ~ " – " ~ thai_date(doc.end_date)) -%}
+
+{% include "consbiz/templates/print/print_style.html" %}
+
+<style>
+	.pf-slip {
+		font-size: 8.5pt;
+	}
+	.pf-slip-head {
+		display: flex;
+		align-items: flex-start;
+		justify-content: space-between;
+		gap: 16px;
+		padding-bottom: 10px;
+		border-bottom: 2px solid var(--pf-ink);
+	}
+	.pf-slip-company {
+		display: flex;
+		gap: 12px;
+		align-items: flex-start;
+	}
+	.pf-slip-company img {
+		max-height: 52px;
+		max-width: 90px;
+		object-fit: contain;
+	}
+	.pf-slip-company b {
+		display: block;
+		font-size: 11pt;
+		color: var(--pf-ink);
+	}
+	.pf-slip-company div {
+		color: var(--pf-muted);
+		line-height: 1.5;
+	}
+	.pf-slip-doc {
+		text-align: right;
+		white-space: nowrap;
+	}
+	.pf-slip-doc h1 {
+		margin: 0;
+		font-size: 17pt;
+		font-weight: 700;
+		color: var(--pf-ink);
+		line-height: 1.1;
+	}
+	.pf-slip-doc .en {
+		font-size: 8pt;
+		letter-spacing: 0.12em;
+		color: var(--pf-muted);
+	}
+	.pf-slip-doc .period {
+		display: inline-block;
+		margin-top: 6px;
+		padding: 2px 10px;
+		border-radius: 999px;
+		background: var(--pf-head);
+		color: var(--pf-ink);
+		font-weight: 600;
+	}
+	.pf-slip-info {
+		display: grid;
+		grid-template-columns: 1.3fr 1fr 1fr 1.2fr;
+		gap: 6px 16px;
+		margin: 12px 0;
+		padding: 10px 12px;
+		border-radius: var(--pf-radius);
+		background: var(--pf-soft);
+	}
+	.pf-slip-info span {
+		display: block;
+		font-size: 7pt;
+		color: var(--pf-muted);
+	}
+	.pf-slip-info b {
+		display: block;
+		color: var(--pf-ink);
+		font-weight: 600;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+	.pf-slip-lines {
+		width: 100%;
+		border-collapse: separate;
+		border-spacing: 0;
+		border: 1px solid var(--pf-line);
+		border-radius: var(--pf-radius);
+		overflow: hidden;
+	}
+	.pf-slip-lines th {
+		padding: 6px 10px;
+		background: var(--pf-head);
+		color: var(--pf-ink);
+		font-weight: 600;
+		text-align: left;
+	}
+	.pf-slip-lines td {
+		padding: 5px 10px;
+		border-top: 1px solid #ececee;
+		height: 15px;
+	}
+	.pf-slip-lines .num {
+		text-align: right;
+		font-variant-numeric: tabular-nums;
+		white-space: nowrap;
+	}
+	.pf-slip-lines .split {
+		border-left: 1px solid var(--pf-line);
+	}
+	.pf-slip-lines tfoot td {
+		border-top: 1px solid var(--pf-line);
+		background: var(--pf-soft);
+		font-weight: 700;
+		color: var(--pf-ink);
+	}
+	.pf-slip-net {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		margin-top: 10px;
+		padding: 10px 14px;
+		border-radius: var(--pf-radius);
+		background: var(--pf-ink);
+		color: #fff;
+	}
+	.pf .pf-slip-net span {
+		color: #fff;
+		font-size: 8pt;
+		opacity: 0.8;
+	}
+	.pf .pf-slip-net b {
+		color: #fff;
+		font-size: 15pt;
+		font-variant-numeric: tabular-nums;
+	}
+	.pf-slip-net .words {
+		font-size: 8.5pt;
+		opacity: 1;
+	}
+	.pf-slip-boxes {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: 10px;
+		margin-top: 10px;
+	}
+	.pf-slip-box {
+		padding: 8px 12px;
+		border: 1px solid var(--pf-line);
+		border-radius: var(--pf-radius);
+	}
+	.pf-slip-box h3 {
+		margin: 0 0 4px;
+		font-size: 8pt;
+		font-weight: 700;
+		color: var(--pf-ink);
+	}
+	.pf-slip-kv {
+		display: flex;
+		justify-content: space-between;
+		padding: 2px 0;
+	}
+	.pf-slip-kv b {
+		color: var(--pf-ink);
+		font-variant-numeric: tabular-nums;
+	}
+	.pf-slip-sign {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: 40px;
+		margin-top: 28px;
+		text-align: center;
+	}
+	.pf-slip-sign .line {
+		margin: 0 24px 4px;
+		border-bottom: 1px solid var(--pf-line);
+		height: 28px;
+	}
+	.pf-slip-note {
+		margin-top: 16px;
+		padding-top: 6px;
+		border-top: 1px solid var(--pf-line);
+		font-size: 7pt;
+		color: var(--pf-muted);
+		text-align: center;
+	}
+</style>
+
+<div class="pf pf-slip">
+	<div class="pf-slip-head">
+		<div class="pf-slip-company">
+			{%- set logo = image_data_uri(company.company_logo) if company.company_logo else "" %}
+			{%- if logo %}<img src="{{ logo }}" alt="" />{% endif %}
+			<div>
+				<b>{{ address.address_title or company.company_name or doc.company }}</b>
+				{%- if company.tax_id %}<div>เลขประจำตัวผู้เสียภาษี {{ company.tax_id }}</div>{% endif %}
+				{%- if address %}
+				<div>{{ [address.address_line1, address.address_line2, address.city, address.state, address.pincode] | select | join(" ") }}</div>
+				{%- endif %}
+				{%- set contact = [company.phone_no and ("โทร " ~ company.phone_no), company.email, company.website] | select | list %}
+				{%- if contact %}<div>{{ contact | join(" · ") }}</div>{% endif %}
+			</div>
+		</div>
+		<div class="pf-slip-doc">
+			<h1>สลิปเงินเดือน</h1>
+			<div class="en">PAY SLIP</div>
+			<div class="period">{{ months[end.month - 1] }} {{ end.year + 543 }}</div>
+		</div>
+	</div>
+
+	<div class="pf-slip-info">
+		<div><span>ชื่อ-สกุล</span><b>{{ (emp.salutation or "") ~ doc.employee_name }}</b></div>
+		<div><span>รหัสพนักงาน</span><b>{{ doc.employee }}</b></div>
+		<div><span>ตำแหน่ง</span><b>{{ doc.designation or "-" }}</b></div>
+		<div><span>แผนก</span><b>{{ (doc.department or "-").rsplit(" - ", 1)[0] }}</b></div>
+		<div><span>งวดวันที่</span><b>{{ period }}</b></div>
+		<div><span>วันที่จ่าย</span><b>{{ thai_date(doc.posting_date) }}</b></div>
+		<div><span>บัญชีรับเงิน</span><b>{{ ((emp.bank_name or "") ~ " " ~ (emp.bank_ac_no or "")).strip() or "-" }}</b></div>
+		<div><span>เลขที่</span><b>{{ doc.name }}</b></div>
+	</div>
+
+	<table class="pf-slip-lines">
+		<thead>
+			<tr>
+				<th>รายได้</th>
+				<th class="num">จำนวนเงิน</th>
+				<th class="split">รายการหัก</th>
+				<th class="num">จำนวนเงิน</th>
+			</tr>
+		</thead>
+		<tbody>
+			{%- for i in range(rows) %}
+			{%- set e = earnings[i] if i < earnings | length else none %}
+			{%- set d = deductions[i] if i < deductions | length else none %}
+			<tr>
+				<td>{{ e.salary_component if e else "" }}</td>
+				<td class="num">{{ money.format(e.amount) if e else "" }}</td>
+				<td class="split">{{ d.salary_component if d else "" }}</td>
+				<td class="num">{{ money.format(d.amount) if d else "" }}</td>
+			</tr>
+			{%- endfor %}
+		</tbody>
+		<tfoot>
+			<tr>
+				<td>รวมรายได้</td>
+				<td class="num">{{ money.format(doc.gross_pay or 0) }}</td>
+				<td class="split">รวมรายการหัก</td>
+				<td class="num">{{ money.format(doc.total_deduction or 0) }}</td>
+			</tr>
+		</tfoot>
+	</table>
+
+	<div class="pf-slip-net">
+		<div>
+			<span>เงินได้สุทธิ (Net Pay)</span><br />
+			<span class="words">({{ thai_baht_text(net) }})</span>
+		</div>
+		<b>{{ money.format(net or 0) }} บาท</b>
+	</div>
+
+	<div class="pf-slip-boxes">
+		<div class="pf-slip-box">
+			<h3>การทำงานในงวด</h3>
+			<div class="pf-slip-kv"><span>วันทำงานในงวด</span><b>{{ "{:g}".format(doc.total_working_days or 0) }} วัน</b></div>
+			<div class="pf-slip-kv"><span>วันที่ได้รับค่าจ้าง</span><b>{{ "{:g}".format(doc.payment_days or 0) }} วัน</b></div>
+			<div class="pf-slip-kv"><span>ขาดงาน</span><b>{{ "{:g}".format(doc.absent_days or 0) }} วัน</b></div>
+			<div class="pf-slip-kv"><span>ลาไม่รับค่าจ้าง</span><b>{{ "{:g}".format(doc.leave_without_pay or 0) }} วัน</b></div>
+		</div>
+		<div class="pf-slip-box">
+			<h3>ยอดสะสมตั้งแต่ต้นปี {{ end.year + 543 }}</h3>
+			<div class="pf-slip-kv"><span>เงินได้สะสม (ก่อนหัก)</span><b>{{ money.format(ns.gross) }}</b></div>
+			<div class="pf-slip-kv"><span>เงินสมทบประกันสังคมสะสม</span><b>{{ money.format(ns.sso) }}</b></div>
+			<div class="pf-slip-kv"><span>ภาษีหัก ณ ที่จ่ายสะสม</span><b>{{ money.format(ns.wht) }}</b></div>
+		</div>
+	</div>
+
+	<div class="pf-slip-sign">
+		<div>
+			<div class="line"></div>
+			ผู้จ่ายเงิน<br />วันที่ ......../......../........
+		</div>
+		<div>
+			<div class="line"></div>
+			ผู้รับเงิน ({{ doc.employee_name }})<br />วันที่ ......../......../........
+		</div>
+	</div>
+
+	<div class="pf-slip-note">
+		ข้อมูลเงินเดือนเป็นความลับของบริษัทและพนักงาน ห้ามเปิดเผยหรือส่งต่อให้ผู้อื่นโดยเด็ดขาด
+	</div>
+</div>

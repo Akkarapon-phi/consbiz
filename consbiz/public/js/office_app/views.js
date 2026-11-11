@@ -6,6 +6,12 @@ import DocView from "../shared/docs/DocView.vue";
 import DocForm from "../shared/docs/DocForm.vue";
 import BoqList from "./views/boq/BoqList.vue";
 import BoqForm from "./views/boq/BoqForm.vue";
+import HrAttendance from "./views/hr/HrAttendance.vue";
+import HrPayroll from "./views/hr/HrPayroll.vue";
+import HrSetup from "./views/hr/HrSetup.vue";
+import HrAdjustments from "./views/hr/HrAdjustments.vue";
+import HrSalaries from "./views/hr/HrSalaries.vue";
+import HrAdvances from "./views/hr/HrAdvances.vue";
 
 export default {
 	buy: DocsHome,
@@ -22,4 +28,10 @@ export default {
 	"sell-form": DocForm,
 	boq: BoqList,
 	"boq-form": BoqForm,
+	"hr-attendance": HrAttendance,
+	"hr-payroll": HrPayroll,
+	"hr-setup": HrSetup,
+	"hr-adjustments": HrAdjustments,
+	"hr-salaries": HrSalaries,
+	"hr-advances": HrAdvances,
 };

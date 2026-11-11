@@ -7,6 +7,7 @@
 #   ช่องติ๊กที่หัวเอกสารเป็นค่าตั้งต้นของตั๋วที่เพิ่มใหม่ (ฟอร์ม) ยอดคิดจากรายตั๋วเท่านั้น
 # - เศษที่เหลือนำไปเทที่อื่นเขียนในหมายเหตุของตั๋ว ยอดของจุดนี้นับเต็มตามตั๋ว
 # - เลขตั๋วซ้ำกับใบอื่นของผู้ขายเดียวกันเตือน (อาจบันทึกซ้ำ) ไม่ห้าม
+# - ชนิดคอนกรีต = Item ในกลุ่ม CONCRETE_GROUP (รวมกลุ่มย่อย) ชื่อ Item บอกกำลังอัดอยู่แล้ว จึงไม่มีช่องกำลังอัดแยก
 
 import frappe
 from frappe import _
@@ -15,6 +16,18 @@ from frappe.utils import flt
 
 from consbiz.consbiz.doctype.daily_report.daily_report import get_leaf_tasks
 from consbiz.employer_supplied import base_item
+
+CONCRETE_GROUP = "คอนกรีตผสมเสร็จ"
+
+
+def concrete_item_filters():
+	"""ตัวกรอง Item ที่เลือกเป็นชนิดคอนกรีตได้ (ใช้ทั้งค้นหาในแอปและตรวจตอนบันทึก)"""
+	return {
+		"item_group": ("descendants of (inclusive)", CONCRETE_GROUP),
+		"custom_base_item": ("is", "not set"),
+		"disabled": 0,
+		"has_variants": 0,
+	}
 
 
 class ConcreteUsage(Document):
@@ -25,9 +38,21 @@ class ConcreteUsage(Document):
 		self.wbs, self.task_name = task.wbs, task.item_name
 		# เก็บ Item หลักเสมอ ของผู้ว่าจ้างจัดหาดูจากช่องติ๊กของตั๋ว
 		self.concrete_item = base_item(self.concrete_item)
+		self.validate_concrete_item()
 		self.validate_tickets()
 		self.set_totals()
 		self.warn_duplicate_tickets()
+
+	def validate_concrete_item(self):
+		# ตรวจเฉพาะตอนเลือกใหม่ ใบเดิมที่เลือก Item ไว้ก่อนมีกลุ่มยังแก้ช่องอื่นได้
+		if not (self.is_new() or self.has_value_changed("concrete_item")):
+			return
+		if not frappe.db.exists("Item Group", CONCRETE_GROUP):
+			frappe.throw(_("ยังไม่มีกลุ่ม Item \"{0}\" สร้างกลุ่มแล้วย้าย Item คอนกรีตเข้ากลุ่มก่อน").format(CONCRETE_GROUP))
+		if not frappe.get_all("Item", filters={"name": self.concrete_item, **concrete_item_filters()}, limit=1):
+			frappe.throw(
+				_("{0} ไม่ใช่คอนกรีต: เลือกได้เฉพาะ Item ในกลุ่ม \"{1}\"").format(self.concrete_item, CONCRETE_GROUP)
+			)
 
 	def validate_tickets(self):
 		seen = set()

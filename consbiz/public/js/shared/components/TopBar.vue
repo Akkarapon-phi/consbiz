@@ -99,7 +99,9 @@ const project_initials = computed(() =>
 const project_label = computed(() =>
 	state.project ? project_name.value : app.project_filter ? "ทุกโครงการ" : "เลือกโครงการ"
 );
-const show_project = computed(() => !props.no_project && !props.back_to && open_picker);
+const show_project = computed(
+	() => !props.no_project && !app.no_project && !props.back_to && open_picker
+);
 // ปุ่มเปลี่ยนหมวด (ซ่อนที่จอ ≥768 เพราะมี Dock): หน้าเมนูหลัก มีหมวดอื่นหรือระบบเต็มให้ไป
 const show_launcher = computed(
 	() =>

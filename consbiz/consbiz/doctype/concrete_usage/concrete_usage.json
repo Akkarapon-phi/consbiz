@@ -16,7 +16,6 @@
   "column_break_main",
   "date",
   "concrete_item",
-  "strength",
   "supplier",
   "employer_supplied",
   "planned_qty",
@@ -105,18 +104,12 @@
    "reqd": 1
   },
   {
-   "description": "เลือก Item หลัก (ไม่ต้องเลือกของผู้ว่าจ้างจัดหา ใช้ช่องติ๊กแทน)",
+   "description": "เลือกจากกลุ่ม Item \"คอนกรีตผสมเสร็จ\" (Item หลัก ของผู้ว่าจ้างจัดหาใช้ช่องติ๊กแทน)",
    "fieldname": "concrete_item",
    "fieldtype": "Link",
    "label": "Concrete",
    "options": "Item",
    "reqd": 1
-  },
-  {
-   "description": "เช่น 240 ksc (Cube)",
-   "fieldname": "strength",
-   "fieldtype": "Data",
-   "label": "Strength"
   },
   {
    "fieldname": "supplier",
@@ -217,7 +210,7 @@
  "index_web_pages_for_search": 0,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-11-04 22:00:00.000000",
+ "modified": "2026-11-11 01:57:50.752150",
  "modified_by": "Administrator",
  "module": "ConsBiz",
  "name": "Concrete Usage",

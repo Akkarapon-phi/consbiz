@@ -807,13 +807,13 @@
   "doctype_or_field": "DocType",
   "field_name": null,
   "is_system_generated": 1,
-  "modified": "2026-04-06 11:56:29.731386",
+  "modified": "2026-11-11 13:15:17.519595",
   "module": "ConsBiz",
   "name": "Salary Slip-main-default_print_format",
   "property": "default_print_format",
   "property_type": "Data",
   "row_name": null,
-  "value": "Salary Slip"
+  "value": "Salary Slip TH"
  },
  {
   "default_value": null,
@@ -4974,5 +4974,37 @@
   "property_type": "Data",
   "row_name": null,
   "value": "Envelope"
+ },
+ {
+  "default_value": null,
+  "doc_type": "Shift Location",
+  "docstatus": 0,
+  "doctype": "Property Setter",
+  "doctype_or_field": "DocField",
+  "field_name": "latitude",
+  "is_system_generated": 1,
+  "modified": "2026-11-11 02:28:10.878136",
+  "module": "ConsBiz",
+  "name": "Shift Location-latitude-precision",
+  "property": "precision",
+  "property_type": "Select",
+  "row_name": null,
+  "value": "7"
+ },
+ {
+  "default_value": null,
+  "doc_type": "Shift Location",
+  "docstatus": 0,
+  "doctype": "Property Setter",
+  "doctype_or_field": "DocField",
+  "field_name": "longitude",
+  "is_system_generated": 1,
+  "modified": "2026-11-11 02:28:10.893545",
+  "module": "ConsBiz",
+  "name": "Shift Location-longitude-precision",
+  "property": "precision",
+  "property_type": "Select",
+  "row_name": null,
+  "value": "7"
  }
 ]

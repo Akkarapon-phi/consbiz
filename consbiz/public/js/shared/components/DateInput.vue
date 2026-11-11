@@ -1,7 +1,8 @@
 <!-- ช่องวันที่ของแอป: แสดงวันที่ไทย (พ.ศ.) เปิดปฏิทินเลือกวัน (แทน <input type="date"> ของเบราว์เซอร์)
      ค่า = "YYYY-MM-DD" (ค.ศ. แบบที่ server ใช้) variant: field / cell
      กดชื่อเดือน = เลือกเดือน, กดปี = เลือกปี (ลูกศรเลื่อนทีละเดือน / ปี / ทศวรรษตามหน้าที่เปิด)
-     คีย์บอร์ด: Enter/Space/↓ เปิด, ลูกศรเลื่อนวัน, PageUp/PageDown เลื่อนเดือน, Enter เลือก, Esc ปิด -->
+     คีย์บอร์ด: Enter/Space/↓ เปิด, ลูกศรเลื่อนวัน, PageUp/PageDown เลื่อนเดือน, Enter เลือก, Esc ปิด
+     picker="month" = เลือกเดือน ค่า "YYYY-MM" (เปิดที่หน้าเดือน กดปี = เลือกปีแล้วกลับหน้าเดือน) max = เดือน/วันสุดท้ายที่เลือกได้ -->
 <template>
 	<button
 		ref="trigger"
@@ -131,8 +132,12 @@
 					</button>
 				</div>
 				<div class="ss-cal-pop-foot">
-					<button type="button" class="ss-link" @mousedown.prevent="choose(today_iso)">
-						วันนี้
+					<button
+						type="button"
+						class="ss-link"
+						@mousedown.prevent="choose(month_picker ? today_iso.slice(0, 7) : today_iso)"
+					>
+						{{ month_picker ? "เดือนนี้" : "วันนี้" }}
 					</button>
 					<button
 						v-if="clearable && modelValue"
@@ -162,7 +167,11 @@ const props = defineProps({
 	clearable: Boolean,
 	// วันแรกที่เลือกได้ ("YYYY-MM-DD") ก่อนหน้านั้นกดไม่ได้
 	min: String,
+	// วัน/เดือนสุดท้ายที่เลือกได้ ("YYYY-MM-DD" หรือ "YYYY-MM" ของ picker month)
+	max: String,
+	picker: { type: String, default: "date" }, // date | month
 });
+const month_picker = computed(() => props.picker === "month");
 const emit = defineEmits(["update:modelValue", "change"]);
 
 const MONTHS = [
@@ -206,12 +215,14 @@ const today_iso = iso_date(new Date());
 
 const parse = (iso) => {
 	const [y, m, d] = String(iso).slice(0, 10).split("-").map(Number);
-	return new Date(y, m - 1, d);
+	return new Date(y, m - 1, d || 1);
 };
 const display = (iso) => {
 	const d = parse(iso);
+	if (month_picker.value) return `${MONTHS[d.getMonth()]} ${d.getFullYear() + 543}`;
 	return `${d.getDate()} ${SHORT[d.getMonth()]} ${d.getFullYear() + 543}`;
 };
+const month_iso = (y, month) => `${y}-${String(month + 1).padStart(2, "0")}`;
 
 // ตาราง 6 สัปดาห์ เริ่มวันอาทิตย์
 const cells = computed(() => {
@@ -221,13 +232,19 @@ const cells = computed(() => {
 	return Array.from({ length: 42 }, (_, i) => {
 		const d = new Date(start.getFullYear(), start.getMonth(), start.getDate() + i);
 		const iso = iso_date(d);
-		return { iso, day: d.getDate(), other: d.getMonth() !== m, off: !!props.min && iso < props.min };
+		return {
+			iso,
+			day: d.getDate(),
+			other: d.getMonth() !== m,
+			off: (!!props.min && iso < props.min) || (!!props.max && iso > props.max),
+		};
 	});
 });
 
 const selected_date = computed(() => (props.modelValue ? parse(props.modelValue) : null));
 const today_date = parse(today_iso);
 const min_date = computed(() => (props.min ? parse(props.min) : null));
+const max_date = computed(() => (props.max ? parse(props.max) : null));
 
 const month_cells = computed(() => {
 	const y = view.value.getFullYear();
@@ -235,7 +252,9 @@ const month_cells = computed(() => {
 		month,
 		today: today_date.getFullYear() === y && today_date.getMonth() === month,
 		selected: selected_date.value?.getFullYear() === y && selected_date.value?.getMonth() === month,
-		off: !!min_date.value && new Date(y, month + 1, 0) < min_date.value,
+		off:
+			(!!min_date.value && new Date(y, month + 1, 0) < min_date.value) ||
+			(!!max_date.value && new Date(y, month, 1) > max_date.value),
 	}));
 });
 
@@ -249,7 +268,9 @@ const year_cells = computed(() =>
 			other: i === 0 || i === 11,
 			today: today_date.getFullYear() === year,
 			selected: selected_date.value?.getFullYear() === year,
-			off: !!min_date.value && year < min_date.value.getFullYear(),
+			off:
+				(!!min_date.value && year < min_date.value.getFullYear()) ||
+				(!!max_date.value && year > max_date.value.getFullYear()),
 		};
 	})
 );
@@ -271,7 +292,7 @@ function show() {
 	const base = props.modelValue ? parse(props.modelValue) : new Date();
 	view.value = new Date(base.getFullYear(), base.getMonth(), 1);
 	focus_iso.value = props.modelValue || today_iso;
-	mode.value = "days";
+	mode.value = month_picker.value ? "months" : "days";
 	place();
 	open.value = true;
 	window.addEventListener("pointerdown", outside, true);
@@ -302,16 +323,18 @@ const PAGE_MONTHS = { days: 1, months: 12, years: 120 };
 const page = (step) => shift(step * PAGE_MONTHS[mode.value]);
 
 function pick_month(month) {
+	if (month_picker.value) return choose(month_iso(view.value.getFullYear(), month));
 	view.value = new Date(view.value.getFullYear(), month, 1);
 	mode.value = "days";
 }
 function pick_year(year) {
 	view.value = new Date(year, view.value.getMonth(), 1);
-	mode.value = "days";
+	mode.value = month_picker.value ? "months" : "days";
 }
 
 function choose(iso) {
-	if (iso && props.min && iso < props.min) return;
+	if (iso && props.min && iso < props.min.slice(0, iso.length)) return;
+	if (iso && props.max && iso > props.max.slice(0, iso.length)) return;
 	if (iso !== props.modelValue) {
 		emit("update:modelValue", iso);
 		emit("change", iso);
@@ -352,8 +375,14 @@ function on_pick_key(event) {
 	if (steps[event.key]) shift(steps[event.key]);
 	else if (event.key === "PageUp") page(-1);
 	else if (event.key === "PageDown") page(1);
-	else if (event.key === "Enter" || event.key === " ") mode.value = "days";
-	else if (event.key === "Escape") mode.value = "days";
+	else if (event.key === "Enter" || event.key === " ") {
+		if (month_picker.value && mode.value === "months")
+			return choose(month_iso(view.value.getFullYear(), view.value.getMonth()));
+		mode.value = month_picker.value ? "months" : "days";
+	} else if (event.key === "Escape") {
+		if (month_picker.value && mode.value === "months") return hide();
+		mode.value = month_picker.value ? "months" : "days";
+	}
 	else if (event.key === "Tab") return hide(false);
 	else return;
 	event.preventDefault();

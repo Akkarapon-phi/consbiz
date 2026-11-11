@@ -172,8 +172,9 @@ export async function upload(file, attach = null) {
 	return data.message; // {name, file_url, ...}
 }
 
-// ย่อรูปจากกล้องมือถือ (หลาย MB) เหลือด้านยาว 1600px
-function shrink_image(file, max = 1600) {
+// ย่อรูปจากกล้องมือถือ (หลาย MB) เหลือด้านยาว max px (ค่าเริ่มต้น 1600) เป็น JPEG
+// quality ระบุ = เข้ารหัสใหม่เสมอ (เช่น เซลฟี่ลงเวลา 480px / 0.6 ให้ไฟล์เล็ก) ไม่ระบุ = ไฟล์เล็กอยู่แล้วใช้ไฟล์เดิม
+export function shrink_image(file, max = 1600, quality = null) {
 	if (!file.type?.startsWith("image/") || file.type === "image/gif")
 		return Promise.resolve(file);
 	return new Promise((resolve) => {
@@ -182,12 +183,12 @@ function shrink_image(file, max = 1600) {
 		img.onload = () => {
 			URL.revokeObjectURL(url);
 			const scale = Math.min(1, max / Math.max(img.width, img.height));
-			if (scale === 1 && file.size < 900 * 1024) return resolve(file);
+			if (!quality && scale === 1 && file.size < 900 * 1024) return resolve(file);
 			const canvas = document.createElement("canvas");
 			canvas.width = Math.round(img.width * scale);
 			canvas.height = Math.round(img.height * scale);
 			canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
-			canvas.toBlob((blob) => resolve(blob || file), "image/jpeg", 0.82);
+			canvas.toBlob((blob) => resolve(blob || file), "image/jpeg", quality || 0.82);
 		};
 		img.onerror = () => resolve(file);
 		img.src = url;
@@ -363,13 +364,21 @@ export function parse_path(pathname = location.pathname) {
 	let section = app.sections[parts[0]] ? parts.shift() : remembered_section();
 	if (!allowed(section)) section = boot.sections[0];
 	let view = parts[0];
-	if (!app.routes[view] || section_of(view) !== section) view = app.sections[section].home;
+	// หน้าหลักของหมวดไม่มีชื่อหน้าใน URL (to_path ตัดออก) params จึงเริ่มที่ส่วนแรก เช่น /conserp/hr/2026-10
+	let offset = 1;
+	if (!app.routes[view] || section_of(view) !== section) {
+		view = app.sections[section].home;
+		offset = 0;
+	}
 	// เมนูที่ไม่มีสิทธิ์ (tab.when) เปิดจาก URL ตรงไม่ได้
 	const tab = app.sections[section].tabs.find((t) => t.view === view);
-	if (tab?.when && !tab.when(boot)) view = app.sections[section].home;
+	if (tab?.when && !tab.when(boot)) {
+		view = app.sections[section].home;
+		offset = parts.length;
+	}
 	const params = {};
 	app.routes[view].params.forEach((key, i) => {
-		if (parts[i + 1] !== undefined) params[key] = parts[i + 1];
+		if (parts[i + offset] !== undefined) params[key] = parts[i + offset];
 	});
 	return { view, params };
 }
