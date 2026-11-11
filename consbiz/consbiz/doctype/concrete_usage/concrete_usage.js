@@ -10,7 +10,15 @@ const TASK_OPTIONS_API =
 frappe.ui.form.on("Concrete Usage", {
 	setup(frm) {
 		frm.set_query("construction_management", () => ({ filters: { status: "Active" } }));
-		frm.set_query("concrete_item", () => ({ filters: { custom_base_item: ["is", "not set"] } }));
+		// ตรงกับ concrete_item_filters ใน concrete_usage.py
+		frm.set_query("concrete_item", () => ({
+			filters: {
+				item_group: ["descendants of (inclusive)", "คอนกรีตผสมเสร็จ"],
+				custom_base_item: ["is", "not set"],
+				disabled: 0,
+				has_variants: 0,
+			},
+		}));
 	},
 
 	refresh(frm) {

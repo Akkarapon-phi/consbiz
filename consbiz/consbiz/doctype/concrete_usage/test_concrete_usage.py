@@ -1,9 +1,13 @@
 # Copyright (c) 2026, Siricons and Contributors
 # See license.txt
 
+from unittest.mock import patch
+
 import frappe
 from frappe.tests import IntegrationTestCase
 
+from consbiz import store_app
+from consbiz.consbiz.doctype.concrete_usage.concrete_usage import CONCRETE_GROUP
 from consbiz.consbiz.doctype.construction_management.construction_management import create_from_boq
 from consbiz.employer_supplied import employer_item
 from consbiz.tests.test_employer_supplied import make_item
@@ -35,7 +39,9 @@ class IntegrationTestConcreteUsage(IntegrationTestCase):
 			boq.append("boq_details", row)
 		insert_boq(boq)
 		self.plan = create_from_boq(boq.name)
-		self.concrete = make_item("_Test Concrete 240")
+		if not frappe.db.exists("Item Group", CONCRETE_GROUP):
+			frappe.get_doc({"doctype": "Item Group", "item_group_name": CONCRETE_GROUP, "is_group": 0}).insert()
+		self.concrete = make_item("_Test Concrete 240", item_group=CONCRETE_GROUP)
 
 	def make_usage(self, tickets, **values):
 		doc = frappe.new_doc("Concrete Usage")
@@ -81,3 +87,36 @@ class IntegrationTestConcreteUsage(IntegrationTestCase):
 			self.make_usage([{"ticket_no": "T1", "qty": 1}, {"ticket_no": "T1", "qty": 2}])
 		with self.assertRaises(frappe.ValidationError):
 			self.make_usage([{"ticket_no": "T1", "qty": 0}])
+
+	def test_concrete_item_must_be_in_concrete_group(self):
+		other = make_item("_Test Concrete Cutting Blade")
+		with self.assertRaises(frappe.ValidationError):
+			self.make_usage([{"ticket_no": "T1", "qty": 1}], concrete_item=other.name)
+
+	def test_old_item_outside_group_still_saves(self):
+		# ใบที่เลือก Item ไว้ก่อนย้ายเข้ากลุ่ม แก้ช่องอื่นได้ เปลี่ยน Item ใหม่ต้องเป็นคอนกรีต
+		doc = self.make_usage([{"ticket_no": "T1", "qty": 1}])
+		other = make_item("_Test Old Concrete")
+		frappe.db.set_value("Concrete Usage", doc.name, "concrete_item", other.name)
+		doc.reload()
+		doc.location = "F2"
+		doc.save()
+		doc.concrete_item = make_item("_Test Pipe").name
+		with self.assertRaises(frappe.ValidationError):
+			doc.save()
+
+	def test_search_lists_concrete_used_in_project_first(self):
+		project = "_Test Concrete Project"
+		other = make_item("_Test Concrete 180", item_group=CONCRETE_GROUP)
+		blade = make_item("_Test Concrete Blade")
+		doc = self.make_usage([{"ticket_no": "T1", "qty": 1}], concrete_item=other.name)
+		frappe.db.set_value("Concrete Usage", doc.name, "project", project)
+		with patch.object(store_app, "check_project"):
+			rows = store_app.search_concrete(project, "_Test Concrete")
+			setup_items = [r for r in store_app.search_concrete(project) if r["used"]][:1]
+		codes = [r["value"] for r in rows]
+		self.assertEqual(codes[0], other.name)
+		self.assertIn(self.concrete.name, codes)
+		self.assertNotIn(blade.name, codes)
+		self.assertTrue(rows[0]["used"])
+		self.assertEqual([r["value"] for r in setup_items], [other.name])

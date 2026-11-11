@@ -49,33 +49,23 @@
 								v-model="doc.concrete_item"
 								label="ชนิดคอนกรีต"
 								:options="setup.items"
-								remote="Item"
+								:remote_fn="search_concrete"
+								empty_text="ไม่พบคอนกรีตในกลุ่ม Item “คอนกรีตผสมเสร็จ”"
 								:display_value="doc.concrete_item_name"
 								required
 								:class="{ 'is-readonly': readonly }"
 								@select="(o) => (doc.concrete_item_name = o.label)"
 							/>
-							<div class="ss-form-row">
-								<label class="ss-field">
-									<span class="ss-field-label">กำลังอัด</span>
-									<input
-										v-model="doc.strength"
-										class="ss-input"
-										placeholder="240 ksc"
-										:disabled="readonly"
-									/>
-								</label>
-								<label class="ss-field">
-									<span class="ss-field-label">ตามแผน (คิว)</span>
-									<input
-										v-model.number="doc.planned_qty"
-										class="ss-input"
-										type="number"
-										inputmode="decimal"
-										:disabled="readonly"
-									/>
-								</label>
-							</div>
+							<label class="ss-field">
+								<span class="ss-field-label">ตามแผน (คิว)</span>
+								<input
+									v-model.number="doc.planned_qty"
+									class="ss-input"
+									type="number"
+									inputmode="decimal"
+									:disabled="readonly"
+								/>
+							</label>
 							<Picker
 								v-model="doc.supplier"
 								label="ผู้ขาย / แพลนท์"
@@ -376,7 +366,6 @@ const doc = reactive({
 	date: today(),
 	concrete_item: null,
 	concrete_item_name: "",
-	strength: "",
 	supplier: null,
 	supplier_name: "",
 	employer_supplied: 0,
@@ -469,6 +458,11 @@ function show_saved() {
 	toast("บันทึกร่างแล้ว", "success");
 }
 
+// ชนิดคอนกรีต = Item ในกลุ่มคอนกรีตผสมเสร็จ (ที่เคยใช้ในโครงการขึ้นก่อน) ไม่ค้น Item ทั้งระบบ
+function search_concrete(txt) {
+	return call("search_concrete", { project: state.project.name, txt });
+}
+
 async function load() {
 	try {
 		const [s, existing] = await Promise.all([
@@ -479,9 +473,11 @@ async function load() {
 			Object.assign(doc, existing, {
 				tickets: (existing.tickets || []).map((t) => ({ ...t, _key: ++key })),
 			});
-		} else if (s.suppliers.length) {
-			doc.supplier = s.suppliers[0].value;
-			doc.supplier_name = s.suppliers[0].label;
+		} else {
+			if (s.suppliers.length) {
+				doc.supplier = s.suppliers[0].value;
+				doc.supplier_name = s.suppliers[0].label;
+			}
 			if (s.items.length) {
 				doc.concrete_item = s.items[0].value;
 				doc.concrete_item_name = s.items[0].label;

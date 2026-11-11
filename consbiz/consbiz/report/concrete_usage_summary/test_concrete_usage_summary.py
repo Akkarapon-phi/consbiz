@@ -20,7 +20,7 @@ def ticket(name, qty, employer=0):
 		task_name="ฐานราก",
 		location="F1",
 		concrete_item="C",
-		strength="240",
+		concrete_item_name="คอนกรีต 240 ksc",
 		supplier="S",
 		planned_qty=10,
 		ticket_no=f"T{qty}",
@@ -46,4 +46,5 @@ class IntegrationTestConcreteUsageSummary(IntegrationTestCase):
 			(first.trucks, first.qty, first.company_qty, first.employer_qty, first.variance), (2, 11, 6, 5, 1)
 		)
 		self.assertEqual((second.qty, second.variance), (3, -7))
+		self.assertEqual(first.concrete_item_name, "คอนกรีต 240 ksc")
 		self.assertEqual([t.supply for t in tickets], ["ซื้อเอง", "ผู้ว่าจ้างจัดหา", "ซื้อเอง"])

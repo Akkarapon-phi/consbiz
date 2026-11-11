@@ -22,6 +22,7 @@ import frappe
 from frappe import _
 from frappe.utils import add_days, cint, flt, getdate, nowdate, nowtime
 
+from consbiz.consbiz.doctype.concrete_usage.concrete_usage import CONCRETE_GROUP, concrete_item_filters
 from consbiz.consbiz.doctype.construction_management.construction_management import get_task_options
 from consbiz.consbiz.doctype.equipment_borrowing.equipment_borrowing import get_outstanding
 from consbiz.site_stock import construction_management_of, project_warehouse
@@ -713,7 +714,7 @@ def get_concrete(project):
 			"wbs",
 			"task_name",
 			"location",
-			"strength",
+			"concrete_item.item_name as concrete_item_name",
 			"total_qty",
 			"ticket_count",
 			"employer_qty",
@@ -734,21 +735,55 @@ def get_concrete_setup(project):
 	recent = frappe.get_list(
 		"Concrete Usage",
 		filters={"docstatus": ("<", 2)},
-		fields=["concrete_item", "strength", "supplier"],
+		fields=["supplier"],
 		order_by="creation desc",
 		limit_page_length=50,
 	)
-	codes = list(dict.fromkeys(r.concrete_item for r in recent if r.concrete_item))
-	names = item_images(codes)
 	suppliers = list(dict.fromkeys(r.supplier for r in recent if r.supplier))
 	return {
 		"construction_management": cm,
 		"wbs": get_task_options(cm) if cm else [],
-		"items": [{"value": c, "label": (names.get(c) or {}).get("item_name") or c} for c in codes[:12]],
+		# ค่าตั้งต้นของใบใหม่ = คอนกรีตที่ใช้ล่าสุดในโครงการ (ไม่เคยใช้ = ให้ผู้ใช้เลือกเอง)
+		"items": [r for r in search_concrete(project) if r["used"]][:1],
 		"suppliers": [
 			{"value": s, "label": frappe.db.get_value("Supplier", s, "supplier_name") or s} for s in suppliers[:8]
 		],
 	}
+
+
+@frappe.whitelist()
+def search_concrete(project, txt=""):
+	"""ชนิดคอนกรีต = Item ในกลุ่มคอนกรีตผสมเสร็จ ที่เคยใช้ในโครงการนี้ขึ้นก่อน"""
+	check_project(project)
+	if not frappe.db.exists("Item Group", CONCRETE_GROUP):
+		return []
+	txt = (txt or "").strip()
+	items = frappe.get_list(
+		"Item",
+		filters=concrete_item_filters(),
+		or_filters=[["name", "like", f"%{txt}%"], ["item_name", "like", f"%{txt}%"]] if txt else None,
+		fields=["name", "item_name"],
+		order_by="item_name asc",
+		limit=100,
+	)
+	used = frappe.get_all(
+		"Concrete Usage",
+		filters={"project": project, "docstatus": ("<", 2)},
+		fields=["concrete_item"],
+		order_by="creation desc",
+		limit=100,
+	)
+	rank = {code: i for i, code in reversed(list(enumerate(r.concrete_item for r in used)))}
+	items.sort(key=lambda r: rank.get(r.name, len(rank)))
+	return [
+		{
+			"value": r.name,
+			"label": r.item_name or r.name,
+			"description": f"{r.name} · {_('เคยใช้ในโครงการนี้')}" if r.name in rank else r.name,
+			"used": r.name in rank,
+		}
+		for r in items
+	]
 
 
 @frappe.whitelist()
@@ -770,7 +805,7 @@ def delete_concrete(name):
 	delete_document(frappe.get_doc("Concrete Usage", name))
 
 
-CONCRETE_FIELDS = ("wbs", "location", "date", "concrete_item", "strength", "supplier", "employer_supplied", "planned_qty", "remarks")
+CONCRETE_FIELDS = ("wbs", "location", "date", "concrete_item", "supplier", "employer_supplied", "planned_qty", "remarks")
 TICKET_FIELDS = ("ticket_no", "vehicle_no", "arrive_time", "finish_time", "qty", "slump", "samples", "employer_supplied", "remarks")
 
 

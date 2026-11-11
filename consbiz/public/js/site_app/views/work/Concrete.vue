@@ -153,7 +153,9 @@
 										><Icon name="ticket" :size="13" />
 										{{ d.ticket_count }} คัน</span
 									>
-									<span v-if="d.strength" class="ss-chip">{{ d.strength }}</span>
+									<span v-if="d.concrete_item_name" class="ss-chip">{{
+										d.concrete_item_name
+									}}</span>
 									<span v-if="d.employer_qty" class="ss-tag tone-violet"
 										>ผู้ว่าจ้าง {{ num(d.employer_qty) }}</span
 									>
@@ -216,7 +218,7 @@ const COLUMNS = [
 	{ key: "name", label: "เลขที่", sort: true, class: "col-no" },
 	{ key: "task_name", label: "งาน", sort: true, class: "col-subject" },
 	{ key: "date", label: "วันที่เท", sort: true, class: "col-date is-date" },
-	{ key: "strength", label: "กำลังอัด", sort: true, class: "col-date col-wide" },
+	{ key: "concrete_item_name", label: "คอนกรีต", sort: true, class: "col-wide" },
 	{ key: "ticket_count", label: "จำนวนคัน", sort: true, class: "is-num" },
 	{ key: "total_qty", label: "ปริมาณ (คิว)", sort: true, class: "is-num" },
 	{ key: "planned_qty", label: "ตามแผน", sort: true, class: "is-num col-wide" },
