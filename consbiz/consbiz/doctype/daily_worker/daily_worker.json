@@ -1,0 +1,293 @@
+{
+ "actions": [],
+ "creation": "2026-11-13 12:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "worker_name",
+  "id_number",
+  "nationality",
+  "phone",
+  "column_break_main",
+  "company",
+  "project",
+  "position",
+  "team",
+  "status",
+  "section_payee",
+  "payee_type",
+  "supplier",
+  "column_break_payee",
+  "bank_name",
+  "bank_account",
+  "account_holder_other",
+  "account_holder",
+  "account_holder_relation",
+  "section_rate",
+  "daily_rate",
+  "ot_flat",
+  "ot_hourly_rate",
+  "column_break_rate",
+  "sso_registered",
+  "sso_number",
+  "rates"
+ ],
+ "fields": [
+  {
+   "fieldname": "worker_name",
+   "fieldtype": "Data",
+   "label": "ชื่อ-นามสกุล",
+   "reqd": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "bold": 1
+  },
+  {
+   "fieldname": "id_number",
+   "fieldtype": "Data",
+   "label": "เลขบัตรประชาชน/พาสปอร์ต"
+  },
+  {
+   "fieldname": "nationality",
+   "fieldtype": "Data",
+   "label": "สัญชาติ",
+   "default": "ไทย"
+  },
+  {
+   "fieldname": "phone",
+   "fieldtype": "Data",
+   "label": "โทรศัพท์",
+   "options": "Phone"
+  },
+  {
+   "fieldname": "column_break_main",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "label": "บริษัท",
+   "options": "Company",
+   "reqd": 1,
+   "in_standard_filter": 1,
+   "remember_last_selected_value": 1
+  },
+  {
+   "fieldname": "project",
+   "fieldtype": "Link",
+   "label": "โครงการที่ประจำ",
+   "options": "Project",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "position",
+   "fieldtype": "Data",
+   "label": "ตำแหน่ง",
+   "in_list_view": 1,
+   "description": "ชื่อเดียวกับตำแหน่งในรายงานประจำวัน เช่น ช่างไม้ กรรมกร"
+  },
+  {
+   "fieldname": "team",
+   "fieldtype": "Data",
+   "label": "ทีม/ชุด",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "search_index": 1,
+   "description": "ใช้จัดกลุ่มในหน้าลงเวลา เช่น ชุดช่างไม้ ว่าง + จ่ายผ่าน ผรม. = ใช้ชื่อ ผรม. เป็นทีม"
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "สถานะ",
+   "options": "Active\nInactive",
+   "default": "Active",
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "section_payee",
+   "fieldtype": "Section Break",
+   "label": "ผู้รับเงิน"
+  },
+  {
+   "fieldname": "payee_type",
+   "fieldtype": "Select",
+   "label": "จ่ายผ่าน",
+   "options": "Company\nSubcontractor",
+   "default": "Company",
+   "reqd": 1,
+   "in_standard_filter": 1,
+   "description": "Company = บริษัทจ่ายให้คนงานเอง, Subcontractor = จ่ายรวมให้ ผรม./หัวหน้าชุด"
+  },
+  {
+   "fieldname": "supplier",
+   "fieldtype": "Link",
+   "label": "ผู้รับเหมา/หัวหน้าชุด",
+   "options": "Supplier",
+   "depends_on": "eval:doc.payee_type=='Subcontractor'",
+   "mandatory_depends_on": "eval:doc.payee_type=='Subcontractor'",
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "column_break_payee",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "bank_name",
+   "fieldtype": "Data",
+   "label": "ธนาคาร"
+  },
+  {
+   "fieldname": "bank_account",
+   "fieldtype": "Data",
+   "label": "เลขที่บัญชี",
+   "description": "ตัวเลขเท่านั้น (ระบบตัดขีด/ช่องว่างให้)"
+  },
+  {
+   "fieldname": "account_holder_other",
+   "fieldtype": "Check",
+   "label": "รับเงินผ่านบัญชีผู้อื่น",
+   "description": "เช่น บัญชีของญาติ/หัวหน้าชุด (คนงานไม่มีบัญชีของตัวเอง)"
+  },
+  {
+   "fieldname": "account_holder",
+   "fieldtype": "Data",
+   "label": "ชื่อเจ้าของบัญชี",
+   "depends_on": "account_holder_other",
+   "mandatory_depends_on": "account_holder_other"
+  },
+  {
+   "fieldname": "account_holder_relation",
+   "fieldtype": "Data",
+   "label": "ความเกี่ยวข้องกับคนงาน",
+   "depends_on": "account_holder_other",
+   "description": "เช่น ภรรยา พี่ชาย หัวหน้าชุด"
+  },
+  {
+   "fieldname": "section_rate",
+   "fieldtype": "Section Break",
+   "label": "ค่าแรง"
+  },
+  {
+   "fieldname": "daily_rate",
+   "fieldtype": "Currency",
+   "label": "ค่าแรง/วัน (ปัจจุบัน)",
+   "read_only": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "ot_flat",
+   "fieldtype": "Check",
+   "label": "OT เหมาเป็นชั่วโมง",
+   "description": "ไม่ติ๊ก = OT ตามกฎหมาย (ค่าแรง ÷ 8 x 1.5, วันหยุด x 3)"
+  },
+  {
+   "fieldname": "ot_hourly_rate",
+   "fieldtype": "Currency",
+   "label": "ค่า OT/ชั่วโมง",
+   "depends_on": "ot_flat",
+   "mandatory_depends_on": "ot_flat"
+  },
+  {
+   "fieldname": "column_break_rate",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "sso_registered",
+   "fieldtype": "Check",
+   "label": "ขึ้นทะเบียนประกันสังคม",
+   "description": "หักเงินสมทบตามตารางอัตราประกันสังคม (เฉพาะคนงานที่บริษัทจ่ายเอง)",
+   "depends_on": "eval:doc.payee_type=='Company'"
+  },
+  {
+   "fieldname": "sso_number",
+   "fieldtype": "Data",
+   "label": "เลขประกันสังคม",
+   "depends_on": "sso_registered"
+  },
+  {
+   "fieldname": "rates",
+   "fieldtype": "Table",
+   "label": "ประวัติค่าแรง",
+   "options": "Daily Worker Rate",
+   "reqd": 1,
+   "description": "ปรับค่าแรง = เพิ่มแถวใหม่พร้อมวันที่มีผล ห้ามแก้แถวเดิม (ใบลงเวลาที่ผ่านแล้วคิดตามอัตราของวันนั้น)"
+  }
+ ],
+ "grid_page_length": 50,
+ "links": [],
+ "modified": "2026-11-13 23:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "ConsBiz",
+ "name": "Daily Worker",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "create": 1,
+   "write": 1,
+   "delete": 1,
+   "share": 1,
+   "email": 1,
+   "role": "System Manager"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "create": 1,
+   "write": 1,
+   "delete": 1,
+   "share": 1,
+   "email": 1,
+   "role": "Projects Manager"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "create": 1,
+   "write": 1,
+   "role": "Projects User"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "role": "Accounts Manager"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "role": "Accounts User"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "role": "HR Manager"
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "autoname": "DW-.#####",
+ "naming_rule": "Expression (old style)",
+ "description": "ทะเบียนคนงานรายวัน (แยกจาก Employee ของ HRMS) ใช้เช็กชื่อและคิดค่าแรงใน Labour Timesheet",
+ "title_field": "worker_name",
+ "show_title_field_in_link": 1,
+ "search_fields": "worker_name,position,team,project",
+ "track_changes": 1
+}

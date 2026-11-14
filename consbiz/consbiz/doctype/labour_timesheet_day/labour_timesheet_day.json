@@ -1,0 +1,97 @@
+{
+ "actions": [],
+ "creation": "2026-11-13 12:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "date",
+  "worker",
+  "worker_name",
+  "hours",
+  "ot_hours",
+  "holiday",
+  "amount",
+  "remark"
+ ],
+ "fields": [
+  {
+   "fieldname": "date",
+   "fieldtype": "Date",
+   "label": "วันที่",
+   "reqd": 1,
+   "in_list_view": 1,
+   "columns": 2
+  },
+  {
+   "fieldname": "worker",
+   "fieldtype": "Link",
+   "label": "คนงาน",
+   "options": "Daily Worker",
+   "reqd": 1,
+   "in_list_view": 1,
+   "columns": 2
+  },
+  {
+   "fieldname": "worker_name",
+   "fieldtype": "Data",
+   "label": "ชื่อ",
+   "fetch_from": "worker.worker_name",
+   "read_only": 1,
+   "in_list_view": 1,
+   "columns": 2
+  },
+  {
+   "fieldname": "hours",
+   "fieldtype": "Float",
+   "label": "ชั่วโมงทำงาน",
+   "reqd": 1,
+   "in_list_view": 1,
+   "columns": 1,
+   "description": "ชั่วโมงทำงานจริง (หักพักแล้ว) 8 = เต็มวัน เกิน 8 = OT"
+  },
+  {
+   "fieldname": "ot_hours",
+   "fieldtype": "Float",
+   "label": "OT (ชม.)",
+   "read_only": 1,
+   "in_list_view": 1,
+   "columns": 1
+  },
+  {
+   "fieldname": "holiday",
+   "fieldtype": "Check",
+   "label": "วันหยุด",
+   "read_only": 1,
+   "in_list_view": 1,
+   "columns": 1
+  },
+  {
+   "fieldname": "amount",
+   "fieldtype": "Currency",
+   "label": "ค่าแรงวันนี้",
+   "read_only": 1,
+   "in_list_view": 1,
+   "columns": 1,
+   "description": "ค่าแรง + OT ของวันนี้ (ระบบคำนวณ)"
+  },
+  {
+   "fieldname": "remark",
+   "fieldtype": "Data",
+   "label": "หมายเหตุ"
+  }
+ ],
+ "grid_page_length": 50,
+ "links": [],
+ "modified": "2026-11-13 18:30:00.000000",
+ "modified_by": "Administrator",
+ "module": "ConsBiz",
+ "name": "Labour Timesheet Day",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "istable": 1,
+ "editable_grid": 1
+}

@@ -1,0 +1,156 @@
+{
+ "actions": [],
+ "creation": "2026-11-13 12:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "company",
+  "section_direct",
+  "wage_expense_account",
+  "employer_sso_expense_account",
+  "wage_payable_account",
+  "column_break_direct",
+  "sso_payable_account",
+  "advance_account",
+  "other_deduction_account",
+  "section_subcontract",
+  "subcontract_item",
+  "subcontract_wht_percent"
+ ],
+ "fields": [
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "label": "บริษัท",
+   "options": "Company",
+   "reqd": 1,
+   "unique": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "section_direct",
+   "fieldtype": "Section Break",
+   "label": "คนงานที่บริษัทจ่ายเอง (ลง Journal Entry ตอนอนุมัติใบลงเวลา)"
+  },
+  {
+   "fieldname": "wage_expense_account",
+   "fieldtype": "Link",
+   "label": "ค่าแรงทางตรง",
+   "options": "Account",
+   "description": "Expense: ค่าแรงงานก่อสร้าง (ผูกโครงการ)",
+   "reqd": 1
+  },
+  {
+   "fieldname": "employer_sso_expense_account",
+   "fieldtype": "Link",
+   "label": "ประกันสังคมส่วนนายจ้าง",
+   "options": "Account",
+   "description": "Expense: เงินสมทบประกันสังคม"
+  },
+  {
+   "fieldname": "wage_payable_account",
+   "fieldtype": "Link",
+   "label": "ค่าแรงค้างจ่าย",
+   "options": "Account",
+   "description": "Liability (ไม่ใช่ Payable): บัญชีจ่ายด้วย Payment Entry / Journal Entry",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_direct",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "sso_payable_account",
+   "fieldtype": "Link",
+   "label": "ประกันสังคมค้างจ่าย",
+   "options": "Account",
+   "description": "Liability: ส่วนลูกจ้าง + นายจ้าง รอนำส่ง สปส."
+  },
+  {
+   "fieldname": "advance_account",
+   "fieldtype": "Link",
+   "label": "เงินเบิกล่วงหน้าคนงาน",
+   "options": "Account",
+   "description": "Asset (ไม่ใช่ Receivable): ลูกหนี้เงินเบิก หักคืนจากค่าแรง"
+  },
+  {
+   "fieldname": "other_deduction_account",
+   "fieldtype": "Link",
+   "label": "หักอื่นๆ",
+   "options": "Account",
+   "description": "บัญชีที่รับยอดหักอื่นๆ เช่น รายได้อื่น (ว่าง = ลดค่าแรงทางตรง)"
+  },
+  {
+   "fieldname": "section_subcontract",
+   "fieldtype": "Section Break",
+   "label": "คนงานผ่าน ผรม./หัวหน้าชุด (ร่าง Purchase Invoice รายละใบ)"
+  },
+  {
+   "fieldname": "subcontract_item",
+   "fieldtype": "Link",
+   "label": "รายการค่าแรง ผรม.",
+   "options": "Item",
+   "description": "Item ที่ไม่ใช่สต็อก เช่น ค่าแรงผู้รับเหมาช่วง"
+  },
+  {
+   "fieldname": "subcontract_wht_percent",
+   "fieldtype": "Percent",
+   "label": "หัก ณ ที่จ่าย (%)",
+   "default": "3"
+  }
+ ],
+ "grid_page_length": 50,
+ "links": [],
+ "modified": "2026-11-13 12:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "ConsBiz",
+ "name": "Labour Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "create": 1,
+   "write": 1,
+   "delete": 1,
+   "share": 1,
+   "email": 1,
+   "role": "System Manager"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "create": 1,
+   "write": 1,
+   "delete": 1,
+   "share": 1,
+   "email": 1,
+   "role": "Accounts Manager"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "role": "Projects Manager"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "role": "Accounts User"
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "autoname": "field:company",
+ "naming_rule": "By fieldname",
+ "description": "บัญชีที่ใช้ลงค่าแรงคนงานรายวัน (Labour Timesheet) และเบิกล่วงหน้า (Labour Advance) แยกตามบริษัท"
+}

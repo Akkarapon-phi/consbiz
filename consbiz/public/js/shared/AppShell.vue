@@ -125,7 +125,7 @@
 
 		<AppTooltip />
 		<ProfileSheet :open="profile_open" @close="profile_open = false" />
-		<SettingsDialog v-if="boot.can?.settings" :open="settings_open" @close="settings_open = false" />
+		<SettingsDialog v-if="boot.can?.settings || boot.can?.labour_settings" :open="settings_open" @close="settings_open = false" />
 
 		<DockMenu
 			:open="dock_menu === 'company'"
@@ -637,7 +637,7 @@ const user_groups = [
 			},
 		],
 	},
-	...(boot.can?.settings
+	...(boot.can?.settings || boot.can?.labour_settings
 		? [{ items: [{ key: "settings", label: "ตั้งค่า", icon: "sliders", onclick: () => (settings_open.value = true) }] }]
 		: []),
 	...(boot.desk

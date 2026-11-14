@@ -3110,6 +3110,11 @@ svg.ss-check {
 	--ss-brand-2: #a16207;
 	--ss-brand-soft: #fdf0dc;
 }
+[data-section="admin"] {
+	--ss-brand: #475569;
+	--ss-brand-2: #0f766e;
+	--ss-brand-soft: #e2e8f0;
+}
 [data-section="hr"] {
 	--ss-brand: #be123c;
 	--ss-brand-2: #c2410c;
@@ -3142,6 +3147,11 @@ svg.ss-check {
 		--ss-brand: #f0a94b;
 		--ss-brand-2: #e0b84a;
 		--ss-brand-soft: rgba(240, 169, 75, 0.16);
+	}
+	[data-section="admin"] {
+		--ss-brand: #94a3b8;
+		--ss-brand-2: #2dd4bf;
+		--ss-brand-soft: rgba(148, 163, 184, 0.16);
 	}
 	[data-section="hr"] {
 		--ss-brand: #fb7185;
@@ -8220,6 +8230,15 @@ select.ss-input {
 .ss-tab.is-active::after {
 	transform: scaleX(1);
 }
+/* จุดแดงท้ายแท็บ = มีงานค้างในแท็บนั้น (StatusTabs option.alert) */
+.ss-tab-dot {
+	width: 7px;
+	height: 7px;
+	margin-left: 4px;
+	border-radius: 50%;
+	background: var(--tone-rose);
+	flex: none;
+}
 .ss-tab-count {
 	min-width: 22px;
 	padding: 1px 7px;
@@ -12632,6 +12651,29 @@ html.ss-boq-grabbing * {
 	padding: 12px 8px;
 	border-right: 1px solid var(--ss-border);
 	background: var(--ss-surface-2);
+}
+.ss-settings-group {
+	padding: 10px 10px 4px;
+	color: var(--ss-muted);
+	font-size: var(--ss-fs-sm);
+	font-weight: 600;
+}
+.ss-settings-group:first-child {
+	padding-top: 0;
+}
+/* หน้าตั้งค่าแบบฟอร์ม (ไม่ใช่ตารางกว้าง) อยู่กลาง กว้างไม่เกิน 920px เลื่อนในกรอบ */
+.ss-settings-form {
+	flex: 1;
+	min-width: 0;
+	overflow: auto;
+}
+.ss-settings-form-inner {
+	display: flex;
+	flex-direction: column;
+	gap: 14px;
+	max-width: 920px;
+	margin: 0 auto;
+	padding: 16px 24px 24px;
 }
 .ss-settings-link {
 	display: flex;

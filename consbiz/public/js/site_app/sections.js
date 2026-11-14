@@ -97,6 +97,17 @@ export const SECTIONS = {
 		],
 		badge: (s) => s?.mr_todo?.count,
 	},
+	// ธุรการโครงการ: ลงเวลาคนงานรายวัน (Labour Timesheet รายรอบ) + ทะเบียนคนงาน
+	admin: {
+		key: "admin",
+		...MODULE_META.site.admin,
+		home: "labour",
+		tabs: [
+			{ view: "labour", label: "ลงเวลาคนงาน", icon: "clock", when: (b) => b.can.view_labour },
+			{ view: "advances", label: "เบิกล่วงหน้า", icon: "calculator", when: (b) => b.can.view_advances },
+			{ view: "workers", label: "ทะเบียนคนงาน", icon: "users", when: (b) => b.can.view_workers },
+		],
+	},
 };
 
 // view → หมวด + ชื่อ params ตามลำดับใน URL
@@ -146,6 +157,10 @@ export const ROUTES = {
 	mr: { section: "buy", params: ["filter"] },
 	"buy-doc": { section: "buy", params: ["kind", "name"] },
 	"buy-form": { section: "buy", params: ["kind", "name", "source"] },
+	// ธุรการ: day = วันใดก็ได้ในรอบ (ว่าง = รอบปัจจุบัน)
+	labour: { section: "admin", params: ["day"] },
+	advances: { section: "admin", params: [] },
+	workers: { section: "admin", params: [] },
 };
 
 // หน้าย่อยนับเป็นเมนูไหน (ไฮไลต์ในแถบข้างของจอใหญ่)

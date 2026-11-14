@@ -82,6 +82,9 @@ def site_sections(can=None):
 	# หน้างานขอซื้อได้อย่างเดียว (สั่งซื้อ/แจ้งหนี้/ขาย ทำที่แอปออฟฟิศ)
 	if can_buy:
 		sections.append("buy")
+	# ธุรการโครงการ: ลงเวลาคนงานรายวัน / ทะเบียนคนงาน
+	if readable_any(("Labour Timesheet", "Daily Worker", "Labour Advance")):
+		sections.append("admin")
 	return sections
 
 
@@ -122,6 +125,8 @@ def add_apps(boot, current):
 	by_app = sections_by_app(current)
 	boot["docs"] = doc_permissions()
 	boot["can"]["settings"] = app_settings.can_manage()
+	# หัวข้อ "ค่าแรงคนงาน" ของหน้าตั้งค่า (บัญชี/ฝ่ายบริหาร ไม่ต้องเป็น System Manager)
+	boot["can"]["labour_settings"] = bool(frappe.has_permission("Labour Settings", "read"))
 	boot["apps"] = available_apps(by_app)
 	boot["modules"] = app_modules(by_app)
 
@@ -191,6 +196,9 @@ def boot_data():
 			"finance": can_view_finance(),
 			"create_inspection": bool(frappe.has_permission("Inspection Request", "create")),
 			"create_punch_list": bool(frappe.has_permission("Punch List", "create")),
+			"view_labour": readable("Labour Timesheet"),
+			"view_workers": readable("Daily Worker"),
+			"view_advances": readable("Labour Advance"),
 		}
 	)
 	sections = site_sections(boot["can"])

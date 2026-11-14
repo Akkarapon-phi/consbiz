@@ -49,6 +49,14 @@ export const MODULE_META = {
 			theme: "#0d9488",
 			colors: ["#0d9488", "#0284c7"],
 		},
+		admin: {
+			label: "ธุรการ",
+			title: "ธุรการโครงการ",
+			note: "ลงเวลาคนงานรายวัน เบิกล่วงหน้า ทะเบียนคนงาน",
+			icon: "briefcase",
+			theme: "#475569",
+			colors: ["#475569", "#0f766e"],
+		},
 	},
 	office: {
 		purchase: {

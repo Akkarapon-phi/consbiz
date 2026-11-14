@@ -17,6 +17,9 @@ import Reports from "./views/work/Reports.vue";
 import Inspections from "./views/work/Inspections.vue";
 import Concrete from "./views/work/Concrete.vue";
 import ConcreteForm from "./views/work/ConcreteForm.vue";
+import Labour from "./views/admin/Labour.vue";
+import Workers from "./views/admin/Workers.vue";
+import Advances from "./views/admin/Advances.vue";
 // แผนงาน
 import PmHome from "./views/pm/PmHome.vue";
 import Plan from "./views/pm/Plan.vue";
@@ -43,6 +46,9 @@ export default {
 	issue: Issue,
 	concrete: Concrete,
 	"concrete-form": ConcreteForm,
+	labour: Labour,
+	workers: Workers,
+	advances: Advances,
 	borrow: Borrow,
 	"borrow-detail": BorrowDetail,
 	"borrow-new": BorrowNew,

@@ -19,8 +19,8 @@ from frappe.utils import getdate, nowdate
 
 from consbiz import hr_attendance
 
-# ประกันสังคม 5% ของค่าจ้างจริง (เงินเดือนตามวันทำงาน + OT) ฐานต่ำสุด 1,650 สูงสุด 17,500 (ปี 2569-2571) = ไม่เกิน 875
-SSO_FORMULA = "min(rounded(max(base * payment_days / total_working_days + OT, 1650) * 0.05), 875) if total_working_days else 0"
+# ประกันสังคม % ของค่าจ้างจริง (เงินเดือนตามวันทำงาน + OT) ฐานต่ำสุด/เพดานจากตาราง Social Security Rate (ชุดเดียวกับค่าแรงคนงานรายวัน)
+# สูตรของ HRMS เป็นข้อความคงที่ จึงสร้างจากอัตราของเดือนปัจจุบัน (sso_formula) ตรวจตั้งค่าแจ้งเมื่ออัตราเปลี่ยน (เช่น ลดอัตราชั่วคราว/เพดานใหม่)
 SSO_CONDITION = "payment_days > 0"
 UNPAID_COMPONENT = "หักเวลาที่ไม่ได้ทำงาน"
 # วันลาขั้นต่ำตาม พ.ร.บ.คุ้มครองแรงงาน (วันทำงาน/ปี)
@@ -206,6 +206,19 @@ def check_salary_proration(company):
 	return result("ok", _("หักตามวันขาด/ลาไม่รับค่าจ้าง"))
 
 
+def sso_formula(day=None):
+	"""สูตรประกันสังคมของโครงสร้างเงินเดือนตามอัตราของเดือน day (ว่าง = วันนี้)"""
+	from consbiz.social_security import require_rate, round_baht
+
+	rate = require_rate(day or nowdate())
+	percent = rate.employee_rate / 100
+	cap = round_baht(rate.max_base * percent)
+	return (
+		f"min(rounded(max(base * payment_days / total_working_days + OT, {rate.min_base:g}) * {percent:g}), {cap:g})"
+		" if total_working_days else 0"
+	)
+
+
 def sso_rows(company):
 	return [r for r in structure_rows(main_structure(company), "deductions") if r.abbr == "SSF"]
 
@@ -214,14 +227,27 @@ def check_sso(company):
 	rows = sso_rows(company)
 	if not rows:
 		return result("warn", _("ไม่พบประกันสังคม (ตัวย่อ SSF) ในโครงสร้างเงินเดือน"), link=form("Salary Structure"))
+	from consbiz.social_security import rate_on
+
+	rate = rate_on(nowdate())
+	if not rate:
+		return result("error", _("ยังไม่ได้ตั้งอัตราประกันสังคมของเดือนนี้"), link=form("Social Security Rate"))
+	summary = _("{0:g}% ของค่าจ้างจริง ฐาน {1:,.0f}-{2:,.0f} บาท").format(rate.employee_rate, rate.min_base, rate.max_base)
 	bad = [r for r in rows if "payment_days" not in (r.formula or "")]
 	if bad:
 		return result(
 			"error",
 			_("ประกันสังคมคิดจากเงินเดือนเต็ม เดือนที่ขาด/ลาไม่รับค่าจ้างจะหักเกินค่าจ้างจริง"),
-			fix=_("คิดจากค่าจ้างจริง (เงินเดือนตามวันทำงาน + OT) 5% ไม่เกิน 875"),
+			fix=_("คิดจากค่าจ้างจริง (เงินเดือนตามวันทำงาน + OT) {0}").format(summary),
 		)
-	return result("ok", _("5% ของค่าจ้างจริง ไม่เกิน 875 บาท"))
+	formula = sso_formula()
+	if any((r.formula or "").strip() != formula for r in rows):
+		return result(
+			"warn",
+			_("สูตรไม่ตรงกับอัตราประกันสังคมเดือนนี้ (ตาราง Social Security Rate)"),
+			fix=_("ปรับสูตรเป็น {0}").format(summary),
+		)
+	return result("ok", summary)
 
 
 def tax_slab_problems(slab):
@@ -520,6 +546,7 @@ def fix_salary_proration(company):
 
 
 def fix_sso(company):
+	formula = sso_formula()
 	for row in sso_rows(company):
 		doc = frappe.get_doc("Salary Structure", row.parent)
 		for d in doc.deductions:
@@ -527,10 +554,10 @@ def fix_sso(company):
 				if not d.amount_based_on_formula:
 					frappe.db.set_value("Salary Detail", d.name, "amount_based_on_formula", 1)
 					d.amount_based_on_formula = 1
-				d.formula = SSO_FORMULA
+				d.formula = formula
 				d.condition = SSO_CONDITION
 		doc.save()
-		comment("Salary Structure", doc.name, _("ประกันสังคมคิดจากค่าจ้างจริง: {0}").format(SSO_FORMULA))
+		comment("Salary Structure", doc.name, _("ประกันสังคมคิดจากค่าจ้างจริง: {0}").format(formula))
 
 
 def fix_tax_slab(company):

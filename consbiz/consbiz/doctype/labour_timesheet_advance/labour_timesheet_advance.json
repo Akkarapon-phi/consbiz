@@ -1,0 +1,62 @@
+{
+ "actions": [],
+ "creation": "2026-11-13 12:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "advance",
+  "worker",
+  "worker_name",
+  "amount"
+ ],
+ "fields": [
+  {
+   "fieldname": "advance",
+   "fieldtype": "Link",
+   "label": "ใบเบิก",
+   "options": "Labour Advance",
+   "read_only": 1,
+   "in_list_view": 1,
+   "columns": 2
+  },
+  {
+   "fieldname": "worker",
+   "fieldtype": "Link",
+   "label": "คนงาน",
+   "options": "Daily Worker",
+   "read_only": 1,
+   "in_list_view": 1,
+   "columns": 2
+  },
+  {
+   "fieldname": "worker_name",
+   "fieldtype": "Data",
+   "label": "ชื่อ",
+   "read_only": 1,
+   "in_list_view": 1,
+   "columns": 2
+  },
+  {
+   "fieldname": "amount",
+   "fieldtype": "Currency",
+   "label": "หักคืนรอบนี้",
+   "read_only": 1,
+   "in_list_view": 1,
+   "columns": 2
+  }
+ ],
+ "grid_page_length": 50,
+ "links": [],
+ "modified": "2026-11-13 12:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "ConsBiz",
+ "name": "Labour Timesheet Advance",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "istable": 1,
+ "editable_grid": 1
+}

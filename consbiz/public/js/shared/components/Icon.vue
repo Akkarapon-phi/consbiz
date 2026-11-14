@@ -114,6 +114,8 @@ const paths = {
 	storm: '<path d="M6 16.33A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 .5 8.97"/><path d="m13 12-3 5h4l-3 5"/>',
 	panel: '<rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/>',
 	"chevrons-left": '<path d="m11 17-5-5 5-5M18 17l-5-5 5-5"/>',
+	"chevrons-up": '<path d="m17 11-5-5-5 5M17 18l-5-5-5 5"/>',
+	"chevrons-down": '<path d="m7 6 5 5 5-5M7 13l5 5 5-5"/>',
 	ticket: '<path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/><path d="M13 5v2M13 17v2M13 11v2"/>',
 	more: '<circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/>',
 	save: '<path d="M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7"/><path d="M7 3v4a1 1 0 0 0 1 1h7"/>',

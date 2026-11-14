@@ -42,9 +42,10 @@ class IntegrationTestSiteApp(IntegrationTestCase):
 			frappe.db.set_value("Construction Management", name, "project", None)
 
 	def test_sections_follow_permissions(self):
-		# หน้างาน: ขอซื้ออย่างเดียว (สั่งซื้อ/แจ้งหนี้/ขาย อยู่แอปออฟฟิศ)
+		# หน้างาน: ขอซื้ออย่างเดียว (สั่งซื้อ/แจ้งหนี้/ขาย อยู่แอปออฟฟิศ) + ธุรการโครงการ (ลงเวลาคนงาน)
 		boot = site_app.boot_data()
-		self.assertEqual(boot["sections"], ["store", "work", "pm", "resources", "buy"])
+		self.assertEqual(boot["sections"], ["store", "work", "pm", "resources", "buy", "admin"])
+		self.assertTrue(boot["can"]["view_labour"])
 		self.assertTrue(boot["can"]["daily_report"])
 		self.assertTrue(boot["can"]["finance"])
 		# Administrator มี System Manager = เห็นโมดูลอนุมัติ (กลุ่มแอป self)

@@ -67,6 +67,15 @@ MODULES = (
 	),
 	("site", "buy", (("Material Request", "ใบขอซื้อ", 0),)),
 	(
+		"site",
+		"admin",
+		(
+			("Labour Timesheet", "ลงเวลา/ค่าแรงคนงาน", 0),
+			("Labour Advance", "เบิกล่วงหน้า", 0),
+			("Daily Worker", "ทะเบียนคนงาน", 0),
+		),
+	),
+	(
 		"office",
 		"purchase",
 		(

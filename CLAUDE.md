@@ -365,6 +365,20 @@ pre-commit run --all-files                               # ruff + prettier (ต�
   ช่องติ๊ก "ไม่หักเงิน (ตักเตือน)" แยกจากสถานะ (ขาด/ครึ่งวัน, `WAIVABLE`): บันทึกเป็น Present ให้จ่ายค่าจ้าง สถานะจริงใน `Attendance.custom_waived_status`
   นับแยก (`totals.waived`) ไว้ใช้ทางวินัย ขาดบ่อยเกิน HR กด "หักเงินวันที่ยกเว้นไว้" (`charge_waived` = บันทึกเป็นสถานะจริง) ก่อนยืนยันสลิป
   "บันทึก Attendance" (`close_period`) = สร้างของวันมาทำงาน/ขาดถึงเมื่อวาน ต้องไม่มีวันรอตัดสิน ผูก `Employee Checkin.attendance` ของวันนั้น
+- คนงานรายวัน (หมวดธุรการ `admin` ของกลุ่มหน้างาน `/conserp/admin`, เริ่ม 2026-11-13, แยกจาก HRMS): `Daily Worker` (ทะเบียน, ค่าแรงเป็นประวัติใน `rates` คิดตามอัตราของแต่ละวัน, จ่ายผ่าน Company หรือ Subcontractor = Supplier)
+  `Labour Timesheet` 1 ใบต่อโครงการต่อรอบ (`period_of`: 1-15 / 16-สิ้นเดือน) แถว `days` = ชั่วโมงทำงานจริง 1 คนต่อวัน (เกิน 8 = OT) วันหยุดของทั้งวันในตาราง `holidays`
+  ค่าแรงตามชั่วโมง (6 ชม. = 6/8 วัน) วันหยุด x 2, OT ÷ 8 x 1.5 (วันหยุด x 3) หรือ OT เหมา (`ot_flat`) ตาราง `pay` คำนวณใหม่ทุกครั้ง (กรอกได้เฉพาะหักอื่นๆ)
+  Submit = อนุมัติ + ลงบัญชีตาม `Labour Settings` (1 ใบต่อบริษัท ตั้งในแอป: avatar > ตั้งค่า > หัวข้อ "บัญชี" > ค่าแรงคนงาน `settings/LabourSettings.vue`, Accounts Manager แก้ได้, ไม่มีบัญชีที่ตรง = ปุ่มสร้างบัญชี/Item ใหม่ `suggest_account` เสนอชื่อ กลุ่มแม่ เลขถัดไป):
+  บริษัทจ่าย = Journal Entry ผูก Project, ผ่าน ผรม. = ร่าง Purchase Invoice ต่อ ผรม. (หัก ณ ที่จ่ายผ่าน `deductions.calculate`) Cancel = ยกเลิก JE / ลบร่าง PI
+  บัญชีค้างจ่าย/เงินเบิกห้ามเป็น Payable/Receivable (JE บังคับคู่ค้า) erpnext_thailand บังคับแถวบริษัทใน Thai Tax Settings ก่อนลง JE (หน้าตั้งค่ามีรายการตรวจ)
+  เบิกล่วงหน้า `Labour Advance` (เฉพาะคนงานที่บริษัทจ่าย, Submit = จ่าย JE) ใบลงเวลาตัดใบที่ค้าง (เก่าก่อน ไม่เกินค่าแรงหลังหักประกันสังคม/หักอื่นๆ) ลง `advances` ยอดค้าง/สถานะคำนวณใหม่ (`update_deduction`)
+  ทะเบียนแก้ในแอป (`WorkerSheet.vue`, `get_worker` / `save_worker`: ค่าแรงใหม่ = เพิ่มแถวประวัติ, บัญชีธนาคาร + รับผ่านบัญชีผู้อื่น `account_holder*`)
+  ทีม (`Daily Worker.team`, ว่าง + ผ่าน ผรม. = ชื่อ ผรม., `labour.team_of`) จัดกลุ่มหน้าลงเวลา: แถวหัวทีมพับได้ ช่องแถวทีม = ใส่ทั้งทีม แท็บกรองทีม (จุดแดง = ทีมที่ยังไม่มีชั่วโมงในวันที่เลือก, เกิน 5 ทีม = แท็บทั้งหมด/ทีมที่เลือก + ปุ่มเลือกทีมแบบค้นหา เพราะแท็บล้นแถบ) ปุ่มพับ/กางทุกทีม วางจาก Excel ได้ ย้ายทีมหลายคนที่ทะเบียน (`set_team`)
+  หน้าแอป: `Labour.vue` (คลิกชื่อ = ยอดค่าแรง + หักอื่นๆ `set_deduction`, ปุ่มพิมพ์ = Print Format `Labour Timesheet` A4 แนวนอน = ใบลงเวลา + เซ็นรับเงิน), `Advances.vue`
+  Daily Report ปุ่ม "ดึงจำนวนจากลงเวลาคนงาน" (`labour_on`) สูตรประกันสังคมของ HR สร้างจากตารางเดียวกัน (`hr_setup.sso_formula`, ตรวจตั้งค่าแจ้งเมื่ออัตราเปลี่ยน)
+  `save_sheet` ส่งเฉพาะช่องที่แก้ ล็อก Project ก่อนหา/สร้างใบ ทะเบียน `views/admin/Workers.vue` (แก้รายละเอียดในระบบเต็ม)
+  ประกันสังคม `consbiz/social_security.py` + ตาราง `Social Security Rate` (ช่วงแคบกว่าชนะ = ลดอัตราชั่วคราว, อัตราตามเดือนที่ทำงาน)
+  เพดานรายเดือนคิดสะสมข้ามใบ (หักงวดนี้ = ควรหักถึงงวดนี้ - ถึงงวดก่อน) ฐานต่ำสุดเฉพาะใบที่ปิดเดือน ปัดบาทแบบ half up
 - แผนตัดเหล็ก: `Bar Cut Plan` ใช้ `Rebar Type` และ `Bar Shape` (สูตรความยาว + รูป SVG) ตัวจัดตัดอยู่ใน `bar_cut_plan/optimizer.py`
   ด้าน A-F, R (มม.), N (รอบ), T (องศา) สูตรใช้ `sqrt` และ `sin`/`cos`/`tan` (องศา) ได้
   ข้อมูลมาตรฐานสร้างด้วย patch `seed_bar_cut_masters`, `seed_more_bar_shapes`, `seed_more_rebar_types` (ข้ามที่มีอยู่แล้ว) รหัสรูปทรงไม่ใช่รหัส BS 8666
@@ -395,7 +409,7 @@ pre-commit run --all-files                               # ruff + prettier (ต�
 
 - DocType: ชื่ออังกฤษ Title Case คำเต็ม (เช่น `Daily Report`, `Retention Release`)
 - เอกสารที่ submit ได้: `autoname = naming_series:` ใช้ `.ABBR.` ถ้าต้องการตัวย่อบริษัท/โครงการ
-- prefix ที่ใช้แล้ว ห้ามใช้ซ้ำ: `BCP-` Bar Cut Plan, `CM-` Construction Management, `CU-` Concrete Usage, `DR-` Daily Report, `DRQ-` Daily Request, `EB-` Equipment Borrowing, `EOT-` Extension of Time, `IR-` Inspection Request, `OPO-` Material Request ผู้ว่าจ้างจัดหา, `PL-` Punch List, `TX-` Transmittal, `VO-` Variation Order, `WDO-` Weekly Day Off (ตั้งชื่อด้วยโค้ด), `WHTE-` WHT Employee
+- prefix ที่ใช้แล้ว ห้ามใช้ซ้ำ: `BCP-` Bar Cut Plan, `CM-` Construction Management, `CU-` Concrete Usage, `DR-` Daily Report, `DRQ-` Daily Request, `EB-` Equipment Borrowing, `EOT-` Extension of Time, `DW-` Daily Worker, `IR-` Inspection Request, `LA-` Labour Advance, `LT-` Labour Timesheet, `OPO-` Material Request ผู้ว่าจ้างจัดหา, `PL-` Punch List, `TX-` Transmittal, `VO-` Variation Order, `WDO-` Weekly Day Off (ตั้งชื่อด้วยโค้ด), `WHTE-` WHT Employee
 - master ที่ตั้งชื่อตามค่า field ใช้ `field:<fieldname>` (เช่น Rebar Type, Bar Shape)
 - fieldname ของ Custom Field ขึ้นต้นด้วย `custom_`
 - CSS ของ Print Format ใช้ class ขึ้นต้น `pf-` สีใหม่ใน `style.css` ใช้ตัวแปร `--consbiz-*`

@@ -1,0 +1,237 @@
+{
+ "actions": [],
+ "creation": "2026-11-13 12:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "naming_series",
+  "worker",
+  "worker_name",
+  "project",
+  "company",
+  "column_break_main",
+  "date",
+  "amount",
+  "paid_from_account",
+  "remark",
+  "section_status",
+  "deducted_amount",
+  "outstanding_amount",
+  "status",
+  "column_break_status",
+  "journal_entry",
+  "amended_from"
+ ],
+ "fields": [
+  {
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "label": "ชุดเลขที่",
+   "options": "LA-.ABBR..YYYY..MM..###",
+   "default": "LA-.ABBR..YYYY..MM..###",
+   "reqd": 1,
+   "hidden": 1
+  },
+  {
+   "fieldname": "worker",
+   "fieldtype": "Link",
+   "label": "คนงาน",
+   "options": "Daily Worker",
+   "reqd": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "worker_name",
+   "fieldtype": "Data",
+   "label": "ชื่อ",
+   "fetch_from": "worker.worker_name",
+   "read_only": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "project",
+   "fieldtype": "Link",
+   "label": "โครงการ",
+   "options": "Project",
+   "reqd": 1,
+   "in_standard_filter": 1,
+   "fetch_from": "worker.project",
+   "fetch_if_empty": 1
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "label": "บริษัท",
+   "options": "Company",
+   "reqd": 1,
+   "fetch_from": "worker.company",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_main",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "date",
+   "fieldtype": "Date",
+   "label": "วันที่จ่าย",
+   "reqd": 1,
+   "default": "Today",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "amount",
+   "fieldtype": "Currency",
+   "label": "จำนวนเงิน",
+   "reqd": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "paid_from_account",
+   "fieldtype": "Link",
+   "label": "จ่ายจากบัญชี",
+   "options": "Account",
+   "reqd": 1,
+   "description": "เงินสด/ธนาคาร"
+  },
+  {
+   "fieldname": "remark",
+   "fieldtype": "Small Text",
+   "label": "หมายเหตุ"
+  },
+  {
+   "fieldname": "section_status",
+   "fieldtype": "Section Break",
+   "label": "การหักคืน"
+  },
+  {
+   "fieldname": "deducted_amount",
+   "fieldtype": "Currency",
+   "label": "หักคืนแล้ว",
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "outstanding_amount",
+   "fieldtype": "Currency",
+   "label": "คงค้าง",
+   "read_only": 1,
+   "no_copy": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "สถานะ",
+   "options": "Draft\nUnpaid\nPartly Deducted\nDeducted\nCancelled",
+   "default": "Draft",
+   "read_only": 1,
+   "no_copy": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "column_break_status",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "journal_entry",
+   "fieldtype": "Link",
+   "label": "Journal Entry",
+   "options": "Journal Entry",
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "options": "Labour Advance",
+   "read_only": 1,
+   "no_copy": 1,
+   "print_hide": 1
+  }
+ ],
+ "grid_page_length": 50,
+ "links": [],
+ "modified": "2026-11-13 12:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "ConsBiz",
+ "name": "Labour Advance",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "create": 1,
+   "write": 1,
+   "delete": 1,
+   "share": 1,
+   "email": 1,
+   "submit": 1,
+   "cancel": 1,
+   "amend": 1,
+   "role": "System Manager"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "create": 1,
+   "write": 1,
+   "delete": 1,
+   "share": 1,
+   "email": 1,
+   "submit": 1,
+   "cancel": 1,
+   "amend": 1,
+   "role": "Projects Manager"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "create": 1,
+   "write": 1,
+   "delete": 1,
+   "share": 1,
+   "email": 1,
+   "submit": 1,
+   "cancel": 1,
+   "amend": 1,
+   "role": "Accounts Manager"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "create": 1,
+   "write": 1,
+   "role": "Projects User"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "role": "Accounts User"
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "date",
+ "sort_order": "DESC",
+ "states": [],
+ "autoname": "naming_series:",
+ "naming_rule": "By \"Naming Series\" field",
+ "is_submittable": 1,
+ "description": "เงินที่คนงานรายวัน (จ่ายโดยบริษัท) เบิกก่อนวันจ่าย Submit = จ่ายเงิน (ลง Journal Entry) หักคืนอัตโนมัติในใบลงเวลารอบที่ครอบวันเบิกหรือรอบถัดไป",
+ "title_field": "worker_name",
+ "track_changes": 1
+}
