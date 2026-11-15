@@ -35,6 +35,12 @@
   "retention_amount",
   "wht_amount",
   "net_amount",
+  "section_contractor",
+  "from_contractor",
+  "prepared_by",
+  "submitted_on",
+  "column_break_contractor",
+  "return_reason",
   "section_invoice",
   "purchase_invoice",
   "remarks",
@@ -125,7 +131,7 @@
    "fieldname": "status",
    "fieldtype": "Select",
    "label": "สถานะ",
-   "options": "Draft\nApproved\nCancelled",
+   "options": "Draft\nPending Review\nReturned\nApproved\nCancelled",
    "default": "Draft",
    "in_list_view": 1,
    "read_only": 1,
@@ -254,6 +260,47 @@
    "read_only": 1
   },
   {
+   "fieldname": "section_contractor",
+   "fieldtype": "Section Break",
+   "label": "ผู้รับเหมาส่งเบิก (แอป /contractor)",
+   "collapsible": 1,
+   "depends_on": "from_contractor"
+  },
+  {
+   "fieldname": "from_contractor",
+   "fieldtype": "Check",
+   "label": "ผู้รับเหมาร่างเอง",
+   "read_only": 1,
+   "no_copy": 1,
+   "description": "ร่างในแอปผู้รับเหมา (/contractor) ผ่านบัญชีผู้ใช้หรือลิงก์ของสัญญา"
+  },
+  {
+   "fieldname": "prepared_by",
+   "fieldtype": "Link",
+   "label": "ผู้รับเหมาที่ร่าง",
+   "options": "User",
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "submitted_on",
+   "fieldtype": "Datetime",
+   "label": "ส่งให้ตรวจเมื่อ",
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "column_break_contractor",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "return_reason",
+   "fieldtype": "Small Text",
+   "label": "เหตุผลที่ส่งกลับแก้",
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
    "fieldname": "section_invoice",
    "fieldtype": "Section Break",
    "label": "ใบแจ้งหนี้"
@@ -285,7 +332,7 @@
  ],
  "grid_page_length": 50,
  "links": [],
- "modified": "2026-11-14 16:00:00.000000",
+ "modified": "2026-11-15 20:00:00.000000",
  "modified_by": "Administrator",
  "module": "ConsBiz",
  "name": "Subcontract Claim",

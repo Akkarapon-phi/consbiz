@@ -27,6 +27,15 @@
 							ลบ
 						</button>
 						<button
+							v-if="view.can_return"
+							type="button"
+							class="ss-btn ss-btn--ghost-danger ss-list-create"
+							:disabled="busy"
+							@click="returning = true"
+						>
+							ส่งกลับแก้
+						</button>
+						<button
 							v-if="view.can_submit && doc.name"
 							type="button"
 							class="ss-btn ss-btn--soft ss-list-create"
@@ -166,6 +175,30 @@
 					</label>
 				</section>
 
+				<div v-if="doc.from_contractor && doc.docstatus === 0" class="ss-banner" :class="`tone-${view.contractor_busy ? 'gray' : 'amber'}`">
+					<Icon name="user" :size="22" />
+					<div>
+						<div class="ss-banner-title">
+							{{
+								view.contractor_busy
+									? `${doc.prepared_by_name || "ผู้รับเหมา"} กำลังร่าง/แก้ใบเบิกนี้ในแอปผู้รับเหมา`
+									: `${doc.prepared_by_name || "ผู้รับเหมา"} ส่งใบเบิกนี้ให้ตรวจ`
+							}}
+						</div>
+						<div class="ss-banner-text">
+							<template v-if="view.contractor_busy && doc.return_reason"
+								>ส่งกลับแก้แล้ว: {{ doc.return_reason }}</template
+							>
+							<template v-else-if="view.contractor_busy"
+								>แก้หรืออนุมัติได้เมื่อผู้รับเหมาส่งให้ตรวจ</template
+							>
+							<template v-else
+								>ตรวจและแก้ปริมาณได้ แล้วอนุมัติ หรือส่งกลับให้ผู้รับเหมาแก้ (ต้องระบุเหตุผล)
+								ไฟล์แนบดูได้ในระบบเต็ม</template
+							>
+						</div>
+					</div>
+				</div>
 				<div v-if="error" class="ss-banner tone-rose">
 					<Icon name="alert" :size="22" />
 					<div class="ss-banner-text">{{ error }}</div>
@@ -322,6 +355,27 @@
 				</button>
 			</template>
 		</Sheet>
+		<Sheet
+			:open="returning"
+			title="ส่งกลับให้ผู้รับเหมาแก้"
+			:subtitle="doc?.name"
+			@close="returning = false"
+		>
+			<label class="ss-field">
+				<span class="ss-field-label">เหตุผล / สิ่งที่ต้องแก้<em>*</em></span>
+				<textarea v-model="return_reason" class="ss-input" rows="3"></textarea>
+			</label>
+			<template #footer>
+				<button
+					type="button"
+					class="ss-btn ss-btn--danger ss-btn--block ss-btn--lg"
+					:disabled="busy || !return_reason.trim()"
+					@click="send_back"
+				>
+					ส่งกลับ
+				</button>
+			</template>
+		</Sheet>
 		<DeleteSheet
 			:open="deleting"
 			label="ใบเบิก"
@@ -376,6 +430,8 @@ const busy = ref(false);
 const deleting = ref(false);
 const confirm_submit = ref(false);
 const confirm_cancel = ref(false);
+const returning = ref(false);
+const return_reason = ref("");
 
 const agreement = computed(() => ctx.value.agreement);
 const editable = computed(() => !!doc.value && (!doc.value.name || view.value.can_edit));
@@ -549,6 +605,15 @@ async function cancel() {
 	);
 	if (result) apply(result);
 	confirm_cancel.value = false;
+}
+async function send_back() {
+	const result = await run(
+		() => post(`${API}.return_claim`, { name: doc.value.name, reason: return_reason.value }),
+		"ส่งกลับแล้ว"
+	);
+	if (result) apply(result);
+	returning.value = false;
+	return_reason.value = "";
 }
 async function make_invoice() {
 	const result = await run(() =>

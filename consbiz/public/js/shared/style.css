@@ -3125,7 +3125,8 @@ svg.ss-check {
 	--ss-brand-2: #4f46e5;
 	--ss-brand-soft: #cffafe;
 }
-[data-section="subcontract"] {
+[data-section="subcontract"],
+[data-section="contractor"] {
 	--ss-brand: #9a3412;
 	--ss-brand-2: #b45309;
 	--ss-brand-soft: #ffedd5;
@@ -3173,7 +3174,8 @@ svg.ss-check {
 		--ss-brand-2: #818cf8;
 		--ss-brand-soft: rgba(34, 211, 238, 0.15);
 	}
-	[data-section="subcontract"] {
+	[data-section="subcontract"],
+	[data-section="contractor"] {
 		--ss-brand: #fb923c;
 		--ss-brand-2: #fbbf24;
 		--ss-brand-soft: rgba(251, 146, 60, 0.15);
@@ -13155,3 +13157,28 @@ html.ss-boq-grabbing * {
 	flex-wrap: wrap;
 	gap: 6px;
 }
+
+/* แอปผู้รับเหมา (/contractor) ใบเบิกงวด: แถวกรอกปริมาณ + ไฟล์แนบที่ไม่ใช่รูป */
+.ss-claim-row {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	margin-top: 8px;
+}
+.ss-photo-doc {
+	display: grid;
+	place-items: center;
+	gap: 4px;
+	width: 100%;
+	height: 100%;
+	padding: 6px;
+	text-align: center;
+	color: var(--ss-muted);
+	overflow: hidden;
+}
+.ss-photo-doc small {
+	font-size: var(--ss-fs-sm);
+	word-break: break-all;
+}
+

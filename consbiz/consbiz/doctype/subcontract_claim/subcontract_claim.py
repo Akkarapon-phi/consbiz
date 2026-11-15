@@ -15,6 +15,9 @@ class SubcontractClaim(Document):
 	def validate(self):
 		subcontract.validate_claim(self)
 
+	def before_submit(self):
+		subcontract.before_submit_claim(self)
+
 	def on_submit(self):
 		subcontract.on_submit_claim(self)
 

@@ -5,7 +5,7 @@
 import { app } from "./app.js";
 import { boot } from "./api.js";
 
-export const APP_LABELS = { site: "หน้างาน", office: "ออฟฟิศ", self: "พนักงาน" };
+export const APP_LABELS = { site: "หน้างาน", office: "ออฟฟิศ", self: "พนักงาน", contractor: "ผู้รับเหมา" };
 
 export const MODULE_META = {
 	site: {
@@ -128,6 +128,17 @@ export const MODULE_META = {
 			icon: "clipboard-check",
 			theme: "#4338ca",
 			colors: ["#4338ca", "#7c3aed"],
+		},
+	},
+	// แอปผู้รับเหมาช่วง (/contractor, คนนอก) consbiz/contractor_app.py สีเดียวกับหมวด ผรม. ของออฟฟิศ
+	contractor: {
+		contractor: {
+			label: "ผู้รับเหมา",
+			title: "ผู้รับเหมาช่วง",
+			note: "สัญญา ใบเบิกงวด",
+			icon: "hardhat",
+			theme: "#9a3412",
+			colors: ["#9a3412", "#b45309"],
 		},
 	},
 };

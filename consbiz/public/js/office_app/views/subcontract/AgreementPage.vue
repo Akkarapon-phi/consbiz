@@ -75,6 +75,15 @@
 							เปิดสัญญาอีกครั้ง
 						</button>
 						<button
+							v-if="view.can_share_link"
+							type="button"
+							class="ss-btn ss-btn--soft ss-list-create"
+							:disabled="busy"
+							@click="open_link"
+						>
+							ลิงก์ผู้รับเหมา
+						</button>
+						<button
 							v-if="view.can_vary"
 							type="button"
 							class="ss-btn ss-btn--soft ss-list-create"
@@ -572,6 +581,35 @@
 			</template>
 		</Sheet>
 
+		<Sheet :open="!!link" title="ลิงก์ผู้รับเหมา" :subtitle="doc?.supplier_name" @close="link = null">
+			<p class="ss-muted">
+				ส่งลิงก์นี้ให้ผู้รับเหมา (เช่น ทาง LINE) เปิดแล้วดูสัญญานี้และส่งใบเบิกงวดได้โดยไม่ต้องเข้าสู่ระบบ
+				ใช้ได้จนกว่าจะปิดสัญญา ใครได้ลิงก์ไปก็ใช้ได้ ถ้าลิงก์หลุดให้กด "สร้างลิงก์ใหม่"
+			</p>
+			<label v-if="link" class="ss-field">
+				<span class="ss-field-label">ลิงก์</span>
+				<input class="ss-input" :value="link.url" readonly @focus="$event.target.select()" />
+			</label>
+			<template #footer>
+				<button
+					v-if="link?.can_reset"
+					type="button"
+					class="ss-btn ss-btn--ghost-danger ss-btn--lg"
+					:disabled="busy"
+					@click="reset_link"
+				>
+					สร้างลิงก์ใหม่
+				</button>
+				<button
+					type="button"
+					class="ss-btn ss-btn--primary ss-btn--block ss-btn--lg"
+					:disabled="!link?.url"
+					@click="copy_link"
+				>
+					<Icon name="copy" :size="18" /> <span>คัดลอกลิงก์</span>
+				</button>
+			</template>
+		</Sheet>
 		<Sheet :open="!!closing" title="ปิดสัญญา" :subtitle="doc?.name" @close="closing = null">
 			<p class="ss-note-line">
 				ใช้เมื่องานจบต่ำกว่าสัญญาหรือผู้รับเหมาไม่ทำต่อ (ไม่ต้องทำงานลด)
@@ -704,6 +742,7 @@ import {
 	show_error,
 	state,
 	thai_date,
+	toast,
 	today,
 } from "../../../shared/api.js";
 import { API, BILLING_METHODS, billing_label } from "./kinds.js";
@@ -741,6 +780,36 @@ const deleting = ref(false);
 const confirm_submit = ref(false);
 const confirm_cancel = ref(false);
 const closing = ref(null);
+// ลิงก์ผู้รับเหมา (แอป /contractor ไม่ต้อง login) {path, url, valid, can_reset} url = โดเมนที่เปิดอยู่ + path
+const link = ref(null);
+const with_url = (info) => ({ ...info, url: info.path ? location.origin + info.path : "" });
+async function open_link() {
+	try {
+		link.value = with_url(await post(`${API}.contractor_link`, { name: doc.value.name }));
+	} catch (e) {
+		show_error(e);
+	}
+}
+async function reset_link() {
+	busy.value = true;
+	try {
+		link.value = with_url(await post(`${API}.reset_contractor_link`, { name: doc.value.name }));
+		toast("สร้างลิงก์ใหม่แล้ว ลิงก์เดิมใช้ไม่ได้แล้ว", "success");
+	} catch (e) {
+		show_error(e);
+	} finally {
+		busy.value = false;
+	}
+}
+async function copy_link() {
+	try {
+		await navigator.clipboard.writeText(link.value.url);
+		toast("คัดลอกลิงก์แล้ว", "success");
+	} catch {
+		// http (ไม่ใช่ https) ใช้ clipboard API ไม่ได้: ให้ผู้ใช้คัดลอกจากช่องเอง
+		toast("คัดลอกอัตโนมัติไม่ได้ กดค้างที่ช่องลิงก์แล้วคัดลอกเอง", "warning");
+	}
+}
 const confirm_reopen = ref(false);
 
 const editable = computed(() => !!doc.value && (!doc.value.name || view.value.can_edit));

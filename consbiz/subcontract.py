@@ -25,6 +25,10 @@ from frappe.utils import add_days, cint, flt, getdate, nowdate
 
 QTY_TOLERANCE = 0.0001
 PURCHASE_ROLES = ("Purchase Manager", "Purchase User")
+# ผู้ตรวจใบเบิกที่ ผรม. ส่งมา (แจ้งเตือนตอน ผรม. ส่ง) = ผู้ที่ร่าง/อนุมัติใบเบิกได้
+CLAIM_REVIEW_ROLES = ("Projects Manager", "Projects User")
+# สถานะร่างของใบเบิกที่ ผรม. ส่งในแอป /contractor
+REVIEW_STATUSES = ("Pending Review", "Returned")
 
 
 def money(value):
@@ -306,11 +310,16 @@ def add_po_comment(po_name, text, user):
 
 
 def purchase_users(company):
-	"""ผู้ใช้ฝ่ายจัดซื้อทุกคน (Role ใน PURCHASE_ROLES) ที่เห็นบริษัทนี้ (มี User Permission ของ Company = ต้องมีบริษัทนี้)"""
+	"""ผู้ใช้ฝ่ายจัดซื้อทุกคน (Role ใน PURCHASE_ROLES) ที่เห็นบริษัทนี้"""
+	return role_users(company, PURCHASE_ROLES)
+
+
+def role_users(company, roles):
+	"""System User ที่มี Role ใน roles และเห็นบริษัทนี้ (มี User Permission ของ Company = ต้องมีบริษัทนี้)"""
 	users = set(
 		frappe.get_all(
 			"Has Role",
-			filters={"role": ("in", PURCHASE_ROLES), "parenttype": "User"},
+			filters={"role": ("in", roles), "parenttype": "User"},
 			pluck="parent",
 		)
 	)
@@ -332,9 +341,13 @@ def purchase_users(company):
 
 
 def notify_purchasing(company, doctype, name, subject):
+	notify_users(purchase_users(company), doctype, name, subject)
+
+
+def notify_users(users, doctype, name, subject):
 	from frappe.desk.doctype.notification_log.notification_log import enqueue_create_notification
 
-	users = [u for u in purchase_users(company) if u != frappe.session.user]
+	users = [u for u in users if u and u != frappe.session.user]
 	if users:
 		enqueue_create_notification(
 			users,
@@ -565,7 +578,9 @@ def validate_claim(doc):
 	for field in ("title", "supplier", "supplier_name", "project", "company", "billing_method"):
 		doc.set(field, agreement.get(field))
 	if doc.docstatus == 0:
-		doc.status = "Draft"
+		# ใบที่ ผรม. ร่างในแอป /contractor (from_contractor): สถานะรอตรวจ/ส่งกลับแก้ ตั้งโดย contractor_app (ส่ง/ถอน) และ return_claim
+		if doc.status not in REVIEW_STATUSES or not doc.from_contractor:
+			doc.status = "Draft"
 		doc.claim_no = len(submitted_claims(agreement.name, exclude=doc.name)) + 1
 	if doc.period_from and doc.period_to and getdate(doc.period_to) < getdate(doc.period_from):
 		frappe.throw(_("วันสิ้นสุดช่วงงานต้องไม่ก่อนวันเริ่ม"))
@@ -671,6 +686,32 @@ def validate_claim(doc):
 	doc.penalty_amount = money(doc.penalty_days * flt(agreement.penalty_per_day))
 	doc.net_amount = money(
 		doc.gross_amount - doc.advance_recovery - doc.retention_amount - doc.wht_amount - doc.penalty_amount
+	)
+
+
+def before_submit_claim(doc):
+	"""ใบที่ ผรม. ร่าง: อนุมัติได้เมื่อ ผรม. ส่งให้ตรวจแล้วเท่านั้น (ระหว่างร่าง/ส่งกลับแก้ ผรม. ยังแก้อยู่)"""
+	if doc.from_contractor and doc.status != "Pending Review":
+		frappe.throw(_("ผู้รับเหมายังไม่ได้ส่งใบเบิกนี้ให้ตรวจ"))
+
+
+@frappe.whitelist(methods=["POST"])
+def return_claim(name, reason):
+	"""ส่งใบเบิกที่ ผรม. ส่งมากลับให้ ผรม. แก้ (ต้องมีเหตุผล) แจ้ง ผรม. ที่ร่างผ่านบัญชีผู้ใช้ (ร่างผ่านลิงก์ = เห็นในหน้าลิงก์)"""
+	doc = frappe.get_doc("Subcontract Claim", name)
+	doc.check_permission("write")
+	if doc.docstatus != 0 or doc.status != "Pending Review":
+		frappe.throw(_("ส่งกลับได้เฉพาะใบเบิกที่ผู้รับเหมาส่งมาและยังไม่อนุมัติ"))
+	reason = (reason or "").strip()
+	if not reason:
+		frappe.throw(_("ระบุเหตุผลที่ส่งกลับแก้"))
+	doc.db_set({"status": "Returned", "return_reason": reason})
+	doc.add_comment("Info", _("ส่งกลับให้ผู้รับเหมาแก้: {0}").format(reason))
+	notify_users(
+		[doc.prepared_by],
+		"Subcontract Claim",
+		doc.name,
+		_("ใบเบิกงวดที่ {0} ถูกส่งกลับให้แก้: {1}").format(doc.claim_no, reason),
 	)
 
 

@@ -46,6 +46,7 @@ KINDS = {
 			"net_amount",
 			"status",
 			"purchase_invoice",
+			"from_contractor",
 		),
 		"date": "posting_date",
 	},
@@ -109,6 +110,8 @@ STATUS = {
 	"Active": (_("ดำเนินการ"), "blue"),
 	"Completed": (_("เบิกครบ"), "green"),
 	"Closed": (_("ปิดสัญญา"), "gray"),
+	"Pending Review": (_("ผรม. ส่งมา รอตรวจ"), "amber"),
+	"Returned": (_("ส่งกลับ ผรม. แก้"), "rose"),
 	"Approved": (_("อนุมัติแล้ว"), "blue"),
 	"Cancelled": (_("ยกเลิก"), "rose"),
 }
@@ -134,6 +137,8 @@ def boot_permissions():
 
 def label_status(row, invoice_status=None):
 	label, tone = STATUS.get(row.get("status"), STATUS["Draft"])
+	if row.get("status") == "Draft" and row.get("from_contractor"):
+		label, tone = _("ผรม. กำลังร่าง"), "gray"
 	if row.get("status") == "Approved" and row.get("purchase_invoice"):
 		label, tone = (_("ตั้งหนี้แล้ว"), "green") if invoice_status == 1 else (_("ร่างใบแจ้งหนี้แล้ว"), "teal")
 	row["status_label"], row["status_tone"] = label, tone
@@ -183,8 +188,18 @@ def get_summary(company=None, project=None, **_kwargs):
 		filters["company"] = company
 	if project:
 		filters["project"] = project
+	# รออนุมัติ = ร่างของเจ้าหน้าที่ + ที่ ผรม. ส่งมาแล้ว (ใบที่ ผรม. ยังร่าง/แก้อยู่ไม่นับ)
 	draft = len(
-		frappe.get_list("Subcontract Claim", filters={**filters, "docstatus": 0}, pluck="name", limit=999)
+		[
+			row
+			for row in frappe.get_list(
+				"Subcontract Claim",
+				filters={**filters, "docstatus": 0},
+				fields=["from_contractor", "status"],
+				limit=999,
+			)
+			if not contractor_busy(row)
+		]
 	)
 	to_invoice = len(
 		frappe.get_list(
@@ -311,6 +326,8 @@ def agreement_actions(doc):
 		and po_status not in (0, 1)
 		and bool(frappe.has_permission("Purchase Order", "create")),
 		"advance_paid": subcontract.advance_paid(doc),
+		# ปุ่มลิงก์ผู้รับเหมา (contractor_link)
+		"can_share_link": doc.docstatus == 1 and doc.status != "Closed",
 		"can_claim": doc.docstatus == 1
 		and doc.status == "Active"
 		and bool(frappe.has_permission("Subcontract Claim", "create")),
@@ -355,6 +372,41 @@ def close_agreement(name, reason=None):
 def reopen_agreement(name):
 	subcontract.reopen_agreement(name)
 	return get_agreement(name)
+
+
+def link_info(doc):
+	"""ลิงก์ผู้รับเหมาของสัญญา (แอป /contractor ไม่ต้อง login) ใช้ได้เมื่อ Submit แล้วและยังไม่ปิด
+	ส่งเฉพาะ path หน้าจอต่อโดเมนที่เจ้าหน้าที่เปิดอยู่เอง (get_url ของเครื่อง dev ใส่พอร์ต 8000 ที่คนนอกเข้าไม่ได้)"""
+	valid = doc.docstatus == 1 and doc.status != "Closed"
+	return {
+		"path": f"/contractor/k/{doc.contractor_token}" if doc.contractor_token else None,
+		"valid": valid,
+		"can_reset": doc.docstatus == 1 and bool(doc.has_permission("submit")),
+	}
+
+
+@frappe.whitelist(methods=["POST"])
+def contractor_link(name):
+	"""ลิงก์ของสัญญา (สร้างครั้งแรกเมื่อมีคนขอ) ผู้ที่อ่านสัญญาได้ส่งลิงก์ให้ผู้รับเหมาได้"""
+	doc = frappe.get_doc("Subcontract Agreement", name)
+	doc.check_permission("read")
+	if doc.docstatus != 1 or doc.status == "Closed":
+		frappe.throw(_("ลิงก์ผู้รับเหมาใช้ได้กับสัญญาที่ Submit แล้วและยังไม่ปิดเท่านั้น"))
+	if not doc.contractor_token:
+		doc.db_set("contractor_token", frappe.generate_hash(length=32), update_modified=False)
+	return link_info(doc)
+
+
+@frappe.whitelist(methods=["POST"])
+def reset_contractor_link(name):
+	"""สร้างลิงก์ใหม่ ลิงก์เดิมใช้ไม่ได้ทันที (ลิงก์หลุด/เปลี่ยนผู้ติดต่อ) เฉพาะผู้อนุมัติสัญญา"""
+	doc = frappe.get_doc("Subcontract Agreement", name)
+	doc.check_permission("submit")
+	if doc.docstatus != 1 or doc.status == "Closed":
+		frappe.throw(_("ลิงก์ผู้รับเหมาใช้ได้กับสัญญาที่ Submit แล้วและยังไม่ปิดเท่านั้น"))
+	doc.db_set("contractor_token", frappe.generate_hash(length=32), update_modified=False)
+	doc.add_comment("Info", _("สร้างลิงก์ผู้รับเหมาใหม่ (ลิงก์เดิมใช้ไม่ได้แล้ว)"))
+	return link_info(doc)
 
 
 @frappe.whitelist(methods=["POST"])
@@ -410,12 +462,17 @@ def serialize_claim(doc):
 		"penalty_amount",
 		"net_amount",
 		"purchase_invoice",
+		"from_contractor",
+		"prepared_by",
+		"submitted_on",
+		"return_reason",
 	)
 	out = {field: doc.get(field) for field in fields}
 	out.update(
 		name=doc.name if not doc.is_new() else None,
 		docstatus=doc.docstatus,
 		modified=str(doc.modified or ""),
+		prepared_by_name=frappe.utils.get_fullname(doc.prepared_by) if doc.prepared_by else doc.supplier_name,
 		items=[
 			{
 				f: row.get(f)
@@ -496,13 +553,21 @@ def claim_context(doc, agreement=None):
 	return out
 
 
+def contractor_busy(doc):
+	"""ใบที่ ผรม. ร่างในแอป /contractor และยังไม่ส่ง (ร่าง/ส่งกลับแก้): เจ้าหน้าที่แก้/อนุมัติไม่ได้จนกว่า ผรม. ส่ง"""
+	return bool(doc.get("from_contractor")) and doc.get("status") in ("Draft", "Returned")
+
+
 def claim_actions(doc):
 	can_write = bool(doc.has_permission("write"))
 	pi_status = doc_status("Purchase Invoice", doc.purchase_invoice)
+	busy = contractor_busy(doc)
 	return {
-		"can_delete": store_app.can_delete(doc),
-		"can_edit": doc.docstatus == 0 and can_write,
-		"can_submit": doc.docstatus == 0 and bool(doc.has_permission("submit")),
+		"can_delete": store_app.can_delete(doc) and not doc.from_contractor,
+		"can_edit": doc.docstatus == 0 and can_write and not busy,
+		"can_submit": doc.docstatus == 0 and bool(doc.has_permission("submit")) and not busy,
+		"can_return": doc.docstatus == 0 and can_write and doc.status == "Pending Review",
+		"contractor_busy": doc.docstatus == 0 and busy,
 		"can_cancel": doc.docstatus == 1 and bool(doc.has_permission("cancel")) and pi_status != 1,
 		"pi_status": pi_status,
 		"can_make_pi": doc.docstatus == 1
@@ -535,6 +600,12 @@ def get_claim(name=None, agreement=None):
 
 
 @frappe.whitelist(methods=["POST"])
+def return_claim(name, reason):
+	subcontract.return_claim(name, reason)
+	return get_claim(name)
+
+
+@frappe.whitelist(methods=["POST"])
 def preview_claim(data):
 	"""คำนวณยอดจากค่าที่กรอก (ไม่บันทึก) ข้อผิดพลาดส่งกลับเป็นข้อความ ไม่ throw"""
 	data = store_app.parse(data)
@@ -560,6 +631,8 @@ def save_claim(data, submit=0):
 		doc = frappe.get_doc("Subcontract Claim", data["name"])
 		if doc.docstatus != 0:
 			frappe.throw(_("ใบเบิกนี้อนุมัติแล้ว แก้ไม่ได้"))
+		if contractor_busy(doc):
+			frappe.throw(_("ผู้รับเหมากำลังแก้ใบเบิกนี้ รอผู้รับเหมาส่งก่อน"))
 		if data.get("modified") and str(doc.modified) != data["modified"]:
 			frappe.throw(_("ใบเบิกนี้ถูกแก้ไขจากที่อื่น โหลดใหม่ก่อนบันทึก"))
 	else:

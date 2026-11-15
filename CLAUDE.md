@@ -173,7 +173,7 @@ pre-commit run --all-files                               # ruff + prettier (ต�
   | `/conserp` | หน้างาน (มือถือ) | ควบคุมงาน, สโตร์, แผนงาน, ทรัพยากร, การเงิน, ขอซื้อ/ขอเบิก + ติดตามสถานะ |
   | `/conserp/purchase`, `/conserp/sales`, ... | ออฟฟิศ (จอใหญ่) | ซื้อ, ขาย, บัญชี, ประกันผลงาน, สารบรรณ (หนังสือเข้า-ออก, ใบนำส่ง, ใบปะหน้า), ผู้รับเหมาช่วง (สัญญา, ใบเบิกงวด) (ค่าแรงรายวันอยู่หมวดธุรการของหน้างาน) |
   | `/conserp/self` | พนักงานทุกคน | Self Service: ลงเวลา, ลา, สลิป, วันหยุดประจำสัปดาห์ + ตารางทีม, เบิกเงินเดือนล่วงหน้า/เงินสำรองจ่าย/เบิกคืน + อนุมัติ หน้าจอครอบ HRMS (แทนแผน `/hr-app` เดิม) |
-  | `/contractor` | ผู้รับเหมาช่วง (คนนอก) | อัปเดตผลงาน, ดูสัญญา/งวดของตัวเอง API แยกและตรวจสิทธิ์ทุกคำขอ |
+  | `/contractor` | ผู้รับเหมาช่วง (คนนอก) | ดูสัญญา/งวด/ยอดของตัวเอง, ร่างใบเบิกงวด + แนบรูป แล้วส่งให้ตรวจ API แยกและตรวจสิทธิ์ทุกคำขอ |
   ห้ามใช้ `/me` (หน้า My Account ของ Frappe), `/hr/...` (Roster ของ HRMS), `/hrms` (ESS ของ HRMS)
   โค้ดหน้าจอกลางอยู่ `public/js/shared/`: `AppShell.vue` (Dock/แถบล่าง/เลือกโครงการ/toast), `api.js` (เรียก API, router, state, รูปแบบ),
   `app.js` (`configure()` ค่าของแต่ละแอป: base, storage, sections, routes, views, summary_api), `components/`, `docs/` (เอกสารซื้อ-ขาย + `kinds.js` = DOC_KINDS),
@@ -382,7 +382,7 @@ pre-commit run --all-files                               # ruff + prettier (ต�
   บริษัทตามโครงการเสมอ (`set_company` ตอน before_insert ด้วย เพราะเลขที่ `.ABBR.` ตั้งก่อน validate และค่าตั้งต้นของผู้ใช้เติมบริษัทก่อน fetch)
   Submit แล้ว "กดปุ่ม" สร้างร่าง PO (`make_purchase_order`, Item = `Labour Settings.subcontract_item` หน่วยของ Item ปริมาณ/หน่วยจริงอยู่ในคำอธิบาย) ไม่สร้างอัตโนมัติ (ผู้ใช้เลือก 2026-11-14)
   เงินล่วงหน้า = ร่าง Payment Entry อ้าง PO (`make_advance_payment`) ยอดที่จ่ายแล้วอ่านจาก `Purchase Order.advance_paid`
-  `Subcontract Claim` (ใบเบิกงวด): ร่างโดยวิศวกร (Projects User) หรือ ผรม. (แอป `/contractor` ยังไม่ทำ) Submit = อนุมัติ (Projects/Purchase Manager) แล้วกดสร้างร่าง PI (`make_purchase_invoice`)
+  `Subcontract Claim` (ใบเบิกงวด): ร่างโดยวิศวกร (Projects User) หรือ ผรม. (แอป `/contractor` ด้านล่าง) Submit = อนุมัติ (Projects/Purchase Manager) แล้วกดสร้างร่าง PI (`make_purchase_invoice`)
   ยอดก่อน VAT: หักคืนเงินล่วงหน้า = % ของงวด ไม่เกินยอดที่จ่ายจริงที่ยังหักไม่หมด, เงินประกัน = % ของงวด ไม่เกินเพดานที่เหลือ, ค่าปรับ = วัน x ค่าปรับ
   PI: หัก ณ ที่จ่าย/เงินประกันเป็นยอดจากใบเบิก (`set_deductions`, ระบบเดิมสร้าง Retention Payable ตอน Submit PI), เงินล่วงหน้าผ่านตาราง advances (จัดสรรไม่เกินยอดหักคืน), ค่าปรับเป็นแถวหักบัญชี `Labour Settings.penalty_income_account`
   ยอดสรุปของสัญญาคำนวณใหม่จากใบเบิกที่ Submit ทุกครั้ง (`refresh_agreement`) ยกเลิกใบเบิก = ลบร่าง PI (PI ที่ Submit แล้วต้องยกเลิกก่อน)
@@ -402,6 +402,20 @@ pre-commit run --all-files                               # ruff + prettier (ต�
   PO ที่ Submit แล้วถูกแก้ = `custom_revision_pending` (งานกลางของฝ่ายจัดซื้อ: หน้าหลักหมวดจัดซื้อ "PO แก้ไขแล้ว รอส่งผู้รับเหมา" `po_resend`, แถบในหน้าดู PO `revision_of` + PDF ฉบับก่อนๆ)
   ใครในฝ่ายก็กด "ส่งผู้รับเหมาแล้ว" (`mark_po_sent` → `custom_revision_sent_by/on`) หน้าสัญญา/ใบงานเพิ่มแสดงสถานะส่ง
 - หน้ารายการกลางของออฟฟิศ `office_app/views/common/KindList.vue` (สารบรรณ + ผรม.) ชนิดเอกสารรวมที่ `common/kinds.js` (api, boot, open, create, คอลัมน์ วันที่/ยอดเงิน, แท็บสถานะ)
+- แอปผู้รับเหมาช่วง (`/contractor`, คนนอก, เริ่ม 2026-11-15): www `contractor.html`, bundle `public/js/contractor_app/` (ใช้ AppShell `no_project` หมวดเดียว `contractor`), API `consbiz/contractor_app.py`
+  เข้าได้ 2 แบบ หน้าจอชุดเดียวกัน: (1) ลิงก์ของสัญญา `/contractor/k/<Subcontract Agreement.contractor_token>` ไม่ต้อง login (ใช้หลัก, ตกลง 2026-11-15: ไม่มี PIN)
+  เห็นเฉพาะสัญญานั้น ใช้ได้จนสัญญาปิด (Closed) หรือยกเลิก (เปิดสัญญาอีกครั้ง = ลิงก์เดิมใช้ได้) เจ้าหน้าที่กด "ลิงก์ผู้รับเหมา" ในหน้าสัญญาของออฟฟิศ (`subcontract_app.contractor_link`, ผู้ที่อ่านสัญญาได้)
+  "สร้างลิงก์ใหม่" = ลิงก์เดิมใช้ไม่ได้ทันที (`reset_contractor_link`, ผู้อนุมัติสัญญา) server ส่งเฉพาะ path หน้าจอต่อ `location.origin` เอง (`get_url` ของเครื่อง dev ใส่พอร์ต 8000)
+  ลิงก์ใช้ base ของ router `/contractor/k/<token>` หน้าแรก = หน้าสัญญา (`boot.agreement`) ทุกคำขอส่ง `token` (`contractor_app/api.js`) ผู้เปิดจากลิงก์ = `boot.guest` (ไม่มีกระดิ่ง/เมนูผู้ใช้)
+  (2) บัญชีผู้ใช้: Website User ในตาราง Portal Users ของ Supplier เห็นทุกสัญญาของผู้รับเหมานั้น login / เปิด `/` แล้วไป `/contractor` (hook `get_website_user_home_page` = `contractor_app.website_user_home_page` เฉพาะ Website User ที่ผูก Supplier
+  ห้ามใช้ `role_home_page` ของ Role Supplier เพราะ Administrator/System Manager มีทุก Role จะถูกพาไปด้วย; `add_to_apps_screen` ของ consbiz มี `has_permission` = `erpnext.check_app_permission` ไม่งั้น login พาไป `/app/consbiz`)
+  ทุก endpoint เป็น `allow_guest` และเรียก `use(token)` บรรทัดแรก (ขอบเขต = ผู้รับเหมา + สัญญาของลิงก์) แล้วตรวจเอกสารกับขอบเขตก่อนอ่าน/เขียนแบบ ignore_permissions endpoint ใหม่ต้องทำแบบเดียวกัน
+  รับเฉพาะ `CLAIM_INPUT` + ปริมาณรายแถว (ค่าปรับ/% งานจริงในแผนเป็นของฝ่ายเรา ผรม. ไม่กรอก/ไม่เห็น)
+  ใบเบิกที่ ผรม. ร่าง (`Subcontract Claim.from_contractor`, `prepared_by` = ผู้ใช้ หรือว่างเมื่อมาจากลิงก์): Draft → ส่งให้ตรวจ (`Pending Review`, แจ้ง Role `CLAIM_REVIEW_ROLES` ของบริษัท)
+  → เจ้าหน้าที่แก้ปริมาณ/ค่าปรับแล้ว Submit หรือส่งกลับแก้ (`Returned` + `return_reason`, `subcontract.return_claim`) ระหว่างรอตรวจ ผรม. ถอนกลับได้ (`withdraw_claim`)
+  ระหว่าง Draft/Returned เจ้าหน้าที่แก้/อนุมัติไม่ได้ (`subcontract_app.contractor_busy`, `before_submit_claim`) 1 สัญญามีใบเบิกของ ผรม. ที่ยังไม่อนุมัติได้ใบเดียว ใบที่เจ้าหน้าที่ร่างเอง ผรม. เห็นเมื่ออนุมัติแล้ว
+  ไฟล์แนบ: `contractor_app.upload_file` (multipart, รูป/PDF ≤ 10MB, ≤ 30 ไฟล์ต่อใบ, private, ผูกใบเบิกทันที เพราะคนไม่ login ใช้ upload_file ของ Frappe ไม่ได้) เปิดผ่าน `open_file` เจ้าหน้าที่ดูไฟล์ในระบบเต็ม
+  การแจ้งเตือน Subcontract Claim เปิดหน้าในแอป (`APP_PAGES` ใน `shared/notifications.js`) ยังไม่ทำ: ดู PDF ของ PO, การ์ดไฟล์แนบในหน้าเจ้าหน้าที่
 - คนงานรายวัน (หมวดธุรการ `admin` ของกลุ่มหน้างาน `/conserp/admin`, เริ่ม 2026-11-13, แยกจาก HRMS): `Daily Worker` (ทะเบียน, ค่าแรงเป็นประวัติใน `rates` คิดตามอัตราของแต่ละวัน, จ่ายผ่าน Company หรือ Subcontractor = Supplier)
   `Labour Timesheet` 1 ใบต่อโครงการต่อรอบ (`period_of`: 1-15 / 16-สิ้นเดือน) แถว `days` = ชั่วโมงทำงานจริง 1 คนต่อวัน (เกิน 8 = OT) วันหยุดของทั้งวันในตาราง `holidays`
   ค่าแรงตามชั่วโมง (6 ชม. = 6/8 วัน) วันหยุด x 2, OT ÷ 8 x 1.5 (วันหยุด x 3) หรือ OT เหมา (`ot_flat`) ตาราง `pay` คำนวณใหม่ทุกครั้ง (กรอกได้เฉพาะหักอื่นๆ)

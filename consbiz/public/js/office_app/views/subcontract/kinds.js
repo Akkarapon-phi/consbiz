@@ -59,7 +59,13 @@ export const SUBCONTRACT_KINDS = {
 		amount_label: "มูลค่างวด",
 		search: ["name", "title", "supplier_name", "project", "subcontract_agreement"],
 		filters: [
-			{ value: "draft", label: "รออนุมัติ", test: (r) => r.docstatus === 0 },
+			// ใบที่ ผรม. ร่างในแอป /contractor นับรออนุมัติเมื่อ ผรม. ส่งแล้ว (Pending Review)
+			{
+				value: "draft",
+				label: "รออนุมัติ",
+				test: (r) => r.docstatus === 0 && !contractor_busy(r),
+			},
+			{ value: "contractor", label: "ผรม. ร่างอยู่", test: contractor_busy },
 			{
 				value: "to-invoice",
 				label: "รอตั้งหนี้",
@@ -99,3 +105,8 @@ export const SUBCONTRACT_KINDS = {
 		create: () => ["variation", { name: "new" }],
 	},
 };
+
+// ใบเบิกที่ ผรม. ยังร่าง/แก้อยู่ (ตรงกับ subcontract_app.contractor_busy)
+function contractor_busy(r) {
+	return r.docstatus === 0 && !!r.from_contractor && ["Draft", "Returned"].includes(r.status);
+}

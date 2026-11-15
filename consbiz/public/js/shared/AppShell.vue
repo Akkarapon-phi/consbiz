@@ -96,6 +96,7 @@
 						</span>
 					</button>
 					<button
+						v-if="!boot.guest"
 						ref="user_button"
 						type="button"
 						class="ss-rail-row ss-rail-ctx ss-rail-user"

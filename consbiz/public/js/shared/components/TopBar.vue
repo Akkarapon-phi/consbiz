@@ -54,7 +54,8 @@
 			<Icon name="chevron-down" :size="14" />
 		</button>
 		<slot name="search" />
-		<NotificationBell />
+		<!-- ผู้ที่เปิดจากลิงก์โดยไม่ login (boot.guest, แอปผู้รับเหมา) ไม่มีการแจ้งเตือน -->
+		<NotificationBell v-if="!boot.guest" />
 		<slot name="actions" />
 	</header>
 	<!-- มือถือ: ปุ่มโครงการเต็มแถวใต้แถบบน แสดงชื่อเต็ม (จอ ≥768 ใช้ปุ่มในแถบบน) -->

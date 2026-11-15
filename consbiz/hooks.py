@@ -11,7 +11,9 @@ add_to_apps_screen = [
         "name": "consbiz",
         "logo": "/assets/consbiz/images/logo.png",
         "title": "ConsBiz",
-        "route": "/app/consbiz"
+        "route": "/app/consbiz",
+        # คนนอก (Website User เช่น ผู้รับเหมา) เข้า desk ไม่ได้: ไม่ให้ login พาไป /app/consbiz (ไปตาม role_home_page แทน)
+        "has_permission": "erpnext.check_app_permission",
     }
 ]
 
@@ -63,6 +65,8 @@ website_route_rules = [
 			{"from_route": f"/conserp/{section}/<path:app_path>", "to_route": "office"},
 		)
 	),
+	# แอปผู้รับเหมาช่วง (คนนอก, www/contractor.html) แยกจาก ConsERP
+	{"from_route": "/contractor/<path:app_path>", "to_route": "contractor"},
 	{"from_route": "/conserp", "to_route": "site"},
 	{"from_route": "/conserp/<path:app_path>", "to_route": "site"},
 ]
@@ -261,9 +265,9 @@ scheduler_events = {
 # home_page = "login"
 
 # website user home page (by Role)
-# role_home_page = {
-# 	"Role": "home_page"
-# }
+# ผู้รับเหมา (Website User ใน Portal Users ของ Supplier) เข้าระบบ/เปิดหน้าแรกแล้วไปแอปผู้รับเหมา
+# ห้ามใช้ role_home_page ของ Role Supplier: Administrator/System Manager มีทุก Role จะถูกพาไป /contractor ด้วย
+get_website_user_home_page = "consbiz.contractor_app.website_user_home_page"
 
 # Generators
 # ----------

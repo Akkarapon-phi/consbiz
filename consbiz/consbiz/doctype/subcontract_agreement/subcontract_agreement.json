@@ -54,7 +54,8 @@
   "close_reason",
   "section_more",
   "remarks",
-  "amended_from"
+  "amended_from",
+  "contractor_token"
  ],
  "fields": [
   {
@@ -409,6 +410,15 @@
    "read_only": 1,
    "no_copy": 1,
    "allow_on_submit": 1
+  },
+  {
+   "fieldname": "contractor_token",
+   "fieldtype": "Data",
+   "label": "รหัสลิงก์ผู้รับเหมา",
+   "read_only": 1,
+   "hidden": 1,
+   "no_copy": 1,
+   "description": "ลิงก์ /contractor/k/<รหัส> ใช้ได้จนสัญญาปิด/ยกเลิก สร้างใหม่ได้ในแอปออฟฟิศ"
   }
  ],
  "grid_page_length": 50,
@@ -424,7 +434,7 @@
    "group": "เอกสาร"
   }
  ],
- "modified": "2026-11-15 16:00:00.000000",
+ "modified": "2026-11-15 20:00:00.000000",
  "modified_by": "Administrator",
  "module": "ConsBiz",
  "name": "Subcontract Agreement",
