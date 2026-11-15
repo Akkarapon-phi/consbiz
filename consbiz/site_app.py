@@ -86,7 +86,7 @@ def site_sections(can=None):
 	sections = []
 	if any(can.get(key) for key in ("receive", "receive_employer", "issue", "borrow")):
 		sections.append("store")
-	if readable_any(WORK_DOCTYPES) or can.get("concrete"):
+	if readable_any(WORK_DOCTYPES) or can.get("concrete") or can.get("bar_cut"):
 		sections.append("work")
 	if frappe.has_permission("Construction Management", "read"):
 		sections.append("pm")
@@ -230,6 +230,10 @@ def boot_data():
 			"view_advances": readable("Labour Advance"),
 		}
 	)
+	# แผนตัดเหล็ก (consbiz/bar_cut_app.py)
+	from consbiz import bar_cut_app
+
+	boot["can"].update(bar_cut_app.boot_permissions())
 	sections = site_sections(boot["can"])
 	boot["sections"] = sections
 	add_apps(boot, ("site", sections))

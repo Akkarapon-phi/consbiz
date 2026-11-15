@@ -44,6 +44,7 @@ MODULES = (
 			("Inspection Request", "ขอตรวจงาน", 0),
 			("Punch List", "Punch List", 0),
 			("Concrete Usage", "คอนกรีต", 0),
+			("Bar Cut Plan", "แผนตัดเหล็ก", 0),
 		),
 	),
 	(

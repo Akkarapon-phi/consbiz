@@ -13192,3 +13192,95 @@ html.ss-boq-grabbing * {
 	word-break: break-all;
 }
 
+/* แผนตัดเหล็ก (site_app/views/work/Rebar*.vue): รูปทรงเหล็ก (SVG จาก Bar Shape) + แถบการตัดต่อเส้น
+   สีชิ้น = สีหมวด, เศษเก็บ = เขียว, เศษทิ้ง = แดง (ตรงกับแผนภาพของระบบเต็ม) */
+.ss-shape svg {
+	display: block;
+	width: 100%;
+	height: auto;
+	overflow: visible;
+	color: var(--ss-text);
+}
+.ss-shape-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+	gap: 8px;
+}
+.ss-shape-card {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	padding: 8px;
+	border: 1px solid var(--ss-border);
+	border-radius: 12px;
+	background: var(--ss-surface);
+	color: var(--ss-text);
+	font-size: var(--ss-fs-sm);
+	text-align: center;
+	cursor: pointer;
+}
+.ss-shape-card.is-active {
+	border-color: var(--ss-brand);
+	box-shadow: 0 0 0 1px var(--ss-brand);
+	background: var(--ss-brand-soft);
+}
+.ss-shape-preview {
+	max-width: 280px;
+	margin: 0 auto;
+}
+.ss-rebar-thumb {
+	flex: 0 0 72px;
+	width: 72px;
+}
+.ss-cut-row {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin-bottom: 6px;
+}
+.ss-cut-label {
+	flex: 0 0 72px;
+	font-size: var(--ss-fs-sm);
+	text-align: right;
+	white-space: nowrap;
+}
+.ss-cut-bar {
+	flex: 1;
+	display: flex;
+	min-width: 0;
+	height: 26px;
+	border: 1px solid var(--ss-border);
+	border-radius: 8px;
+	overflow: hidden;
+	background: var(--ss-surface-2);
+}
+.ss-cut-piece,
+.ss-cut-offcut {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	overflow: hidden;
+	font-size: var(--ss-fs-sm);
+	white-space: nowrap;
+}
+.ss-cut-piece {
+	background: var(--ss-brand-soft);
+	border-right: 1px solid color-mix(in srgb, var(--ss-brand) 45%, transparent);
+}
+.ss-cut-offcut.is-reusable,
+.ss-cut-swatch.is-reusable {
+	background: rgba(34, 197, 94, 0.22);
+}
+.ss-cut-offcut.is-scrap,
+.ss-cut-swatch.is-scrap {
+	background: rgba(239, 68, 68, 0.2);
+}
+.ss-cut-swatch {
+	display: inline-block;
+	width: 10px;
+	height: 10px;
+	margin-right: 4px;
+	border-radius: 2px;
+	vertical-align: middle;
+}
+

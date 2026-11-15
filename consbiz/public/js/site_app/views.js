@@ -17,6 +17,8 @@ import Reports from "./views/work/Reports.vue";
 import Inspections from "./views/work/Inspections.vue";
 import Concrete from "./views/work/Concrete.vue";
 import ConcreteForm from "./views/work/ConcreteForm.vue";
+import Rebar from "./views/work/Rebar.vue";
+import RebarPlan from "./views/work/RebarPlan.vue";
 import Labour from "./views/admin/Labour.vue";
 import Workers from "./views/admin/Workers.vue";
 import Advances from "./views/admin/Advances.vue";
@@ -46,6 +48,8 @@ export default {
 	issue: Issue,
 	concrete: Concrete,
 	"concrete-form": ConcreteForm,
+	rebar: Rebar,
+	"rebar-plan": RebarPlan,
 	labour: Labour,
 	workers: Workers,
 	advances: Advances,

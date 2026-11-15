@@ -56,6 +56,8 @@ export const SECTIONS = {
 				badge: (s) => (s?.inspections_pending || 0) + (s?.inspections_failed || 0),
 				alert: (s) => s?.inspections_failed,
 			},
+			// แผนตัดเหล็ก (views/work/Rebar*.vue, API consbiz/bar_cut_app.py)
+			{ view: "rebar", label: "ตัดเหล็ก", icon: "list-ordered", when: (b) => b.can.bar_cut },
 		],
 		badge: (s) => (s?.requests_pending || 0) + (s?.inspections_pending || 0),
 	},
@@ -134,6 +136,9 @@ export const ROUTES = {
 	"site-form": { section: "work", params: ["kind", "name", "source"] },
 	concrete: { section: "work", params: [] },
 	"concrete-form": { section: "work", params: ["name"] },
+	// แผนตัดเหล็ก: name = new (แผนใหม่) หรือเลขที่ tab = รายการ / ผลการตัด / ตั้งค่า
+	rebar: { section: "work", params: [] },
+	"rebar-plan": { section: "work", params: ["name", "tab"] },
 	// แผนงาน
 	pm: { section: "pm", params: [] },
 	plan: { section: "pm", params: [] },
@@ -168,6 +173,7 @@ export const PARENT_TAB = {
 	"receive-form": "receive",
 	receipt: "receive",
 	"concrete-form": "concrete",
+	"rebar-plan": "rebar",
 	"borrow-detail": "borrow",
 	"borrow-new": "borrow",
 	"report-form": "reports",
