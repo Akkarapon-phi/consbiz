@@ -18,6 +18,11 @@ import SarabanForm from "./views/saraban/SarabanForm.vue";
 import AgreementPage from "./views/subcontract/AgreementPage.vue";
 import ClaimPage from "./views/subcontract/ClaimPage.vue";
 import VariationPage from "./views/subcontract/VariationPage.vue";
+import RetentionPage from "./views/retention/RetentionPage.vue";
+import PaymentPage from "./views/accounting/PaymentPage.vue";
+import WhtPage from "./views/accounting/WhtPage.vue";
+import TaxInvoicePage from "./views/accounting/TaxInvoicePage.vue";
+import TaxReport from "./views/accounting/TaxReport.vue";
 
 export default {
 	buy: DocsHome,
@@ -52,4 +57,21 @@ export default {
 	claim: ClaimPage,
 	variations: KindList,
 	variation: VariationPage,
+	"acc-receipts": KindList,
+	"acc-payments": KindList,
+	"acc-wht": KindList,
+	"acc-sales-tax": KindList,
+	"acc-purchase-tax": KindList,
+	"acc-payment": PaymentPage,
+	"acc-wht-doc": WhtPage,
+	"acc-tax-doc": TaxInvoicePage,
+	"acc-tax-report": TaxReport,
+	"acc-retention-in": KindList,
+	"acc-retention-out": KindList,
+	"sell-retention": KindList,
+	"buy-retention": KindList,
+	"acc-retention-in-doc": RetentionPage,
+	"acc-retention-out-doc": RetentionPage,
+	"sell-retention-doc": RetentionPage,
+	"buy-retention-doc": RetentionPage,
 };

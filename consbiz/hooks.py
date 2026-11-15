@@ -45,7 +45,7 @@ app_include_js = [
 
 # แอป ConsERP: ทุกหมวดอยู่ระดับเดียวกันใต้ /conserp/<หมวด> (PWA ตัวเดียว scope /conserp)
 # หมวดจัดซื้อ/ขาย = bundle ออฟฟิศ (www/office.html, ชื่อหมวดตรงกับ site_app.office_sections) ที่เหลือ = bundle หน้างาน (www/site.html)
-_OFFICE_SECTIONS = ("purchase", "sales", "boq", "hr", "saraban", "subcontract")
+_OFFICE_SECTIONS = ("purchase", "sales", "boq", "hr", "saraban", "subcontract", "accounting")
 # bundle self_app (www/self.html): Self Service ของพนักงานทุกคน (consbiz/self_service.py) + โมดูลอนุมัติ (consbiz/approvals.py)
 _SELF_SECTIONS = ("self", "approve")
 website_route_rules = [

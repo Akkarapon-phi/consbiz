@@ -7,6 +7,8 @@ import { scope_args } from "../shared/api.js";
 import AppShell from "../shared/AppShell.vue";
 import { ROUTES, SECTIONS } from "./sections.js";
 import VIEWS from "./views.js";
+import { DOC_PAGES as RETENTION_PAGES } from "./views/retention/kinds.js";
+import { DOC_PAGES as ACCOUNTING_PAGES } from "./views/accounting/kinds.js";
 
 configure({
 	key: "office",
@@ -22,15 +24,18 @@ configure({
 		agreement: "agreements",
 		claim: "claims",
 		variation: "variations",
+		...RETENTION_PAGES,
+		...ACCOUNTING_PAGES,
 	},
 	// หน้าดู/ฟอร์มไฮไลต์เมนูตาม params.kind (สารบรรณ: kind = ชื่อหน้ารายการ เช่น letters-in)
-	kind_pages: ["buy-doc", "sell-doc", "buy-form", "sell-form", "saraban-doc", "saraban-form"],
+	kind_pages: ["buy-doc", "sell-doc", "buy-form", "sell-form", "saraban-doc", "saraban-form", "acc-payment", "acc-tax-doc"],
 	summary_api: {
 		purchase: () => ["consbiz.site_docs.get_summary", { section: "buy", ...scope_args() }],
 		sales: () => ["consbiz.site_docs.get_summary", { section: "sell", ...scope_args() }],
 		hr: () => ["consbiz.hr_attendance.get_summary", scope_args()],
 		saraban: () => ["consbiz.saraban.get_summary", scope_args()],
 		subcontract: () => ["consbiz.subcontract_app.get_summary", scope_args()],
+		accounting: () => ["consbiz.accounting_app.get_summary", scope_args()],
 	},
 	fallback: "purchase",
 	doc_kinds: ["mr", "po", "pi", "qtn", "so", "si"],

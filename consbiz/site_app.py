@@ -64,6 +64,11 @@ def office_sections():
 
 	if subcontract_app.readable_kinds():
 		sections.append("subcontract")
+	# บัญชี: รับ/จ่ายชำระ ภาษี หัก ณ ที่จ่าย (consbiz/accounting_app.py) + เงินประกันผลงาน (consbiz/retention_app.py)
+	from consbiz import accounting_app
+
+	if accounting_app.can_account():
+		sections.append("accounting")
 	return sections
 
 
@@ -194,6 +199,14 @@ def office_boot_data():
 	from consbiz import subcontract_app
 
 	boot["subcontract"] = subcontract_app.boot_permissions()
+	from consbiz import retention_app
+
+	# เงินประกันผลงาน: หมวดบัญชี (2 ฝั่ง) + เมนูในหมวดขาย (ฝั่งรับ) / จัดซื้อ (ฝั่งจ่าย)
+	boot["retention"] = retention_app.boot_permissions()
+	from consbiz import accounting_app
+
+	# รับ/จ่ายชำระ หนังสือรับรองหัก ณ ที่จ่าย ภาษีซื้อ-ขาย รายงานภาษี (เมนูในหมวดบัญชี + ปุ่มรับ/จ่ายชำระในหน้าใบแจ้งหนี้)
+	boot["accounting"] = accounting_app.boot_permissions()
 	add_apps(boot, ("office", sections))
 	return boot
 

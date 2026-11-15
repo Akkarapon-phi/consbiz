@@ -3131,6 +3131,11 @@ svg.ss-check {
 	--ss-brand-2: #b45309;
 	--ss-brand-soft: #ffedd5;
 }
+[data-section="accounting"] {
+	--ss-brand: #1d4ed8;
+	--ss-brand-2: #0f766e;
+	--ss-brand-soft: #dbeafe;
+}
 [data-section="self"] {
 	--ss-brand: #15803d;
 	--ss-brand-2: #0f766e;
@@ -3179,6 +3184,11 @@ svg.ss-check {
 		--ss-brand: #fb923c;
 		--ss-brand-2: #fbbf24;
 		--ss-brand-soft: rgba(251, 146, 60, 0.15);
+	}
+	[data-section="accounting"] {
+		--ss-brand: #60a5fa;
+		--ss-brand-2: #2dd4bf;
+		--ss-brand-soft: rgba(96, 165, 250, 0.15);
 	}
 	[data-section="self"] {
 		--ss-brand: #4ade80;

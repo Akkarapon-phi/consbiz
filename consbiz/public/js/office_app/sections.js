@@ -1,6 +1,6 @@
 // หมวดงานของแอปออฟฟิศ (/conserp/purchase, /conserp/sales: /conserp/<หมวด>/<หน้า>/<params...>) ตั้งค่าแอปที่ office_app.bundle.js (configure)
 // งานออฟฟิศบนจอใหญ่: จัดซื้อ (ขอซื้อ → สั่งซื้อ → แจ้งหนี้) / ขาย (เสนอราคา → สั่งขาย → แจ้งหนี้)
-// ต่อไป: บัญชี ประกันผลงาน เพิ่มหมวดใหม่: SECTIONS + ROUTES + views.js + สิทธิ์ใน site_app.office_sections
+// บัญชี: รับ/จ่ายชำระ ภาษี หัก ณ ที่จ่าย + เงินประกันผลงาน (หมวดขาย/จัดซื้อมีเมนูเงินประกันของฝั่งตัวเองด้วย) เพิ่มหมวดใหม่: SECTIONS + ROUTES + views.js + สิทธิ์ใน site_app.office_sections
 // ชื่อหน้า (view) ห้ามซ้ำข้ามหมวด เพราะ go("<view>") หาหมวดจากชื่อหน้า
 
 import { boot } from "../shared/api.js";
@@ -30,6 +30,15 @@ export const SECTIONS = {
 				icon: "file",
 				alert: (s) => s?.pi_overdue?.count,
 				badge: (s) => s?.pi_overdue?.count,
+			},
+			// เงินประกันที่หัก ผรม. (retention_app, สิทธิ์ของ Retention Payable / Release)
+			{
+				view: "buy-retention",
+				label: "เงินประกัน",
+				icon: "shield",
+				when: (b) => b.retention?.sides?.out,
+				badge: (s) => s?.retention_out?.count,
+				alert: (s) => s?.retention_out?.late,
 			},
 		],
 		badge: (s) => s?.mr_todo?.count,
@@ -61,6 +70,15 @@ export const SECTIONS = {
 				icon: "receive",
 				alert: (s) => s?.si_overdue?.count,
 				badge: (s) => s?.si_overdue?.count,
+			},
+			// เงินประกันที่ผู้ว่าจ้างหัก (retention_app, สิทธิ์ของ Retention Receivable / Invoice)
+			{
+				view: "sell-retention",
+				label: "เงินประกัน",
+				icon: "shield",
+				when: (b) => b.retention?.sides?.in,
+				badge: (s) => s?.retention_in?.count,
+				alert: (s) => s?.retention_in?.late,
 			},
 		],
 		badge: (s) => s?.si_overdue?.count,
@@ -178,6 +196,77 @@ export const SECTIONS = {
 		],
 		badge: (s) => s?.claims_draft?.count,
 	},
+	// บัญชี: รับ/จ่ายชำระ, หัก ณ ที่จ่าย, ภาษีขาย/ซื้อ, รายงานภาษี (views/accounting, API consbiz/accounting_app.py)
+	// + เงินประกันผลงาน 2 ฝั่ง (views/retention, API consbiz/retention_app.py)
+	accounting: {
+		key: "accounting",
+		...MODULE_META.office.accounting,
+		get home() {
+			return (this.tabs.find((t) => t.when(boot)) || this.tabs[0]).view;
+		},
+		tabs: [
+			{
+				view: "acc-receipts",
+				label: "รับชำระ",
+				icon: "receive",
+				when: (b) => b.accounting?.["acc-receipts"],
+				badge: (s) => s?.receipts_draft?.count,
+			},
+			{
+				view: "acc-payments",
+				label: "จ่ายชำระ",
+				icon: "send",
+				when: (b) => b.accounting?.["acc-payments"],
+				badge: (s) => s?.payments_draft?.count,
+			},
+			{
+				view: "acc-wht",
+				label: "หัก ณ ที่จ่าย",
+				icon: "file",
+				when: (b) => b.accounting?.["acc-wht"],
+				badge: (s) => s?.wht_to_issue?.count,
+				alert: (s) => s?.wht_to_issue?.count,
+			},
+			{
+				view: "acc-sales-tax",
+				label: "ภาษีขาย",
+				icon: "trending",
+				when: (b) => b.accounting?.["acc-sales-tax"],
+			},
+			{
+				view: "acc-purchase-tax",
+				label: "ภาษีซื้อ",
+				icon: "cart",
+				when: (b) => b.accounting?.["acc-purchase-tax"],
+			},
+			{
+				view: "acc-tax-report",
+				label: "รายงานภาษี",
+				icon: "list",
+				when: (b) => b.accounting?.reports?.length,
+			},
+			{
+				view: "acc-retention-in",
+				label: "ประกันรับ",
+				icon: "shield",
+				when: (b) => b.retention?.sides?.in,
+				badge: (s) => s?.retention_in?.count,
+				alert: (s) => s?.retention_in?.late,
+			},
+			{
+				view: "acc-retention-out",
+				label: "ประกันจ่าย",
+				icon: "shield",
+				when: (b) => b.retention?.sides?.out,
+				badge: (s) => s?.retention_out?.count,
+				alert: (s) => s?.retention_out?.late,
+			},
+		],
+		badge: (s) =>
+			(s?.wht_to_issue?.count || 0) +
+			(s?.retention_in?.count || 0) +
+			(s?.retention_out?.count || 0),
+	},
 };
 
 // view → หมวด + ชื่อ params ตามลำดับใน URL
@@ -220,4 +309,26 @@ export const ROUTES = {
 	claim: { section: "subcontract", params: ["name", "agreement"] },
 	variations: { section: "subcontract", params: ["tab"] },
 	variation: { section: "subcontract", params: ["name", "agreement"] },
+	// บัญชี: รายการ (tab) / หน้าเอกสาร kind = ชื่อหน้ารายการ (ไฮไลต์เมนูผ่าน kind_pages): รับ/จ่ายชำระ (acc-receipts/acc-payments),
+	// ใบกำกับภาษี (acc-sales-tax/acc-purchase-tax) / หนังสือรับรอง: name = new + source = จ่ายชำระต้นทาง
+	// รายงานภาษี: report = sales/purchase/pnd3/pnd53, month = YYYY-MM
+	"acc-receipts": { section: "accounting", params: ["tab"] },
+	"acc-payments": { section: "accounting", params: ["tab"] },
+	"acc-wht": { section: "accounting", params: ["tab"] },
+	"acc-sales-tax": { section: "accounting", params: ["tab"] },
+	"acc-purchase-tax": { section: "accounting", params: ["tab"] },
+	"acc-payment": { section: "accounting", params: ["kind", "name"] },
+	"acc-wht-doc": { section: "accounting", params: ["name", "source"] },
+	"acc-tax-doc": { section: "accounting", params: ["kind", "name"] },
+	"acc-tax-report": { section: "accounting", params: ["report", "month"] },
+	// เงินประกันผลงาน: รายการ (tab) / หน้าเอกสาร `<รายการ>-doc` (type = rr/ri/rp/rl, name = new = ใบขอคืน/ใบคืนใหม่,
+	// source = เงินประกันต้นทางของใบใหม่)
+	"acc-retention-in": { section: "accounting", params: ["tab"] },
+	"acc-retention-out": { section: "accounting", params: ["tab"] },
+	"acc-retention-in-doc": { section: "accounting", params: ["type", "name", "source"] },
+	"acc-retention-out-doc": { section: "accounting", params: ["type", "name", "source"] },
+	"sell-retention": { section: "sales", params: ["tab"] },
+	"sell-retention-doc": { section: "sales", params: ["type", "name", "source"] },
+	"buy-retention": { section: "purchase", params: ["tab"] },
+	"buy-retention-doc": { section: "purchase", params: ["type", "name", "source"] },
 };

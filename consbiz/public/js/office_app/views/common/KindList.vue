@@ -21,7 +21,7 @@
 					v-if="!wide && can_create"
 					type="button"
 					class="ss-btn ss-btn--primary ss-list-create"
-					:aria-label="`สร้าง${kind.label}`"
+					:aria-label="`สร้าง${kind.create_label || kind.label}`"
 					@click="create"
 				>
 					<Icon name="plus" :size="18" :stroke="2.6" />
@@ -50,7 +50,7 @@
 						@click="create"
 					>
 						<Icon name="plus" :size="18" :stroke="2.6" />
-						<span>สร้าง{{ kind.label }}</span>
+						<span>สร้าง{{ kind.create_label || kind.label }}</span>
 					</button>
 				</div>
 			</div>

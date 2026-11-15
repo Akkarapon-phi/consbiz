@@ -487,6 +487,16 @@
 					>
 						<Icon name="plus" :size="18" :stroke="2.4" /> สร้าง{{ DOC_KINDS[next_kind].label }}
 					</button>
+					<!-- ใบแจ้งหนี้ที่ยังค้าง: รับชำระ / จ่ายชำระ (Payment Entry, PaymentSheet.vue) -->
+					<button
+						v-if="doc.can_pay"
+						type="button"
+						class="ss-btn ss-btn--primary ss-btn--lg ss-grow"
+						@click="paying = true"
+					>
+						<Icon :name="params.kind === 'si' ? 'receive' : 'send'" :size="18" />
+						{{ params.kind === "si" ? "รับชำระ" : "จ่ายชำระ" }}
+					</button>
 				</div>
 			</Transition>
 		</Teleport>
@@ -528,6 +538,15 @@
 			@deleted="after_delete"
 		/>
 
+		<PaymentSheet
+			v-if="doc?.can_pay"
+			:open="paying"
+			:kind="params.kind"
+			:name="params.name"
+			@close="paying = false"
+			@done="after_pay"
+		/>
+
 		<PdfViewer
 			:open="pdf"
 			:url="doc?.pdf_url"
@@ -548,10 +567,12 @@ import PdfViewer from "../components/PdfViewer.vue";
 import DeleteSheet from "../components/DeleteSheet.vue";
 import RichText from "../components/RichText.vue";
 import DocActivity from "./DocActivity.vue";
+import PaymentSheet from "./PaymentSheet.vue";
 import InlineEdit from "../components/InlineEdit.vue";
 import { use_shortcuts } from "../shortcuts.js";
 import { DOC_KINDS, in_app, open_doc } from "./kinds.js";
 import {
+	boot,
 	call,
 	celebrate,
 	desk_url,
@@ -696,8 +717,25 @@ const next_kind = computed(() =>
 );
 
 const has_bar = computed(
-	() => !!(doc.value && (doc.value.can_edit || doc.value.can_submit || doc.value.can_delete || next_kind.value))
+	() =>
+		!!(
+			doc.value &&
+			(doc.value.can_edit || doc.value.can_submit || doc.value.can_delete || next_kind.value || doc.value.can_pay)
+		)
 );
+
+// รับ/จ่ายชำระ: หน้ารายการของหมวดบัญชี (เปิดรายการที่สร้างในแอปถ้าเข้าหมวดบัญชีได้)
+const PAYMENT_LIST = { si: "acc-receipts", pi: "acc-payments" };
+const paying = ref(false);
+const payment_list = (kind = params.kind) =>
+	boot.sections?.includes("accounting") && boot.accounting?.[PAYMENT_LIST[kind]] ? PAYMENT_LIST[kind] : null;
+async function after_pay(result) {
+	paying.value = false;
+	reload_summary();
+	const list = payment_list();
+	if (list) go("acc-payment", { kind: list, name: result.name });
+	else await load();
+}
 
 const deleting = ref(false);
 function after_delete() {
@@ -749,6 +787,7 @@ function item_progress(it) {
 // เอกสารจัดซื้อ/ขาย: ชนิดที่แอปนี้ดูแลเปิดในแอป ชนิดอื่นไปแอปที่ดูแล (open_doc) ที่เหลือ (ใบรับของ, ใบส่งของ, รับ/จ่ายเงิน) เปิดในระบบเต็ม
 function open_link(l) {
 	if (l.kind) open_doc(l.kind, l.name);
+	else if (l.doctype === "Payment Entry" && payment_list()) go("acc-payment", { kind: payment_list(), name: l.name });
 	else window.location.href = desk_url(l.doctype, l.name);
 }
 

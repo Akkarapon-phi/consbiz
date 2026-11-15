@@ -171,7 +171,7 @@ pre-commit run --all-files                               # ruff + prettier (ต�
   | URL | คนใช้ | เนื้อหา |
   |---|---|---|
   | `/conserp` | หน้างาน (มือถือ) | ควบคุมงาน, สโตร์, แผนงาน, ทรัพยากร, การเงิน, ขอซื้อ/ขอเบิก + ติดตามสถานะ |
-  | `/conserp/purchase`, `/conserp/sales`, ... | ออฟฟิศ (จอใหญ่) | ซื้อ, ขาย, บัญชี, ประกันผลงาน, สารบรรณ (หนังสือเข้า-ออก, ใบนำส่ง, ใบปะหน้า), ผู้รับเหมาช่วง (สัญญา, ใบเบิกงวด) (ค่าแรงรายวันอยู่หมวดธุรการของหน้างาน) |
+  | `/conserp/purchase`, `/conserp/sales`, ... | ออฟฟิศ (จอใหญ่) | ซื้อ, ขาย, บัญชี (รับ/จ่ายชำระ, ภาษีซื้อ-ขาย, หัก ณ ที่จ่าย, รายงานภาษี, เงินประกันผลงาน (ตกลง 2026-11-15: อยู่ในบัญชี + เมนูของฝั่งตัวเองในขาย/จัดซื้อ)), สารบรรณ (หนังสือเข้า-ออก, ใบนำส่ง, ใบปะหน้า), ผู้รับเหมาช่วง (สัญญา, ใบเบิกงวด) (ค่าแรงรายวันอยู่หมวดธุรการของหน้างาน) |
   | `/conserp/self` | พนักงานทุกคน | Self Service: ลงเวลา, ลา, สลิป, วันหยุดประจำสัปดาห์ + ตารางทีม, เบิกเงินเดือนล่วงหน้า/เงินสำรองจ่าย/เบิกคืน + อนุมัติ หน้าจอครอบ HRMS (แทนแผน `/hr-app` เดิม) |
   | `/contractor` | ผู้รับเหมาช่วง (คนนอก) | ดูสัญญา/งวด/ยอดของตัวเอง, ร่างใบเบิกงวด + แนบรูป แล้วส่งให้ตรวจ API แยกและตรวจสิทธิ์ทุกคำขอ |
   ห้ามใช้ `/me` (หน้า My Account ของ Frappe), `/hr/...` (Roster ของ HRMS), `/hrms` (ESS ของ HRMS)
@@ -401,7 +401,6 @@ pre-commit run --all-files                               # ruff + prettier (ต�
   บันทึก Comment ที่ PO ว่าใครอนุมัติ แล้วแจ้งฝ่ายจัดซื้อทุกคนของบริษัท (`notify_purchasing`, Role ใน `PURCHASE_ROLES` + User Permission ของ Company) ไม่ผูกคนสร้าง PO
   PO ที่ Submit แล้วถูกแก้ = `custom_revision_pending` (งานกลางของฝ่ายจัดซื้อ: หน้าหลักหมวดจัดซื้อ "PO แก้ไขแล้ว รอส่งผู้รับเหมา" `po_resend`, แถบในหน้าดู PO `revision_of` + PDF ฉบับก่อนๆ)
   ใครในฝ่ายก็กด "ส่งผู้รับเหมาแล้ว" (`mark_po_sent` → `custom_revision_sent_by/on`) หน้าสัญญา/ใบงานเพิ่มแสดงสถานะส่ง
-- หน้ารายการกลางของออฟฟิศ `office_app/views/common/KindList.vue` (สารบรรณ + ผรม.) ชนิดเอกสารรวมที่ `common/kinds.js` (api, boot, open, create, คอลัมน์ วันที่/ยอดเงิน, แท็บสถานะ)
 - แอปผู้รับเหมาช่วง (`/contractor`, คนนอก, เริ่ม 2026-11-15): www `contractor.html`, bundle `public/js/contractor_app/` (ใช้ AppShell `no_project` หมวดเดียว `contractor`), API `consbiz/contractor_app.py`
   เข้าได้ 2 แบบ หน้าจอชุดเดียวกัน: (1) ลิงก์ของสัญญา `/contractor/k/<Subcontract Agreement.contractor_token>` ไม่ต้อง login (ใช้หลัก, ตกลง 2026-11-15: ไม่มี PIN)
   เห็นเฉพาะสัญญานั้น ใช้ได้จนสัญญาปิด (Closed) หรือยกเลิก (เปิดสัญญาอีกครั้ง = ลิงก์เดิมใช้ได้) เจ้าหน้าที่กด "ลิงก์ผู้รับเหมา" ในหน้าสัญญาของออฟฟิศ (`subcontract_app.contractor_link`, ผู้ที่อ่านสัญญาได้)
@@ -416,6 +415,29 @@ pre-commit run --all-files                               # ruff + prettier (ต�
   ระหว่าง Draft/Returned เจ้าหน้าที่แก้/อนุมัติไม่ได้ (`subcontract_app.contractor_busy`, `before_submit_claim`) 1 สัญญามีใบเบิกของ ผรม. ที่ยังไม่อนุมัติได้ใบเดียว ใบที่เจ้าหน้าที่ร่างเอง ผรม. เห็นเมื่ออนุมัติแล้ว
   ไฟล์แนบ: `contractor_app.upload_file` (multipart, รูป/PDF ≤ 10MB, ≤ 30 ไฟล์ต่อใบ, private, ผูกใบเบิกทันที เพราะคนไม่ login ใช้ upload_file ของ Frappe ไม่ได้) เปิดผ่าน `open_file` เจ้าหน้าที่ดูไฟล์ในระบบเต็ม
   การแจ้งเตือน Subcontract Claim เปิดหน้าในแอป (`APP_PAGES` ใน `shared/notifications.js`) ยังไม่ทำ: ดู PDF ของ PO, การ์ดไฟล์แนบในหน้าเจ้าหน้าที่
+- หน้ารายการกลางของออฟฟิศ `office_app/views/common/KindList.vue` (สารบรรณ + ผรม. + เงินประกันผลงาน) ชนิดเอกสารรวมที่ `common/kinds.js` (api, boot, open, create, `create_label` (ชื่อปุ่มสร้างถ้าต่างจากชื่อรายการ), คอลัมน์ วันที่/ยอดเงิน, แท็บสถานะ)
+- บัญชี (หมวด `accounting` ของแอปออฟฟิศ `/conserp/accounting`, เริ่ม 2026-11-15): รับชำระ / จ่ายชำระ, หัก ณ ที่จ่าย, ภาษีขาย / ภาษีซื้อ, รายงานภาษี, เงินประกันผลงาน 2 ฝั่ง
+  เห็นหมวดเมื่อเปิดเมนูใดได้ (`accounting_app.can_account`: อ่าน DocType ของเมนู / รายงาน หรือ `retention_app.can_account` = อ่าน Journal Entry + เงินประกันอย่างน้อย 1 ฝั่ง) ฝ่ายขาย/จัดซื้อที่ไม่ใช่บัญชีเห็นเฉพาะเมนูเงินประกันในหมวดของตัวเอง
+  API `consbiz/accounting_app.py` หน้า `office_app/views/accounting/` (`kinds.js` = รายการ KindList, `PaymentPage.vue`, `WhtPage.vue`, `TaxInvoicePage.vue`, `TaxReport.vue`) สิทธิ์ `boot.accounting` (`boot_permissions`)
+  รับ/จ่ายชำระ = Payment Entry ของ ERPNext: ปุ่ม "รับชำระ"/"จ่ายชำระ" ในหน้าดู SI/PI (`doc.can_pay` = ค้างชำระ + สร้าง PE ได้, sheet `shared/docs/PaymentSheet.vue`)
+  `payment_defaults` / `make_payment` (`get_payment_entry` แล้วตั้งบัญชีเงิน วิธีชำระ เลขอ้างอิง ยอดตัดหนี้ (บางส่วนได้) รายการหัก) สูตรเดียวกับ `payment_entry_deduction.js`: หักตาม `custom_payment_entry_deduction` ของใบแจ้งหนี้
+  (เติมเฉพาะครั้งแรกที่รับ/จ่าย, จ่าย = ยอดติดลบ) แถวบัญชีหัก ณ ที่จ่ายของ Company ใส่ `withholding_tax_type` (Withholding Tax Type ที่บัญชี+อัตราตรง) + `withholding_tax_base` (= net_total) ให้ออกหนังสือรับรองได้
+  ภาษีรอเรียกเก็บ: erpnext_thailand ล้างเองตอนบันทึก PE (`clear_invoice_undue_tax`) รับชำระ = ออกใบกำกับภาษีขายอัตโนมัติ จ่ายชำระที่ PI มีภาษีซื้อรอเรียกเก็บ ติ๊ก "ได้รับใบกำกับแล้ว" + เลขที่/วันที่ (`has_purchase_tax_invoice`)
+  Submit ทันทีถ้ามีสิทธิ์ ไม่มี = ร่าง หลังสร้างเปิดหน้ารับ/จ่ายชำระของหมวดบัญชี (`acc-payment/<acc-receipts|acc-payments>/<PE>`, ไฮไลต์เมนูผ่าน `kind_pages`) ถ้าเข้าหมวดบัญชีได้ "เอกสารที่เกี่ยวข้อง" ของ SI/PI แสดงร่าง PE ด้วย
+  ยกเลิกรับ/จ่ายชำระในแอป (`cancel_payment`) ยกเลิกหนังสือรับรอง + ใบกำกับภาษีที่อ้าง PE ก่อน (Dynamic Link ที่ Submit อยู่ทำให้ยกเลิก PE ไม่ได้)
+  หนังสือรับรองหัก ณ ที่จ่าย (Withholding Tax Cert, เฉพาะที่เราออก = จ่ายชำระผู้ขาย) ออกจากหน้าจ่ายชำระ (`acc-wht-doc/new/<PE>`, `cert_from_payment` แบบ `make_withholding_tax_cert` ของ erpnext_thailand)
+  แบบ PND3 = Supplier ประเภท Individual อื่น = PND53, ประเภทเงินได้เริ่มต้น `DEFAULT_INCOME` (5 ค่าจ้างทำของ) ช่อง description = ประเภทเงินได้ในรายงาน ภ.ง.ด. 1 PE มีหนังสือที่ไม่ยกเลิกได้ใบเดียว ตัวเลขเมนู = จ่ายชำระที่มีหัก ณ ที่จ่ายแต่ยังไม่ออก (`to_issue_count`)
+  ภาษีขาย/ซื้อ (Sales/Purchase Tax Invoice ระบบสร้างจาก GL) ดู + แก้ช่อง Allow on Submit (`TAX_EDIT`: ภาษีซื้อ = เลขที่/วันที่ใบกำกับผู้ขาย + ยื่นล่าช้า, ภาษีขาย = ยื่นล่าช้า)
+  รายงานภาษี (`acc-tax-report/<sales|purchase|pnd3|pnd53>/<YYYY-MM>`) เรียก `execute` ของ Script Report ของ erpnext_thailand แล้วกรองบริษัทเอง (รายงานเดิมกรองแค่ที่อยู่) Excel = `export_report` แบบฟอร์มยื่นพิมพ์จากรายงานในระบบเต็ม (ปุ่มเครื่องพิมพ์ส่งตัวกรองไปให้) สิทธิ์ = Role ของ Report + อ่าน DocType
+  เงินประกันผลงาน: API `consbiz/retention_app.py` (หน้าจอครอบ กฎ/ยอด/สถานะอยู่ `retention.py` เหมือนเดิม) หน้า `office_app/views/retention/` (`kinds.js` + `RetentionPage.vue`)
+  ฝั่ง `in` = RR + RI (ผู้ว่าจ้างหักเรา) / `out` = RP + Release (เราหัก ผรม.) ชนิดในหน้าจอ (`params.type`) = `rr`/`ri`/`rp`/`rl`
+  หน้ารายการ (KindList, รวมเงินประกันที่ถูกหัก + ใบขอคืน/ใบคืนของฝั่ง แยกด้วย `row.type`): `acc-retention-in`, `acc-retention-out` (บัญชี), `sell-retention` (ขาย, ฝั่ง in), `buy-retention` (จัดซื้อ, ฝั่ง out)
+  หน้าเอกสาร = `<หน้ารายการ>-doc` (อยู่หมวดเดียวกับรายการ ไม่พาไปหมวดอื่น, `parent_tab` จาก `DOC_PAGES`) เพิ่มหน้ารายการใหม่ต้องเพิ่ม `LISTS` ใน retention_app.py ด้วย
+  สิทธิ์ = สิทธิ์ DocType ของฝั่ง (`boot.retention.sides`) ตั้งได้ในหน้าตั้งค่า: เอกสารฝั่ง in อยู่หมวดขาย, ฝั่ง out อยู่หมวดจัดซื้อ, ทั้งหมด + Journal Entry อยู่หมวดบัญชี (`app_settings.MODULES`)
+  เงินประกันที่ถูกหัก (RR/RP ระบบสร้างจากใบแจ้งหนี้ ในแอปสร้างไม่ได้): ดู + แก้วันครบกำหนดคืน (`set_due_date`) + "ทำใบขอคืน/ใบคืน" (`get_doc(type, source=)` = `retention.make_claim`)
+  ใบขอคืน/ใบคืน: ร่างแก้ในหน้าเดียวกัน เลือกเงินประกันที่ยังคืนได้ของคู่ค้า (`open_sources`) แก้ยอดบางส่วนได้ (`save_claim`) ยืนยัน = Submit แล้ว PDF
+  "บันทึกรับ/จ่ายเงิน" (`record_payment`) = `retention.make_journal_entry` แล้ว Submit JE ทันทีถ้ามีสิทธิ์ (ไม่มีสิทธิ์ Submit JE = ร่างไว้ให้ผู้มีสิทธิ์) สถานะ Paid ตาม doc_events ของ JE เดิม
+  ตัวเลขเมนู (`side_counts`): ถึงกำหนดคืน (RR/RP Overdue) + รอรับ/จ่ายเงิน จุดแดง = ใบขอคืน/ใบคืนเลยกำหนด หมวดขาย/จัดซื้อได้ตัวเลขผ่าน `site_docs.get_summary` (`retention_in` / `retention_out`)
 - คนงานรายวัน (หมวดธุรการ `admin` ของกลุ่มหน้างาน `/conserp/admin`, เริ่ม 2026-11-13, แยกจาก HRMS): `Daily Worker` (ทะเบียน, ค่าแรงเป็นประวัติใน `rates` คิดตามอัตราของแต่ละวัน, จ่ายผ่าน Company หรือ Subcontractor = Supplier)
   `Labour Timesheet` 1 ใบต่อโครงการต่อรอบ (`period_of`: 1-15 / 16-สิ้นเดือน) แถว `days` = ชั่วโมงทำงานจริง 1 คนต่อวัน (เกิน 8 = OT) วันหยุดของทั้งวันในตาราง `holidays`
   ค่าแรงตามชั่วโมง (6 ชม. = 6/8 วัน) วันหยุด x 2, OT ÷ 8 x 1.5 (วันหยุด x 3) หรือ OT เหมา (`ot_flat`) ตาราง `pay` คำนวณใหม่ทุกครั้ง (กรอกได้เฉพาะหักอื่นๆ)

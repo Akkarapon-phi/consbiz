@@ -110,6 +110,15 @@ export const MODULE_META = {
 			theme: "#9a3412",
 			colors: ["#9a3412", "#b45309"],
 		},
+		// บัญชี: รับ-จ่ายชำระ ภาษี หัก ณ ที่จ่าย (consbiz/accounting_app.py) + เงินประกันผลงาน (consbiz/retention_app.py)
+		accounting: {
+			label: "บัญชี",
+			title: "บัญชี",
+			note: "รับ-จ่ายชำระ ภาษีซื้อ-ขาย หัก ณ ที่จ่าย เงินประกันผลงาน",
+			icon: "wallet",
+			theme: "#1d4ed8",
+			colors: ["#1d4ed8", "#0f766e"],
+		},
 	},
 	self: {
 		self: {
