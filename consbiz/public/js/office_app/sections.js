@@ -281,6 +281,46 @@ export const SECTIONS = {
 			(s?.retention_in?.count || 0) +
 			(s?.retention_out?.count || 0),
 	},
+	// ข้อมูลหลัก: 1 ชนิด = 1 เมนู (views/master/kinds.js + MasterPage.vue, API consbiz/master_data.py)
+	master: {
+		key: "master",
+		...MODULE_META.office.master,
+		get home() {
+			return (this.tabs.find((t) => t.when(boot)) || this.tabs[0]).view;
+		},
+		tabs: [
+			{
+				view: "md-employees",
+				label: "พนักงาน",
+				icon: "users",
+				when: (b) => b.master?.["md-employees"],
+			},
+			{
+				view: "md-items",
+				label: "สินค้า/วัสดุ",
+				icon: "package",
+				when: (b) => b.master?.["md-items"],
+			},
+			{
+				view: "md-customers",
+				label: "ลูกค้า",
+				icon: "building",
+				when: (b) => b.master?.["md-customers"],
+			},
+			{
+				view: "md-suppliers",
+				label: "ผู้ขาย",
+				icon: "truck",
+				when: (b) => b.master?.["md-suppliers"],
+			},
+			{
+				view: "md-projects",
+				label: "โครงการ",
+				icon: "briefcase",
+				when: (b) => b.master?.["md-projects"],
+			},
+		],
+	},
 };
 
 // view → หมวด + ชื่อ params ตามลำดับใน URL
@@ -349,4 +389,11 @@ export const ROUTES = {
 	"sell-retention-doc": { section: "sales", params: ["type", "name", "source"] },
 	"buy-retention": { section: "purchase", params: ["tab"] },
 	"buy-retention-doc": { section: "purchase", params: ["type", "name", "source"] },
+	// ข้อมูลหลัก: รายการ (tab) / หน้าข้อมูล kind = ชื่อหน้ารายการ (ไฮไลต์เมนูผ่าน kind_pages) name = new (ใหม่) หรือรหัส
+	"md-employees": { section: "master", params: ["tab"] },
+	"md-items": { section: "master", params: ["tab"] },
+	"md-customers": { section: "master", params: ["tab"] },
+	"md-suppliers": { section: "master", params: ["tab"] },
+	"md-projects": { section: "master", params: ["tab"] },
+	"md-doc": { section: "master", params: ["kind", "name"] },
 };

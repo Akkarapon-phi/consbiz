@@ -119,6 +119,15 @@ export const MODULE_META = {
 			theme: "#1d4ed8",
 			colors: ["#1d4ed8", "#0f766e"],
 		},
+		// ข้อมูลหลัก: พนักงาน สินค้า/วัสดุ ลูกค้า ผู้ขาย โครงการ (consbiz/master_data.py)
+		master: {
+			label: "ข้อมูลหลัก",
+			title: "ข้อมูลหลัก",
+			note: "พนักงาน สินค้า/วัสดุ ลูกค้า ผู้ขาย โครงการ",
+			icon: "grid",
+			theme: "#4d7c0f",
+			colors: ["#4d7c0f", "#0f766e"],
+		},
 	},
 	self: {
 		self: {

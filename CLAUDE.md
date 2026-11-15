@@ -445,6 +445,15 @@ pre-commit run --all-files                               # ruff + prettier (ต�
   ใบขอคืน/ใบคืน: ร่างแก้ในหน้าเดียวกัน เลือกเงินประกันที่ยังคืนได้ของคู่ค้า (`open_sources`) แก้ยอดบางส่วนได้ (`save_claim`) ยืนยัน = Submit แล้ว PDF
   "บันทึกรับ/จ่ายเงิน" (`record_payment`) = `retention.make_journal_entry` แล้ว Submit JE ทันทีถ้ามีสิทธิ์ (ไม่มีสิทธิ์ Submit JE = ร่างไว้ให้ผู้มีสิทธิ์) สถานะ Paid ตาม doc_events ของ JE เดิม
   ตัวเลขเมนู (`side_counts`): ถึงกำหนดคืน (RR/RP Overdue) + รอรับ/จ่ายเงิน จุดแดง = ใบขอคืน/ใบคืนเลยกำหนด หมวดขาย/จัดซื้อได้ตัวเลขผ่าน `site_docs.get_summary` (`retention_in` / `retention_out`)
+- ข้อมูลหลัก (หมวด `master` ของแอปออฟฟิศ `/conserp/master`, เริ่ม 2026-11-15): ทะเบียนพนักงาน / สินค้า-วัสดุ / ลูกค้า / ผู้ขาย / โครงการ สร้าง-แก้ได้โดยไม่ต้องเข้าระบบเต็ม
+  ครอบ DocType เดิม (Employee, Item, Customer, Supplier, Project) ไม่มี DocType ใหม่ API `consbiz/master_data.py` รายการ KindList (`office_app/views/master/kinds.js`) หน้าเดียวดู+แก้ `MasterPage.vue` (`md-doc/<kind>/<name>`)
+  ฟอร์มสร้างจาก `KINDS[kind].sections` ที่ server (tab = หมวดของฟอร์ม) ชนิดช่อง/ตัวเลือก/บังคับกรอกอ่านจาก meta (`schema`) เพิ่มช่อง = เพิ่มใน KINDS ที่เดียว ป้ายไทยของ Select อยู่ `labels`
+  ตัวเลือกช่อง: `create_only` (แก้ได้ตอนสร้าง: บริษัท, ตัวย่อ/ชื่อคลังโครงการ, ราคาขายมาตรฐาน), `filters` (Link กรองตามช่องในฟอร์ม เช่น แผนกตามบริษัท), `show` (แสดงเมื่อ เช่น วันที่ออกเมื่อลาออก), `digits` (เลขบัตร/เลขภาษี 13 หลัก ตรวจที่ server ด้วย)
+  `save_doc` ตั้งเฉพาะช่องใน KINDS ที่ไม่ read only และอยู่ใน permlevel ที่เขียนได้ ค้นหา Link (`search`) ได้เฉพาะ DocType ที่อยู่ในฟอร์มของ kind นั้น (ผ่าน `search_link` ของ Frappe)
+  พนักงาน: ตั้ง `custom_year_of_joining` จากวันเริ่มงานแบบ `employee.js` (เลข EMP-<ปี>) โครงการ: ตัวย่อบังคับ (อยู่ในเลขโครงการ) คลังสร้างตาม `site_stock` เดิม
+  สินค้า: ตารางหน่วยแปลง (`uoms`, หน่วยหลัก = 1 เติมเอง หน่วยที่ซื้อต้องอยู่ในตาราง) สินค้าคู่ของวัสดุผู้ว่าจ้าง (`custom_base_item`) ไม่ขึ้นในรายการ เปิดแล้วแก้ไม่ได้
+  ลูกค้า/ผู้ขาย: tab ที่อยู่ = Address หลัก (`*_primary_address` หรือ Address ที่ผูกไว้, Billing ก่อน) แก้ตัวเดิมหรือสร้างใหม่ คัดลอกเลขภาษี/สาขาลง Address (ใบกำกับของ erpnext_thailand อ่านจากที่อยู่)
+  สิทธิ์ = สิทธิ์ DocType (`boot.master`) ตั้งในหน้าตั้งค่า หมวดข้อมูลหลัก (รวม Address) สีหมวดเขียวมะกอก (`[data-section="master"]`)
 - คนงานรายวัน (หมวดธุรการ `admin` ของกลุ่มหน้างาน `/conserp/admin`, เริ่ม 2026-11-13, แยกจาก HRMS): `Daily Worker` (ทะเบียน, ค่าแรงเป็นประวัติใน `rates` คิดตามอัตราของแต่ละวัน, จ่ายผ่าน Company หรือ Subcontractor = Supplier)
   `Labour Timesheet` 1 ใบต่อโครงการต่อรอบ (`period_of`: 1-15 / 16-สิ้นเดือน) แถว `days` = ชั่วโมงทำงานจริง 1 คนต่อวัน (เกิน 8 = OT) วันหยุดของทั้งวันในตาราง `holidays`
   ค่าแรงตามชั่วโมง (6 ชม. = 6/8 วัน) วันหยุด x 2, OT ÷ 8 x 1.5 (วันหยุด x 3) หรือ OT เหมา (`ot_flat`) ตาราง `pay` คำนวณใหม่ทุกครั้ง (กรอกได้เฉพาะหักอื่นๆ)

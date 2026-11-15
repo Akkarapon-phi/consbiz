@@ -142,6 +142,19 @@ MODULES = (
 			("Retention Release", "ใบคืนเงินประกัน ผรม.", 0),
 		),
 	),
+	# ข้อมูลหลัก (consbiz/master_data.py) ที่อยู่ = ที่อยู่หลักของลูกค้า/ผู้ขาย (แก้ในหน้าลูกค้า/ผู้ขาย)
+	(
+		"office",
+		"master",
+		(
+			("Employee", "ทะเบียนพนักงาน", 0),
+			("Item", "สินค้า / วัสดุ", 0),
+			("Customer", "ลูกค้า", 0),
+			("Supplier", "ผู้ขาย / ผู้รับเหมา", 0),
+			("Address", "ที่อยู่ลูกค้า / ผู้ขาย", 0),
+			("Project", "โครงการ", 0),
+		),
+	),
 )
 TARGETS = {(row[0], row[2]) for _app, _section, rows in MODULES for row in rows}
 

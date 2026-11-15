@@ -24,6 +24,7 @@ import PaymentPage from "./views/accounting/PaymentPage.vue";
 import WhtPage from "./views/accounting/WhtPage.vue";
 import TaxInvoicePage from "./views/accounting/TaxInvoicePage.vue";
 import TaxReport from "./views/accounting/TaxReport.vue";
+import MasterPage from "./views/master/MasterPage.vue";
 
 export default {
 	buy: DocsHome,
@@ -78,4 +79,10 @@ export default {
 	"hr-contracts": KindList,
 	"hr-wht": KindList,
 	"hr-doc": HrDocPage,
+	"md-employees": KindList,
+	"md-items": KindList,
+	"md-customers": KindList,
+	"md-suppliers": KindList,
+	"md-projects": KindList,
+	"md-doc": MasterPage,
 };

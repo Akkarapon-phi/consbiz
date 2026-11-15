@@ -69,6 +69,11 @@ def office_sections():
 
 	if accounting_app.can_account():
 		sections.append("accounting")
+	# ข้อมูลหลัก: พนักงาน สินค้า ลูกค้า ผู้ขาย โครงการ (consbiz/master_data.py) เห็นเมื่ออ่านได้อย่างน้อย 1 ชนิด
+	from consbiz import master_data
+
+	if master_data.readable_kinds():
+		sections.append("master")
 	return sections
 
 
@@ -211,6 +216,9 @@ def office_boot_data():
 
 	# รับ/จ่ายชำระ หนังสือรับรองหัก ณ ที่จ่าย ภาษีซื้อ-ขาย รายงานภาษี (เมนูในหมวดบัญชี + ปุ่มรับ/จ่ายชำระในหน้าใบแจ้งหนี้)
 	boot["accounting"] = accounting_app.boot_permissions()
+	from consbiz import master_data
+
+	boot["master"] = master_data.boot_permissions()
 	add_apps(boot, ("office", sections))
 	return boot
 

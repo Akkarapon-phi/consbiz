@@ -3136,6 +3136,11 @@ svg.ss-check {
 	--ss-brand-2: #0f766e;
 	--ss-brand-soft: #dbeafe;
 }
+[data-section="master"] {
+	--ss-brand: #4d7c0f;
+	--ss-brand-2: #0f766e;
+	--ss-brand-soft: #ecfccb;
+}
 [data-section="self"] {
 	--ss-brand: #15803d;
 	--ss-brand-2: #0f766e;
@@ -3189,6 +3194,11 @@ svg.ss-check {
 		--ss-brand: #60a5fa;
 		--ss-brand-2: #2dd4bf;
 		--ss-brand-soft: rgba(96, 165, 250, 0.15);
+	}
+	[data-section="master"] {
+		--ss-brand: #a3e635;
+		--ss-brand-2: #2dd4bf;
+		--ss-brand-soft: rgba(163, 230, 53, 0.15);
 	}
 	[data-section="self"] {
 		--ss-brand: #4ade80;
@@ -13284,3 +13294,17 @@ html.ss-boq-grabbing * {
 	vertical-align: middle;
 }
 
+/* ข้อมูลหลัก (office_app/views/master/MasterPage.vue): ฟอร์มที่ server กำหนดช่อง ช่องยาว/สวิตช์/ตาราง เต็มแถว */
+.ss-md-field {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	min-width: 0;
+}
+.ss-md-field.is-wide {
+	grid-column: 1 / -1;
+}
+/* Picker ในช่องตาราง: ชื่อคอลัมน์อยู่หัวตารางแล้ว */
+.ss-md-cell-picker .ss-field-label {
+	display: none;
+}
