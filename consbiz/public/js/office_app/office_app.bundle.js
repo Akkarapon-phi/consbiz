@@ -28,7 +28,7 @@ configure({
 		...ACCOUNTING_PAGES,
 	},
 	// หน้าดู/ฟอร์มไฮไลต์เมนูตาม params.kind (สารบรรณ: kind = ชื่อหน้ารายการ เช่น letters-in)
-	kind_pages: ["buy-doc", "sell-doc", "buy-form", "sell-form", "saraban-doc", "saraban-form", "acc-payment", "acc-tax-doc"],
+	kind_pages: ["buy-doc", "sell-doc", "buy-form", "sell-form", "saraban-doc", "saraban-form", "hr-doc", "acc-payment", "acc-tax-doc"],
 	summary_api: {
 		purchase: () => ["consbiz.site_docs.get_summary", { section: "buy", ...scope_args() }],
 		sales: () => ["consbiz.site_docs.get_summary", { section: "sell", ...scope_args() }],

@@ -99,7 +99,15 @@ MODULES = (
 		),
 	),
 	("office", "boq", (("BOQ", "BOQ", 0),)),
-	("office", "hr", (("Attendance", "การเข้างาน (Attendance)", 0),)),
+	(
+		"office",
+		"hr",
+		(
+			("Attendance", "การเข้างาน (Attendance)", 0),
+			("Employment Contract", "สัญญาจ้างพนักงาน", 0),
+			("WHT Employee", "หนังสือรับรองหัก ณ ที่จ่าย พนักงาน (50 ทวิ)", 0),
+		),
+	),
 	(
 		"office",
 		"saraban",

@@ -19,6 +19,7 @@ import AgreementPage from "./views/subcontract/AgreementPage.vue";
 import ClaimPage from "./views/subcontract/ClaimPage.vue";
 import VariationPage from "./views/subcontract/VariationPage.vue";
 import RetentionPage from "./views/retention/RetentionPage.vue";
+import HrDocPage from "./views/hr/HrDocPage.vue";
 import PaymentPage from "./views/accounting/PaymentPage.vue";
 import WhtPage from "./views/accounting/WhtPage.vue";
 import TaxInvoicePage from "./views/accounting/TaxInvoicePage.vue";
@@ -74,4 +75,7 @@ export default {
 	"acc-retention-out-doc": RetentionPage,
 	"sell-retention-doc": RetentionPage,
 	"buy-retention-doc": RetentionPage,
+	"hr-contracts": KindList,
+	"hr-wht": KindList,
+	"hr-doc": HrDocPage,
 };

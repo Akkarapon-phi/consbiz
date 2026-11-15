@@ -96,6 +96,7 @@
    "label": "\u0e27\u0e31\u0e19\u0e17\u0e35\u0e48\u0e2a\u0e34\u0e49\u0e19\u0e2a\u0e38\u0e14\u0e17\u0e14\u0e25\u0e2d\u0e07\u0e07\u0e32\u0e19"
   },
   {
+   "allow_on_submit": 1,
    "fieldname": "probation",
    "fieldtype": "Select",
    "label": "\u0e2a\u0e16\u0e32\u0e19\u0e30\u0e17\u0e14\u0e25\u0e2d\u0e07\u0e07\u0e32\u0e19",
@@ -116,7 +117,7 @@
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-10-22 09:07:06.933920",
+ "modified": "2026-11-15 13:25:53.179261",
  "modified_by": "Administrator",
  "module": "ConsBiz",
  "name": "Employment Contract",

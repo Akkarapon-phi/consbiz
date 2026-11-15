@@ -433,7 +433,10 @@ def get_summary(project=None, company=None):
 	if not company:
 		return {}
 	_start, _end, rows = build(company, nowdate()[:7], project)
-	return {"flag": sum(r["totals"]["flag"] for r in rows)}
+	from consbiz import hr_docs
+
+	# + สัญญาจ้างที่ครบทดลองงานแล้วยังไม่ได้ประเมิน (เมนูสัญญาจ้าง)
+	return {"flag": sum(r["totals"]["flag"] for r in rows), **hr_docs.get_summary()}
 
 
 @frappe.whitelist()

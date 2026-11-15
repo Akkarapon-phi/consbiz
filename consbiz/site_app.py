@@ -193,6 +193,10 @@ def office_boot_data():
 	from consbiz import hr_payroll
 
 	boot["can"]["payroll"] = "hr" in sections and hr_payroll.can_manage()
+	from consbiz import hr_docs
+
+	# สัญญาจ้าง / 50 ทวิ พนักงาน (เมนูในหมวดบุคคล) ตามสิทธิ์ของ DocType
+	boot["hr_docs"] = hr_docs.boot_permissions() if "hr" in sections else {}
 	from consbiz import saraban
 
 	boot["saraban"] = saraban.boot_permissions()

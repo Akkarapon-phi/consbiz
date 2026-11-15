@@ -120,6 +120,20 @@ export const SECTIONS = {
 				when: (b) => b.can?.payroll,
 			},
 			{ view: "hr-advances", label: "เบิกเงิน", icon: "swap" },
+			// สัญญาจ้าง / 50 ทวิ พนักงาน (views/hr/kinds.js + HrDocPage.vue, API consbiz/hr_docs.py)
+			{
+				view: "hr-contracts",
+				label: "สัญญาจ้าง",
+				icon: "file",
+				when: (b) => b.hr_docs?.["hr-contracts"],
+				badge: (s) => s?.probation_due?.count,
+			},
+			{
+				view: "hr-wht",
+				label: "50 ทวิ",
+				icon: "receive",
+				when: (b) => b.hr_docs?.["hr-wht"],
+			},
 			{ view: "hr-setup", label: "ตั้งค่า HR", icon: "sliders" },
 		],
 		badge: (s) => s?.flag,
@@ -294,6 +308,10 @@ export const ROUTES = {
 	"hr-adjustments": { section: "hr", params: ["month"] },
 	"hr-salaries": { section: "hr", params: ["filter"] },
 	"hr-advances": { section: "hr", params: ["filter"] },
+	// สัญญาจ้าง / 50 ทวิ: รายการ (tab) / หน้าเอกสาร kind = ชื่อหน้ารายการ (ไฮไลต์เมนูผ่าน kind_pages)
+	"hr-contracts": { section: "hr", params: ["tab"] },
+	"hr-wht": { section: "hr", params: ["tab"] },
+	"hr-doc": { section: "hr", params: ["kind", "name"] },
 	// สารบรรณ: รายการ (tab = แท็บสถานะ) / ดู / ฟอร์ม (kind = letter_in/letter_out/transmittal/envelope)
 	// source ของฟอร์ม = ใบนำส่งต้นทางของใบปะหน้าใหม่
 	"letters-in": { section: "saraban", params: ["tab"] },
