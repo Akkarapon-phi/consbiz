@@ -95,6 +95,25 @@ MODULES = (
 	),
 	("office", "boq", (("BOQ", "BOQ", 0),)),
 	("office", "hr", (("Attendance", "การเข้างาน (Attendance)", 0),)),
+	(
+		"office",
+		"saraban",
+		(
+			("Letter In", "หนังสือเข้า", 0),
+			("Letter Out", "หนังสือออก", 0),
+			("Transmittal", "ใบนำส่งเอกสาร", 0),
+			("Envelope", "ใบปะหน้าซอง", 0),
+		),
+	),
+	(
+		"office",
+		"subcontract",
+		(
+			("Subcontract Agreement", "สัญญาจ้างเหมาช่วง", 0),
+			("Subcontract Claim", "ใบเบิกงวด ผรม.", 0),
+			("Subcontract Variation", "ใบงานเพิ่ม ผรม.", 0),
+		),
+	),
 )
 TARGETS = {(row[0], row[2]) for _app, _section, rows in MODULES for row in rows}
 

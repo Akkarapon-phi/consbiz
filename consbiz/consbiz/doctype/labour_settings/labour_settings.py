@@ -15,6 +15,8 @@ ACCOUNT_RULES = {
 	"sso_payable_account": (("Liability",), _("ประกันสังคมค้างจ่าย")),
 	"advance_account": (("Asset",), _("เงินเบิกล่วงหน้าคนงาน")),
 	"other_deduction_account": (("Income", "Expense", "Liability"), _("หักอื่นๆ")),
+	"subcontract_expense_account": (("Expense",), _("ค่าจ้างเหมาช่วง")),
+	"penalty_income_account": (("Income",), _("รายได้ค่าปรับผู้รับเหมา")),
 }
 NO_PARTY = ("Payable", "Receivable")
 

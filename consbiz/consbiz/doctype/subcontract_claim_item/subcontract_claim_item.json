@@ -1,0 +1,141 @@
+{
+ "actions": [],
+ "creation": "2026-11-14 16:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "agreement_item",
+  "variation",
+  "wbs",
+  "item_name",
+  "uom",
+  "contract_qty",
+  "previous_qty",
+  "qty",
+  "cumulative_qty",
+  "remaining_qty",
+  "rate",
+  "amount",
+  "claimed_progress",
+  "actual_progress"
+ ],
+ "fields": [
+  {
+   "fieldname": "agreement_item",
+   "fieldtype": "Data",
+   "label": "แถวในสัญญา",
+   "reqd": 1,
+   "hidden": 1
+  },
+  {
+   "fieldname": "wbs",
+   "fieldtype": "Data",
+   "label": "WBS",
+   "in_list_view": 1,
+   "columns": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "item_name",
+   "fieldtype": "Data",
+   "label": "รายการ",
+   "in_list_view": 1,
+   "columns": 2,
+   "read_only": 1
+  },
+  {
+   "fieldname": "uom",
+   "fieldtype": "Link",
+   "label": "หน่วย",
+   "options": "UOM",
+   "read_only": 1
+  },
+  {
+   "fieldname": "contract_qty",
+   "fieldtype": "Float",
+   "label": "ปริมาณตามสัญญา",
+   "in_list_view": 1,
+   "columns": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "previous_qty",
+   "fieldtype": "Float",
+   "label": "เบิกก่อนหน้า",
+   "in_list_view": 1,
+   "columns": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "cumulative_qty",
+   "fieldtype": "Float",
+   "label": "สะสมถึงงวดนี้",
+   "in_list_view": 1,
+   "columns": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "qty",
+   "fieldtype": "Float",
+   "label": "งวดนี้",
+   "in_list_view": 1,
+   "columns": 1
+  },
+  {
+   "fieldname": "rate",
+   "fieldtype": "Currency",
+   "label": "ราคาต่อหน่วย",
+   "options": "Company:company:default_currency",
+   "read_only": 1
+  },
+  {
+   "fieldname": "amount",
+   "fieldtype": "Currency",
+   "label": "มูลค่างวดนี้",
+   "options": "Company:company:default_currency",
+   "in_list_view": 1,
+   "columns": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "claimed_progress",
+   "fieldtype": "Percent",
+   "label": "% เบิกสะสม",
+   "read_only": 1
+  },
+  {
+   "fieldname": "actual_progress",
+   "fieldtype": "Percent",
+   "label": "% งานจริงในแผน",
+   "in_list_view": 1,
+   "columns": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "remaining_qty",
+   "fieldtype": "Float",
+   "label": "คงเหลือ",
+   "read_only": 1
+  },
+  {
+   "fieldname": "variation",
+   "fieldtype": "Data",
+   "label": "งานเพิ่ม (แนบท้าย)",
+   "read_only": 1
+  }
+ ],
+ "grid_page_length": 50,
+ "links": [],
+ "modified": "2026-11-15 16:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "ConsBiz",
+ "name": "Subcontract Claim Item",
+ "owner": "Administrator",
+ "row_format": "Dynamic",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "permissions": [],
+ "istable": 1,
+ "editable_grid": 1
+}

@@ -1,0 +1,320 @@
+{
+ "actions": [],
+ "autoname": "naming_series:",
+ "creation": "2026-11-15 12:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "naming_series",
+  "subcontract_agreement",
+  "title",
+  "supplier",
+  "supplier_name",
+  "column_break_head",
+  "project",
+  "company",
+  "revision_no",
+  "status",
+  "section_detail",
+  "posting_date",
+  "variation_order",
+  "column_break_detail",
+  "reason",
+  "section_items",
+  "items",
+  "section_amounts",
+  "previous_amount",
+  "column_break_amounts1",
+  "addition_amount",
+  "column_break_amounts2",
+  "revised_amount",
+  "section_po",
+  "purchase_order",
+  "column_break_po",
+  "po_snapshot",
+  "amended_from"
+ ],
+ "fields": [
+  {
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "label": "ชุดเลขที่",
+   "options": "SCV-.ABBR..YY..####",
+   "default": "SCV-.ABBR..YY..####",
+   "reqd": 1,
+   "hidden": 1
+  },
+  {
+   "fieldname": "subcontract_agreement",
+   "fieldtype": "Link",
+   "label": "สัญญา",
+   "options": "Subcontract Agreement",
+   "reqd": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "title",
+   "fieldtype": "Data",
+   "label": "งานที่จ้าง",
+   "fetch_from": "subcontract_agreement.title",
+   "read_only": 1
+  },
+  {
+   "fieldname": "supplier",
+   "fieldtype": "Link",
+   "label": "ผู้รับเหมาช่วง",
+   "options": "Supplier",
+   "read_only": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "supplier_name",
+   "fieldtype": "Data",
+   "label": "ชื่อผู้รับเหมา",
+   "read_only": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "column_break_head",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "project",
+   "fieldtype": "Link",
+   "label": "โครงการ",
+   "options": "Project",
+   "read_only": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "label": "บริษัท",
+   "options": "Company",
+   "read_only": 1
+  },
+  {
+   "fieldname": "revision_no",
+   "fieldtype": "Int",
+   "label": "แก้ไขครั้งที่",
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "สถานะ",
+   "options": "Draft\nApproved\nCancelled",
+   "default": "Draft",
+   "in_list_view": 1,
+   "read_only": 1,
+   "no_copy": 1,
+   "allow_on_submit": 1
+  },
+  {
+   "fieldname": "section_detail",
+   "fieldtype": "Section Break",
+   "label": "รายละเอียด"
+  },
+  {
+   "fieldname": "posting_date",
+   "fieldtype": "Date",
+   "label": "วันที่",
+   "reqd": 1,
+   "default": "Today",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "variation_order",
+   "fieldtype": "Link",
+   "label": "อ้างงานเพิ่ม-ลด ผู้ว่าจ้าง (VO)",
+   "options": "Variation Order"
+  },
+  {
+   "fieldname": "column_break_detail",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "reason",
+   "fieldtype": "Small Text",
+   "label": "เหตุผล",
+   "reqd": 1
+  },
+  {
+   "fieldname": "section_items",
+   "fieldtype": "Section Break",
+   "label": "รายการงานเพิ่ม (แนบท้ายสัญญา)"
+  },
+  {
+   "fieldname": "items",
+   "fieldtype": "Table",
+   "label": "รายการ",
+   "options": "Subcontract Variation Item",
+   "reqd": 1
+  },
+  {
+   "fieldname": "section_amounts",
+   "fieldtype": "Section Break",
+   "label": "มูลค่า (ก่อน VAT)"
+  },
+  {
+   "fieldname": "previous_amount",
+   "fieldtype": "Currency",
+   "label": "มูลค่าสัญญาก่อนแก้",
+   "options": "Company:company:default_currency",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_amounts1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "addition_amount",
+   "fieldtype": "Currency",
+   "label": "มูลค่างานเพิ่ม",
+   "options": "Company:company:default_currency",
+   "read_only": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "column_break_amounts2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "revised_amount",
+   "fieldtype": "Currency",
+   "label": "มูลค่าสัญญาหลังแก้",
+   "options": "Company:company:default_currency",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_po",
+   "fieldtype": "Section Break",
+   "label": "ใบสั่งซื้อ"
+  },
+  {
+   "fieldname": "purchase_order",
+   "fieldtype": "Link",
+   "label": "ใบสั่งซื้อ (PO)",
+   "options": "Purchase Order",
+   "read_only": 1,
+   "no_copy": 1,
+   "allow_on_submit": 1
+  },
+  {
+   "fieldname": "column_break_po",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "po_snapshot",
+   "fieldtype": "Attach",
+   "label": "PO ฉบับก่อนแก้ (PDF)",
+   "read_only": 1,
+   "no_copy": 1,
+   "allow_on_submit": 1
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "options": "Subcontract Variation",
+   "no_copy": 1,
+   "print_hide": 1,
+   "read_only": 1,
+   "search_index": 1
+  }
+ ],
+ "grid_page_length": 50,
+ "is_submittable": 1,
+ "links": [],
+ "modified": "2026-11-15 16:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "ConsBiz",
+ "name": "Subcontract Variation",
+ "naming_rule": "By \"Naming Series\" field",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "create": 1,
+   "write": 1,
+   "delete": 1,
+   "share": 1,
+   "email": 1,
+   "submit": 1,
+   "cancel": 1,
+   "amend": 1
+  },
+  {
+   "role": "Projects Manager",
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "create": 1,
+   "write": 1,
+   "delete": 1,
+   "share": 1,
+   "email": 1,
+   "submit": 1,
+   "cancel": 1,
+   "amend": 1
+  },
+  {
+   "role": "Purchase Manager",
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "create": 1,
+   "write": 1,
+   "delete": 1,
+   "share": 1,
+   "email": 1,
+   "submit": 1,
+   "cancel": 1,
+   "amend": 1
+  },
+  {
+   "role": "Projects User",
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1
+  },
+  {
+   "role": "Purchase User",
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1
+  },
+  {
+   "role": "Accounts Manager",
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1
+  },
+  {
+   "role": "Accounts User",
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "search_fields": "supplier_name,subcontract_agreement",
+ "sort_field": "posting_date",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "supplier_name",
+ "track_changes": 1
+}

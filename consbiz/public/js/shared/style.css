@@ -3120,6 +3120,16 @@ svg.ss-check {
 	--ss-brand-2: #c2410c;
 	--ss-brand-soft: #ffe4e6;
 }
+[data-section="saraban"] {
+	--ss-brand: #0e7490;
+	--ss-brand-2: #4f46e5;
+	--ss-brand-soft: #cffafe;
+}
+[data-section="subcontract"] {
+	--ss-brand: #9a3412;
+	--ss-brand-2: #b45309;
+	--ss-brand-soft: #ffedd5;
+}
 [data-section="self"] {
 	--ss-brand: #15803d;
 	--ss-brand-2: #0f766e;
@@ -3157,6 +3167,16 @@ svg.ss-check {
 		--ss-brand: #fb7185;
 		--ss-brand-2: #fb923c;
 		--ss-brand-soft: rgba(251, 113, 133, 0.15);
+	}
+	[data-section="saraban"] {
+		--ss-brand: #22d3ee;
+		--ss-brand-2: #818cf8;
+		--ss-brand-soft: rgba(34, 211, 238, 0.15);
+	}
+	[data-section="subcontract"] {
+		--ss-brand: #fb923c;
+		--ss-brand-2: #fbbf24;
+		--ss-brand-soft: rgba(251, 146, 60, 0.15);
 	}
 	[data-section="self"] {
 		--ss-brand: #4ade80;

@@ -92,6 +92,24 @@ export const MODULE_META = {
 			theme: "#be123c",
 			colors: ["#be123c", "#c2410c"],
 		},
+		// สารบรรณ: หนังสือเข้า-ออก ใบนำส่งเอกสาร ใบปะหน้าซอง (consbiz/saraban.py)
+		saraban: {
+			label: "สารบรรณ",
+			title: "งานสารบรรณ",
+			note: "หนังสือเข้า-ออก ใบนำส่งเอกสาร ใบปะหน้าซอง",
+			icon: "send",
+			theme: "#0e7490",
+			colors: ["#0e7490", "#4f46e5"],
+		},
+		// ผู้รับเหมาช่วง: สัญญาจ้างเหมาช่วง + ใบเบิกงวด (consbiz/subcontract_app.py)
+		subcontract: {
+			label: "ผรม.",
+			title: "ผู้รับเหมาช่วง",
+			note: "สัญญาจ้างเหมาช่วง ใบเบิกงวด",
+			icon: "hardhat",
+			theme: "#9a3412",
+			colors: ["#9a3412", "#b45309"],
+		},
 	},
 	self: {
 		self: {

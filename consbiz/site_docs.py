@@ -529,6 +529,12 @@ def get_summary(section, project=None, scope="project", company=None):
 				"pi", scoped("pi", {**DOCS["pi"]["todo"], "due_date": ("<", today)}), "outstanding_amount"
 			),
 			"drafts_by_kind": drafts(("mr", "po", "pi")),
+			# PO ที่แก้ตามใบงานเพิ่ม ผรม. แล้วยังไม่ส่งฉบับใหม่ให้ผู้รับเหมา (งานกลางของฝ่ายจัดซื้อ)
+			"po_resend": top(
+				"po", scoped("po", {"docstatus": 1, "custom_revision_pending": 1}), "modified asc"
+			)
+			if frappe.get_meta("Purchase Order").has_field("custom_revision_pending")
+			else [],
 			"due_soon": top(
 				"po",
 				scoped(
@@ -851,6 +857,41 @@ def get_doc(kind, name):
 		"after_submit": after_submit_info(doc, kind),
 		"next_kind": next_of(doc, kind),
 		"pdf_url": pdf_url(doc.doctype, doc.name),
+		"revision": revision_of(doc) if kind == "po" else None,
+	}
+
+
+def revision_of(doc):
+	"""PO ที่แก้ตามใบงานเพิ่ม ผรม. (consbiz/subcontract_variation.py): Rev. ปัจจุบัน, รอส่งผู้รับเหมา, PDF ฉบับก่อนๆ"""
+	from consbiz.subcontract import PURCHASE_ROLES
+
+	if not doc.meta.has_field("custom_revision_pending"):
+		return None
+	if not (cint(doc.custom_revision) or doc.custom_revision_pending or doc.custom_revision_sent_by):
+		return None
+	files = frappe.get_all(
+		"File",
+		filters={
+			"attached_to_doctype": doc.doctype,
+			"attached_to_name": doc.name,
+			"file_name": ("like", f"{doc.name}-Rev%.pdf"),
+		},
+		fields=["file_name", "file_url"],
+		order_by="creation asc",
+	)
+	return {
+		"revision": cint(doc.custom_revision),
+		"note": doc.custom_revision_note,
+		"pending": cint(doc.custom_revision_pending),
+		"sent_by_name": frappe.utils.get_fullname(doc.custom_revision_sent_by)
+		if doc.custom_revision_sent_by
+		else None,
+		"sent_on": doc.custom_revision_sent_on,
+		"snapshots": files,
+		"can_mark_sent": bool(
+			cint(doc.custom_revision_pending)
+			and (doc.has_permission("write") or set(PURCHASE_ROLES) & set(frappe.get_roles()))
+		),
 	}
 
 

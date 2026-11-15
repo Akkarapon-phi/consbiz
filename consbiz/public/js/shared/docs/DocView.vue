@@ -149,6 +149,36 @@
 					</dl>
 				</section>
 
+				<!-- PO ที่แก้ตามใบงานเพิ่ม ผรม.: Rev. ปัจจุบัน + รอส่งผู้รับเหมา (ใครในฝ่ายจัดซื้อก็กดส่งได้) + PDF ฉบับก่อนๆ -->
+				<div v-if="doc.revision" class="ss-banner" :class="doc.revision.pending ? 'tone-amber' : 'tone-blue'">
+					<Icon :name="doc.revision.pending ? 'alert' : 'check'" :size="22" />
+					<div class="ss-grow">
+						<div class="ss-banner-title">
+							Rev.{{ doc.revision.revision }}
+							{{ doc.revision.pending ? "รอส่งฉบับนี้ให้ผู้รับเหมา" : "ส่งผู้รับเหมาแล้ว" }}
+						</div>
+						<div class="ss-banner-text">
+							{{ doc.revision.note || "ฉบับตามสัญญาเดิม" }}
+							<template v-if="!doc.revision.pending && doc.revision.sent_by_name">
+								· ส่งโดย {{ doc.revision.sent_by_name }}
+								{{ thai_date(doc.revision.sent_on, { year: true }) }}
+							</template>
+							<template v-for="f in doc.revision.snapshots" :key="f.file_url">
+								· <a :href="f.file_url" target="_blank">{{ f.file_name }}</a>
+							</template>
+						</div>
+					</div>
+					<button
+						v-if="doc.revision.can_mark_sent"
+						type="button"
+						class="ss-btn ss-btn--primary"
+						:disabled="busy"
+						@click="mark_sent"
+					>
+						ส่งผู้รับเหมาแล้ว
+					</button>
+				</div>
+
 				<div class="ss-dv-body">
 					<div class="ss-dv-main">
 						<h2 class="ss-section-title ss-section-title--first">
@@ -727,6 +757,20 @@ async function load() {
 		doc.value = await call("consbiz.site_docs.get_doc", { kind: params.kind, name: params.name });
 	} catch (error) {
 		show_error(error);
+	}
+}
+
+async function mark_sent() {
+	busy.value = true;
+	try {
+		await post("consbiz.subcontract.mark_po_sent", { name: params.name });
+		toast("บันทึกว่าส่งผู้รับเหมาแล้ว", "success");
+		reload_summary();
+		await load();
+	} catch (error) {
+		show_error(error);
+	} finally {
+		busy.value = false;
 	}
 }
 

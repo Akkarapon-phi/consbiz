@@ -54,6 +54,16 @@ def office_sections():
 	from consbiz import hr_attendance
 
 	sections += hr_attendance.hr_sections()
+	# สารบรรณ: หนังสือเข้า-ออก ใบนำส่ง ใบปะหน้า (consbiz/saraban.py) เห็นเมื่ออ่านได้อย่างน้อย 1 ชนิด
+	from consbiz import saraban
+
+	if saraban.saraban_kinds():
+		sections.append("saraban")
+	# ผู้รับเหมาช่วง: สัญญา + ใบเบิกงวด (consbiz/subcontract_app.py)
+	from consbiz import subcontract_app
+
+	if subcontract_app.readable_kinds():
+		sections.append("subcontract")
 	return sections
 
 
@@ -178,6 +188,12 @@ def office_boot_data():
 	from consbiz import hr_payroll
 
 	boot["can"]["payroll"] = "hr" in sections and hr_payroll.can_manage()
+	from consbiz import saraban
+
+	boot["saraban"] = saraban.boot_permissions()
+	from consbiz import subcontract_app
+
+	boot["subcontract"] = subcontract_app.boot_permissions()
 	add_apps(boot, ("office", sections))
 	return boot
 

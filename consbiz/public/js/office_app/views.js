@@ -12,6 +12,12 @@ import HrSetup from "./views/hr/HrSetup.vue";
 import HrAdjustments from "./views/hr/HrAdjustments.vue";
 import HrSalaries from "./views/hr/HrSalaries.vue";
 import HrAdvances from "./views/hr/HrAdvances.vue";
+import KindList from "./views/common/KindList.vue";
+import SarabanView from "./views/saraban/SarabanView.vue";
+import SarabanForm from "./views/saraban/SarabanForm.vue";
+import AgreementPage from "./views/subcontract/AgreementPage.vue";
+import ClaimPage from "./views/subcontract/ClaimPage.vue";
+import VariationPage from "./views/subcontract/VariationPage.vue";
 
 export default {
 	buy: DocsHome,
@@ -34,4 +40,16 @@ export default {
 	"hr-adjustments": HrAdjustments,
 	"hr-salaries": HrSalaries,
 	"hr-advances": HrAdvances,
+	"letters-in": KindList,
+	"letters-out": KindList,
+	transmittals: KindList,
+	envelopes: KindList,
+	"saraban-doc": SarabanView,
+	"saraban-form": SarabanForm,
+	agreements: KindList,
+	claims: KindList,
+	agreement: AgreementPage,
+	claim: ClaimPage,
+	variations: KindList,
+	variation: VariationPage,
 };

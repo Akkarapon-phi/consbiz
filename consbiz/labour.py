@@ -443,6 +443,8 @@ SETTING_FIELDS = (
 	"other_deduction_account",
 	"subcontract_item",
 	"subcontract_wht_percent",
+	"subcontract_expense_account",
+	"penalty_income_account",
 )
 
 
@@ -548,6 +550,8 @@ ACCOUNT_FILTERS = {
 	"sso_payable_account": ("Liability",),
 	"advance_account": ("Asset",),
 	"other_deduction_account": ("Income", "Expense", "Liability"),
+	"subcontract_expense_account": ("Expense",),
+	"penalty_income_account": ("Income",),
 }
 
 
@@ -605,6 +609,8 @@ ACCOUNT_SUGGESTIONS = {
 	"sso_payable_account": ("เงินประกันสังคมค้างนำส่ง", ("ประกันสังคม", "ภาษี"), "default_payroll_payable_account"),
 	"advance_account": ("เงินเบิกล่วงหน้าคนงานรายวัน", ("หมุนเวียนอื่น", "เงินทดรอง"), "default_employee_advance_account"),
 	"other_deduction_account": ("รายได้อื่น - หักค่าแรงคนงาน", ("รายได้อื่น",), None),
+	"subcontract_expense_account": ("ค่าจ้างเหมาช่วง", ("ต้นทุน",), "default_expense_account"),
+	"penalty_income_account": ("รายได้ค่าปรับผู้รับเหมา", ("รายได้อื่น",), None),
 }
 
 

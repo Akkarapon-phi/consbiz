@@ -165,6 +165,14 @@ const GROUPS = [
 			{ field: "subcontract_wht_percent", label: "หัก ณ ที่จ่าย (%)", hint: "ปกติ 3% ใส่ 0 = ไม่หัก" },
 		],
 	},
+	{
+		title: "สัญญาจ้างเหมาช่วง",
+		hint: "PO ของสัญญาและใบแจ้งหนี้จากใบเบิกงวดใช้ \"รายการค่าแรง ผรม.\" ด้านบน ค่าปรับหักเป็นรายได้ในตารางหักของใบแจ้งหนี้",
+		fields: [
+			{ field: "subcontract_expense_account", label: "ค่าจ้างเหมาช่วง", hint: "ค่าใช้จ่าย (Expense) ว่าง = ใช้บัญชีของ Item" },
+			{ field: "penalty_income_account", label: "รายได้ค่าปรับผู้รับเหมา", hint: "รายได้ (Income) ต้องตั้งเมื่อใบเบิกมีค่าปรับ" },
+		],
+	},
 ];
 
 const data = ref(null);

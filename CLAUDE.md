@@ -171,7 +171,7 @@ pre-commit run --all-files                               # ruff + prettier (ต�
   | URL | คนใช้ | เนื้อหา |
   |---|---|---|
   | `/conserp` | หน้างาน (มือถือ) | ควบคุมงาน, สโตร์, แผนงาน, ทรัพยากร, การเงิน, ขอซื้อ/ขอเบิก + ติดตามสถานะ |
-  | `/conserp/purchase`, `/conserp/sales`, ... | ออฟฟิศ (จอใหญ่) | ซื้อ, ขาย, บัญชี, ประกันผลงาน, แอดมิน (หนังสือเข้า-ออก, สัญญา ผรม., ใบนำส่ง, ใบปะหน้า, ค่าแรงรายวัน) |
+  | `/conserp/purchase`, `/conserp/sales`, ... | ออฟฟิศ (จอใหญ่) | ซื้อ, ขาย, บัญชี, ประกันผลงาน, สารบรรณ (หนังสือเข้า-ออก, ใบนำส่ง, ใบปะหน้า), ผู้รับเหมาช่วง (สัญญา, ใบเบิกงวด) (ค่าแรงรายวันอยู่หมวดธุรการของหน้างาน) |
   | `/conserp/self` | พนักงานทุกคน | Self Service: ลงเวลา, ลา, สลิป, วันหยุดประจำสัปดาห์ + ตารางทีม, เบิกเงินเดือนล่วงหน้า/เงินสำรองจ่าย/เบิกคืน + อนุมัติ หน้าจอครอบ HRMS (แทนแผน `/hr-app` เดิม) |
   | `/contractor` | ผู้รับเหมาช่วง (คนนอก) | อัปเดตผลงาน, ดูสัญญา/งวดของตัวเอง API แยกและตรวจสิทธิ์ทุกคำขอ |
   ห้ามใช้ `/me` (หน้า My Account ของ Frappe), `/hr/...` (Roster ของ HRMS), `/hrms` (ESS ของ HRMS)
@@ -365,6 +365,43 @@ pre-commit run --all-files                               # ruff + prettier (ต�
   ช่องติ๊ก "ไม่หักเงิน (ตักเตือน)" แยกจากสถานะ (ขาด/ครึ่งวัน, `WAIVABLE`): บันทึกเป็น Present ให้จ่ายค่าจ้าง สถานะจริงใน `Attendance.custom_waived_status`
   นับแยก (`totals.waived`) ไว้ใช้ทางวินัย ขาดบ่อยเกิน HR กด "หักเงินวันที่ยกเว้นไว้" (`charge_waived` = บันทึกเป็นสถานะจริง) ก่อนยืนยันสลิป
   "บันทึก Attendance" (`close_period`) = สร้างของวันมาทำงาน/ขาดถึงเมื่อวาน ต้องไม่มีวันรอตัดสิน ผูก `Employee Checkin.attendance` ของวันนั้น
+- สารบรรณ (หมวด `saraban` ของแอปออฟฟิศ `/conserp/saraban`, `consbiz/saraban.py`, `office_app/views/saraban/`, เริ่ม 2026-11-14):
+  หน้าจอครอบ `Letter In` / `Letter Out` / `Transmittal` / `Envelope` (กฎของเอกสารอยู่ใน DocType เหมือนเดิม) 1 ชนิด = 1 เมนู
+  ชนิด (kind) = ชื่อหน้ารายการ (`letters-in`, `letters-out`, `transmittals`, `envelopes`) ทั้งใน `KINDS` ของ saraban.py และ `kinds.js`
+  เพราะหน้าดู/ฟอร์ม (`saraban-doc`, `saraban-form`) ไฮไลต์เมนูตาม `params.kind` (`kind_pages`) หน้าแรกของหมวด = เมนูแรกที่เปิดได้ (getter `home` ใน sections.js)
+  สิทธิ์ต่อชนิด = `boot.saraban` (`boot_permissions`: อ่านได้ = มีเมนู, `create` = ปุ่มสร้าง) หมวดแสดงเมื่ออ่านได้อย่างน้อย 1 ชนิด (`saraban_kinds`)
+  หลัง Submit แก้ได้เฉพาะ `after` ของ KINDS: สถานะหนังสือออก (`document_status`), วันที่ส่ง/ผู้รับ/วันที่รับของใบนำส่ง ยกเลิกได้ในแอป แก้ฉบับ (Amend) ใช้ระบบเต็ม
+  หนังสือเข้า: บันทึกและลงรับ (Submit) → เสนออนุมัติ (`propose`, ผู้ใช้ Role `Approver`) → ผู้อนุมัติ `decide` (ไม่อนุมัติต้องมีเหตุผล) ระหว่างรอ `withdraw` / `change_approver`
+  ขั้นตอนเดียวกับปุ่มในฟอร์มระบบเต็ม (`letter_in.js`) แจ้งผู้อนุมัติด้วย Assign To (ปิดเมื่อพิจารณา ยกเลิกเมื่อถอน/เปลี่ยน) ผู้อนุมัติไม่ต้องมีสิทธิ์เขียน (ตรวจสิทธิ์ของขั้นแล้วบันทึกแบบ ignore_permissions)
+  ตัวเลขเมนู: หนังสือรอผู้ใช้คนนี้อนุมัติ (`to_approve`) และใบนำส่งรอส่ง (`to_send`)
+  ใบนำส่ง "ดึงเอกสาร" = `transmittal.get_documents` (ผ่าน `transmittal_documents`) ใบปะหน้าสร้างจากใบนำส่งผ่าน `envelope.make_envelope` (`saraban-form/envelopes/new/<ใบนำส่ง>`)
+  ใบปะหน้าพิมพ์ได้ 3 ขนาด (`ENVELOPE_FORMATS`: Print Format `Envelope`, `Envelope DL`, `Envelope 9/125`)
+- ผู้รับเหมาช่วง (หมวด `subcontract` ของแอปออฟฟิศ `/conserp/subcontract`, ตกลง 2026-11-14): กฎ/การคำนวณ `consbiz/subcontract.py`, API แอป `consbiz/subcontract_app.py`, หน้า `office_app/views/subcontract/`
+  `Subcontract Agreement` (สัญญา): รายการงาน (WBS ในแผน, ปริมาณ x ราคา) + เงินประกัน/เพดาน (% ของมูลค่าสัญญา), หัก ณ ที่จ่าย, เงินล่วงหน้า/% หักคืนต่องวด, ค่าปรับต่อวัน, ระยะรับประกัน
+  วิธีเบิก `Measured` (กรอกปริมาณงวดนี้รายแถว ระบบคิดสะสม/คงเหลือ, ตกลง 2026-11-15) / `Milestone` (เลือกงวด = % ของทุกแถว งวดสุดท้ายเบิกส่วนที่เหลือ, % งวดรวม 100) ทั้งสองแบบจึงเป็นปริมาณต่อแถว PO/PI ผูกรายแถว (`purchase_order_item`) ยอดผูกพันในหน้าการเงินถูก
+  บริษัทตามโครงการเสมอ (`set_company` ตอน before_insert ด้วย เพราะเลขที่ `.ABBR.` ตั้งก่อน validate และค่าตั้งต้นของผู้ใช้เติมบริษัทก่อน fetch)
+  Submit แล้ว "กดปุ่ม" สร้างร่าง PO (`make_purchase_order`, Item = `Labour Settings.subcontract_item` หน่วยของ Item ปริมาณ/หน่วยจริงอยู่ในคำอธิบาย) ไม่สร้างอัตโนมัติ (ผู้ใช้เลือก 2026-11-14)
+  เงินล่วงหน้า = ร่าง Payment Entry อ้าง PO (`make_advance_payment`) ยอดที่จ่ายแล้วอ่านจาก `Purchase Order.advance_paid`
+  `Subcontract Claim` (ใบเบิกงวด): ร่างโดยวิศวกร (Projects User) หรือ ผรม. (แอป `/contractor` ยังไม่ทำ) Submit = อนุมัติ (Projects/Purchase Manager) แล้วกดสร้างร่าง PI (`make_purchase_invoice`)
+  ยอดก่อน VAT: หักคืนเงินล่วงหน้า = % ของงวด ไม่เกินยอดที่จ่ายจริงที่ยังหักไม่หมด, เงินประกัน = % ของงวด ไม่เกินเพดานที่เหลือ, ค่าปรับ = วัน x ค่าปรับ
+  PI: หัก ณ ที่จ่าย/เงินประกันเป็นยอดจากใบเบิก (`set_deductions`, ระบบเดิมสร้าง Retention Payable ตอน Submit PI), เงินล่วงหน้าผ่านตาราง advances (จัดสรรไม่เกินยอดหักคืน), ค่าปรับเป็นแถวหักบัญชี `Labour Settings.penalty_income_account`
+  ยอดสรุปของสัญญาคำนวณใหม่จากใบเบิกที่ Submit ทุกครั้ง (`refresh_agreement`) ยกเลิกใบเบิก = ลบร่าง PI (PI ที่ Submit แล้วต้องยกเลิกก่อน)
+  % งานจริงต่อแถวมาจาก `Construction Management Task.progress` ตาม WBS เบิกเกินแสดงคำเตือน (ไม่บล็อก) ฟอร์มในแอปคำนวณยอดจาก server ทันที (`preview_claim`)
+  ตั้งค่าบัญชี: Labour Settings หัวข้อ "สัญญาจ้างเหมาช่วง" (`subcontract_expense_account`, `penalty_income_account`) ในหน้าตั้งค่าค่าแรงของแอป
+  ปริมาณจ้างรวมต่องานในแผน (`check_plan_quantity`, ตกลง 2026-11-15): สัญญานี้ + สัญญาอื่นที่ Submit แล้ว (สัญญาที่ปิดนับเฉพาะที่เบิกจริง) ต้องไม่เกินปริมาณในแผน
+  (แถวงานเพิ่ม VO ที่ `source_wbs` = งานเดิมรวมกองเดียวกัน) เกิน = ห้ามบันทึก ต้องทำ VO ผู้ว่าจ้างก่อน ตรวจเฉพาะแถวที่มี WBS + หน่วยตรงแผน งานเหมาไม่ตรวจ (ฟอร์มเติมหน่วยจากแผนให้: `wbs_options` มี `uom`)
+  ไม่มีงานลด ผรม. (ตกลง 2026-11-15): งานจบต่ำกว่าสัญญาหรือ ผรม. ไม่ทำต่อ = ปิดสัญญา (`close_agreement` สถานะ `Closed` + เหตุผล + `warranty_end`, ปิด PO ด้วย ERPNext Close, มีร่างค้างปิดไม่ได้) เปิดอีกครั้งได้ (`reopen_agreement`)
+  งานเพิ่ม = `Subcontract Variation` (ใบงานเพิ่ม `SCV-`, `consbiz/subcontract_variation.py`, หน้า `VariationPage.vue`) เป็น "รายการแนบท้าย" ทุกสัญญา (ตกลง 2026-11-15):
+  แถวใหม่ในสัญญาที่มี `variation` งานหลักไม่เปลี่ยน (% งวดคิดจากงานหลักเท่านั้น) แนบท้ายเบิกตามปริมาณจริงเสมอ สัญญางวดงานไม่เลือกงวด = เบิกเฉพาะแนบท้าย
+  สัญญาเก็บ `original_amount` (งานหลัก) + `variation_amount` + `revision` (ครั้ง) ใบเบิก/หน้าสัญญาแยกกลุ่มแนบท้ายตามใบงานเพิ่ม
+  Submit = อนุมัติ: PDF ของ PO ฉบับปัจจุบันแนบที่ PO (`<PO>-Rev<n>.pdf`, ลิงก์ `po_snapshot`, สร้างไม่ได้ = ไม่อนุมัติ) → แถวแนบท้ายในสัญญา
+  → PO เดิมเลขที่เดิมด้วย `update_child_qty_rate` ของ ERPNext + คำนวณหักใหม่ + `Purchase Order.custom_revision` / `custom_revision_note` (ใส่ในแบบพิมพ์ PO เอง)
+  ยกเลิกได้เฉพาะฉบับล่าสุดและแถวแนบท้ายยังไม่ถูกเบิก (ลบแถวในสัญญาและ PO, PO กลับ Rev. ก่อนหน้า)
+  แก้/ปิด PO ตามสัญญา "ระบบทำแทน" (`subcontract.as_system`, ตกลง 2026-11-15): ตรวจสิทธิ์อนุมัติใบงานเพิ่ม/ปิดสัญญาของผู้ใช้ ไม่ต้องมีสิทธิ์ PO
+  บันทึก Comment ที่ PO ว่าใครอนุมัติ แล้วแจ้งฝ่ายจัดซื้อทุกคนของบริษัท (`notify_purchasing`, Role ใน `PURCHASE_ROLES` + User Permission ของ Company) ไม่ผูกคนสร้าง PO
+  PO ที่ Submit แล้วถูกแก้ = `custom_revision_pending` (งานกลางของฝ่ายจัดซื้อ: หน้าหลักหมวดจัดซื้อ "PO แก้ไขแล้ว รอส่งผู้รับเหมา" `po_resend`, แถบในหน้าดู PO `revision_of` + PDF ฉบับก่อนๆ)
+  ใครในฝ่ายก็กด "ส่งผู้รับเหมาแล้ว" (`mark_po_sent` → `custom_revision_sent_by/on`) หน้าสัญญา/ใบงานเพิ่มแสดงสถานะส่ง
+- หน้ารายการกลางของออฟฟิศ `office_app/views/common/KindList.vue` (สารบรรณ + ผรม.) ชนิดเอกสารรวมที่ `common/kinds.js` (api, boot, open, create, คอลัมน์ วันที่/ยอดเงิน, แท็บสถานะ)
 - คนงานรายวัน (หมวดธุรการ `admin` ของกลุ่มหน้างาน `/conserp/admin`, เริ่ม 2026-11-13, แยกจาก HRMS): `Daily Worker` (ทะเบียน, ค่าแรงเป็นประวัติใน `rates` คิดตามอัตราของแต่ละวัน, จ่ายผ่าน Company หรือ Subcontractor = Supplier)
   `Labour Timesheet` 1 ใบต่อโครงการต่อรอบ (`period_of`: 1-15 / 16-สิ้นเดือน) แถว `days` = ชั่วโมงทำงานจริง 1 คนต่อวัน (เกิน 8 = OT) วันหยุดของทั้งวันในตาราง `holidays`
   ค่าแรงตามชั่วโมง (6 ชม. = 6/8 วัน) วันหยุด x 2, OT ÷ 8 x 1.5 (วันหยุด x 3) หรือ OT เหมา (`ot_flat`) ตาราง `pay` คำนวณใหม่ทุกครั้ง (กรอกได้เฉพาะหักอื่นๆ)
@@ -409,7 +446,7 @@ pre-commit run --all-files                               # ruff + prettier (ต�
 
 - DocType: ชื่ออังกฤษ Title Case คำเต็ม (เช่น `Daily Report`, `Retention Release`)
 - เอกสารที่ submit ได้: `autoname = naming_series:` ใช้ `.ABBR.` ถ้าต้องการตัวย่อบริษัท/โครงการ
-- prefix ที่ใช้แล้ว ห้ามใช้ซ้ำ: `BCP-` Bar Cut Plan, `CM-` Construction Management, `CU-` Concrete Usage, `DR-` Daily Report, `DRQ-` Daily Request, `EB-` Equipment Borrowing, `EOT-` Extension of Time, `DW-` Daily Worker, `IR-` Inspection Request, `LA-` Labour Advance, `LT-` Labour Timesheet, `OPO-` Material Request ผู้ว่าจ้างจัดหา, `PL-` Punch List, `TX-` Transmittal, `VO-` Variation Order, `WDO-` Weekly Day Off (ตั้งชื่อด้วยโค้ด), `WHTE-` WHT Employee
+- prefix ที่ใช้แล้ว ห้ามใช้ซ้ำ: `BCP-` Bar Cut Plan, `CM-` Construction Management, `CU-` Concrete Usage, `DR-` Daily Report, `DRQ-` Daily Request, `EB-` Equipment Borrowing, `EOT-` Extension of Time, `DW-` Daily Worker, `IR-` Inspection Request, `LA-` Labour Advance, `LT-` Labour Timesheet, `OPO-` Material Request ผู้ว่าจ้างจัดหา, `PL-` Punch List, `SCA-` Subcontract Agreement, `SCC-` Subcontract Claim, `SCV-` Subcontract Variation, `TX-` Transmittal, `VO-` Variation Order, `WDO-` Weekly Day Off (ตั้งชื่อด้วยโค้ด), `WHTE-` WHT Employee
 - master ที่ตั้งชื่อตามค่า field ใช้ `field:<fieldname>` (เช่น Rebar Type, Bar Shape)
 - fieldname ของ Custom Field ขึ้นต้นด้วย `custom_`
 - CSS ของ Print Format ใช้ class ขึ้นต้น `pf-` สีใหม่ใน `style.css` ใช้ตัวแปร `--consbiz-*`
