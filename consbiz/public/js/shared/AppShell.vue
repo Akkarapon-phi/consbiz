@@ -7,6 +7,8 @@
 	>
 		<!-- แถบล่าง/ปุ่มลอยของแต่ละหน้า (Teleport มาที่นี่: ไม่ให้ transform ตอนเปลี่ยนหน้าดึงตำแหน่ง fixed) -->
 		<div id="ss-layer"></div>
+		<!-- แถบบน (TopBar.vue ของหน้า Teleport มาที่นี่): แถวบนสุดของโครง เต็มความกว้าง Dock และเนื้อหาอยู่ใต้แถวนี้ -->
+		<div id="ss-header"></div>
 		<main class="ss-stage">
 			<Transition :name="`ss-${state.direction}`">
 				<component
@@ -81,25 +83,6 @@
 						<span class="ss-rail-text">{{ pin_label }}</span>
 					</button>
 					<button
-						v-if="app.project_filter && companies.length > 1"
-						ref="company_button"
-						type="button"
-						class="ss-rail-row ss-rail-ctx"
-						:class="{ 'is-open': dock_menu === 'company' }"
-						:title="`บริษัท: ${company_label}`"
-						aria-haspopup="menu"
-						:aria-expanded="dock_menu === 'company'"
-						@click="toggle_dock_menu('company')"
-					>
-						<span class="ss-avatar" :class="`tone-${tone(state.company || 'all')}`">{{
-							state.company ? initials(company_label) : "ทั้ง"
-						}}</span>
-						<span class="ss-rail-text ss-rail-ctx-text">
-							<span>{{ company_label }}</span>
-							<small>บริษัท</small>
-						</span>
-					</button>
-					<button
 						v-if="!boot.guest"
 						ref="user_button"
 						type="button"
@@ -133,12 +116,6 @@
 		<GlobalSearch v-if="!boot.guest" :open="search_open" @close="search_open = false" />
 		<SettingsDialog v-if="boot.can?.settings || boot.can?.labour_settings" :open="settings_open" @close="settings_open = false" />
 
-		<DockMenu
-			:open="dock_menu === 'company'"
-			:anchor="company_button"
-			:groups="company_groups"
-			@close="dock_menu = ''"
-		/>
 		<DockMenu
 			:open="dock_menu === 'user'"
 			:anchor="header_user_anchor || user_button"
@@ -269,6 +246,49 @@
 			</div>
 		</Sheet>
 
+		<!-- กลุ่มออฟฟิศ: เลือกบริษัทจากปุ่มบนแถบบน (TopBar) แทนปุ่มโครงการ -->
+		<Sheet
+			:open="company_picker"
+			title="เลือกบริษัท"
+			subtitle="แสดงเอกสารเฉพาะบริษัทที่เลือก"
+			half
+			@close="company_picker = false"
+		>
+			<div class="ss-options">
+				<button
+					type="button"
+					class="ss-option ss-option--project"
+					:class="{ 'is-active': !state.company }"
+					@click="choose_company('')"
+				>
+					<span class="ss-avatar"><Icon name="layers" :size="18" /></span>
+					<span class="ss-option-main">
+						<span class="ss-option-label">ทุกบริษัท</span>
+						<span class="ss-option-desc">เอกสารของทุกบริษัท</span>
+					</span>
+					<Icon v-if="!state.company" name="check" :size="18" />
+				</button>
+				<button
+					v-for="c in companies"
+					:key="c.name"
+					type="button"
+					class="ss-option ss-option--project"
+					:class="{ 'is-active': c.name === state.company }"
+					@click="choose_company(c.name)"
+				>
+					<span class="ss-avatar" :class="{ 'has-logo': c.company_logo }">
+						<img v-if="c.company_logo" :src="c.company_logo" alt="" />
+						<template v-else>{{ initials(c.name) }}</template>
+					</span>
+					<span class="ss-option-main">
+						<span class="ss-option-label">{{ c.name }}</span>
+						<span v-if="c.abbr" class="ss-option-desc">{{ c.abbr }}</span>
+					</span>
+					<Icon v-if="c.name === state.company" name="check" :size="18" />
+				</button>
+			</div>
+		</Sheet>
+
 		<SectionLauncher :open="launcher" @close="launcher = false" />
 
 		<div class="ss-toasts" aria-live="polite">
@@ -322,7 +342,7 @@ import SettingsDialog from "./components/SettingsDialog.vue";
 import SectionLauncher from "./components/SectionLauncher.vue";
 import Desktop from "./components/Desktop.vue";
 import { app, app_of, is_desktop, is_filter_section, is_tab } from "./app.js";
-import { group_of, module_badge, module_list, MODULE_META, NEW_LOOK } from "./modules.js";
+import { group_of, is_company_section, module_badge, module_list, MODULE_META, NEW_LOOK } from "./modules.js";
 import {
 	boot,
 	call,
@@ -358,8 +378,13 @@ const desktop = computed(() => is_desktop(state.section));
 const has_shell = computed(
 	() => !!(state.project || app.project_filter || app.no_project || desktop.value)
 );
+// หน้าแสดงหลัง AppShell อยู่ในหน้าเว็บแล้ว: TopBar ของหน้า Teleport ไป #ss-header ซึ่งต้องหาเจอใน document ตอน mount
+// (Vue 3.3 ไม่มี Teleport defer และ render แรกสร้างลูกก่อนใส่ .ss-app ลงหน้าเว็บ)
+const shell_mounted = ref(false);
 const ready = computed(
-	() => has_shell.value || state.route.view === SECTIONS[state.section]?.home
+	() =>
+		shell_mounted.value &&
+		(has_shell.value || state.route.view === SECTIONS[state.section]?.home)
 );
 
 // มือถือ: แถบล่างเฉพาะหน้าหลักของเมนู (หน้าแรกไม่มี)
@@ -456,7 +481,7 @@ const filtered_projects = computed(() => {
 	const q = project_txt.value.trim().toLowerCase();
 	// ออฟฟิศ: เฉพาะโครงการของบริษัทที่เลือก
 	const list = (projects.value || []).filter(
-		(p) => !app.project_filter || !state.company || p.company === state.company
+		(p) => !is_company_section(state.section) || !state.company || p.company === state.company
 	);
 	return q
 		? list.filter((p) =>
@@ -504,29 +529,10 @@ watch(
 
 const companies = boot.companies || [];
 const company_label = computed(() => state.company || "ทุกบริษัท");
-const company_groups = computed(() => [
-	{
-		label: "เปลี่ยนบริษัท",
-		items: [
-			{
-				key: "",
-				label: "ทุกบริษัท",
-				icon: "layers",
-				selected: !state.company,
-				onclick: () => choose_company(""),
-			},
-			...companies.map((c) => ({
-				key: c.name,
-				label: c.name,
-				image: c.company_logo,
-				icon: "building",
-				selected: c.name === state.company,
-				onclick: () => choose_company(c.name),
-			})),
-		],
-	},
-]);
+const company_picker = ref(false);
+provide("open_company_picker", () => (company_picker.value = true));
 function choose_company(company) {
+	company_picker.value = false;
 	const changed = company !== state.company;
 	set_company(company);
 	if (!changed) return;
@@ -629,10 +635,9 @@ function close_peek(event) {
 	if (peek.value && !event.target.closest?.(".ss-rail, .ss-menu")) peek.value = false;
 }
 
-// ---------------------------------------------------------------- เมนูท้าย Dock (บริษัท / ผู้ใช้)
+// ---------------------------------------------------------------- เมนูท้าย Dock (ผู้ใช้)
 
 const dock_menu = ref("");
-const company_button = ref(null);
 const user_button = ref(null);
 const header_user_anchor = ref(null);
 function toggle_dock_menu(name) {
@@ -698,6 +703,7 @@ provide("open_user_menu", toggle_header_user_menu);
 provide("section_nav", { tabs, active_view, open_tab });
 
 onMounted(async () => {
+	shell_mounted.value = true;
 	// ?project=<รหัส> เลือกโครงการให้เลย (ลิงก์จากฟอร์ม Project / CM, กดการแจ้งเตือน)
 	const wanted = new URLSearchParams(location.search).get("project");
 	const remembered = remembered_project();
@@ -723,7 +729,12 @@ onMounted(async () => {
 	}
 	// ออฟฟิศ: โครงการเป็นแค่ตัวกรอง ไม่ต้องเลือกก่อน (ตัวกรองต้องเป็นของบริษัทที่เลือก)
 	if (app.project_filter) {
-		if (state.project && state.company && state.project.company !== state.company)
+		if (
+			is_company_section(state.section) &&
+			state.project &&
+			state.company &&
+			state.project.company !== state.company
+		)
 			state.project = null;
 		load_summaries();
 	} else if (!state.project && projects.value.length === 1) {

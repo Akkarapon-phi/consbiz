@@ -1,5 +1,5 @@
 <!-- ตัวกรองโครงการของแอปออฟฟิศ (app.project_filter): ปุ่มเปิดหน้าเลือกโครงการ (ใน AppShell) ว่าง = ทุกโครงการ
-     แอปหน้างานใช้ ScopeSwitch / ตัวเลือกขอบเขต (โครงการที่ทำงานอยู่ / ทุกโครงการ) แทน -->
+     หมวดหน้างานใช้โครงการที่เลือกที่แถบบนเท่านั้น (ไม่มีตัวเลือกขอบเขต) -->
 <template>
 	<span class="ss-project-filter" :class="{ 'is-active': state.project }">
 		<button
@@ -26,13 +26,17 @@
 </template>
 
 <script setup>
-import { computed, inject } from "vue";
+import { computed, inject, onBeforeUnmount, onMounted } from "vue";
 import Icon from "../components/Icon.vue";
 import { state } from "../api.js";
 
 const open_picker = inject("open_project_picker");
 const choose_project = inject("choose_project");
 const name = computed(() => state.project?.project_name || state.project?.name || "");
+
+// กลุ่มออฟฟิศกรองโครงการเฉพาะตอนมีตัวกรองนี้บนหน้า (scope_args)
+onMounted(() => state.project_filter_shown++);
+onBeforeUnmount(() => state.project_filter_shown--);
 
 // เลิกกรอง = ทุกโครงการ (AppShell จำค่าและโหลดตัวเลขใหม่)
 const clear = () => choose_project(null);

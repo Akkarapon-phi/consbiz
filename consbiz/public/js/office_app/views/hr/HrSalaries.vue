@@ -3,20 +3,18 @@
 <template>
 	<div>
 		<TopBar title="ค่าจ้างพนักงาน">
-			<template #search>
-				<HeaderSearch v-if="wide" v-model="txt" placeholder="ค้นหาชื่อ ตำแหน่ง แผนก" />
-			</template>
 		</TopBar>
 
 		<div class="ss-content">
-			<div v-if="wide" class="ss-list-head">
-				<StatusTabs v-model="filter" :options="tabs" />
-				<div class="ss-list-tools">
-					<button type="button" class="ss-icon-btn" :class="{ 'is-spinning': loading }" aria-label="โหลดใหม่" title="โหลดใหม่" @click="load">
-						<Icon name="refresh" :size="17" />
-					</button>
-				</div>
-			</div>
+			<ListHead
+				v-model:search="txt"
+				search_placeholder="ค้นหาชื่อ ตำแหน่ง แผนก"
+				v-if="wide"
+				v-model="filter"
+				:tabs="tabs"
+				:loading="loading"
+				@refresh="load"
+			/>
 			<Segmented v-else v-model="filter" :options="tabs" />
 
 			<Skeleton v-if="data === null" :rows="6" />
@@ -92,7 +90,6 @@
 
 <script setup>
 import { computed, reactive, ref, watch } from "vue";
-import Icon from "../../../shared/components/Icon.vue";
 import TopBar from "../../../shared/components/TopBar.vue";
 import Segmented from "../../../shared/components/Segmented.vue";
 import Skeleton from "../../../shared/components/Skeleton.vue";
@@ -102,8 +99,7 @@ import SelectBox from "../../../shared/components/SelectBox.vue";
 import MoneyInput from "../../../shared/components/MoneyInput.vue";
 import DateInput from "../../../shared/components/DateInput.vue";
 import DataTable from "../../../shared/components/DataTable.vue";
-import StatusTabs from "../../../shared/components/StatusTabs.vue";
-import HeaderSearch from "../../../shared/components/HeaderSearch.vue";
+import ListHead from "../../../shared/components/ListHead.vue";
 import { matches, use_wide } from "../../../shared/table.js";
 import { call, money, post, show_error, state, strip_html, thai_date, toast } from "../../../shared/api.js";
 

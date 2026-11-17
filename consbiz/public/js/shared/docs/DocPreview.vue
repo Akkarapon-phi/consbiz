@@ -1,5 +1,5 @@
 <!-- ตัวอย่างเอกสารข้างตารางรายการ (จอ ≥1480, DocList.vue) ดูได้โดยไม่เปลี่ยนหน้า
-     ข้อมูลเดียวกับหน้าดู (site_docs.get_doc) แบบย่อ + ปุ่ม PDF / แก้ไข / ส่ง / สร้างเอกสารถัดไป / เปิดเต็มหน้า -->
+     ข้อมูลเดียวกับหน้าดู (site_docs.get_doc) แบบย่อ + ปุ่ม PDF / แก้ไข / ยืนยัน / สร้างเอกสารถัดไป / เปิดเต็มหน้า -->
 <template>
 	<aside class="ss-preview" :aria-label="`ตัวอย่าง ${name}`">
 		<header class="ss-preview-head">
@@ -97,7 +97,7 @@
 
 		<footer v-if="doc" class="ss-preview-foot">
 			<template v-if="confirm">
-				<span class="ss-preview-confirm">ส่งแล้วแก้ไขไม่ได้ ยืนยัน?</span>
+				<span class="ss-preview-confirm">ยืนยันแล้วแก้ไขไม่ได้ ยืนยัน?</span>
 				<button type="button" class="ss-btn ss-btn--ghost ss-btn--sm" @click="confirm = false">
 					ยกเลิก
 				</button>
@@ -108,7 +108,7 @@
 					@click="submit"
 				>
 					<span v-if="busy" class="ss-spinner"></span>
-					<template v-else>ยืนยันส่ง</template>
+					<template v-else>ยืนยัน</template>
 				</button>
 			</template>
 			<template v-else>
@@ -161,7 +161,7 @@
 					class="ss-btn ss-btn--primary ss-btn--sm"
 					@click="confirm = true"
 				>
-					ส่ง{{ config.label }}
+					ยืนยัน{{ config.label }}
 				</button>
 				<button
 					v-else-if="doc.next_kind && in_app(doc.next_kind)"
@@ -232,7 +232,7 @@ async function submit() {
 	busy.value = true;
 	try {
 		await post("consbiz.site_docs.submit_doc", { kind: props.kind, name: props.name });
-		await celebrate(`ส่ง${config.value.label}แล้ว`, props.name);
+		await celebrate(`ยืนยัน${config.value.label}แล้ว`, props.name);
 		emit("changed");
 		await load();
 	} catch (error) {

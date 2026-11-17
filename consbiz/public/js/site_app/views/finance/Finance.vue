@@ -13,16 +13,25 @@
 			<Empty icon="alert" title="ไม่มีสิทธิ์ดูข้อมูลการเงิน" text="ต้องมีสิทธิ์เห็นงบต้นทุนของแผนงาน" />
 		</div>
 		<div v-else class="ss-content ss-fin">
-			<div :class="wide ? 'ss-list-head' : 'ss-fin-head'">
-				<StatusTabs v-if="wide" v-model="tab" :options="TABS" />
-				<Segmented v-else v-model="tab" :options="TABS" />
-				<div :class="wide ? 'ss-list-tools' : 'ss-fin-date'">
+			<ListHead
+				v-if="wide"
+				v-model="tab"
+				:tabs="TABS"
+				:loading="finance.loading"
+				@refresh="load_finance(project, { force: true })"
+			>
+				<template #tools>
 					<span class="ss-fin-date-label">ณ วันที่</span>
-					<DateInput :model-value="finance.date" :variant="wide ? 'tool' : 'field'" label="ณ วันที่" @update:model-value="set_date" />
-					<button type="button" class="ss-btn" :class="{ 'ss-btn--soft ss-list-create': wide }" :disabled="finance.date === today()" @click="set_date(today())"><span>วันนี้</span></button>
-					<button v-if="wide" type="button" class="ss-icon-btn" :class="{ 'is-spinning': finance.loading }" aria-label="โหลดใหม่" @click="load_finance(project, { force: true })">
-						<Icon name="refresh" :size="17" />
-					</button>
+					<DateInput :model-value="finance.date" variant="tool" label="ณ วันที่" @update:model-value="set_date" />
+					<button type="button" class="ss-btn ss-btn--soft ss-list-create" :disabled="finance.date === today()" @click="set_date(today())"><span>วันนี้</span></button>
+				</template>
+			</ListHead>
+			<div v-else class="ss-fin-head">
+				<Segmented v-model="tab" :options="TABS" />
+				<div class="ss-fin-date">
+					<span class="ss-fin-date-label">ณ วันที่</span>
+					<DateInput :model-value="finance.date" variant="field" label="ณ วันที่" @update:model-value="set_date" />
+					<button type="button" class="ss-btn" :disabled="finance.date === today()" @click="set_date(today())"><span>วันนี้</span></button>
 				</div>
 			</div>
 
@@ -179,11 +188,11 @@ import Skeleton from "../../../shared/components/Skeleton.vue";
 import Empty from "../../../shared/components/Empty.vue";
 import DateInput from "../../../shared/components/DateInput.vue";
 import Segmented from "../../../shared/components/Segmented.vue";
-import StatusTabs from "../../../shared/components/StatusTabs.vue";
 import { boot, money, remember_tab, state, thai_date } from "../../../shared/api.js";
 import { use_wide } from "../../../shared/table.js";
 import { MONTHS } from "../pm/planner/time_axis.js";
 import MoneyChart from "./MoneyChart.vue";
+import ListHead from "../../../shared/components/ListHead.vue";
 import { finance, load_finance, today } from "./finance_data.js";
 
 const TABS = [

@@ -3,7 +3,7 @@
 // ค่าของแต่ละแอป (หมวด/หน้า/base) อยู่ใน app.js (configure ใน bundle ของแอป)
 import { reactive } from "vue";
 import { app, is_desktop, is_filter_section, is_tab, route_in, section_for, section_of } from "./app.js";
-import { NEW_LOOK } from "./modules.js";
+import { NEW_LOOK, is_company_section } from "./modules.js";
 
 const API = "consbiz.store_app.";
 const section_key = () => `${app.storage}.section`;
@@ -16,15 +16,6 @@ function remembered(key, fallback) {
 		return localStorage.getItem(key) || fallback;
 	} catch {
 		return fallback;
-	}
-}
-
-export function set_doc_scope(scope) {
-	state.doc_scope = scope;
-	try {
-		localStorage.setItem("consbiz.site.doc_scope", scope);
-	} catch {
-		// private mode
 	}
 }
 
@@ -43,13 +34,14 @@ export const state = reactive({
 	project: null, // {name, project_name, company}
 	// ออฟฟิศ: บริษัทที่เลือก ("" = ทุกบริษัท) กรองรายการ/ตัวเลข และเป็นบริษัทของเอกสารใหม่
 	company: "",
+	// จำนวน ProjectFilter ที่แสดงอยู่ (กลุ่มออฟฟิศใช้ตัวกรองโครงการเฉพาะหน้าที่มีตัวกรองนี้)
+	project_filter_shown: 0,
 	section: null, // ตั้งใน init_app()
 	// summary ของแต่ละหมวด (สโตร์ = store_app.get_summary, ควบคุมงาน = site_app.get_work_summary)
 	summaries: {},
 	// หน้าหลักล่าสุดของแต่ละหมวด: สลับหมวดกลับมาแล้วอยู่เมนูเดิม
 	last_tab: {},
 	// จัดซื้อ/ขาย: project = เฉพาะโครงการที่เลือก, all = ทุกโครงการ
-	doc_scope: remembered("consbiz.site.doc_scope", "project"),
 	route: { view: "home", params: {} },
 	direction: "fade", // forward | back | fade (สลับแท็บ)
 	toasts: [],
@@ -340,17 +332,23 @@ export function set_company(company) {
 }
 
 // ขอบเขตของรายการ/ตัวเลขเอกสารซื้อ-ขาย (site_docs.get_docs / get_summary)
-// หน้างาน: โครงการที่เลือก หรือทุกโครงการ (state.doc_scope) / ออฟฟิศ: ตัวกรองโครงการ + บริษัท
+// หน้างาน: โครงการที่เลือกเท่านั้น (เลือกที่แถบบน) / ออฟฟิศ: ตัวกรองโครงการ + บริษัท
 // section = หมวดที่ขอ (ตัวเลขของหมวดอื่นโหลดพร้อมกัน) ไม่ระบุ = หมวดที่เปิดอยู่
 export function scope_args(section = state.section) {
 	if (is_filter_section(section)) {
+		// กลุ่มออฟฟิศ: ทุกโครงการ เว้นหน้าที่เปิดอยู่มีตัวกรองโครงการในหัวรายการ (ตัวเลขบนเมนู = ทุกโครงการ)
+		const project =
+			!is_company_section(section) || (section === state.section && state.project_filter_shown)
+				? state.project?.name
+				: undefined;
 		return {
-			project: state.project?.name,
-			scope: state.project ? "project" : "all",
-			company: state.company || undefined,
+			project,
+			scope: project ? "project" : "all",
+			// บริษัทเลือกได้เฉพาะกลุ่มออฟฟิศ (ปุ่มบนแถบบน) ธุรการโครงการ: บริษัทตามโครงการที่เลือก
+			company: (is_company_section(section) && state.company) || undefined,
 		};
 	}
-	return { project: state.project?.name, scope: state.doc_scope };
+	return { project: state.project?.name, scope: "project" };
 }
 // เปลี่ยนเมื่อขอบเขตเปลี่ยน (ใช้ใน watch)
 export const scope_key = () => JSON.stringify(scope_args());

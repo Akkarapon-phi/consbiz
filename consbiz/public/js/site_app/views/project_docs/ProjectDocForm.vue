@@ -1,10 +1,17 @@
 <!-- ฟอร์มสร้าง/แก้ร่างของเอกสารโครงการ 4 ชนิด (kinds.js) รายการ (งานลด-เพิ่ม/Punch List) แก้ทีละแถวใน sheet
      Submit งานลด-เพิ่ม/EOT ทำจากหน้าดู (มีผลกับแผนงาน ต้องยืนยัน) ขอตรวจงาน/Punch List ส่งจากฟอร์มได้เลย -->
 <template>
-	<div class="ss-has-bar">
+	<div>
 		<TopBar :title="`${params.name === 'new' ? 'สร้าง' : 'แก้ไข'} ${kind.label}`" :subtitle="doc.name || 'เอกสารใหม่'" :back_to="kind.list" :back_params="kind.list_params" />
 
 		<div class="ss-content">
+			<FormHead
+				v-if="setup"
+				model-value="main"
+				:tabs="[{ value: 'main', label: kind.label }]"
+				:actions="form_actions"
+				:busy="saving"
+			/>
 			<Skeleton v-if="!setup" :rows="4" />
 			<div v-else class="ss-split">
 				<div class="ss-split-main">
@@ -150,17 +157,6 @@
 			</div>
 		</div>
 
-		<Teleport to="#ss-layer">
-			<Transition name="ss-bar">
-				<div v-if="setup" class="ss-bottom-bar">
-					<button v-if="quick_submit" type="button" class="ss-btn ss-btn--ghost ss-btn--lg" :disabled="saving" @click="save(0)">บันทึกร่าง</button>
-					<button type="button" class="ss-btn ss-btn--primary ss-btn--lg ss-grow" :disabled="saving" @click="save(quick_submit ? 1 : 0)">
-						<span v-if="saving" class="ss-spinner"></span>
-						<template v-else>{{ quick_submit ? "ส่ง" : "บันทึก" }}</template>
-					</button>
-				</div>
-			</Transition>
-		</Teleport>
 
 		<Sheet :open="!!row" :title="row?._new ? 'เพิ่มรายการ' : 'แก้รายการ'" @close="row = null">
 			<div v-if="row" class="ss-form">
@@ -227,6 +223,8 @@
 </template>
 
 <script setup>
+import FormHead from "../../../shared/components/FormHead.vue";
+import { step_actions } from "../../../shared/form_actions.js";
 import { computed, inject, reactive, ref } from "vue";
 import DateInput from "../../../shared/components/DateInput.vue";
 import Icon from "../../../shared/components/Icon.vue";
@@ -255,6 +253,8 @@ const can_submit = ref(false);
 const doc = reactive({ name: null, title: "", items: [] });
 const has_items = params.kind === "vo" || params.kind === "punch";
 const quick_submit = computed(() => kind.quick && can_submit.value);
+// หัวฟอร์ม: หน้านี้ = ร่าง ขั้นเดียวคือบันทึก แล้วส่งจากหน้าดู (ไม่ข้ามขั้น)
+const form_actions = computed(() => step_actions({ stage: "draft", is_new: true, save: () => save(0) }));
 
 const task_options = computed(() =>
 	(setup.value?.tasks || []).map((t) => ({ value: t.wbs, label: `${t.wbs} ${t.item_name}`, description: t.group_path, task: t }))

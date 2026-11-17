@@ -5,86 +5,15 @@
 		<TopBar :title="title" :subtitle="doc?.customer" back_to="boq" no_project />
 
 		<div class="ss-content ss-boq-content">
-			<div v-if="doc" class="ss-list-head ss-boq-tabbar">
-				<StatusTabs v-model="tab" :options="TABS" />
-				<div class="ss-list-tools">
-					<a
-						v-if="doc?.name && doc.can?.export"
-						class="ss-icon-btn"
-						:href="export_url"
-						title="ส่งออก Excel"
-						aria-label="ส่งออก Excel"
-					>
-						<Icon name="receive" :size="19" />
-					</a>
-					<template v-if="draft">
-						<template v-if="doc.plan">
-							<a v-if="doc.can?.open_plan" class="ss-btn ss-btn--soft ss-list-create" :href="plan_url">เปิดแผนงาน</a>
-							<button v-if="doc.can?.sync_plan" type="button" class="ss-btn ss-btn--soft ss-list-create" :disabled="busy" @click="open_sync">
-								อัปเดตแผนงาน
-							</button>
-						</template>
-						<button
-							v-else-if="doc.name && doc.can_create_plan"
-							type="button"
-							class="ss-btn ss-btn--soft ss-list-create"
-							:disabled="busy"
-							@click="create_plan"
-						>
-							สร้างแผนงาน
-						</button>
-						<button
-							type="button"
-							class="ss-btn ss-btn--primary ss-list-create"
-							aria-label="บันทึก"
-							:disabled="busy || !dirty"
-							@click="save()"
-						>
-							<Icon name="save" :size="18" />
-							<span>บันทึก</span>
-						</button>
-						<button
-							v-if="doc.name && doc.can?.submit"
-							type="button"
-							class="ss-btn ss-btn--soft ss-list-create"
-							:disabled="busy"
-							@click="ask('submit')"
-						>
-							Submit
-						</button>
-					</template>
-					<template v-else-if="doc">
-						<button
-							v-if="doc.docstatus === 1 && !doc.plan && doc.can?.cancel"
-							type="button"
-							class="ss-btn ss-btn--ghost-danger ss-list-create"
-							:disabled="busy"
-							@click="ask('cancel')"
-						>
-							ยกเลิก
-						</button>
-						<button
-							v-if="doc.docstatus === 2 && doc.can?.amend"
-							type="button"
-							class="ss-btn ss-btn--soft ss-list-create"
-							:disabled="busy"
-							@click="run('amend_boq')"
-						>
-							แก้ไขฉบับใหม่
-						</button>
-						<a v-if="doc.plan && doc.can?.open_plan" class="ss-btn ss-btn--soft ss-list-create" :href="plan_url">เปิดแผนงาน</a>
-						<button
-							v-else-if="doc.docstatus === 1 && !doc.plan && doc.can_create_plan"
-							type="button"
-							class="ss-btn ss-btn--primary ss-list-create"
-							:disabled="busy"
-							@click="create_plan"
-						>
-							สร้างแผนงาน
-						</button>
-					</template>
-				</div>
-			</div>
+			<FormHead
+				v-if="doc"
+				class="ss-boq-tabbar"
+				v-model="tab"
+				:tabs="TABS"
+				:actions="head_actions"
+				:menu="head_menu"
+				:busy="busy"
+			/>
 
 			<Skeleton v-if="!doc" :rows="6" />
 			<template v-else>
@@ -516,10 +445,11 @@ import SelectBox from "../../../shared/components/SelectBox.vue";
 import DateInput from "../../../shared/components/DateInput.vue";
 import RichEditor from "../../../shared/components/RichEditor.vue";
 import Segmented from "../../../shared/components/Segmented.vue";
-import StatusTabs from "../../../shared/components/StatusTabs.vue";
 import RichText from "../../../shared/components/RichText.vue";
 import PlanMenu from "../../../site_app/views/pm/planner/PlanMenu.vue";
 import BoqItemInput from "./BoqItemInput.vue";
+import FormHead from "../../../shared/components/FormHead.vue";
+import { LABELS, can_duplicate, doc_menu, duplicate_doc, step_actions } from "../../../shared/form_actions.js";
 import {
 	boot,
 	call,
@@ -1242,5 +1172,40 @@ onBeforeUnmount(() => {
 	hold_end();
 	end_drag(true);
 });
+// หัวฟอร์ม: ร่าง → บันทึก → ยืนยัน → สร้าง/เปิดแผนงาน, ยกเลิกแล้ว → แก้ไขฉบับใหม่
+// สร้าง/อัปเดตแผนงานตอนเป็นร่างได้ (ไม่ใช่ขั้นบังคับ) อยู่ในเมนู ⋯
+const head_actions = computed(() => {
+	const d = doc.value;
+	const can = d.can || {};
+	const open_plan = d.plan && can.open_plan && { label: "เปิดแผนงาน", icon: "gantt", href: plan_url.value, target: "_self" };
+	return step_actions({
+		stage: draft.value ? "draft" : d.docstatus === 2 ? "cancelled" : "done",
+		is_new: !d.name,
+		dirty: dirty.value,
+		save: draft.value && (() => save()),
+		submit: d.name && can.submit && { label: LABELS.confirm, run: () => ask("submit") },
+		cancel: d.docstatus === 1 && !d.plan && can.cancel && (() => ask("cancel")),
+		amend: d.docstatus === 2 && can.amend && (() => run("amend_boq")),
+		next: [
+			open_plan ||
+				(d.docstatus === 1 && !d.plan && d.can_create_plan && { label: "สร้างแผนงาน", icon: "gantt", run: create_plan }),
+		],
+	});
+});
+const head_menu = computed(() => {
+	const d = doc.value;
+	const can = d.can || {};
+	return doc_menu({
+		items: [
+			draft.value && d.plan && can.open_plan && { label: "เปิดแผนงาน", icon: "gantt", href: plan_url.value },
+			draft.value && d.plan && can.sync_plan && { label: "อัปเดตแผนงาน", icon: "refresh", run: open_sync },
+			draft.value && !d.plan && d.name && d.can_create_plan && { label: "สร้างแผนงาน", icon: "gantt", run: create_plan },
+			d.name && can.export && { label: "ส่งออก Excel", icon: "receive", href: export_url.value },
+		],
+		refresh: d.name && load,
+		desk: ["BOQ", d.name],
+	});
+});
+
 load();
 </script>

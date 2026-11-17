@@ -3,20 +3,19 @@
 <template>
 	<div>
 		<TopBar title="เบิกเงิน">
-			<template #search>
-				<HeaderSearch v-if="wide" v-model="txt" placeholder="ค้นหาชื่อพนักงาน เลขที่ หรือวัตถุประสงค์" />
-			</template>
 		</TopBar>
 
 		<div class="ss-content">
-			<div v-if="wide" class="ss-list-head ss-list-head--many">
-				<StatusTabs v-model="filter" :options="tabs" />
-				<div class="ss-list-tools">
-					<button type="button" class="ss-icon-btn" :class="{ 'is-spinning': loading }" aria-label="โหลดใหม่" title="โหลดใหม่" @click="load">
-						<Icon name="refresh" :size="17" />
-					</button>
-				</div>
-			</div>
+			<ListHead
+				v-model:search="txt"
+				search_placeholder="ค้นหาชื่อพนักงาน เลขที่ หรือวัตถุประสงค์"
+				v-if="wide"
+				many
+				v-model="filter"
+				:tabs="tabs"
+				:loading="loading"
+				@refresh="load"
+			/>
 			<div v-else class="ss-tabs">
 				<button v-for="t in tabs" :key="t.value" type="button" class="ss-tab" :class="{ 'is-active': filter === t.value }" @click="filter = t.value">
 					{{ t.label }} <span class="ss-tab-count">{{ t.count }}</span>
@@ -117,16 +116,14 @@
 
 <script setup>
 import { computed, ref, watch } from "vue";
-import Icon from "../../../shared/components/Icon.vue";
 import TopBar from "../../../shared/components/TopBar.vue";
 import Skeleton from "../../../shared/components/Skeleton.vue";
 import Empty from "../../../shared/components/Empty.vue";
 import Sheet from "../../../shared/components/Sheet.vue";
 import DataTable from "../../../shared/components/DataTable.vue";
-import StatusTabs from "../../../shared/components/StatusTabs.vue";
-import HeaderSearch from "../../../shared/components/HeaderSearch.vue";
 import EmployeeContext from "../../../shared/components/EmployeeContext.vue";
 import ApprovalSheet from "../../../shared/approvals/ApprovalSheet.vue";
+import ListHead from "../../../shared/components/ListHead.vue";
 import { find_pending } from "../../../shared/approvals/kinds.js";
 import { matches, use_wide } from "../../../shared/table.js";
 import { call, money, remember_tab, show_error, state, thai_date, toast } from "../../../shared/api.js";

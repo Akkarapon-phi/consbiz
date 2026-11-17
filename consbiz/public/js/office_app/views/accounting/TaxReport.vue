@@ -6,9 +6,9 @@
 		<TopBar title="รายงานภาษี" />
 
 		<div class="ss-content">
-			<div v-if="wide" class="ss-list-head">
-				<StatusTabs v-model="report" :options="tabs" />
-				<div class="ss-list-tools">
+			<ListHead v-if="wide" v-model="report" :tabs="tabs">
+				<!-- ปุ่ม Excel (ลิงก์) เป็นปุ่มหลักขวาสุด: โหลดใหม่จึงอยู่ใน tools ก่อนหน้า -->
+				<template #tools>
 					<button
 						type="button"
 						class="ss-icon-btn"
@@ -30,9 +30,9 @@
 					<a class="ss-btn ss-btn--primary ss-list-create" :href="excel_url">
 						<Icon name="file" :size="18" /> <span>Excel</span>
 					</a>
-				</div>
+				</template>
 				<!-- แถวตัวกรอง: เดือน → ที่อยู่บริษัท -->
-				<div class="ss-list-filterbar">
+				<template #filters>
 					<span class="acc-month">
 						<button
 							type="button"
@@ -43,12 +43,7 @@
 						>
 							<Icon name="chevron-left" :size="17" />
 						</button>
-						<DateInput
-							v-model="month"
-							picker="month"
-							variant="tool"
-							label="เลือกเดือน"
-						/>
+						<DateInput v-model="month" picker="month" variant="tool" label="เลือกเดือน" />
 						<button
 							type="button"
 							class="ss-icon-btn"
@@ -66,8 +61,8 @@
 						label="ที่อยู่บริษัท (สาขา)"
 						variant="tool"
 					/>
-				</div>
-			</div>
+				</template>
+			</ListHead>
 			<template v-else>
 				<Segmented v-model="report" :options="tabs" />
 				<div class="acc-month acc-month--mobile">
@@ -205,8 +200,8 @@ import Icon from "../../../shared/components/Icon.vue";
 import Segmented from "../../../shared/components/Segmented.vue";
 import SelectBox from "../../../shared/components/SelectBox.vue";
 import Skeleton from "../../../shared/components/Skeleton.vue";
-import StatusTabs from "../../../shared/components/StatusTabs.vue";
 import TopBar from "../../../shared/components/TopBar.vue";
+import ListHead from "../../../shared/components/ListHead.vue";
 import { use_wide } from "../../../shared/table.js";
 import {
 	boot,

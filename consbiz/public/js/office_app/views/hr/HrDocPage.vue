@@ -6,69 +6,15 @@
 		<TopBar :title="title" :subtitle="doc?.name || 'ใหม่'" :back_to="params.kind" />
 
 		<div class="ss-content">
-			<div v-if="doc" class="ss-list-head">
-				<StatusTabs v-model="tab" :options="[{ value: 'main', label: kind.label }]" />
-				<div class="ss-list-tools">
-					<a
-						v-if="doc.name"
-						class="ss-icon-btn"
-						:href="desk_url(DOCTYPE, doc.name)"
-						title="เปิดในระบบเต็ม"
-						aria-label="เปิดในระบบเต็ม"
-						><Icon name="external" :size="17"
-					/></a>
-					<button
-						v-for="p in view.pdfs"
-						:key="p.url"
-						type="button"
-						class="ss-btn ss-btn--soft ss-list-create"
-						:disabled="dirty"
-						:title="dirty ? 'บันทึกก่อน' : ''"
-						@click="pdf = p"
-					>
-						<Icon name="printer" :size="17" /> <span>{{ p.label }}</span>
-					</button>
-					<template v-if="view.can_edit">
-						<button
-							v-if="view.can_delete"
-							type="button"
-							class="ss-btn ss-btn--ghost-danger ss-list-create"
-							:disabled="busy"
-							@click="deleting = true"
-						>
-							ลบ
-						</button>
-						<button
-							v-if="view.can_submit"
-							type="button"
-							class="ss-btn ss-btn--soft ss-list-create"
-							:disabled="busy || dirty"
-							:title="dirty ? 'บันทึกก่อนยืนยัน' : ''"
-							@click="confirm_submit = true"
-						>
-							ยืนยัน
-						</button>
-					</template>
-					<button
-						v-else-if="view.can_cancel"
-						type="button"
-						class="ss-btn ss-btn--ghost-danger ss-list-create"
-						:disabled="busy"
-						@click="confirm_cancel = true"
-					>
-						ยกเลิก
-					</button>
-					<button
-						v-if="view.can_edit || view.can_edit_after"
-						type="button"
-						class="ss-btn ss-btn--primary ss-list-create"
-						:disabled="busy || !dirty || !ready"
-						@click="save"
-					>
-						<Icon name="save" :size="18" /> <span>บันทึก</span>
-					</button>
-				</div>
-			</div>
+			<FormHead
+				v-if="doc"
+				v-model="tab"
+				:tabs="[{ value: 'main', label: kind.label }]"
+				:actions="actions"
+				:menu="menu"
+				:busy="busy"
+				:on-print="print_one"
+			/>
 
 			<Skeleton v-if="!doc" :rows="6" />
 			<template v-else>
@@ -430,8 +376,9 @@ import Picker from "../../../shared/components/Picker.vue";
 import SelectBox from "../../../shared/components/SelectBox.vue";
 import Sheet from "../../../shared/components/Sheet.vue";
 import Skeleton from "../../../shared/components/Skeleton.vue";
-import StatusTabs from "../../../shared/components/StatusTabs.vue";
 import TopBar from "../../../shared/components/TopBar.vue";
+import FormHead from "../../../shared/components/FormHead.vue";
+import { LABELS, can_duplicate, doc_menu, duplicate_doc, step_actions } from "../../../shared/form_actions.js";
 import {
 	back,
 	boot,
@@ -671,5 +618,39 @@ async function load() {
 		back(params.kind);
 	}
 }
+// หัวฟอร์ม: ร่าง → บันทึก → ยืนยัน → ยกเลิก (ยืนยันแล้วแก้ได้เฉพาะบางช่อง เช่น ผลทดลองงาน = บันทึก)
+const actions = computed(() => {
+	const v = view.value;
+	return step_actions({
+		stage: editable.value ? "draft" : "done",
+		is_new: !doc.value.name,
+		dirty: dirty.value,
+		save: editable.value && { run: save, disabled: !ready.value },
+		save_after: v.can_edit_after && { run: save, disabled: !ready.value },
+		submit: v.can_submit && { label: LABELS.confirm, run: () => (confirm_submit.value = true) },
+		cancel: v.can_cancel && (() => (confirm_cancel.value = true)),
+	});
+});
+// PDF ใบเดียว = ปุ่มพิมพ์ หลายแบบ = เลือกในเมนู ⋯ (ต้องบันทึกก่อนพิมพ์)
+const print_one = computed(() =>
+	(view.value.pdfs || []).length === 1 && !dirty.value ? () => (pdf.value = view.value.pdfs[0]) : null
+);
+const menu = computed(() => {
+	const pdfs = view.value.pdfs || [];
+	return doc_menu({
+		items:
+			pdfs.length > 1 && !dirty.value
+				? pdfs.map((p) => ({ key: p.url, label: `พิมพ์${p.label}`, icon: "printer", run: () => (pdf.value = p) }))
+				: [],
+		duplicate:
+			doc.value.name &&
+			can_duplicate(DOCTYPE) &&
+			(() => duplicate_doc(DOCTYPE, doc.value.name, "hr-doc", { kind: params.kind })),
+		refresh: doc.value.name && load,
+		desk: [DOCTYPE, doc.value.name],
+		remove: editable.value && view.value.can_delete && (() => (deleting.value = true)),
+	});
+});
+
 load();
 </script>

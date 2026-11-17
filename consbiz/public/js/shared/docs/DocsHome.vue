@@ -5,9 +5,6 @@
 		<Hero />
 
 		<div class="ss-content">
-			<!-- ออฟฟิศ: เลือกโครงการที่แถบบนแล้ว / หน้างาน: ขอบเขต โครงการนี้-ทุกโครงการ -->
-			<ScopeSwitch v-if="!app.project_filter" />
-
 			<div class="ss-stats">
 				<button
 					v-for="(s, i) in stats"
@@ -84,7 +81,6 @@ import { computed, inject, onMounted, watch } from "vue";
 import Icon from "../components/Icon.vue";
 import Hero from "../components/Hero.vue";
 import DocCard from "./DocCard.vue";
-import ScopeSwitch from "./ScopeSwitch.vue";
 import { app } from "../app.js";
 import { DOC_KINDS, can_doc, in_app } from "./kinds.js";
 import { go, money, scope_key, state } from "../api.js";

@@ -1,10 +1,19 @@
 <!-- สร้าง/แก้ไขร่างเอกสารจัดซื้อ/ขาย (ชุดเดียวทั้ง 6 ชนิด) ข้อมูล/บันทึกผ่าน site_docs.get_form / preview_doc / save_doc
      ยอดเงินและภาษีคำนวณที่ server (ERPNext) ทุกครั้งที่แก้ (หน่วงเล็กน้อย) ฟอร์มใหม่เก็บร่างใน localStorage -->
 <template>
-	<div class="ss-has-bar">
+	<div>
 		<TopBar :title="title" :subtitle="subtitle" :back_to="back_view" :back_params="back_params" />
 
 		<div class="ss-content ss-docform">
+			<FormHead
+				v-if="form"
+				model-value="main"
+				:tabs="[{ value: 'main', label: config.label }]"
+				:actions="form_actions"
+				:busy="saving"
+			>
+				<template #summary><small>ยอดรวม</small> <b>{{ money(grand_total) }}</b></template>
+			</FormHead>
 			<Skeleton v-if="!form" :rows="3" />
 			<div v-else class="ss-docform-body" :class="{ 'has-insight': xl }">
 				<div class="ss-docform-main">
@@ -380,34 +389,6 @@
 			</div>
 		</div>
 
-		<Teleport to="#ss-layer">
-			<Transition name="ss-bar">
-				<div v-if="form" class="ss-bottom-bar">
-					<span class="ss-bar-summary">
-						<small>ยอดรวม</small> <b>{{ money(grand_total) }}</b>
-					</span>
-					<button
-						type="button"
-						class="ss-btn ss-btn--ghost ss-btn--lg"
-						:class="{ 'ss-grow': !form.can_submit }"
-						:disabled="saving"
-						@click="save(0)"
-					>
-						บันทึกร่าง
-					</button>
-					<button
-						v-if="form.can_submit"
-						type="button"
-						class="ss-btn ss-btn--primary ss-btn--lg ss-grow"
-						:disabled="saving"
-						@click="ask_submit"
-					>
-						<span v-if="saving" class="ss-spinner"></span>
-						<template v-else>บันทึกและส่ง</template>
-					</button>
-				</div>
-			</Transition>
-		</Teleport>
 
 		<!-- เลือกสินค้า/บริการ (แตะได้หลายรายการ) -->
 		<Sheet
@@ -493,6 +474,8 @@
 <script setup>
 import { computed, inject, nextTick, onBeforeUnmount, ref, watch } from "vue";
 import Icon from "../components/Icon.vue";
+import FormHead from "../components/FormHead.vue";
+import { step_actions } from "../form_actions.js";
 import TopBar from "../components/TopBar.vue";
 import Skeleton from "../components/Skeleton.vue";
 import Empty from "../components/Empty.vue";
@@ -909,6 +892,9 @@ function ask_submit() {
 	}
 	confirm.value = true;
 }
+
+// หัวฟอร์ม: หน้านี้ = ร่าง ขั้นเดียวคือบันทึก แล้วยืนยันที่หน้าดูเอกสาร (ไม่ข้ามขั้น)
+const form_actions = computed(() => step_actions({ stage: "draft", is_new: true, save: () => save(0) }));
 
 async function save(submit) {
 	const error = form_error();

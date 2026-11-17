@@ -6,27 +6,7 @@
 		<TopBar :title="title" :subtitle="doc?.party_name" :back_to="params.kind" />
 
 		<div class="ss-content">
-			<div v-if="doc" class="ss-list-head">
-				<StatusTabs v-model="tab" :options="TABS" />
-				<div class="ss-list-tools">
-					<a
-						class="ss-icon-btn"
-						:href="desk_url(doc.doctype, doc.name)"
-						title="เปิดในระบบเต็ม"
-						aria-label="เปิดในระบบเต็ม"
-						><Icon name="external" :size="17"
-					/></a>
-					<button
-						v-if="edit.length"
-						type="button"
-						class="ss-btn ss-btn--primary ss-list-create"
-						:disabled="busy || !dirty"
-						@click="save"
-					>
-						<Icon name="save" :size="18" /> <span>บันทึก</span>
-					</button>
-				</div>
-			</div>
+			<FormHead v-if="doc" v-model="tab" :tabs="TABS" :actions="actions" :menu="menu" :busy="busy" />
 
 			<Skeleton v-if="!doc" :rows="5" />
 			<template v-else>
@@ -87,8 +67,9 @@ import DateInput from "../../../shared/components/DateInput.vue";
 import Icon from "../../../shared/components/Icon.vue";
 import SelectBox from "../../../shared/components/SelectBox.vue";
 import Skeleton from "../../../shared/components/Skeleton.vue";
-import StatusTabs from "../../../shared/components/StatusTabs.vue";
 import TopBar from "../../../shared/components/TopBar.vue";
+import FormHead from "../../../shared/components/FormHead.vue";
+import { LABELS, doc_menu, step_actions } from "../../../shared/form_actions.js";
 import { open_doc } from "../../../shared/docs/kinds.js";
 import {
 	back,
@@ -192,5 +173,16 @@ async function load() {
 		back(params.kind);
 	}
 }
+// หัวฟอร์ม: ใบกำกับภาษีระบบสร้างจาก GL แก้ได้เฉพาะช่องหลังยืนยัน (บันทึก) ไม่มีขั้นอื่น
+const actions = computed(() =>
+	edit.value.length ? step_actions({ stage: "draft", dirty: dirty.value, save }) : []
+);
+const menu = computed(() =>
+	doc_menu({
+		refresh: load,
+		desk: [doc.value.doctype, doc.value.name],
+	})
+);
+
 load();
 </script>

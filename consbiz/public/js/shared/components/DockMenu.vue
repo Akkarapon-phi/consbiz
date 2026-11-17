@@ -1,7 +1,7 @@
 <!--
 	เมนูลอยข้าง Dock หน้าตาและตำแหน่งตาม frappe.ui.Dropdown (es-menu, side: right, align: end)
 	หน้าแอปไม่โหลด desk จึงใช้ของ Frappe ตรงๆ ไม่ได้
-	groups = [{ label?, items: [{ key, label, sub?, avatar?: { image?, text, tone }, icon?, image?, href?, selected?, onclick? }] }]
+	groups = [{ label?, items: [{ key, label, sub?, avatar?: { image?, text, tone }, icon?, image?, href?, selected?, danger?, onclick? }] }]
 -->
 <template>
 	<Transition name="ss-menu">
@@ -15,7 +15,7 @@
 					:type="item.href ? undefined : 'button'"
 					:href="item.href"
 					class="ss-menu-item"
-					:class="{ 'is-selected': item.selected }"
+					:class="{ 'is-selected': item.selected, 'is-danger': item.danger }"
 					role="menuitem"
 					@click="activate(item)"
 				>
@@ -60,6 +60,7 @@ const props = defineProps({
 	anchor: { type: Object, default: null },
 	groups: { type: Array, required: true },
 	// "side" = ข้าง Dock ชิดล่างของปุ่ม (ค่าเดิม), "below" = ใต้ปุ่มบนแถบบน ชิดขวาของปุ่ม
+	// "above" = เหนือปุ่ม ชิดขวา (ปุ่มในแถบล่างของมือถือ)
 	placement: { type: String, default: "side" },
 });
 const emit = defineEmits(["close"]);
@@ -118,7 +119,19 @@ watch(
 		if (!open || !props.anchor) return;
 		const rect = props.anchor.getBoundingClientRect();
 		position.value =
-			props.placement === "below"
+			props.placement === "above"
+				? {
+						bottom: `${window.innerHeight - rect.top + 8}px`,
+						// ปุ่มอยู่ซ้ายของจอ = เมนูชิดซ้ายของปุ่ม ไม่งั้นชิดขวา
+						...(rect.left < window.innerWidth / 2
+							? { left: `${Math.max(rect.left, 8)}px`, transformOrigin: "bottom left" }
+							: {
+									right: `${Math.max(window.innerWidth - rect.right, 8)}px`,
+									transformOrigin: "bottom right",
+							  }),
+						maxHeight: `${rect.top - 16}px`,
+				  }
+				: props.placement === "below"
 				? {
 						top: `${rect.bottom + 8}px`,
 						right: `${window.innerWidth - rect.right}px`,

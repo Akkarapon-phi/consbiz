@@ -42,38 +42,17 @@
 					</div>
 				</div>
 
-				<div v-if="wide" class="ss-list-head">
-					<StatusTabs
-						model-value="all"
-						:options="[
-							{ value: 'all', label: 'ใบเทคอนกรีต', count: data.docs.length },
-						]"
-					/>
-					<div class="ss-list-tools">
-						<button
-							v-if="boot.can.concrete"
-							type="button"
-							class="ss-btn ss-btn--primary ss-list-create"
-							@click="go('concrete-form')"
-						>
-							<Icon name="plus" :size="18" :stroke="2.6" />
-							<span>เทคอนกรีต</span>
-						</button>
-						<button
-							type="button"
-							class="ss-icon-btn"
-							:class="{ 'is-spinning': loading }"
-							aria-label="โหลดใหม่"
-							@click="load"
-						>
-							<Icon name="refresh" :size="17" />
-						</button>
-					</div>
-					<!-- แถวตัวกรอง: ค้นหา -->
-					<div class="ss-list-filterbar">
-						<ListSearch v-model="txt" placeholder="ค้นหางาน WBS หรือตำแหน่ง" />
-					</div>
-				</div>
+				<ListHead
+					v-if="wide"
+					model-value="all"
+					:tabs="[{ value: 'all', label: 'ใบเทคอนกรีต', count: data.docs.length }]"
+					v-model:search="txt"
+					search_placeholder="ค้นหางาน WBS หรือตำแหน่ง"
+					:loading="loading"
+					:create="boot.can.concrete ? 'เทคอนกรีต' : ''"
+					@refresh="load"
+					@create="go('concrete-form')"
+				/>
 
 				<Empty
 					v-if="!data.docs.length"
@@ -199,9 +178,8 @@ import Icon from "../../../shared/components/Icon.vue";
 import TopBar from "../../../shared/components/TopBar.vue";
 import Skeleton from "../../../shared/components/Skeleton.vue";
 import Empty from "../../../shared/components/Empty.vue";
-import StatusTabs from "../../../shared/components/StatusTabs.vue";
 import DataTable from "../../../shared/components/DataTable.vue";
-import ListSearch from "../../../shared/components/ListSearch.vue";
+import ListHead from "../../../shared/components/ListHead.vue";
 import { matches, use_wide } from "../../../shared/table.js";
 import {
 	call,

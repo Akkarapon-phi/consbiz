@@ -267,6 +267,10 @@ def boot_data():
 	boot["sections"] = sections + office
 	add_apps(boot, {"site": sections, "office": office})
 	boot["desk"] = boot["desk"] or any(can_work.values()) or bool(office)
+	# เมนู ⋯ > ทำซ้ำ ของหัวฟอร์ม (consbiz/form_actions.py)
+	from consbiz import form_actions
+
+	boot["duplicate"] = form_actions.duplicable()
 	return boot
 
 

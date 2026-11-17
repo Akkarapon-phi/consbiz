@@ -18,19 +18,14 @@
 		</TopBar>
 
 		<div class="ss-content">
-			<div v-if="wide" class="ss-list-head">
-				<StatusTabs v-model="filter" :options="tabs" />
-				<div class="ss-list-tools">
-					<button
-						type="button"
-						class="ss-icon-btn"
-						:class="{ 'is-spinning': loading }"
-						aria-label="โหลดใหม่"
-						title="ตรวจใหม่"
-						@click="load"
-					>
-						<Icon name="refresh" :size="17" />
-					</button>
+			<ListHead
+				v-if="wide"
+				v-model="filter"
+				:tabs="tabs"
+				:loading="loading"
+				@refresh="load"
+			>
+				<template #tools>
 					<button
 						v-if="data?.can_fix"
 						type="button"
@@ -41,8 +36,8 @@
 						<Icon name="check" :size="18" :stroke="2.6" />
 						<span>แก้อัตโนมัติ{{ fixable.length ? ` ${fixable.length} ข้อ` : "" }}</span>
 					</button>
-				</div>
-			</div>
+				</template>
+			</ListHead>
 			<Segmented v-else v-model="filter" :options="tabs" />
 
 			<Skeleton v-if="data === null" :rows="6" />
@@ -98,7 +93,7 @@ import TopBar from "../../../shared/components/TopBar.vue";
 import Segmented from "../../../shared/components/Segmented.vue";
 import Skeleton from "../../../shared/components/Skeleton.vue";
 import Empty from "../../../shared/components/Empty.vue";
-import StatusTabs from "../../../shared/components/StatusTabs.vue";
+import ListHead from "../../../shared/components/ListHead.vue";
 import { use_wide } from "../../../shared/table.js";
 import { call, post, show_error, state, toast } from "../../../shared/api.js";
 

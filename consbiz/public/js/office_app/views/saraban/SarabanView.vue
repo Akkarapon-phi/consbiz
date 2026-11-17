@@ -3,30 +3,19 @@
      หนังสือออก = บันทึกสถานะ, ใบนำส่ง = บันทึกการส่ง/รับ + สร้างใบปะหน้า, ใบปะหน้า = พิมพ์ตามขนาดซอง
      แก้ฉบับ (amend) และไฟล์แนบใช้ระบบเต็ม -->
 <template>
-	<div class="ss-has-bar">
-		<TopBar :title="kind.label" :subtitle="params.name" :back_to="params.kind">
-			<template #actions>
-				<button
-					v-if="view?.pdf_url"
-					type="button"
-					class="ss-icon-btn"
-					aria-label="PDF / พิมพ์"
-					title="PDF / พิมพ์"
-					@click="open_pdf(view.pdf_url)"
-				>
-					<Icon name="printer" :size="19" />
-				</button>
-				<a
-					class="ss-icon-btn"
-					:href="desk_url(kind.doctype, params.name)"
-					aria-label="เปิดในระบบเต็ม"
-					title="เปิดในระบบเต็ม"
-					><Icon name="external" :size="19"
-				/></a>
-			</template>
-		</TopBar>
+	<div>
+		<TopBar :title="kind.label" :subtitle="params.name" :back_to="params.kind" />
 
 		<div class="ss-content">
+			<FormHead
+				v-if="view"
+				model-value="main"
+				:tabs="[{ value: 'main', label: kind.label }]"
+				:actions="actions"
+				:menu="menu"
+				:busy="busy"
+				:on-print="view.pdf_url ? () => open_pdf(view.pdf_url) : null"
+			/>
 			<Skeleton v-if="!view" :rows="4" />
 			<div v-else class="ss-split">
 				<div class="ss-split-main">
@@ -139,29 +128,6 @@
 			</div>
 		</div>
 
-		<Teleport to="#ss-layer">
-			<Transition name="ss-bar">
-				<div v-if="actions.length" class="ss-bottom-bar">
-					<button
-						v-for="a in actions"
-						:key="a.label"
-						type="button"
-						class="ss-btn ss-btn--lg"
-						:class="
-							a.primary
-								? 'ss-btn--primary ss-grow'
-								: a.danger
-								? 'ss-btn--ghost-danger'
-								: 'ss-btn--ghost'
-						"
-						:disabled="busy"
-						@click="a.run"
-					>
-						{{ a.label }}
-					</button>
-				</div>
-			</Transition>
-		</Teleport>
 
 		<DeleteSheet
 			:open="deleting"
@@ -324,6 +290,8 @@
 </template>
 
 <script setup>
+import FormHead from "../../../shared/components/FormHead.vue";
+import { LABELS, can_duplicate, doc_menu, duplicate_doc, step_actions } from "../../../shared/form_actions.js";
 import { computed, inject, ref } from "vue";
 import DateInput from "../../../shared/components/DateInput.vue";
 import DeleteSheet from "../../../shared/components/DeleteSheet.vue";
@@ -463,15 +431,40 @@ const approver_options = computed(() =>
 	)
 );
 
+// หัวฟอร์ม (shared/form_actions.js): ร่าง → ยืนยัน/ลงรับ → (หนังสือเข้า) ส่งอนุมัติ → รออนุมัติ: ดึงกลับ / พิจารณาอนุมัติ
+// หนังสือออก/ใบนำส่ง หลังยืนยัน → บันทึกสถานะ/การส่ง → สร้างใบปะหน้า
 const actions = computed(() => {
 	const v = view.value;
 	if (!v) return [];
-	const list = [];
-	if (v.can_delete) list.push({ label: "ลบ", danger: true, run: () => (deleting.value = true) });
-	if (v.can_cancel)
-		list.push({
-			label: "ยกเลิก",
-			danger: true,
+	const pending = !!(v.can_withdraw || v.can_decide);
+	return step_actions({
+		stage: v.can_submit || v.can_edit ? "draft" : pending ? "pending" : "done",
+		submit: v.can_submit && {
+			label: params.kind === "letters-in" ? "ลงรับ" : LABELS.confirm,
+			run: () =>
+				ask({
+					title: params.kind === "letters-in" ? "ลงรับหนังสือ" : `ยืนยัน${kind.label}`,
+					text: "ยืนยันแล้วแก้ได้เฉพาะสถานะและวันที่ส่ง-รับ ช่องอื่นต้องยกเลิกแล้วแก้ไขฉบับใหม่",
+					button: "ยืนยัน",
+					run: () =>
+						run(
+							() => post(`${API}.submit_doc`, { kind: params.kind, name: params.name }),
+							"บันทึกแล้ว"
+						),
+				}),
+		},
+		withdraw: v.can_withdraw && {
+			run: () =>
+				ask({
+					title: "ดึงกลับ",
+					text: `ดึงเรื่องที่เสนอ ${doc.value.approver_name || doc.value.approver} กลับมา ใช่หรือไม่`,
+					button: "ดึงกลับ",
+					danger: true,
+					run: () => run(() => post(`${API}.withdraw`, { name: params.name }), "ดึงกลับแล้ว"),
+				}),
+		},
+		reject: false,
+		cancel: v.can_cancel && {
 			run: () =>
 				ask({
 					title: `ยกเลิก${kind.label}`,
@@ -480,81 +473,57 @@ const actions = computed(() => {
 					danger: true,
 					run: () =>
 						run(
-							() =>
-								post(`${API}.cancel_doc`, {
-									kind: params.kind,
-									name: params.name,
-								}),
+							() => post(`${API}.cancel_doc`, { kind: params.kind, name: params.name }),
 							"ยกเลิกแล้ว"
 						),
 				}),
-		});
-	if (v.can_edit)
-		list.push({
-			label: "แก้ไข",
-			primary: !v.can_submit,
-			run: () => go("saraban-form", { kind: params.kind, name: params.name }),
-		});
-	if (v.can_submit)
-		list.push({
-			label: params.kind === "letters-in" ? "ลงรับ" : "Submit",
-			primary: true,
-			run: () =>
-				ask({
-					title: params.kind === "letters-in" ? "ลงรับหนังสือ" : `Submit ${kind.label}`,
-					text: "Submit แล้วแก้ได้เฉพาะสถานะและวันที่ส่ง-รับ ช่องอื่นต้องยกเลิกแล้วแก้ไขฉบับใหม่",
-					button: "ยืนยัน",
-					run: () =>
-						run(
-							() =>
-								post(`${API}.submit_doc`, {
-									kind: params.kind,
-									name: params.name,
-								}),
-							"บันทึกแล้ว"
-						),
-				}),
-		});
-	// หนังสือเข้า
-	if (v.can_withdraw)
-		list.push({
-			label: "ถอนเรื่อง",
-			run: () =>
-				ask({
-					title: "ถอนเรื่อง",
-					text: `ถอนเรื่องเสนออนุมัติจาก ${
-						doc.value.approver_name || doc.value.approver
-					} ใช่หรือไม่`,
-					button: "ถอนเรื่อง",
-					danger: true,
-					run: () =>
-						run(() => post(`${API}.withdraw`, { name: params.name }), "ถอนเรื่องแล้ว"),
-				}),
-		});
-	if (v.can_change_approver)
-		list.push({ label: "เปลี่ยนผู้อนุมัติ", run: () => choose("change") });
-	if (v.can_propose)
-		list.push({ label: "เสนออนุมัติ", primary: true, run: () => choose("propose") });
-	if (v.can_decide)
-		list.push({
-			label: "พิจารณาอนุมัติ",
-			primary: true,
-			run: () => (deciding.value = { approve_date: today(), remark: "" }),
-		});
-	// หนังสือออก / ใบนำส่ง
-	if (v.can_update)
-		list.push({
-			label: params.kind === "transmittals" ? "บันทึกการส่ง" : "บันทึกสถานะ",
-			primary: !v.can_envelope,
-			run: open_update,
-		});
-	if (v.can_envelope)
-		list.push({
-			label: "สร้างใบปะหน้า",
-			primary: true,
-			run: () => go("saraban-form", { kind: "envelopes", name: "new", source: params.name }),
-		});
-	return list;
+		},
+		next: [
+			v.can_propose && { label: LABELS.send, icon: "send", run: () => choose("propose") },
+			v.can_update && {
+				label: params.kind === "transmittals" ? "บันทึกการส่ง" : "บันทึกสถานะ",
+				run: open_update,
+			},
+			v.can_envelope && {
+				label: "สร้างใบปะหน้า",
+				icon: "plus",
+				run: () => go("saraban-form", { kind: "envelopes", name: "new", source: params.name }),
+			},
+		],
+		extra: [
+			v.can_edit && {
+				label: "แก้ไข",
+				icon: "pen",
+				tone: v.can_submit ? "soft" : "primary",
+				run: () => go("saraban-form", { kind: params.kind, name: params.name }),
+			},
+		],
+	}).concat(
+		pending && v.can_decide
+			? [
+					{
+						key: "decide",
+						label: "พิจารณาอนุมัติ",
+						icon: "check",
+						tone: "primary",
+						onClick: () => (deciding.value = { approve_date: today(), remark: "" }),
+					},
+			  ]
+			: []
+	);
+});
+const menu = computed(() => {
+	const v = view.value;
+	if (!v) return [];
+	return doc_menu({
+		items: [v.can_change_approver && { label: "เปลี่ยนผู้อนุมัติ", icon: "user", run: () => choose("change") }],
+		duplicate:
+			can_duplicate(kind.doctype) &&
+			(() => duplicate_doc(kind.doctype, params.name, "saraban-form", { kind: params.kind })),
+		refresh: load,
+		desk: [kind.doctype, params.name],
+		remove: v.can_delete && (() => (deleting.value = true)),
+	});
 });
 
 function ask(options) {

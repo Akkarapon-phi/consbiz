@@ -26,25 +26,23 @@
 			<template v-else>
 				<!-- เลือกสัปดาห์ (สัปดาห์ที่แล้ว + 3 สัปดาห์ข้างหน้า นับจากวันที่ดู) ช่วงวันที่ดูจากหัวตาราง/แถววัน
 				     แท็บเล็ต/จอใหญ่ = หัวรายการ: แท็บ + ณ วันที่ / พิมพ์ / โหลดใหม่ -->
-				<div v-if="wide" class="ss-list-head ss-list-head--many ss-la-head">
-					<StatusTabs :model-value="shown_week" :options="week_tabs" @update:model-value="choose_week" />
-					<div class="ss-list-tools">
+				<ListHead
+					v-if="wide"
+					class="ss-la-head"
+					many
+					:model-value="shown_week"
+					:tabs="week_tabs"
+					:loading="loading"
+					@update:model-value="choose_week"
+					@refresh="load"
+				>
+					<template #tools>
 						<DateInput :model-value="ref_date" variant="tool" label="ณ วันที่" @update:model-value="set_date" />
 						<button type="button" class="ss-icon-btn" aria-label="พิมพ์" title="พิมพ์" @click="print">
 							<Icon name="printer" :size="17" />
 						</button>
-						<button
-							type="button"
-							class="ss-icon-btn"
-							:class="{ 'is-spinning': loading }"
-							aria-label="โหลดใหม่"
-							title="โหลดใหม่"
-							@click="load"
-						>
-							<Icon name="refresh" :size="17" />
-						</button>
-					</div>
-				</div>
+					</template>
+				</ListHead>
 				<template v-else>
 					<div class="ss-la-mobile-tools">
 						<DateInput :model-value="ref_date" label="ณ วันที่" @update:model-value="set_date" />
@@ -226,6 +224,13 @@
 				</div>
 			</template>
 		</div>
+		<HtmlPreview
+			:open="preview_open"
+			:html="preview_html"
+			:title="preview_title"
+			subtitle="A4 แนวนอน"
+			@close="preview_open = false"
+		/>
 	</div>
 </template>
 
@@ -235,8 +240,9 @@ import Icon from "../../../shared/components/Icon.vue";
 import TopBar from "../../../shared/components/TopBar.vue";
 import Skeleton from "../../../shared/components/Skeleton.vue";
 import Empty from "../../../shared/components/Empty.vue";
-import StatusTabs from "../../../shared/components/StatusTabs.vue";
 import DateInput from "../../../shared/components/DateInput.vue";
+import HtmlPreview from "../../../shared/components/HtmlPreview.vue";
+import ListHead from "../../../shared/components/ListHead.vue";
 import { call, iso_date, replace_params, show_error, state, thai_date } from "../../../shared/api.js";
 
 // สถานะของวัน: ชุดเดียวกับ Tab Look-ahead ของ CM (project_dashboard/LookAhead.vue day_state)
@@ -416,13 +422,39 @@ function set_date(value) {
 	load();
 }
 
-// พิมพ์ตารางที่เห็นอยู่ (แนวนอน A4): หน้าต่างใหม่ใช้ CSS ชุดเดียวกับแอป (คัดลอก <link>/<style> และค่า data-* ของ <html>)
+// พิมพ์ตารางที่เห็นอยู่ (แนวนอน A4): เปิดตัวอย่างก่อน (HtmlPreview) แล้วค่อยพิมพ์/บันทึก PDF จากในนั้น
+// เอกสารใช้ CSS ชุดเดียวกับแอป (คัดลอก <link>/<style> และค่า data-* ของ <html>)
+const preview_html = ref("");
+const preview_open = ref(false);
+const preview_title = computed(() => `Look-ahead · ${state.project?.project_name || ""}`);
+// CSS ของแอปแบบสว่างเสมอ: คัดลอกกฎทั้งหมดยกเว้น @media (prefers-color-scheme: dark)
+// (ตัวอย่าง/งานพิมพ์ใน iframe ยังได้ค่า dark ของเครื่อง กระดาษจะกลายเป็นพื้นดำ)
+function light_css() {
+	const out = [];
+	const walk = (rules) => {
+		for (const rule of rules) {
+			if (rule instanceof CSSMediaRule) {
+				if (/prefers-color-scheme:\s*dark/.test(rule.conditionText || rule.media.mediaText)) continue;
+				out.push(`@media ${rule.conditionText || rule.media.mediaText} {`);
+				walk(rule.cssRules);
+				out.push("}");
+			} else out.push(rule.cssText);
+		}
+	};
+	for (const sheet of document.styleSheets) {
+		try {
+			walk(sheet.cssRules);
+		} catch {
+			// stylesheet ข้ามโดเมน อ่านกฎไม่ได้
+		}
+	}
+	return out.join("\n").replace(/<\/style/gi, "<\\/style");
+}
+
 function print() {
 	if (!table.value) return;
-	const win = window.open("", "_blank");
-	if (!win) return;
 	const esc = (v) => String(v ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
-	const styles = [...document.querySelectorAll("link[rel='stylesheet'], style")].map((el) => el.outerHTML).join("");
+	const styles = `<style>${light_css()}</style>`;
 	const attrs = [...document.documentElement.attributes]
 		.filter((a) => a.name.startsWith("data-") && a.name !== "data-theme")
 		.map((a) => `${a.name}="${esc(a.value)}"`)
@@ -431,12 +463,12 @@ function print() {
 		.map(([key, label]) => `<span><i class="ss-la-box is-${key}"></i>${esc(label)}</span>`)
 		.join("");
 	const shown = days.value;
-	const title = `Look-ahead · ${state.project?.project_name || ""}`;
-	win.document.write(`<!doctype html><html ${attrs} data-theme="light"><head><meta charset="utf-8"><title>${esc(title)}</title>
+	const title = preview_title.value;
+	preview_html.value = `<!doctype html><html ${attrs} data-theme="light"><head><meta charset="utf-8"><title>${esc(title)}</title>
 		<base href="${esc(location.origin)}/">${styles}
 		<style>
 			@page { size: A4 landscape; margin: 8mm; }
-			html, body { height: auto !important; overflow: visible !important; background: #fff !important; }
+			html, body, .ss-app { height: auto !important; overflow: visible !important; background: #fff !important; }
 			body { margin: 0; padding: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 			.ss-la-print-title { font-size: 15px; font-weight: 700; margin-bottom: 2px; }
 			.ss-la-print-sub { color: #666; font-size: 11px; margin-bottom: 8px; }
@@ -445,6 +477,7 @@ function print() {
 			.ss-la-name { padding: 5px 8px !important; gap: 2px !important; }
 			.ss-la-sub { flex-wrap: wrap; row-gap: 2px; }
 			.ss-cal-legend { margin-top: 8px; }
+			@media screen { body { padding: 8mm; } }
 		</style></head><body>
 		<div class="ss-app" data-look="new" style="min-height:0;padding:0">
 			<div class="ss-la-print-title">${esc(title)}</div>
@@ -454,14 +487,8 @@ function print() {
 			${table.value.outerHTML}
 			<div class="ss-cal-legend">${legend}</div>
 		</div>
-		</body></html>`);
-	win.document.close();
-	const go_print = () => {
-		win.focus();
-		win.print();
-	};
-	if (win.document.readyState === "complete") setTimeout(go_print, 300);
-	else win.addEventListener("load", go_print);
+		</body></html>`;
+	preview_open.value = true;
 }
 
 async function load() {

@@ -19,20 +19,13 @@
 		</TopBar>
 
 		<div class="ss-content">
-			<div v-if="wide" class="ss-list-head">
-				<StatusTabs v-model="tab" :options="TABS" />
-				<div class="ss-list-tools">
-					<button
-						type="button"
-						class="ss-icon-btn"
-						:class="{ 'is-spinning': loading }"
-						aria-label="โหลดใหม่"
-						@click="reload"
-					>
-						<Icon name="refresh" :size="17" />
-					</button>
-				</div>
-			</div>
+			<ListHead
+				v-if="wide"
+				v-model="tab"
+				:tabs="TABS"
+				:loading="loading"
+				@refresh="reload"
+			/>
 			<div v-else class="ss-tabs">
 				<button
 					v-for="t in TABS"
@@ -156,7 +149,7 @@ import Icon from "../../shared/components/Icon.vue";
 import TopBar from "../../shared/components/TopBar.vue";
 import Skeleton from "../../shared/components/Skeleton.vue";
 import Empty from "../../shared/components/Empty.vue";
-import StatusTabs from "../../shared/components/StatusTabs.vue";
+import ListHead from "../../shared/components/ListHead.vue";
 import { use_wide } from "../../shared/table.js";
 import { call, initials, post, show_error, thai_date, toast, tone, today } from "../../shared/api.js";
 

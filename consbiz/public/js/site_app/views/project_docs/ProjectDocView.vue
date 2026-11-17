@@ -1,14 +1,18 @@
 <!-- ดูเอกสารโครงการ 4 ชนิด (kinds.js): ร่าง = แก้/ส่ง, ส่งแล้ว = บันทึกผลอนุมัติ/ผลตรวจ, ปิดรายการ Punch List, แก้ปริมาณจริงของงานลด-เพิ่ม
      ยกเลิก/แก้ฉบับ (amend) และไฟล์แนบใช้ระบบเต็ม -->
 <template>
-	<div class="ss-has-bar">
-		<TopBar :title="kind.label" :subtitle="params.name" :back_to="kind.list" :back_params="kind.list_params">
-			<template #actions>
-				<a class="ss-icon-btn" :href="desk_url(kind.doctype, params.name)" aria-label="เปิดในระบบเต็ม" title="เปิดในระบบเต็ม"><Icon name="external" :size="19" /></a>
-			</template>
-		</TopBar>
+	<div>
+		<TopBar :title="kind.label" :subtitle="params.name" :back_to="kind.list" :back_params="kind.list_params" />
 
 		<div class="ss-content">
+			<FormHead
+				v-if="view"
+				model-value="main"
+				:tabs="[{ value: 'main', label: kind.label }]"
+				:actions="actions"
+				:menu="menu"
+				:busy="busy"
+			/>
 			<Skeleton v-if="!view" :rows="4" />
 			<div v-else class="ss-split">
 				<div class="ss-split-main">
@@ -69,13 +73,6 @@
 			</div>
 		</div>
 
-		<Teleport to="#ss-layer">
-			<Transition name="ss-bar">
-				<div v-if="actions.length" class="ss-bottom-bar">
-					<button v-for="a in actions" :key="a.label" type="button" class="ss-btn ss-btn--lg" :class="a.primary ? 'ss-btn--primary ss-grow' : a.danger ? 'ss-btn--ghost-danger' : 'ss-btn--ghost'" :disabled="busy" @click="a.run">{{ a.label }}</button>
-				</div>
-			</Transition>
-		</Teleport>
 
 		<DeleteSheet
 			:open="deleting"
@@ -185,6 +182,8 @@
 </template>
 
 <script setup>
+import FormHead from "../../../shared/components/FormHead.vue";
+import { LABELS, can_duplicate, doc_menu, duplicate_doc, step_actions } from "../../../shared/form_actions.js";
 import { computed, inject, ref } from "vue";
 import DateInput from "../../../shared/components/DateInput.vue";
 import Icon from "../../../shared/components/Icon.vue";
@@ -282,18 +281,50 @@ function after_delete() {
 	go(kind.list, kind.list_params, { replace: true });
 }
 
+// หัวฟอร์ม: ร่าง → ส่ง (VO/EOT ส่งอนุมัติผู้ว่าจ้าง, ขอตรวจงาน ส่งขอตรวจ, Punch List ยืนยัน) → บันทึกผลอนุมัติ/ผลตรวจ
+const SUBMIT_LABEL = { vo: LABELS.send, eot: LABELS.send, inspection: "ส่งขอตรวจ", punch: LABELS.confirm };
 const actions = computed(() => {
 	const v = view.value;
 	if (!v) return [];
-	const list = [];
-	if (v.can_delete) list.push({ label: "ลบ", danger: true, run: () => (deleting.value = true) });
-	if (v.can_edit) list.push({ label: "แก้ไข", primary: !v.can_submit, run: () => go(kind.form, { kind: params.kind, name: params.name }) });
-	if (v.can_submit) list.push({ label: "ส่ง", primary: true, run: () => (kind.quick ? submit() : (confirming.value = true)) });
-	if (v.can_update && params.kind !== "punch")
-		list.push({ label: params.kind === "inspection" ? "บันทึกผลตรวจ" : "บันทึกผลอนุมัติ", primary: true, run: open_result });
-	if (v.can_reinspect && !v.reinspection)
-		list.push({ label: "ขอตรวจซ้ำ", run: () => go(kind.form, { kind: params.kind, name: "new", source: params.name }) });
-	return list;
+	return step_actions({
+		stage: v.can_submit || v.can_edit ? "draft" : "done",
+		submit: v.can_submit && {
+			label: SUBMIT_LABEL[params.kind],
+			icon: "send",
+			run: () => (kind.quick ? submit() : (confirming.value = true)),
+		},
+		next: [
+			v.can_update && params.kind !== "punch" && {
+				label: params.kind === "inspection" ? "บันทึกผลตรวจ" : "บันทึกผลอนุมัติ",
+				run: open_result,
+			},
+			v.can_reinspect && !v.reinspection && {
+				label: "ขอตรวจซ้ำ",
+				icon: "plus",
+				run: () => go(kind.form, { kind: params.kind, name: "new", source: params.name }),
+			},
+		],
+		extra: [
+			v.can_edit && {
+				label: "แก้ไข",
+				icon: "pen",
+				tone: v.can_submit ? "soft" : "primary",
+				run: () => go(kind.form, { kind: params.kind, name: params.name }),
+			},
+		],
+	});
+});
+const menu = computed(() => {
+	const v = view.value;
+	if (!v) return [];
+	return doc_menu({
+		duplicate:
+			can_duplicate(kind.doctype) &&
+			(() => duplicate_doc(kind.doctype, params.name, kind.form, { kind: params.kind })),
+		refresh: load,
+		desk: [kind.doctype, params.name],
+		remove: v.can_delete && (() => (deleting.value = true)),
+	});
 });
 
 function open_result() {

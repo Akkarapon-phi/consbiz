@@ -18,34 +18,17 @@
 		</TopBar>
 
 		<div class="ss-content">
-			<div v-if="wide" class="ss-list-head">
-				<StatusTabs v-model="status" :options="tabs" />
-				<div class="ss-list-tools">
-					<button
-						type="button"
-						class="ss-icon-btn"
-						:class="{ 'is-spinning': loading }"
-						aria-label="โหลดใหม่"
-						title="โหลดใหม่"
-						@click="load"
-					>
-						<Icon name="refresh" :size="17" />
-					</button>
-					<button
-						v-if="data?.can_create"
-						type="button"
-						class="ss-btn ss-btn--primary ss-list-create"
-						@click="adding = true"
-					>
-						<Icon name="plus" :size="18" :stroke="2.6" />
-						<span>คนงานใหม่</span>
-					</button>
-				</div>
-				<!-- แถวตัวกรอง: ค้นหา -->
-				<div class="ss-list-filterbar">
-					<ListSearch v-model="txt" placeholder="ค้นหาชื่อ ตำแหน่ง ผรม." />
-				</div>
-			</div>
+			<ListHead
+				v-if="wide"
+				v-model="status"
+				:tabs="tabs"
+				v-model:search="txt"
+				search_placeholder="ค้นหาชื่อ ตำแหน่ง ผรม."
+				:loading="loading"
+				:create="data?.can_create ? 'คนงานใหม่' : ''"
+				@refresh="load"
+				@create="adding = true"
+			/>
 			<template v-else>
 				<Segmented v-model="status" :options="tabs" />
 				<input v-model="txt" class="ss-input wk-search" placeholder="ค้นหาชื่อ ตำแหน่ง ผรม." />
@@ -149,13 +132,12 @@ import Icon from "../../../shared/components/Icon.vue";
 import TopBar from "../../../shared/components/TopBar.vue";
 import Skeleton from "../../../shared/components/Skeleton.vue";
 import Empty from "../../../shared/components/Empty.vue";
-import StatusTabs from "../../../shared/components/StatusTabs.vue";
 import Segmented from "../../../shared/components/Segmented.vue";
 import DataTable from "../../../shared/components/DataTable.vue";
-import ListSearch from "../../../shared/components/ListSearch.vue";
 import WorkerSheet from "./WorkerSheet.vue";
 import Sheet from "../../../shared/components/Sheet.vue";
 import Picker from "../../../shared/components/Picker.vue";
+import ListHead from "../../../shared/components/ListHead.vue";
 import { matches, use_wide } from "../../../shared/table.js";
 import { call, money, post, show_error, state, toast } from "../../../shared/api.js";
 

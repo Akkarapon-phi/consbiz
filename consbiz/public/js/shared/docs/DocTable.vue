@@ -48,8 +48,7 @@
 					}"
 					:style="{ '--i': Math.min(i, 20) }"
 					tabindex="0"
-					@click="preview ? $emit('select', row) : open(row)"
-					@dblclick="open(row)"
+					@click="click_row(row)"
 					@keydown.enter="open(row)"
 					@keydown.down.prevent="step($event, 1)"
 					@keydown.up.prevent="step($event, -1)"
@@ -162,7 +161,9 @@ const props = defineProps({
 	sort: String,
 	order: String,
 	selected: { type: Set, default: () => new Set() },
-	// จอ ≥1480: คลิก = เลือกดูตัวอย่างข้างตาราง (emit select) ดับเบิลคลิก/Enter = เปิดเต็มหน้า
+	// จอ ≥1480 (previewable): คลิกแถว = ดูตัวอย่างข้างตาราง (emit select) คลิกแถวที่ดูอยู่ซ้ำ = เปิดเต็มหน้า
+	// จอเล็กกว่า: คลิกแถว = เปิดเต็มหน้า (Enter = เปิดเต็มหน้าเสมอ)
+	previewable: Boolean,
 	preview: Boolean,
 	active: String,
 });
@@ -214,6 +215,11 @@ const columns = computed(() => {
 
 const all_checked = computed(() => props.rows.length && props.rows.every((r) => props.selected.has(r.name)));
 const some_checked = computed(() => props.rows.some((r) => props.selected.has(r.name)));
+
+function click_row(row) {
+	if (props.previewable && !(props.preview && row.name === props.active)) emit("select", row);
+	else open(row);
+}
 
 const subject = (row) => row.party || row.title || row.name;
 

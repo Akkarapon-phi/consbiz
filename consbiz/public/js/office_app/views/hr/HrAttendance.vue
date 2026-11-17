@@ -4,9 +4,6 @@
 <template>
 	<div>
 		<TopBar title="สรุปวันทำงาน">
-			<template #search>
-				<HeaderSearch v-if="wide" v-model="txt" placeholder="ค้นหาชื่อพนักงาน ตำแหน่ง แผนก" />
-			</template>
 			<template #actions>
 				<button
 					v-if="!wide"
@@ -22,43 +19,27 @@
 		</TopBar>
 
 		<div class="ss-content">
-			<div v-if="wide" class="ss-list-head">
-				<StatusTabs v-model="filter" :options="tabs" />
-				<div class="ss-list-tools">
-					<button
-						type="button"
-						class="ss-icon-btn"
-						:class="{ 'is-spinning': loading }"
-						aria-label="โหลดใหม่"
-						title="โหลดใหม่"
-						@click="load"
-					>
-						<Icon name="refresh" :size="17" />
-					</button>
-					<button
-						type="button"
-						class="ss-btn ss-btn--primary ss-list-create"
-						:disabled="busy || !to_close"
-						:title="close_hint"
-						@click="close_period"
-					>
-						<Icon name="check" :size="18" :stroke="2.6" />
-						<span>บันทึก Attendance{{ to_close ? ` (${num(to_close)})` : "" }}</span>
-					</button>
-				</div>
-				<!-- แถวตัวกรอง: ค้นหา (HeaderSearch ย้ายมาเอง) → เดือน → โครงการ -->
-				<div class="ss-list-filterbar">
+			<ListHead
+				v-if="wide"
+				v-model="filter"
+				:tabs="tabs"
+				v-model:search="txt"
+				search_placeholder="ค้นหาชื่อพนักงาน ตำแหน่ง แผนก"
+				:loading="loading"
+				:create="`บันทึก Attendance${to_close ? ` (${num(to_close)})` : ''}`"
+				create_icon="check"
+				:create_disabled="busy || !to_close"
+				:create_title="close_hint"
+				@refresh="load"
+				@create="close_period"
+			>
+				<!-- แถวตัวกรอง: ค้นหา → เดือน → โครงการ -->
+				<template #filters>
 					<span class="hr-month">
 						<button type="button" class="ss-icon-btn" aria-label="เดือนก่อน" title="เดือนก่อน" @click="shift(-1)">
 							<Icon name="chevron-left" :size="17" />
 						</button>
-						<DateInput
-							v-model="month"
-							picker="month"
-							variant="tool"
-							:max="this_month"
-							label="เลือกเดือน"
-						/>
+						<DateInput v-model="month" picker="month" variant="tool" :max="this_month" label="เลือกเดือน" />
 						<button
 							type="button"
 							class="ss-icon-btn"
@@ -71,8 +52,8 @@
 						</button>
 					</span>
 					<ProjectFilter />
-				</div>
-			</div>
+				</template>
+			</ListHead>
 			<template v-else>
 				<div class="hr-month hr-month--mobile">
 					<button type="button" class="ss-icon-btn" aria-label="เดือนก่อน" @click="shift(-1)">
@@ -430,9 +411,8 @@ import Sheet from "../../../shared/components/Sheet.vue";
 import DateInput from "../../../shared/components/DateInput.vue";
 import ApprovalSheet from "../../../shared/approvals/ApprovalSheet.vue";
 import { find_pending } from "../../../shared/approvals/kinds.js";
-import StatusTabs from "../../../shared/components/StatusTabs.vue";
-import HeaderSearch from "../../../shared/components/HeaderSearch.vue";
 import ProjectFilter from "../../../shared/docs/ProjectFilter.vue";
+import ListHead from "../../../shared/components/ListHead.vue";
 import { matches, use_wide } from "../../../shared/table.js";
 import {
 	call,

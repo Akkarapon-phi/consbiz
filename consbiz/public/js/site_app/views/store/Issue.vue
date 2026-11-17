@@ -16,27 +16,15 @@
 		</TopBar>
 
 		<div class="ss-content">
-			<div v-if="wide" class="ss-list-head">
-				<StatusTabs v-model="tab" :options="TABS" />
-				<div class="ss-list-tools">
-					<button
-						type="button"
-						class="ss-icon-btn"
-						:class="{ 'is-spinning': loading }"
-						aria-label="โหลดใหม่"
-						@click="load"
-					>
-						<Icon name="refresh" :size="17" />
-					</button>
-				</div>
-				<!-- แถวตัวกรอง: ค้นหา + ตัวกรองของหน้า -->
-				<div class="ss-list-filterbar">
-					<ListSearch
-						v-model="txt"
-						:placeholder="tab === 'new' ? 'ค้นหาวัสดุในคลัง' : 'ค้นหาเลขที่ ผู้เบิก หรือวัสดุ'"
-					/>
-				</div>
-			</div>
+			<ListHead
+				v-if="wide"
+				v-model="tab"
+				:tabs="TABS"
+				v-model:search="txt"
+				:search_placeholder="tab === 'new' ? 'ค้นหาวัสดุในคลัง' : 'ค้นหาเลขที่ ผู้เบิก หรือวัสดุ'"
+				:loading="loading"
+				@refresh="load"
+			/>
 			<Segmented v-else v-model="tab" :options="TABS" />
 
 			<Transition name="ss-fade" mode="out-in">
@@ -350,8 +338,7 @@ import Sheet from "../../../shared/components/Sheet.vue";
 import Stepper from "../../../shared/components/Stepper.vue";
 import Picker from "../../../shared/components/Picker.vue";
 import DataTable from "../../../shared/components/DataTable.vue";
-import StatusTabs from "../../../shared/components/StatusTabs.vue";
-import ListSearch from "../../../shared/components/ListSearch.vue";
+import ListHead from "../../../shared/components/ListHead.vue";
 import { matches, use_wide } from "../../../shared/table.js";
 import {
 	call,

@@ -6,73 +6,7 @@
 		<TopBar :title="title" :subtitle="doc?.supplier_name" back_to="variations" />
 
 		<div class="ss-content">
-			<div v-if="doc" class="ss-list-head">
-				<StatusTabs v-model="tab" :options="TABS" />
-				<div class="ss-list-tools">
-					<a
-						v-if="doc.name"
-						class="ss-icon-btn"
-						:href="desk_url('Subcontract Variation', doc.name)"
-						title="เปิดในระบบเต็ม"
-						aria-label="เปิดในระบบเต็ม"
-						><Icon name="external" :size="17"
-					/></a>
-					<template v-if="editable">
-						<button
-							v-if="view.can_delete && doc.name"
-							type="button"
-							class="ss-btn ss-btn--ghost-danger ss-list-create"
-							:disabled="busy"
-							@click="deleting = true"
-						>
-							ลบ
-						</button>
-						<button
-							v-if="view.can_submit && doc.name"
-							type="button"
-							class="ss-btn ss-btn--soft ss-list-create"
-							:disabled="busy || dirty || !!error"
-							:title="dirty ? 'บันทึกก่อนอนุมัติ' : ''"
-							@click="confirm_submit = true"
-						>
-							อนุมัติ
-						</button>
-						<button
-							type="button"
-							class="ss-btn ss-btn--primary ss-list-create"
-							:disabled="busy || !dirty || !doc.subcontract_agreement"
-							@click="save"
-						>
-							<Icon name="save" :size="18" /> <span>บันทึก</span>
-						</button>
-					</template>
-					<template v-else>
-						<button
-							v-if="view.can_cancel"
-							type="button"
-							class="ss-btn ss-btn--ghost-danger ss-list-create"
-							:disabled="busy"
-							@click="confirm_cancel = true"
-						>
-							ยกเลิก
-						</button>
-						<a
-							v-if="doc.po_snapshot"
-							class="ss-btn ss-btn--soft ss-list-create"
-							:href="doc.po_snapshot"
-							target="_blank"
-							>PO ฉบับเดิม (Rev.{{ (doc.revision_no || 1) - 1 }})</a
-						>
-						<a
-							v-if="doc.purchase_order"
-							class="ss-btn ss-btn--soft ss-list-create"
-							:href="desk_url('Purchase Order', doc.purchase_order)"
-							target="_blank"
-							>{{ doc.purchase_order }}</a
-						>
-					</template>
-				</div>
-			</div>
+			<FormHead v-if="doc" v-model="tab" :tabs="TABS" :actions="actions" :menu="menu" :busy="busy" />
 
 			<Skeleton v-if="!doc" :rows="6" />
 			<template v-else>
@@ -349,8 +283,9 @@ import MoneyInput from "../../../shared/components/MoneyInput.vue";
 import Picker from "../../../shared/components/Picker.vue";
 import Sheet from "../../../shared/components/Sheet.vue";
 import Skeleton from "../../../shared/components/Skeleton.vue";
-import StatusTabs from "../../../shared/components/StatusTabs.vue";
 import TopBar from "../../../shared/components/TopBar.vue";
+import FormHead from "../../../shared/components/FormHead.vue";
+import { LABELS, doc_menu, step_actions } from "../../../shared/form_actions.js";
 import {
 	back,
 	call,
@@ -563,5 +498,44 @@ async function load() {
 		back("variations");
 	}
 }
+// หัวฟอร์ม: ร่าง → บันทึก → อนุมัติ (PO แก้ตามใบงานเพิ่ม) → ยกเลิกได้เฉพาะฉบับล่าสุด
+const actions = computed(() => {
+	const d = doc.value;
+	const v = view.value;
+	return step_actions({
+		stage: editable.value ? "draft" : "done",
+		is_new: !d.name,
+		dirty: dirty.value,
+		save: editable.value && { run: save, disabled: !d.subcontract_agreement },
+		submit: v.can_submit && d.name && {
+			label: LABELS.approve,
+			disabled: !!error.value,
+			run: () => (confirm_submit.value = true),
+		},
+		cancel: v.can_cancel && (() => (confirm_cancel.value = true)),
+	});
+});
+const menu = computed(() => {
+	const d = doc.value;
+	const v = view.value;
+	return doc_menu({
+		items: [
+			!editable.value && d.po_snapshot && {
+				label: `PO ฉบับเดิม (Rev.${(d.revision_no || 1) - 1})`,
+				icon: "file",
+				href: d.po_snapshot,
+			},
+			!editable.value && d.purchase_order && {
+				label: `ใบสั่งซื้อ ${d.purchase_order}`,
+				icon: "file",
+				href: desk_url("Purchase Order", d.purchase_order),
+			},
+		],
+		refresh: d.name && load,
+		desk: ["Subcontract Variation", d.name],
+		remove: editable.value && v.can_delete && d.name && (() => (deleting.value = true)),
+	});
+});
+
 load();
 </script>

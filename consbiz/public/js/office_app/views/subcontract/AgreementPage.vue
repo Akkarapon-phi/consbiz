@@ -6,121 +6,7 @@
 		<TopBar :title="title" :subtitle="doc?.supplier_name" back_to="agreements" />
 
 		<div class="ss-content">
-			<div v-if="doc" class="ss-list-head">
-				<StatusTabs v-model="tab" :options="tabs" />
-				<div class="ss-list-tools">
-					<a
-						v-if="doc.name"
-						class="ss-icon-btn"
-						:href="desk_url('Subcontract Agreement', doc.name)"
-						title="เปิดในระบบเต็ม"
-						aria-label="เปิดในระบบเต็ม"
-						><Icon name="external" :size="17"
-					/></a>
-					<template v-if="editable">
-						<button
-							v-if="view.can_delete && doc.name"
-							type="button"
-							class="ss-btn ss-btn--ghost-danger ss-list-create"
-							:disabled="busy"
-							@click="deleting = true"
-						>
-							ลบ
-						</button>
-						<button
-							v-if="view.can_submit && doc.name"
-							type="button"
-							class="ss-btn ss-btn--soft ss-list-create"
-							:disabled="busy || dirty"
-							:title="dirty ? 'บันทึกก่อน Submit' : ''"
-							@click="confirm_submit = true"
-						>
-							Submit
-						</button>
-						<button
-							type="button"
-							class="ss-btn ss-btn--primary ss-list-create"
-							:disabled="busy || !dirty"
-							@click="save()"
-						>
-							<Icon name="save" :size="18" /> <span>บันทึก</span>
-						</button>
-					</template>
-					<template v-else>
-						<button
-							v-if="view.can_cancel"
-							type="button"
-							class="ss-btn ss-btn--ghost-danger ss-list-create"
-							:disabled="busy"
-							@click="confirm_cancel = true"
-						>
-							ยกเลิก
-						</button>
-						<button
-							v-if="view.can_close"
-							type="button"
-							class="ss-btn ss-btn--ghost-danger ss-list-create"
-							:disabled="busy"
-							@click="closing = { reason: '' }"
-						>
-							ปิดสัญญา
-						</button>
-						<button
-							v-if="view.can_reopen"
-							type="button"
-							class="ss-btn ss-btn--soft ss-list-create"
-							:disabled="busy"
-							@click="confirm_reopen = true"
-						>
-							เปิดสัญญาอีกครั้ง
-						</button>
-						<button
-							v-if="view.can_share_link"
-							type="button"
-							class="ss-btn ss-btn--soft ss-list-create"
-							:disabled="busy"
-							@click="open_link"
-						>
-							ลิงก์ผู้รับเหมา
-						</button>
-						<button
-							v-if="view.can_vary"
-							type="button"
-							class="ss-btn ss-btn--soft ss-list-create"
-							:disabled="busy"
-							@click="go('variation', { name: 'new', agreement: doc.name })"
-						>
-							ใบงานเพิ่ม
-						</button>
-						<button
-							v-if="view.can_make_po"
-							type="button"
-							class="ss-btn ss-btn--soft ss-list-create"
-							:disabled="busy"
-							@click="action('purchase_order')"
-						>
-							สร้างใบสั่งซื้อ (PO)
-						</button>
-						<button
-							v-if="view.can_pay_advance"
-							type="button"
-							class="ss-btn ss-btn--soft ss-list-create"
-							:disabled="busy"
-							@click="action('advance')"
-						>
-							จ่ายเงินล่วงหน้า
-						</button>
-						<button
-							v-if="view.can_claim"
-							type="button"
-							class="ss-btn ss-btn--primary ss-list-create"
-							@click="go('claim', { name: 'new', agreement: doc.name })"
-						>
-							<Icon name="plus" :size="18" :stroke="2.6" /> <span>ใบเบิกงวด</span>
-						</button>
-					</template>
-				</div>
-			</div>
+			<FormHead v-if="doc" v-model="tab" :tabs="tabs" :actions="actions" :menu="menu" :busy="busy" />
 
 			<Skeleton v-if="!doc" :rows="6" />
 			<template v-else>
@@ -727,8 +613,9 @@ import Picker from "../../../shared/components/Picker.vue";
 import Segmented from "../../../shared/components/Segmented.vue";
 import Sheet from "../../../shared/components/Sheet.vue";
 import Skeleton from "../../../shared/components/Skeleton.vue";
-import StatusTabs from "../../../shared/components/StatusTabs.vue";
 import TopBar from "../../../shared/components/TopBar.vue";
+import FormHead from "../../../shared/components/FormHead.vue";
+import { LABELS, can_duplicate, doc_menu, duplicate_doc, step_actions } from "../../../shared/form_actions.js";
 import {
 	back,
 	call,
@@ -1065,5 +952,58 @@ watch(
 	() => doc.value?.billing_method,
 	(method) => method !== "Milestone" && tab.value === "milestones" && (tab.value = "main")
 );
+// หัวฟอร์ม: ร่าง → บันทึก → อนุมัติ → สร้าง PO → ใบเบิกงวด (ขั้นถัดไปแสดงทีละขั้น ที่เหลืออยู่ในเมนู ⋯)
+const actions = computed(() => {
+	const d = doc.value;
+	const v = view.value;
+	const make_po = v.can_make_po && { label: "สร้างใบสั่งซื้อ (PO)", run: () => action("purchase_order") };
+	const claim = v.can_claim && {
+		label: "ใบเบิกงวด",
+		icon: "plus",
+		run: () => go("claim", { name: "new", agreement: d.name }),
+	};
+	const reopen = v.can_reopen && { label: "เปิดสัญญาอีกครั้ง", run: () => (confirm_reopen.value = true) };
+	return step_actions({
+		stage: editable.value ? "draft" : "done",
+		is_new: !d.name,
+		dirty: dirty.value,
+		save: editable.value && { run: () => save() },
+		submit: v.can_submit && d.name && { label: LABELS.approve, run: () => (confirm_submit.value = true) },
+		cancel: v.can_cancel && (() => (confirm_cancel.value = true)),
+		next: [reopen || make_po || claim],
+	});
+});
+const menu = computed(() => {
+	const d = doc.value;
+	const v = view.value;
+	const done = !editable.value;
+	return doc_menu({
+		items: [
+			done && v.can_make_po && v.can_claim && {
+				label: "ใบเบิกงวด",
+				icon: "plus",
+				run: () => go("claim", { name: "new", agreement: d.name }),
+			},
+			done && v.can_vary && {
+				label: "ใบงานเพิ่ม",
+				icon: "plus",
+				run: () => go("variation", { name: "new", agreement: d.name }),
+			},
+			done && v.can_pay_advance && { label: "จ่ายเงินล่วงหน้า", icon: "wallet", run: () => action("advance") },
+			done && v.can_share_link && { label: "ลิงก์ผู้รับเหมา", icon: "link", run: open_link },
+			done && v.can_close && {
+				label: "ปิดสัญญา",
+				icon: "ban",
+				danger: true,
+				run: () => (closing.value = { reason: "" }),
+			},
+		],
+		duplicate: d.name && can_duplicate("Subcontract Agreement") && (() => duplicate_doc("Subcontract Agreement", d.name, "agreement")),
+		refresh: d.name && load,
+		desk: ["Subcontract Agreement", d.name],
+		remove: editable.value && v.can_delete && d.name && (() => (deleting.value = true)),
+	});
+});
+
 load();
 </script>

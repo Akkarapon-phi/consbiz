@@ -3,7 +3,7 @@
      "คำนวณและบันทึก" = บันทึก Bar Cut Plan (validate คำนวณความยาวตัด + จัดตัด) ผลการตัดมาจาก server เสมอ
      ลอกหน้าตาฟอร์มจากคอนกรีต (ConcreteForm.vue) API consbiz/bar_cut_app.py -->
 <template>
-	<div class="ss-has-bar">
+	<div>
 		<TopBar
 			:title="doc?.name ? doc.title || doc.name : 'แผนตัดเหล็กใหม่'"
 			:subtitle="doc?.name || state.project?.project_name"
@@ -13,15 +13,18 @@
 		<div class="ss-content">
 			<Skeleton v-if="!doc || !setup" :rows="4" />
 			<template v-else>
-				<div v-if="wide" class="ss-list-head">
-					<StatusTabs v-model="tab" :options="tabs" />
-					<div class="ss-list-tools">
-						<span v-if="dirty && doc.patterns.length" class="ss-tag tone-amber"
-							>แก้แล้ว ยังไม่คำนวณใหม่</span
-						>
-					</div>
-				</div>
-				<Segmented v-else v-model="tab" :options="tabs" />
+				<FormHead
+					v-model="tab"
+					:tabs="tabs"
+					:actions="actions"
+					:menu="menu"
+					:busy="saving"
+					:on-print="view.pdf_url && !dirty ? () => (pdf = true) : null"
+				>
+					<template v-if="wide && dirty && doc.patterns.length" #tools>
+						<span class="ss-tag tone-amber">แก้แล้ว ยังไม่คำนวณใหม่</span>
+					</template>
+				</FormHead>
 
 				<!-- ---------------- รายการตัด ---------------- -->
 				<template v-if="tab === 'items'">
@@ -338,42 +341,6 @@
 			</template>
 		</div>
 
-		<Teleport to="#ss-layer">
-			<Transition name="ss-bar">
-				<div v-if="doc && setup" class="ss-bottom-bar">
-					<button
-						v-if="view.can_delete"
-						type="button"
-						class="ss-btn ss-btn--ghost-danger ss-btn--lg"
-						@click="deleting = true"
-					>
-						<Icon name="trash" :size="17" /> ลบ
-					</button>
-					<button
-						v-if="view.pdf_url"
-						type="button"
-						class="ss-btn ss-btn--ghost ss-btn--lg"
-						:disabled="dirty"
-						:title="dirty ? 'คำนวณและบันทึกก่อน' : ''"
-						@click="pdf = true"
-					>
-						<Icon name="printer" :size="17" /> PDF
-					</button>
-					<button
-						v-if="!readonly"
-						type="button"
-						class="ss-btn ss-btn--primary ss-btn--lg ss-grow"
-						:disabled="
-							saving || !doc.title || !doc.items.length || (!dirty && !!doc.name)
-						"
-						@click="save"
-					>
-						<span v-if="saving" class="ss-spinner"></span>
-						<template v-else>คำนวณและบันทึก</template>
-					</button>
-				</div>
-			</Transition>
-		</Teleport>
 
 		<!-- เพิ่ม / แก้เหล็ก 1 แถว -->
 		<Sheet
@@ -525,6 +492,8 @@
 </template>
 
 <script setup>
+import FormHead from "../../../shared/components/FormHead.vue";
+import { can_duplicate, doc_menu, duplicate_doc, step_actions } from "../../../shared/form_actions.js";
 import { computed, ref, watch } from "vue";
 import DateInput from "../../../shared/components/DateInput.vue";
 import DeleteSheet from "../../../shared/components/DeleteSheet.vue";
@@ -535,9 +504,9 @@ import Picker from "../../../shared/components/Picker.vue";
 import Segmented from "../../../shared/components/Segmented.vue";
 import Sheet from "../../../shared/components/Sheet.vue";
 import Skeleton from "../../../shared/components/Skeleton.vue";
-import StatusTabs from "../../../shared/components/StatusTabs.vue";
 import Stepper from "../../../shared/components/Stepper.vue";
 import TopBar from "../../../shared/components/TopBar.vue";
+import ListHead from "../../../shared/components/ListHead.vue";
 import { use_wide } from "../../../shared/table.js";
 import {
 	back,
@@ -641,6 +610,31 @@ const payload = () =>
 		stock: doc.value.stock.map((r) => Object.fromEntries(STOCK.map((f) => [f, r[f] ?? null]))),
 	});
 const dirty = computed(() => !!doc.value && (!doc.value.name || payload() !== saved.value));
+
+// หัวฟอร์ม: แผนตัดเหล็กไม่มีขั้นอนุมัติ ขั้นเดียว = คำนวณและบันทึก
+const actions = computed(() =>
+	step_actions({
+		stage: "draft",
+		is_new: !doc.value.name,
+		dirty: dirty.value,
+		save: !readonly.value && {
+			label: "คำนวณและบันทึก",
+			icon: "calculator",
+			disabled: !doc.value.title || !doc.value.items.length,
+			run: save,
+		},
+	})
+);
+const menu = computed(() =>
+	doc_menu({
+		duplicate:
+			doc.value.name &&
+			can_duplicate("Bar Cut Plan") &&
+			(() => duplicate_doc("Bar Cut Plan", doc.value.name, "rebar-plan")),
+		refresh: doc.value.name && load,
+		remove: view.value.can_delete && (() => (deleting.value = true)),
+	})
+);
 
 function apply(result) {
 	view.value = result;

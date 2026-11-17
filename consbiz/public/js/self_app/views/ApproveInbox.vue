@@ -21,21 +21,17 @@
 		</TopBar>
 
 		<div class="ss-content">
-			<div v-if="wide" class="ss-list-head">
-				<StatusTabs v-model="tab" :options="tabs" />
-				<div class="ss-list-tools">
+			<ListHead
+				v-if="wide"
+				v-model="tab"
+				:tabs="tabs"
+				:loading="loading"
+				@refresh="load"
+			>
+				<template #tools>
 					<Segmented v-model="mode" :options="MODES" />
-					<button
-						type="button"
-						class="ss-icon-btn"
-						:class="{ 'is-spinning': loading }"
-						aria-label="โหลดใหม่"
-						@click="load"
-					>
-						<Icon name="refresh" :size="17" />
-					</button>
-				</div>
-			</div>
+				</template>
+			</ListHead>
 			<Segmented v-if="!wide" v-model="mode" :options="MODES" />
 			<div v-if="!wide" class="ss-tabs">
 				<button
@@ -92,9 +88,9 @@ import Icon from "../../shared/components/Icon.vue";
 import TopBar from "../../shared/components/TopBar.vue";
 import Skeleton from "../../shared/components/Skeleton.vue";
 import Empty from "../../shared/components/Empty.vue";
-import StatusTabs from "../../shared/components/StatusTabs.vue";
 import Segmented from "../../shared/components/Segmented.vue";
 import ApprovalSheet from "../../shared/approvals/ApprovalSheet.vue";
+import ListHead from "../../shared/components/ListHead.vue";
 import { inbox_items, KINDS, kinds_of, MODULES } from "../../shared/approvals/kinds.js";
 import { use_wide } from "../../shared/table.js";
 import { boot, call, initials, money, show_error, state, tone } from "../../shared/api.js";

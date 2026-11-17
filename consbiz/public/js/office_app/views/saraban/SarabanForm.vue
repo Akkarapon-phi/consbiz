@@ -2,7 +2,7 @@
      ใบนำส่ง: รายการแก้ทีละแถวใน sheet และ "ดึงเอกสาร" จากเอกสารที่ Submit แล้ว (transmittal.get_documents)
      ใบปะหน้า: source = ใบนำส่งต้นทาง (envelope.make_envelope เติมที่อยู่/ผู้ติดต่อของคู่ค้า) -->
 <template>
-	<div class="ss-has-bar">
+	<div>
 		<TopBar
 			:title="`${params.name === 'new' ? 'สร้าง' : 'แก้ไข'}${kind.label}`"
 			:subtitle="doc.name || 'เอกสารใหม่'"
@@ -10,6 +10,13 @@
 		/>
 
 		<div class="ss-content">
+			<FormHead
+				v-if="setup"
+				model-value="main"
+				:tabs="[{ value: 'main', label: kind.label }]"
+				:actions="actions"
+				:busy="saving"
+			/>
 			<Skeleton v-if="!setup" :rows="4" />
 			<div v-else class="ss-split">
 				<div class="ss-split-main">
@@ -321,30 +328,6 @@
 			</div>
 		</div>
 
-		<Teleport to="#ss-layer">
-			<Transition name="ss-bar">
-				<div v-if="setup" class="ss-bottom-bar">
-					<button
-						type="button"
-						class="ss-btn ss-btn--lg"
-						:class="can_submit ? 'ss-btn--ghost' : 'ss-btn--primary ss-grow'"
-						:disabled="saving"
-						@click="save(0)"
-					>
-						<Icon name="save" :size="17" /> บันทึกร่าง
-					</button>
-					<button
-						v-if="can_submit"
-						type="button"
-						class="ss-btn ss-btn--primary ss-btn--lg ss-grow"
-						:disabled="saving"
-						@click="save(1)"
-					>
-						{{ params.kind === "letters-in" ? "บันทึกและลงรับ" : "บันทึกและ Submit" }}
-					</button>
-				</div>
-			</Transition>
-		</Teleport>
 
 		<!-- ใบนำส่ง: แก้ / เพิ่มแถว -->
 		<Sheet :open="!!row" :title="row?._new ? 'เพิ่มรายการ' : 'แก้รายการ'" @close="row = null">
@@ -497,6 +480,8 @@
 </template>
 
 <script setup>
+import FormHead from "../../../shared/components/FormHead.vue";
+import { step_actions } from "../../../shared/form_actions.js";
 import { computed, inject, reactive, ref } from "vue";
 import DateInput from "../../../shared/components/DateInput.vue";
 import Empty from "../../../shared/components/Empty.vue";
@@ -546,6 +531,8 @@ let key = 0;
 const setup = ref(null);
 const saving = ref(false);
 const can_submit = ref(false);
+// หัวฟอร์ม: หน้านี้ = ร่าง ขั้นเดียวคือบันทึก แล้วไปหน้าดูเพื่อยืนยัน/ลงรับ (ไม่ข้ามขั้น)
+const actions = computed(() => step_actions({ stage: "draft", is_new: true, save: () => save(0) }));
 const doc = reactive({ name: null, items: [] });
 const labels = reactive({});
 const row = ref(null);

@@ -1,6 +1,6 @@
 <!-- รายละเอียดเอกสารจัดซื้อ/ขาย: หัวเอกสาร, ความคืบหน้า, รายการ, ยอดรวม, เอกสารต้นทาง/ปลายทาง, PDF, ส่งเอกสาร -->
 <template>
-	<div :class="{ 'ss-has-bar ss-has-slim-bar': has_bar }">
+<div>
 		<TopBar :title="config.label" :subtitle="params.name" :back_to="params.kind">
 			<template #actions>
 				<!-- เปิด/ปิด sidebar ขวา (มอบหมาย ไฟล์แนบ ความคิดเห็น ความเคลื่อนไหว) -->
@@ -20,6 +20,15 @@
 		</TopBar>
 
 		<div class="ss-content ss-docview">
+			<FormHead
+				v-if="doc"
+				model-value="main"
+				:tabs="[{ value: 'main', label: config.label }]"
+				:actions="actions"
+				:menu="menu"
+				:busy="busy"
+				:on-print="() => (pdf = true)"
+			/>
 			<Skeleton v-if="!doc" :rows="3" />
 			<template v-else>
 				<section class="ss-dv-head">
@@ -425,76 +434,10 @@
 			</Transition>
 		</Teleport>
 
-		<Teleport to="#ss-layer">
-			<Transition name="ss-bar">
-				<div v-if="has_bar" class="ss-bottom-bar ss-docview-bar">
-					<!-- ปุ่มพิมพ์ซ้ายสุด: เปิด PdfViewer (พิมพ์ / แชร์ / ดาวน์โหลด) -->
-					<button
-						type="button"
-						class="ss-btn ss-btn--ghost ss-btn--lg ss-docview-print"
-						title="PDF / พิมพ์ / แชร์ (p)"
-						@click="pdf = true"
-					>
-						<Icon name="printer" :size="17" /> <span class="ss-docview-print-label">พิมพ์</span>
-					</button>
-					<button
-						v-if="doc.can_delete"
-						type="button"
-						class="ss-btn ss-btn--ghost-danger ss-btn--lg"
-						@click="deleting = true"
-					>
-						<Icon name="trash" :size="17" /> ลบ
-					</button>
-					<button
-						v-if="doc.can_edit"
-						type="button"
-						class="ss-btn ss-btn--ghost ss-btn--lg"
-						:class="{ 'ss-grow': !doc.can_submit }"
-						@click="go(`${config.section}-form`, { kind: params.kind, name: params.name })"
-					>
-						<Icon name="pen" :size="17" /> แก้ไข
-					</button>
-					<button
-						v-if="doc.can_submit"
-						type="button"
-						class="ss-btn ss-btn--primary ss-btn--lg ss-grow"
-						:disabled="busy"
-						@click="confirm = true"
-					>
-						ส่ง{{ config.label }}
-					</button>
-					<!-- เอกสารที่ส่งแล้ว: สร้างเอกสารถัดไป (ขอซื้อ → สั่งซื้อ → แจ้งหนี้, เสนอราคา → สั่งขาย → แจ้งหนี้) -->
-					<button
-						v-if="next_kind"
-						type="button"
-						class="ss-btn ss-btn--primary ss-btn--lg ss-grow"
-						@click="
-							go(`${config.section}-form`, {
-								kind: next_kind,
-								name: 'new',
-								source: params.name,
-							})
-						"
-					>
-						<Icon name="plus" :size="18" :stroke="2.4" /> สร้าง{{ DOC_KINDS[next_kind].label }}
-					</button>
-					<!-- ใบแจ้งหนี้ที่ยังค้าง: รับชำระ / จ่ายชำระ (Payment Entry, PaymentSheet.vue) -->
-					<button
-						v-if="doc.can_pay"
-						type="button"
-						class="ss-btn ss-btn--primary ss-btn--lg ss-grow"
-						@click="paying = true"
-					>
-						<Icon :name="params.kind === 'si' ? 'receive' : 'send'" :size="18" />
-						{{ params.kind === "si" ? "รับชำระ" : "จ่ายชำระ" }}
-					</button>
-				</div>
-			</Transition>
-		</Teleport>
 
-		<Sheet :open="confirm" :title="`ส่ง${config.label}`" :subtitle="params.name" @close="confirm = false">
+		<Sheet :open="confirm" :title="`ยืนยัน${config.label}`" :subtitle="params.name" @close="confirm = false">
 			<p class="ss-muted">
-				ส่งแล้วแก้ได้เฉพาะบางช่อง (มีรูปดินสอ) เช่น กำหนดส่ง เลขที่อ้างอิง
+				ยืนยันแล้วแก้ได้เฉพาะบางช่อง (มีรูปดินสอ) เช่น กำหนดส่ง เลขที่อ้างอิง
 				ที่เหลือต้องยกเลิกแล้วแก้ในระบบเต็ม
 			</p>
 			<div v-if="doc" class="ss-facts ss-facts--grid">
@@ -514,7 +457,7 @@
 					@click="submit"
 				>
 					<span v-if="busy" class="ss-spinner"></span>
-					<template v-else>ยืนยันส่ง</template>
+					<template v-else>ยืนยัน</template>
 				</button>
 			</template>
 		</Sheet>
@@ -551,6 +494,8 @@
 <script setup>
 import { computed, inject, onBeforeUnmount, ref, watch } from "vue";
 import Icon from "../components/Icon.vue";
+import FormHead from "../components/FormHead.vue";
+import { LABELS, can_duplicate, doc_menu, duplicate_doc, step_actions } from "../form_actions.js";
 import TopBar from "../components/TopBar.vue";
 import Skeleton from "../components/Skeleton.vue";
 import Sheet from "../components/Sheet.vue";
@@ -707,8 +652,49 @@ const next_kind = computed(() =>
 	doc.value?.next_kind && in_app(doc.value.next_kind) ? doc.value.next_kind : null
 );
 
-// แถบล่างแสดงเสมอเมื่อโหลดเอกสารแล้ว (มีปุ่มพิมพ์ทุกใบ)
-const has_bar = computed(() => !!doc.value);
+// หัวฟอร์ม: ร่าง → ยืนยัน → สร้างเอกสารถัดไป (ขอซื้อ → สั่งซื้อ → แจ้งหนี้, เสนอราคา → สั่งขาย → แจ้งหนี้) / รับ-จ่ายชำระ
+const actions = computed(() => {
+	const d = doc.value;
+	if (!d) return [];
+	const form = (args) => go(`${config.section}-form`, { kind: params.kind, ...args });
+	return step_actions({
+		stage: d.can_submit || d.can_edit ? "draft" : "done",
+		submit: d.can_submit && { label: LABELS.confirm, run: () => (confirm.value = true) },
+		next: [
+			d.can_pay && {
+				label: params.kind === "si" ? "รับชำระ" : "จ่ายชำระ",
+				icon: params.kind === "si" ? "receive" : "send",
+				run: () => (paying.value = true),
+			},
+			next_kind.value && {
+				label: `สร้าง${DOC_KINDS[next_kind.value].label}`,
+				icon: "plus",
+				run: () =>
+					go(`${config.section}-form`, { kind: next_kind.value, name: "new", source: params.name }),
+			},
+		],
+		extra: [
+			d.can_edit && {
+				label: "แก้ไข",
+				icon: "pen",
+				tone: d.can_submit ? "soft" : "primary",
+				run: () => form({ name: params.name }),
+			},
+		],
+	});
+});
+const menu = computed(() => {
+	const d = doc.value;
+	if (!d) return [];
+	return doc_menu({
+		duplicate:
+			can_duplicate(config.doctype) &&
+			(() => duplicate_doc(config.doctype, params.name, `${config.section}-form`, { kind: params.kind })),
+		refresh: load,
+		desk: boot.desk !== false ? [config.doctype, params.name] : null,
+		remove: d.can_delete && (() => (deleting.value = true)),
+	});
+});
 
 // รับ/จ่ายชำระ: หน้ารายการของหมวดบัญชี (เปิดรายการที่สร้างในแอปถ้าเข้าหมวดบัญชีได้)
 const PAYMENT_LIST = { si: "acc-receipts", pi: "acc-payments" };
@@ -804,7 +790,7 @@ async function submit() {
 	try {
 		await post("consbiz.site_docs.submit_doc", { kind: params.kind, name: params.name });
 		confirm.value = false;
-		await celebrate(`ส่ง${config.label}แล้ว`, params.name);
+		await celebrate(`ยืนยัน${config.label}แล้ว`, params.name);
 		reload_summary();
 		await load();
 	} catch (error) {

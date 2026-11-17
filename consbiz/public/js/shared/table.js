@@ -43,5 +43,7 @@ export function use_overflow_row(box, sources = []) {
 	});
 	watch(sources, () => nextTick(measure));
 	onBeforeUnmount(() => observer.disconnect());
+	// วัดใหม่เองได้ (เช่น ListHead วัดทุกครั้งที่ตัวกรองในช่องเปลี่ยน)
+	hidden.measure = () => nextTick(measure);
 	return hidden;
 }

@@ -1,42 +1,26 @@
 <!-- ตารางรายงานประจำวัน / ขออนุมัติปฏิบัติงาน (จอ ≥768) เลือกหลายแถวแล้วพิมพ์เป็น PDF ไฟล์เดียว
      ข้อมูลจาก site_app.get_report_list โหลดครบแล้ว DataTable แบ่งหน้าในเครื่อง ดู Design.md "ตารางเลือกหลายแถว" -->
 <template>
-	<div class="ss-list-head">
-		<StatusTabs :model-value="tab" :options="tabs" @update:model-value="$emit('update:tab', $event)" />
-		<div class="ss-list-tools">
-			<button
-				v-if="can_create"
-				type="button"
-				class="ss-btn ss-btn--primary ss-list-create"
-				@click="go('report-form', { kind, name: 'new', date: today() })"
-			>
-				<Icon name="plus" :size="18" :stroke="2.6" />
-				<span>{{ kind === "dr" ? "เขียนรายงาน" : "ขออนุมัติปฏิบัติงาน" }}</span>
-			</button>
-			<button
-				type="button"
-				class="ss-icon-btn"
-				:class="{ 'is-spinning': loading }"
-				aria-label="โหลดใหม่"
-				@click="load"
-			>
-				<Icon name="refresh" :size="17" />
-			</button>
-		</div>
-		<!-- แถวตัวกรอง: ค้นหา + ช่วงวันที่ -->
-		<div class="ss-list-filterbar">
-			<ListSearch
-				:model-value="search"
-				placeholder="ค้นหาเลขที่ ผู้จัดทำ หรือปัญหา"
-				@update:model-value="$emit('update:search', $event)"
-			/>
+	<ListHead
+		:model-value="tab"
+		:tabs="tabs"
+		:search="search"
+		search_placeholder="ค้นหาเลขที่ ผู้จัดทำ หรือปัญหา"
+		:loading="loading"
+		:create="can_create ? (kind === 'dr' ? 'เขียนรายงาน' : 'ขออนุมัติปฏิบัติงาน') : ''"
+		@update:model-value="$emit('update:tab', $event)"
+		@update:search="$emit('update:search', $event)"
+		@refresh="load"
+		@create="go('report-form', { kind, name: 'new', date: today() })"
+	>
+		<template #filters>
 			<span class="ss-report-range">
 				<DateInput v-model="from_date" variant="tool" label="ตั้งแต่วันที่" />
 				<span>ถึง</span>
 				<DateInput v-model="to_date" variant="tool" label="ถึงวันที่" />
 			</span>
-		</div>
-	</div>
+		</template>
+	</ListHead>
 
 	<Skeleton v-if="data === null" />
 	<Empty
@@ -115,11 +99,10 @@ import { computed, onBeforeUnmount, ref, watch } from "vue";
 import Icon from "../../../shared/components/Icon.vue";
 import Skeleton from "../../../shared/components/Skeleton.vue";
 import Empty from "../../../shared/components/Empty.vue";
-import StatusTabs from "../../../shared/components/StatusTabs.vue";
 import DataTable from "../../../shared/components/DataTable.vue";
 import DateInput from "../../../shared/components/DateInput.vue";
-import ListSearch from "../../../shared/components/ListSearch.vue";
 import PdfViewer from "../../../shared/components/PdfViewer.vue";
+import ListHead from "../../../shared/components/ListHead.vue";
 import { matches } from "../../../shared/table.js";
 import { boot, call, go, show_error, state, thai_date, today } from "../../../shared/api.js";
 

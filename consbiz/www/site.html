@@ -6,6 +6,7 @@
 			name="viewport"
 			content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no"
 		/>
+		<meta name="color-scheme" content="light dark" />
 		<meta name="theme-color" content="#1f6feb" id="theme-color" />
 		<meta name="apple-mobile-web-app-capable" content="yes" />
 		<meta name="mobile-web-app-capable" content="yes" />
@@ -72,6 +73,19 @@
 				}
 			}
 		</style>
+		<script>
+			// โหมดมืดของหน้าตาใหม่อ่าน html[data-theme] (ธีมเดิมอ่าน prefers-color-scheme ตรง ๆ)
+			// ตั้งตามระบบก่อนวาดหน้า และเปลี่ยนตามเมื่อผู้ใช้สลับโหมดระหว่างเปิดแอป
+			(function () {
+				var mq = window.matchMedia("(prefers-color-scheme: dark)");
+				function apply() {
+					document.documentElement.setAttribute("data-theme", mq.matches ? "dark" : "light");
+				}
+				apply();
+				if (mq.addEventListener) mq.addEventListener("change", apply);
+				else if (mq.addListener) mq.addListener(apply);
+			})();
+		</script>
 	</head>
 	<body>
 		<div id="site-app">

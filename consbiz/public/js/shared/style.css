@@ -175,13 +175,27 @@ a {
 	position: relative;
 	/* ตัดส่วนที่ล้นด้านข้างตอนเปลี่ยนหน้า (หน้าใหม่เลื่อนเข้าจาก translateX 42%) ไม่งั้นหน้าเว็บกว้างเกินจอชั่วขณะ
 	   มือถือย่อทั้งหน้าให้พอดีแล้วขยายกลับ (กดแก้ไข/ย้อนกลับแล้วหน้าย่อแวบหนึ่ง) clip ไม่สร้างกล่องเลื่อน แถบบน sticky ยังทำงาน
-	   ต้องตัดที่ .ss-app (เต็มจอ) ห้ามตัดที่ .ss-stage: แถบบนหน้าตาใหม่ใช้ margin ติดลบยื่นไปใต้ Dock จะถูกตัดหัว */
+	   ต้องตัดที่ .ss-app (เต็มจอ) */
 	overflow-x: clip;
+	/* โครงแอป: แถบบน (#ss-header) แถวบนเต็มความกว้าง → .ss-stage (เนื้อหา) ยืดเต็มที่เหลือ Dock อยู่ซ้ายของ stage ใต้แถบบน */
+	display: flex;
+	flex-direction: column;
+	--ss-head-h: calc(62px + var(--ss-top));
+}
+/* แถบบนของหน้า (TopBar Teleport มา) อยู่ในโครงแอปตรงๆ (sticky เทียบ .ss-app)
+   ตอนเปลี่ยนหน้ามีของหน้าเก่าค้างชั่วครู่: แสดงเฉพาะของหน้าล่าสุด */
+#ss-header,
+#ss-header > .ss-head {
+	display: contents;
+}
+#ss-header > .ss-head:not(:last-child) {
+	display: none;
 }
 
 .ss-stage {
 	position: relative;
 	display: grid;
+	flex: 1 0 auto;
 }
 
 .ss-stage > .ss-view {
@@ -2887,7 +2901,8 @@ svg.ss-check {
 	.ss-app {
 		max-width: none;
 	}
-	.ss-app.has-side {
+	/* ช่องของ Dock อยู่ที่ stage (เนื้อหา) ไม่ใช่ทั้งแอป แถบบนจึงเต็มความกว้างโดยไม่ต้องยื่นออกไป */
+	.ss-app.has-side > .ss-stage {
 		padding-left: var(--ss-side);
 	}
 	.ss-stage > .ss-view {
@@ -4524,12 +4539,18 @@ a.ss-btn--soft {
 .ss-planner {
 	display: flex;
 	flex-direction: column;
-	height: 100vh;
-	height: 100dvh;
+	min-height: 0;
 	overflow: hidden;
 }
-.ss-planner > .ss-topbar {
-	flex: none;
+/* หน้าแผนงานเต็มจอ: แอปสูงเท่าจอ stage ได้ที่เหลือใต้แถบบน (+ แถบโครงการบนมือถือ) */
+.ss-app:has(> .ss-stage > .ss-view.ss-planner) {
+	height: 100vh;
+	height: 100dvh;
+}
+.ss-app:has(> .ss-stage > .ss-view.ss-planner) > .ss-stage {
+	flex: 1 1 0;
+	min-height: 0;
+	grid-template-rows: minmax(0, 1fr);
 }
 .pl-save-state {
 	max-width: 160px;
@@ -7135,9 +7156,6 @@ a.ss-btn--soft {
 
 /* ================================================================ จัดซื้อ / ขาย */
 
-.ss-scope {
-	max-width: 420px;
-}
 .ss-chips--wrap {
 	flex-wrap: wrap;
 }
@@ -7494,7 +7512,7 @@ a.ss-btn--soft {
 	html[data-side="expanded"] {
 		--ss-side: var(--ss-rail-open);
 	}
-	.ss-app.has-side {
+	.ss-app.has-side > .ss-stage {
 		transition: padding-left 0.3s var(--ss-ease);
 	}
 
@@ -10260,10 +10278,7 @@ div.ss-line-del {
 	gap: 20px;
 	align-items: start;
 }
-/* ตารางคู่ตัวอย่าง: ซ่อนคอลัมน์รอง */
-.ss-table--list.is-compact .col-wide {
-	display: none;
-}
+/* ตารางคู่ตัวอย่าง: คอลัมน์ลดตามความกว้างกรอบตาราง (container doclist) ไม่ซ่อนทั้งหมดในครั้งเดียว */
 .ss-table tbody tr.is-active {
 	background: var(--ss-brand-soft);
 }
@@ -10764,9 +10779,9 @@ div.ss-line-del {
 		--ss-rside: 380px;
 	}
 }
-.ss-app {
+.ss-stage {
 	padding-right: var(--ss-rside);
-	transition: padding-right 0.3s var(--ss-ease);
+	transition: padding-right 0.3s var(--ss-ease), padding-left 0.3s var(--ss-ease);
 }
 @media (min-width: 768px) {
 	.ss-bottom-bar {
@@ -11273,7 +11288,7 @@ div.ss-line-del {
 	order: 1;
 }
 /* มีตารางตามมา: ติดกับตาราง (ลบระยะห่างของ .ss-content) */
-.ss-content .ss-list-head:has(~ * .ss-table-wrap) {
+.ss-content .ss-list-head:not(.ss-form-head):has(~ * .ss-table-wrap) {
 	margin-bottom: calc(-1 * var(--ss-list-gap, 16px));
 	border-bottom: 0;
 	border-radius: var(--ss-radius-sm) var(--ss-radius-sm) 0 0;
@@ -11282,18 +11297,18 @@ div.ss-line-del {
 	--ss-list-gap: 14px;
 }
 /* กรอบเส้นเดียวไม่มีเงา แบบการ์ดของหน้าแก้แผนงาน (เงาของหัวรายการทำให้เส้นใต้แท็บเบลอ) */
-.ss-content .ss-list-head ~ * .ss-table-wrap {
+.ss-content .ss-list-head:not(.ss-form-head) ~ * .ss-table-wrap {
 	border: 1px solid var(--ss-border);
 	border-top: 0;
 	border-radius: 0;
 	box-shadow: none;
 }
-.ss-content .ss-list-head ~ * .ss-list-foot {
+.ss-content .ss-list-head:not(.ss-form-head) ~ * .ss-list-foot {
 	border: 1px solid var(--ss-border);
 	border-radius: 0 0 var(--ss-radius-sm) var(--ss-radius-sm);
 	box-shadow: none;
 }
-.ss-content .ss-list-head ~ * .ss-table-wrap:has(+ .ss-list-foot) {
+.ss-content .ss-list-head:not(.ss-form-head) ~ * .ss-table-wrap:has(+ .ss-list-foot) {
 	border-bottom: 0;
 }
 .ss-list-body.has-preview > .ss-preview {
@@ -14367,7 +14382,7 @@ html[data-theme="dark"] .ss-work-stats > button.is-featured {
    เนื้อหาห่างจาก Dock 16px ขวาเว้น 12px เท่าแถบบน */
 @media (min-width: 768px) {
 	.ss-app[data-look="new"] .ss-topbar {
-		margin: 10px 12px 0 calc(12px - var(--ss-side));
+		margin: 10px 12px 0;
 	}
 	.ss-app[data-look="new"] .ss-rail {
 		top: 80px;
@@ -14523,8 +14538,9 @@ html[data-theme="dark"] .ss-work-stats > button.is-featured {
 /* ---------------------------------------------------------------- 2026-11-16 ขยายหน้าตาใหม่ทั้งหมวดควบคุมงาน
    ใช้ html[data-section] เพื่อให้ sheet ที่ Teleport ไป body ได้ด้วย */
 @media (min-width: 768px) {
-	/* ทุกหน้าของหมวด: เนื้อหาห่าง Dock 16px ขวาเว้น 12px เท่าแถบบน */
+	/* ทุกหน้าของหมวด: เนื้อหาห่าง Dock 16px ขวาเว้น 12px เท่าแถบบน บนเว้น 12px ใต้แถบบนเท่า Dock */
 	.ss-app[data-look="new"] .ss-content {
+		padding-top: 12px;
 		padding-left: 4px;
 		padding-right: 12px;
 	}
@@ -14606,16 +14622,16 @@ html[data-look="new"] .ss-btn {
 .ss-app[data-look="new"] .ss-list-head {
 	border-radius: 22px;
 }
-.ss-app[data-look="new"] .ss-content .ss-list-head:has(~ * .ss-table-wrap) {
+.ss-app[data-look="new"] .ss-content .ss-list-head:not(.ss-form-head):has(~ * .ss-table-wrap) {
 	border-radius: 22px 22px 0 0;
 }
-.ss-app[data-look="new"] .ss-content .ss-list-head ~ * .ss-table-wrap {
+.ss-app[data-look="new"] .ss-content .ss-list-head:not(.ss-form-head) ~ * .ss-table-wrap {
 	border-color: var(--ss-work-line);
 }
-.ss-app[data-look="new"] .ss-content .ss-list-head ~ * .ss-table-wrap:not(:has(+ .ss-list-foot)) {
+.ss-app[data-look="new"] .ss-content .ss-list-head:not(.ss-form-head) ~ * .ss-table-wrap:not(:has(+ .ss-list-foot)) {
 	border-radius: 0 0 22px 22px;
 }
-.ss-app[data-look="new"] .ss-content .ss-list-head ~ * .ss-list-foot {
+.ss-app[data-look="new"] .ss-content .ss-list-head:not(.ss-form-head) ~ * .ss-list-foot {
 	border-color: var(--ss-work-line);
 	border-radius: 0 0 22px 22px;
 }
@@ -14707,20 +14723,6 @@ html[data-look="new"] .ss-segmented button.is-active {
 	color: #fff;
 }
 
-/* หน้าแผนงานเต็มจอ (.ss-planner, overflow: hidden) ตัดแถบบนที่ยื่นไปซ้าย: ขยายตัวหน้าไปชิดซ้าย 12px แทน
-   แล้วเลื่อนเนื้อหาอื่นกลับมาห่าง Dock 16px เท่าหน้าอื่น */
-@media (min-width: 768px) {
-	.ss-app[data-look="new"] .ss-stage > .ss-view.ss-planner {
-		width: calc(100% + var(--ss-side) - 12px);
-		margin-left: calc(12px - var(--ss-side));
-	}
-	.ss-app[data-look="new"] .ss-planner > .ss-topbar {
-		margin-left: 0;
-	}
-	.ss-app[data-look="new"] .ss-planner > :not(.ss-topbar):not(.ss-project-bar) {
-		margin-left: calc(var(--ss-side) - 8px);
-	}
-}
 /* HeaderSearch ที่ย้ายลงแถวตัวกรอง: อยู่ซ้ายสุดของแถว, ที่เหลือบนแถบบนไม่กินที่ */
 .ss-header-search-anchor {
 	display: contents;
@@ -15057,5 +15059,403 @@ html[data-look="new"] .ss-segmented button.is-active {
 	.ss-app[data-look="new"] .ss-sectab .ss-sectab-label,
 	.ss-app[data-look="new"] .ss-sectab:not(.is-active) .ss-sectab-label {
 		display: inline;
+	}
+}
+
+/* ---------------------------------------------------------------- 2026-11-17 iOS แถบสถานะ
+   แอปที่ติดตั้งบน iPhone/iPad (black-translucent) วาดเนื้อหาใต้แถบสถานะ ทำให้ --ss-top > 0
+   แถบบนแบบลอยเดิมยืดตัวขึ้นไปใต้นาฬิกา (การ์ดขาว + ตัวอักษรสถานะสีขาวมองไม่เห็น)
+   ย้ายแถบบนลงมาใต้ safe area และทาแถบสถานะเป็นสีกรมท่าเหมือน theme-color ที่ Android ใช้
+   (Android/เดสก์ท็อป --ss-top = 0 จึงไม่เปลี่ยน) */
+html[data-look="new"] body::before {
+	content: "";
+	position: fixed;
+	z-index: 2000;
+	top: 0;
+	left: 0;
+	right: 0;
+	height: var(--ss-top);
+	background: #17233f;
+	pointer-events: none;
+}
+@media (max-width: 767px) {
+	.ss-app[data-look="new"] .ss-topbar {
+		top: calc(8px + var(--ss-top));
+		height: 54px;
+		margin-top: calc(8px + var(--ss-top));
+		padding-block: 5px;
+	}
+}
+@media (min-width: 768px) {
+	.ss-app[data-look="new"] .ss-topbar {
+		top: calc(10px + var(--ss-top));
+		margin-top: calc(10px + var(--ss-top));
+	}
+	.ss-app[data-look="new"] {
+		--ss-head-h: calc(68px + var(--ss-top));
+	}
+	/* Dock เริ่มใต้แถบบน (เว้น 12px) */
+	.ss-app[data-look="new"] .ss-rail {
+		top: calc(var(--ss-head-h) + 12px);
+	}
+}
+
+/* ---------------------------------------------------------------- 2026-11-17 dark: เมนู/แท็บที่ยังไม่เลือกเป็นสีขาว
+   เดิมเป็นเทาอมฟ้า (#7d889c / #9ca6b7) บนพื้นกรมท่าเข้มอ่านยาก ตัวที่เลือกแล้วยังเด่นด้วยพื้นทอง/พื้นทึบ */
+html[data-theme="dark"] .ss-app[data-look="new"] .ss-list-tab:not(.is-active),
+html[data-theme="dark"] .ss-app[data-look="new"] .ss-tab:not(.is-active),
+html[data-theme="dark"] .ss-app[data-look="new"] .ss-sectab:not(.is-active),
+html[data-theme="dark"] .ss-app[data-look="new"] .ss-nav-item:not(.is-active),
+html[data-theme="dark"] .ss-app[data-look="new"] .ss-nav-item:not(.is-active) .ss-nav-icon,
+html[data-theme="dark"] .ss-app[data-look="new"] .ss-nav-item:not(.is-active) .ss-nav-label,
+html[data-theme="dark"] .ss-app[data-look="new"] .ss-rail-row:not(.is-open):not(.is-active),
+html[data-theme="dark"] .ss-app[data-look="new"] .ss-rail-row:not(.is-open):not(.is-active) .ss-rail-icon,
+html[data-theme="dark"] .ss-app[data-look="new"] .ss-select--tool,
+html[data-theme="dark"] .ss-app[data-look="new"] .ss-tool,
+html[data-theme="dark"] .ss-app[data-look="new"] .ss-project-bar {
+	color: #f2f4f8;
+}
+/* อักษรย่อโครงการบนวงกลมทองเข้ม (dark) ที่ยังไม่เลือก: กรมท่าบนพื้น #3a2f17 มองไม่เห็น → ขาว */
+html[data-theme="dark"] .ss-app[data-look="new"] .ss-topbar-project:not(.is-active) .ss-avatar,
+html[data-theme="dark"] .ss-app[data-look="new"] .ss-project-bar .ss-avatar,
+html[data-theme="dark"][data-look="new"] .ss-option--project:not(.is-active) .ss-avatar {
+	color: #f2f4f8;
+}
+
+/* ตัวอย่างงานพิมพ์ HTML (HtmlPreview.vue): กระดาษขาวกลางพื้นเทาเหมือนหน้า PDF จอแคบเลื่อนซ้าย-ขวา */
+.ss-html-preview {
+	flex: none;
+	margin: 16px auto;
+	max-width: none;
+	background: #fff;
+	box-shadow: 0 4px 18px rgba(0, 0, 0, 0.25);
+}
+.ss-html-preview iframe {
+	/* prefers-color-scheme ใน iframe ตาม color-scheme ของ iframe: กระดาษเป็นโหมดสว่างเสมอ */
+	color-scheme: light;
+	display: block;
+	width: 100%;
+	border: 0;
+	background: #fff;
+}
+
+/* ปุ่ม/ตัวเลือกบริษัท (กลุ่มออฟฟิศ): โลโก้บริษัทบนพื้นขาว ไม่มีโลโก้ = อักษรย่อ */
+.ss-avatar.has-logo,
+html[data-look="new"] .ss-avatar.has-logo {
+	padding: 3px;
+	background: #fff;
+	overflow: hidden;
+}
+.ss-avatar.has-logo img {
+	width: 100%;
+	height: 100%;
+	object-fit: contain;
+}
+
+/* ---------------------------------------------------------------- 2026-11-17 ListHead.vue (หัวรายการกลาง)
+   ตัวกรองของหน้าต่อจากช่องค้นหา (ชิดซ้าย) ไม่มีปุ่มตัวกรองรวม = ตกบรรทัดได้ ไม่ล็อกความสูงแถวเดียว */
+.ss-list-filterbar > .ss-list-filters {
+	justify-content: flex-start;
+}
+.ss-list-filterbar:not(.ss-list-filterbar--doc) > .ss-list-filters {
+	height: auto;
+}
+
+/* ---------------------------------------------------------------- 2026-11-17 รายการเอกสาร (DocList.vue, จอ ≥768): หัวรายการ + การ์ดเดียว
+   การ์ดต่อจากหัวรายการสูงถึงล่างจอพอดี (ข้อมูลมาก = เลื่อนในตาราง ดูกฎ ≥768 ด้านล่าง): ข้อมูลน้อย = พื้นที่ว่างในการ์ด (ท้ายตารางชิดล่าง), ไม่มีข้อมูล = Empty กลางการ์ด
+   จอ ≥1480 ตัวอย่างเอกสาร (DocPreview) เป็นช่องขวาของการ์ดเดียวกัน คั่นด้วยเส้น ไม่มีเงา ติดจอ (sticky) ตอนเลื่อน */
+.ss-app[data-look] .ss-stage > .ss-view:has(.ss-list-card) {
+	display: flex;
+	flex-direction: column;
+	min-height: calc(100dvh - var(--ss-head-h));
+	padding-bottom: var(--ss-bottom);
+}
+/* หน้า (.ss-view = root ของ DocList) → เนื้อหา → การ์ด ยืดเต็มความสูงที่เหลือ */
+.ss-content.ss-list-page:has(> .ss-list-card) {
+	flex: 1;
+}
+.ss-content .ss-list-head:not(.ss-form-head):has(+ .ss-list-card) {
+	margin-bottom: calc(-1 * var(--ss-list-gap, 16px));
+	border-bottom: 0;
+	border-radius: var(--ss-radius-sm) var(--ss-radius-sm) 0 0;
+}
+.ss-app[data-look="new"] .ss-content .ss-list-head:not(.ss-form-head):has(+ .ss-list-card) {
+	border-radius: 22px 22px 0 0;
+}
+.ss-list-card {
+	flex: 1;
+	display: flex;
+	align-items: stretch;
+	min-height: 320px;
+	border: 1px solid var(--ss-border);
+	border-radius: 0 0 var(--ss-radius-sm) var(--ss-radius-sm);
+	background: var(--ss-surface);
+	/* clip ไม่ใช่ hidden: มุมโค้งตัดเนื้อหา แต่ตัวอย่างเอกสารยัง sticky ได้ */
+	overflow: clip;
+}
+.ss-app[data-look="new"] .ss-list-card {
+	border-color: var(--ss-work-line);
+	border-radius: 0 0 22px 22px;
+	background: var(--ss-work-card);
+}
+.ss-list-card > .ss-list-main {
+	flex: 1;
+	min-width: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 0;
+}
+.ss-content .ss-list-card .ss-list-main > .ss-table-wrap {
+	border: 0;
+	border-radius: 0;
+	box-shadow: none;
+}
+.ss-list-page .ss-list-card .ss-list-main > .ss-list-foot {
+	margin-top: auto;
+	border: 0;
+	border-top: 1px solid var(--ss-border);
+	border-radius: 0;
+	box-shadow: none;
+	background: transparent;
+}
+.ss-app[data-look="new"] .ss-list-page .ss-list-card .ss-list-main > .ss-list-foot {
+	border-top-color: var(--ss-work-line);
+}
+.ss-list-card > .ss-list-main > .ss-empty {
+	margin: auto;
+}
+.ss-list-card > .ss-list-main > .ss-list {
+	padding: 14px;
+}
+.ss-list-card > .ss-preview {
+	/* สัดส่วนตามการ์ด: ~38% ของความกว้าง (ไม่แคบกว่า 440 ไม่กว้างกว่า 680) ตารางได้ที่เหลือ */
+	flex: 0 0 clamp(440px, 38%, 680px);
+	/* สูงเท่าการ์ด (การ์ดสูงถึงล่างจอ) ตารางยาวกว่าจอ = สูงไม่เกินจอและติดจอตอนเลื่อน */
+	align-self: stretch;
+	position: sticky;
+	top: calc(84px + var(--ss-top));
+	max-height: calc(100dvh - 84px - var(--ss-top) - 16px - var(--ss-bottom));
+	margin: 0;
+	border-left: 1px solid var(--ss-border);
+	border-radius: 0;
+	background: transparent;
+	box-shadow: none;
+	animation: ss-fade-in 0.2s ease both;
+}
+.ss-app[data-look="new"] .ss-list-card > .ss-preview {
+	border-left-color: var(--ss-work-line);
+}
+/* จอ ≥768: การ์ดพอดีจอ (ตกลง 2026-11-17) หัวรายการ + หัวคอลัมน์ + ท้ายตาราง (แสดง/แถวต่อหน้า) อยู่ในจอเสมอ
+   เลื่อนเฉพาะแถวในตาราง (หัวคอลัมน์ th sticky top 0 ในกรอบตาราง) ตัวอย่างเอกสารเลื่อนในช่องตัวเอง
+   จอเตี้ยจนการ์ดเหลือน้อยกว่า 320px = หน้าเลื่อนตามปกติ */
+@media (min-width: 768px) {
+	.ss-app[data-look] .ss-stage > .ss-view:has(.ss-list-card) {
+		height: calc(100dvh - var(--ss-head-h));
+	}
+	.ss-content.ss-list-page:has(> .ss-list-card) {
+		min-height: 0;
+	}
+	.ss-list-card > .ss-list-main {
+		min-height: 0;
+	}
+	.ss-list-card > .ss-list-main > .ss-table-wrap {
+		flex: 1 1 auto;
+		min-height: 0;
+		overflow: auto;
+	}
+	.ss-list-card > .ss-list-main > .ss-list {
+		flex: 1 1 auto;
+		min-height: 0;
+		overflow-y: auto;
+	}
+	.ss-list-card > .ss-preview {
+		position: static;
+		max-height: none;
+		min-height: 0;
+	}
+	/* หน้ารายการอื่น (KindList, ทะเบียน, สโตร์ ฯลฯ) = หัวรายการ + DataTable ท้ายหน้า: พอดีจอแบบเดียวกัน
+	   ตารางยืดถึงล่างจอ (ข้อมูลน้อย = ท้ายตารางชิดล่าง) ข้อมูลมาก = เลื่อนในตาราง */
+	.ss-app[data-look] .ss-stage > .ss-view:has(> .ss-content > .ss-list-head + .ss-data-table:last-child) {
+		display: flex;
+		flex-direction: column;
+		height: calc(100dvh - var(--ss-head-h));
+		padding-bottom: var(--ss-bottom);
+	}
+	.ss-content:has(> .ss-list-head + .ss-data-table:last-child) {
+		flex: 1;
+		min-height: 0;
+	}
+	.ss-content > .ss-list-head + .ss-data-table:last-child {
+		flex: 1 1 auto;
+		min-height: 240px;
+		display: flex;
+		flex-direction: column;
+	}
+	.ss-content > .ss-list-head + .ss-data-table:last-child > .ss-table-wrap {
+		flex: 1 1 auto;
+		min-height: 0;
+		overflow: auto;
+	}
+	/* Look-ahead (ตาราง ≥768): ตารางงาน × วันเลื่อนในกรอบตัวเอง หัวสัปดาห์ + หัววันค้างบนสุดของกรอบ
+	   สรุปจำนวนงานอยู่บน คำอธิบายสีอยู่ล่าง ในจอเสมอ (ตกลง 2026-11-17) */
+	.ss-app[data-look] .ss-stage > .ss-view:has(> .ss-content > .ss-la-table),
+	.ss-app[data-look] .ss-stage > .ss-view:has(> .ss-content > .ss-split--calendar) {
+		display: flex;
+		flex-direction: column;
+		height: calc(100dvh - var(--ss-head-h));
+		padding-bottom: var(--ss-bottom);
+	}
+	.ss-content:has(> .ss-la-table),
+	.ss-content:has(> .ss-split--calendar) {
+		flex: 1;
+		min-height: 0;
+	}
+	.ss-content > .ss-la-table {
+		flex: 1 1 auto;
+		min-height: 240px;
+		overflow: auto;
+	}
+	.ss-content > .ss-la-table > .ss-la-weeks,
+	.ss-content > .ss-la-table > .ss-la-thead {
+		position: sticky;
+		z-index: 3;
+		background: var(--ss-surface);
+	}
+	.ss-content > .ss-la-table > .ss-la-weeks {
+		top: 0;
+		height: 28px;
+	}
+	.ss-content > .ss-la-table > .ss-la-thead {
+		top: 28px;
+	}
+	.ss-app[data-look="new"] .ss-content > .ss-la-table > .ss-la-weeks,
+	.ss-app[data-look="new"] .ss-content > .ss-la-table > .ss-la-thead {
+		background: var(--ss-work-card, var(--ss-surface));
+	}
+}
+/* ปฏิทินรายงาน (ควบคุมงาน, ≥900 ปฏิทินซ้าย + เอกสารของวันขวา): ช่องวันยืด/หดให้ทั้งเดือนพอดีจอ
+   เอกสารของวันที่เลือกเลื่อนในแผงขวา จอเตี้ยมาก = ช่องวันไม่ต่ำกว่า 40px แล้วหน้าเลื่อนตามปกติ (ตกลง 2026-11-17) */
+@media (min-width: 900px) {
+	.ss-content > .ss-split--calendar {
+		flex: 1 1 auto;
+		min-height: 0;
+		align-items: stretch;
+	}
+	.ss-split--calendar > .ss-split-main {
+		display: flex;
+		flex-direction: column;
+		min-height: 0;
+	}
+	.ss-split--calendar > .ss-split-main > .ss-cal {
+		flex: 1 1 auto;
+		min-height: 0;
+	}
+	.ss-split--calendar .ss-cal-grid {
+		flex: 1 1 auto;
+		min-height: 0;
+		grid-template-rows: auto;
+		grid-auto-rows: minmax(40px, 1fr);
+	}
+	.ss-split--calendar .ss-cal-day {
+		min-height: 0;
+	}
+	.ss-split--calendar > .ss-split-side {
+		position: static;
+		max-height: none;
+		min-height: 0;
+		overflow-y: auto;
+	}
+}
+@keyframes ss-fade-in {
+	from {
+		opacity: 0;
+	}
+}
+/* หัวตัวอย่างเอกสาร = แถบหัวคอลัมน์ของตาราง (สี/ความสูงเดียวกัน) อ่านเป็นแถวเดียวกันทั้งการ์ด */
+.ss-list-card > .ss-preview > .ss-preview-head {
+	height: var(--ss-list-card-th, 39px);
+	padding: 0 8px 0 16px;
+	background: var(--ss-th-bg);
+	border-bottom-color: var(--ss-th-line, var(--ss-border));
+}
+
+
+/* ---------------------------------------------------------------- 2026-11-17 หัวฟอร์มกลาง (FormHead.vue)
+   ใช้การ์ด/แท็บ/ปุ่มชุดเดียวกับหัวรายการ (.ss-list-head) ปุ่มตามขั้นตอนขวาสุด เมนู ⋯ คำสั่งอื่น
+   มือถือ: ปุ่มอยู่แถบล่าง (.ss-form-bar) หัวเหลือแท็บ ไม่มีแท็บ = ไม่แสดงหัว
+   หัวฟอร์มเป็นแถบแยก เว้นห่างจากการ์ดด้านล่างตามระยะของหน้าเสมอ ไม่ต่อกับตาราง/การ์ด (ตกลง 2026-11-17)
+   กฎ "ต่อกับตาราง" ของหัวรายการจึงใส่ :not(.ss-form-head) ไว้ */
+.ss-form-head.is-empty {
+	display: none;
+}
+.ss-form-head .ss-list-tools {
+	margin-left: auto;
+}
+.ss-form-more.is-on {
+	background: color-mix(in srgb, var(--ss-text) 9%, transparent);
+}
+.ss-form-bar .ss-form-more {
+	flex: 0 0 auto;
+	padding-inline: 12px;
+}
+.ss-form-bar .ss-docview-print + .ss-form-more {
+	margin-right: auto;
+}
+.ss-form-bar .ss-docview-print:has(+ .ss-form-more) {
+	margin-right: 0;
+}
+.ss-form-bar > .ss-btn--lg:not(.ss-docview-print):not(.ss-form-more) {
+	white-space: nowrap;
+}
+.ss-menu-item.is-danger,
+.ss-menu-item.is-danger > svg {
+	color: var(--ss-danger, #d24f57);
+}
+/* มือถือ: เว้นท้ายหน้าให้เนื้อหาไม่จมใต้แถบปุ่มของหัวฟอร์ม */
+@media (max-width: 767px) {
+	.ss-view:has(.ss-form-head) {
+		padding-bottom: calc(74px + var(--ss-bottom));
+	}
+}
+
+/* ---------------------------------------------------------------- 2026-11-17 โครงแอป: แถบบนเต็มแถว → ใต้แถบบน Dock | เนื้อหา | แผงขวา
+   แผงขวาของหน้าดูเอกสาร (.ss-rside) อยู่ใต้แถบบนเหมือน Dock (เดิมสูงเต็มจอทับปลายแถบบน) จอ ≥1480 ที่กางค้างดันเนื้อหาเท่าแผง + ระยะขอบ */
+@media (min-width: 768px) {
+	.ss-app[data-look="new"] .ss-rside {
+		top: calc(var(--ss-head-h) + 12px);
+		right: 12px;
+		bottom: 12px;
+		border: 1px solid var(--ss-work-line);
+		border-radius: 28px;
+		background: var(--ss-work-card);
+		overflow: hidden;
+	}
+}
+@media (min-width: 1480px) {
+	html[data-rside] .ss-app[data-look="new"] {
+		--ss-rside: 392px;
+	}
+}
+/* หน้าพอดีจอ (รายการ, Look-ahead, ปฏิทิน): ขอบบน-ล่างของการ์ดตรงกับ Dock (ห่างแถบบน 12px, ห่างล่างจอ 12px) */
+@media (min-width: 768px) {
+	.ss-app[data-look="new"] .ss-stage > .ss-view:is(
+			:has(.ss-list-card),
+			:has(> .ss-content > .ss-list-head + .ss-data-table:last-child),
+			:has(> .ss-content > .ss-la-table),
+			:has(> .ss-content > .ss-split--calendar)
+		) > .ss-content {
+		padding-bottom: 12px;
+	}
+}
+/* หน้าแผนงาน (PlanEdit): กรอบเดียวกับหน้ารายการ บน 12px ใต้แถบบน ล่าง 12px เท่า Dock ห่าง Dock 16px (เนื้อหาอื่น padding-left 4px) */
+@media (min-width: 768px) {
+	.ss-app[data-look="new"] .ss-planner > .pl-ribbon {
+		margin: 12px 12px 0 4px;
+	}
+	.ss-app[data-look="new"] .ss-planner > .pl-main {
+		margin: 0 12px 0 4px;
+	}
+	.ss-app[data-look="new"] .ss-planner > .pl-statusbar {
+		margin: 0 12px 12px 4px;
 	}
 }

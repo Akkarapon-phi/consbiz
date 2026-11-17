@@ -39,34 +39,17 @@
 					</div>
 				</div>
 
-				<div v-if="wide" class="ss-list-head">
-					<StatusTabs v-model="tab" :options="tabs" />
-					<div class="ss-list-tools">
-						<button
-							type="button"
-							class="ss-icon-btn"
-							:class="{ 'is-spinning': loading }"
-							aria-label="โหลดใหม่"
-							title="โหลดใหม่"
-							@click="load"
-						>
-							<Icon name="refresh" :size="17" />
-						</button>
-						<button
-							v-if="data.can_create"
-							type="button"
-							class="ss-btn ss-btn--primary ss-list-create"
-							@click="open_new"
-						>
-							<Icon name="plus" :size="18" :stroke="2.6" />
-							<span>เบิกล่วงหน้า</span>
-						</button>
-					</div>
-					<!-- แถวตัวกรอง: ค้นหา -->
-					<div class="ss-list-filterbar">
-						<ListSearch v-model="txt" placeholder="ค้นหาชื่อคนงาน เลขที่" />
-					</div>
-				</div>
+				<ListHead
+					v-if="wide"
+					v-model="tab"
+					:tabs="tabs"
+					v-model:search="txt"
+					search_placeholder="ค้นหาชื่อคนงาน เลขที่"
+					:loading="loading"
+					:create="data.can_create ? 'เบิกล่วงหน้า' : ''"
+					@refresh="load"
+					@create="open_new"
+				/>
 				<Segmented v-else v-model="tab" :options="tabs" />
 
 				<Empty v-if="!shown.length" icon="inbox" :title="data.rows.length ? 'ไม่มีรายการ' : 'ยังไม่มีการเบิกล่วงหน้า'" />
@@ -209,15 +192,14 @@ import Icon from "../../../shared/components/Icon.vue";
 import TopBar from "../../../shared/components/TopBar.vue";
 import Skeleton from "../../../shared/components/Skeleton.vue";
 import Empty from "../../../shared/components/Empty.vue";
-import StatusTabs from "../../../shared/components/StatusTabs.vue";
 import Segmented from "../../../shared/components/Segmented.vue";
 import DataTable from "../../../shared/components/DataTable.vue";
-import ListSearch from "../../../shared/components/ListSearch.vue";
 import Sheet from "../../../shared/components/Sheet.vue";
 import Picker from "../../../shared/components/Picker.vue";
 import MoneyInput from "../../../shared/components/MoneyInput.vue";
 import DateInput from "../../../shared/components/DateInput.vue";
 import SelectBox from "../../../shared/components/SelectBox.vue";
+import ListHead from "../../../shared/components/ListHead.vue";
 import { matches, use_wide } from "../../../shared/table.js";
 import { call, money, post, show_error, state, thai_date, toast, today } from "../../../shared/api.js";
 

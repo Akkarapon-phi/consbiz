@@ -6,62 +6,15 @@
 		<TopBar :title="title" :subtitle="doc?.party_name" :back_to="list_view" />
 
 		<div class="ss-content">
-			<div v-if="doc" class="ss-list-head">
-				<StatusTabs v-model="tab" :options="TABS" />
-				<div class="ss-list-tools">
-					<a
-						class="ss-icon-btn"
-						:href="desk_url('Payment Entry', doc.name)"
-						title="เปิดในระบบเต็ม"
-						aria-label="เปิดในระบบเต็ม"
-						><Icon name="external" :size="17"
-					/></a>
-					<button
-						type="button"
-						class="ss-icon-btn"
-						title="PDF"
-						aria-label="PDF"
-						@click="pdf = true"
-					>
-						<Icon name="printer" :size="17" />
-					</button>
-					<button
-						v-if="view.can_delete"
-						type="button"
-						class="ss-btn ss-btn--ghost-danger ss-list-create"
-						:disabled="busy"
-						@click="deleting = true"
-					>
-						ลบ
-					</button>
-					<button
-						v-if="view.can_cancel"
-						type="button"
-						class="ss-btn ss-btn--ghost-danger ss-list-create"
-						:disabled="busy"
-						@click="confirm_cancel = true"
-					>
-						ยกเลิก
-					</button>
-					<button
-						v-if="view.can_submit"
-						type="button"
-						class="ss-btn ss-btn--primary ss-list-create"
-						:disabled="busy"
-						@click="confirm_submit = true"
-					>
-						<Icon name="check" :size="18" /> <span>ยืนยัน{{ word }}</span>
-					</button>
-					<button
-						v-if="view.can_cert"
-						type="button"
-						class="ss-btn ss-btn--primary ss-list-create"
-						@click="go('acc-wht-doc', { name: 'new', source: doc.name })"
-					>
-						<Icon name="file" :size="18" /> <span>ออกหนังสือรับรองหัก ณ ที่จ่าย</span>
-					</button>
-				</div>
-			</div>
+			<FormHead
+				v-if="doc"
+				v-model="tab"
+				:tabs="TABS"
+				:actions="actions"
+				:menu="menu"
+				:busy="busy"
+				:on-print="() => (pdf = true)"
+			/>
 
 			<Skeleton v-if="!doc" :rows="6" />
 			<template v-else>
@@ -303,8 +256,9 @@ import Icon from "../../../shared/components/Icon.vue";
 import PdfViewer from "../../../shared/components/PdfViewer.vue";
 import Sheet from "../../../shared/components/Sheet.vue";
 import Skeleton from "../../../shared/components/Skeleton.vue";
-import StatusTabs from "../../../shared/components/StatusTabs.vue";
 import TopBar from "../../../shared/components/TopBar.vue";
+import FormHead from "../../../shared/components/FormHead.vue";
+import { LABELS, can_duplicate, doc_menu, duplicate_doc, step_actions } from "../../../shared/form_actions.js";
 import { open_doc } from "../../../shared/docs/kinds.js";
 import {
 	back,
@@ -448,5 +402,29 @@ async function load() {
 		back(list_view);
 	}
 }
+// หัวฟอร์ม: ร่าง (ไม่มีสิทธิ์ยืนยันตอนสร้าง) → ยืนยัน → ออกหนังสือรับรองหัก ณ ที่จ่าย
+const actions = computed(() => {
+	const v = view.value;
+	return step_actions({
+		stage: v.can_submit ? "draft" : "done",
+		submit: v.can_submit && { label: `${LABELS.confirm}${word.value}`, run: () => (confirm_submit.value = true) },
+		cancel: v.can_cancel && (() => (confirm_cancel.value = true)),
+		next: [
+			v.can_cert && {
+				label: "ออกหนังสือรับรองหัก ณ ที่จ่าย",
+				icon: "file",
+				run: () => go("acc-wht-doc", { name: "new", source: doc.value.name }),
+			},
+		],
+	});
+});
+const menu = computed(() =>
+	doc_menu({
+		refresh: load,
+		desk: ["Payment Entry", doc.value.name],
+		remove: view.value.can_delete && (() => (deleting.value = true)),
+	})
+);
+
 load();
 </script>

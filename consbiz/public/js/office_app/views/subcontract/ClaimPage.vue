@@ -5,85 +5,7 @@
 		<TopBar :title="title" :subtitle="doc?.supplier_name" back_to="claims" />
 
 		<div class="ss-content">
-			<div v-if="doc" class="ss-list-head">
-				<StatusTabs v-model="tab" :options="TABS" />
-				<div class="ss-list-tools">
-					<a
-						v-if="doc.name"
-						class="ss-icon-btn"
-						:href="desk_url('Subcontract Claim', doc.name)"
-						title="เปิดในระบบเต็ม"
-						aria-label="เปิดในระบบเต็ม"
-						><Icon name="external" :size="17"
-					/></a>
-					<template v-if="editable">
-						<button
-							v-if="view.can_delete && doc.name"
-							type="button"
-							class="ss-btn ss-btn--ghost-danger ss-list-create"
-							:disabled="busy"
-							@click="deleting = true"
-						>
-							ลบ
-						</button>
-						<button
-							v-if="view.can_return"
-							type="button"
-							class="ss-btn ss-btn--ghost-danger ss-list-create"
-							:disabled="busy"
-							@click="returning = true"
-						>
-							ส่งกลับแก้
-						</button>
-						<button
-							v-if="view.can_submit && doc.name"
-							type="button"
-							class="ss-btn ss-btn--soft ss-list-create"
-							:disabled="busy || dirty || !!error"
-							:title="dirty ? 'บันทึกก่อนอนุมัติ' : ''"
-							@click="confirm_submit = true"
-						>
-							อนุมัติ
-						</button>
-						<button
-							type="button"
-							class="ss-btn ss-btn--primary ss-list-create"
-							:disabled="busy || !dirty || !doc.subcontract_agreement"
-							@click="save()"
-						>
-							<Icon name="save" :size="18" /> <span>บันทึก</span>
-						</button>
-					</template>
-					<template v-else>
-						<button
-							v-if="view.can_cancel"
-							type="button"
-							class="ss-btn ss-btn--ghost-danger ss-list-create"
-							:disabled="busy"
-							@click="confirm_cancel = true"
-						>
-							ยกเลิก
-						</button>
-						<a
-							v-if="doc.purchase_invoice && view.pi_status !== 2"
-							class="ss-btn ss-btn--soft ss-list-create"
-							:href="desk_url('Purchase Invoice', doc.purchase_invoice)"
-							target="_blank"
-							>{{ doc.purchase_invoice }}</a
-						>
-						<button
-							v-if="view.can_make_pi"
-							type="button"
-							class="ss-btn ss-btn--primary ss-list-create"
-							:disabled="busy"
-							@click="make_invoice"
-						>
-							<Icon name="plus" :size="18" :stroke="2.6" />
-							<span>สร้างใบแจ้งหนี้ (PI)</span>
-						</button>
-					</template>
-				</div>
-			</div>
+			<FormHead v-if="doc" v-model="tab" :tabs="TABS" :actions="actions" :menu="menu" :busy="busy" />
 
 			<Skeleton v-if="!doc" :rows="6" />
 			<template v-else>
@@ -397,8 +319,9 @@ import Picker from "../../../shared/components/Picker.vue";
 import SelectBox from "../../../shared/components/SelectBox.vue";
 import Sheet from "../../../shared/components/Sheet.vue";
 import Skeleton from "../../../shared/components/Skeleton.vue";
-import StatusTabs from "../../../shared/components/StatusTabs.vue";
 import TopBar from "../../../shared/components/TopBar.vue";
+import FormHead from "../../../shared/components/FormHead.vue";
+import { LABELS, doc_menu, step_actions } from "../../../shared/form_actions.js";
 import {
 	back,
 	call,
@@ -643,5 +566,41 @@ async function load() {
 		back("claims");
 	}
 }
+// หัวฟอร์ม: ร่าง → บันทึก → อนุมัติ (หรือส่งกลับแก้) → สร้างใบแจ้งหนี้ (PI)
+const actions = computed(() => {
+	const d = doc.value;
+	const v = view.value;
+	return step_actions({
+		stage: editable.value ? "draft" : "done",
+		is_new: !d.name,
+		dirty: dirty.value,
+		save: editable.value && { run: () => save(), disabled: !d.subcontract_agreement },
+		submit: v.can_submit && d.name && {
+			label: LABELS.approve,
+			disabled: !!error.value,
+			run: () => (confirm_submit.value = true),
+		},
+		reject: v.can_return && { label: "ส่งกลับแก้", run: () => (returning.value = true) },
+		cancel: v.can_cancel && (() => (confirm_cancel.value = true)),
+		next: [v.can_make_pi && { label: "สร้างใบแจ้งหนี้ (PI)", icon: "plus", run: make_invoice }],
+	});
+});
+const menu = computed(() => {
+	const d = doc.value;
+	const v = view.value;
+	return doc_menu({
+		items: [
+			d.purchase_invoice && v.pi_status !== 2 && {
+				label: `ใบแจ้งหนี้ ${d.purchase_invoice}`,
+				icon: "file",
+				href: desk_url("Purchase Invoice", d.purchase_invoice),
+			},
+		],
+		refresh: d.name && load,
+		desk: ["Subcontract Claim", d.name],
+		remove: editable.value && v.can_delete && d.name && (() => (deleting.value = true)),
+	});
+});
+
 load();
 </script>

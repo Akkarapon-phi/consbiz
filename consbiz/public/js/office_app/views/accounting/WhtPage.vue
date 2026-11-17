@@ -6,67 +6,15 @@
 		<TopBar :title="title" :subtitle="doc?.supplier_name" :back_to="back_view" />
 
 		<div class="ss-content">
-			<div v-if="doc" class="ss-list-head">
-				<StatusTabs v-model="tab" :options="TABS" />
-				<div class="ss-list-tools">
-					<a
-						v-if="doc.name"
-						class="ss-icon-btn"
-						:href="desk_url(doc.doctype, doc.name)"
-						title="เปิดในระบบเต็ม"
-						aria-label="เปิดในระบบเต็ม"
-						><Icon name="external" :size="17"
-					/></a>
-					<button
-						v-if="view.pdf_url"
-						type="button"
-						class="ss-icon-btn"
-						title="PDF"
-						aria-label="PDF"
-						@click="pdf = true"
-					>
-						<Icon name="printer" :size="17" />
-					</button>
-					<template v-if="editable">
-						<button
-							v-if="view.can_delete"
-							type="button"
-							class="ss-btn ss-btn--ghost-danger ss-list-create"
-							:disabled="busy"
-							@click="deleting = true"
-						>
-							ลบ
-						</button>
-						<button
-							v-if="view.can_submit"
-							type="button"
-							class="ss-btn ss-btn--soft ss-list-create"
-							:disabled="busy || dirty"
-							:title="dirty ? 'บันทึกก่อนยืนยัน' : ''"
-							@click="confirm_submit = true"
-						>
-							ยืนยันออกหนังสือ
-						</button>
-						<button
-							type="button"
-							class="ss-btn ss-btn--primary ss-list-create"
-							:disabled="busy || !dirty || !can_save"
-							@click="save"
-						>
-							<Icon name="save" :size="18" /> <span>บันทึก</span>
-						</button>
-					</template>
-					<button
-						v-else-if="view.can_cancel"
-						type="button"
-						class="ss-btn ss-btn--ghost-danger ss-list-create"
-						:disabled="busy"
-						@click="confirm_cancel = true"
-					>
-						ยกเลิก
-					</button>
-				</div>
-			</div>
+			<FormHead
+				v-if="doc"
+				v-model="tab"
+				:tabs="TABS"
+				:actions="actions"
+				:menu="menu"
+				:busy="busy"
+				:on-print="view.pdf_url ? () => (pdf = true) : null"
+			/>
 
 			<Skeleton v-if="!doc" :rows="6" />
 			<template v-else>
@@ -324,8 +272,9 @@ import PdfViewer from "../../../shared/components/PdfViewer.vue";
 import SelectBox from "../../../shared/components/SelectBox.vue";
 import Sheet from "../../../shared/components/Sheet.vue";
 import Skeleton from "../../../shared/components/Skeleton.vue";
-import StatusTabs from "../../../shared/components/StatusTabs.vue";
 import TopBar from "../../../shared/components/TopBar.vue";
+import FormHead from "../../../shared/components/FormHead.vue";
+import { LABELS, can_duplicate, doc_menu, duplicate_doc, step_actions } from "../../../shared/form_actions.js";
 import {
 	back,
 	call,
@@ -480,5 +429,25 @@ async function load() {
 		back(back_view);
 	}
 }
+// หัวฟอร์ม: ร่าง → บันทึก → ยืนยันออกหนังสือ → ยกเลิก
+const actions = computed(() => {
+	const v = view.value;
+	return step_actions({
+		stage: editable.value ? "draft" : "done",
+		is_new: !doc.value.name,
+		dirty: dirty.value,
+		save: editable.value && { run: save, disabled: !can_save.value },
+		submit: v.can_submit && { label: "ยืนยันออกหนังสือ", run: () => (confirm_submit.value = true) },
+		cancel: v.can_cancel && (() => (confirm_cancel.value = true)),
+	});
+});
+const menu = computed(() =>
+	doc_menu({
+		refresh: doc.value.name && load,
+		desk: [doc.value.doctype, doc.value.name],
+		remove: editable.value && view.value.can_delete && (() => (deleting.value = true)),
+	})
+);
+
 load();
 </script>

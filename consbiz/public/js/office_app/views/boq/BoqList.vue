@@ -2,13 +2,6 @@
 <template>
 	<div>
 		<TopBar title="BOQ" no_project>
-			<template #search>
-				<HeaderSearch
-					v-if="wide"
-					v-model="txt"
-					placeholder="ค้นหาเลขที่ ลูกค้า หรือโครงการ"
-				/>
-			</template>
 			<template #actions>
 				<button
 					v-if="!wide"
@@ -33,30 +26,17 @@
 		</TopBar>
 
 		<div class="ss-content">
-			<div v-if="wide" class="ss-list-head">
-				<StatusTabs v-model="filter" :options="tabs" />
-				<div class="ss-list-tools">
-					<button
-						v-if="boot.docs?.boq?.create"
-						type="button"
-						class="ss-btn ss-btn--primary ss-list-create"
-						@click="go('boq-form', { name: 'new' })"
-					>
-						<Icon name="plus" :size="18" :stroke="2.6" />
-						<span>สร้าง BOQ</span>
-					</button>
-					<button
-						type="button"
-						class="ss-icon-btn"
-						:class="{ 'is-spinning': loading }"
-						aria-label="โหลดใหม่"
-						title="โหลดใหม่"
-						@click="load"
-					>
-						<Icon name="refresh" :size="17" />
-					</button>
-				</div>
-			</div>
+			<ListHead
+				v-model:search="txt"
+				search_placeholder="ค้นหาเลขที่ ลูกค้า หรือโครงการ"
+				v-if="wide"
+				v-model="filter"
+				:tabs="tabs"
+				:loading="loading"
+				@refresh="load"
+				:create="boot.docs?.boq?.create ? 'สร้าง BOQ' : ''"
+				@create="go('boq-form', { name: 'new' })"
+			/>
 			<Segmented v-else v-model="filter" :options="tabs" />
 
 			<Skeleton v-if="rows === null" />
@@ -121,8 +101,7 @@ import Segmented from "../../../shared/components/Segmented.vue";
 import Skeleton from "../../../shared/components/Skeleton.vue";
 import Empty from "../../../shared/components/Empty.vue";
 import DataTable from "../../../shared/components/DataTable.vue";
-import StatusTabs from "../../../shared/components/StatusTabs.vue";
-import HeaderSearch from "../../../shared/components/HeaderSearch.vue";
+import ListHead from "../../../shared/components/ListHead.vue";
 import { matches, use_wide } from "../../../shared/table.js";
 import {
 	call,

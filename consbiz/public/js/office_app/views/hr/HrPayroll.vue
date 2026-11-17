@@ -19,34 +19,26 @@
 		</TopBar>
 
 		<div class="ss-content">
-			<div class="ss-list-head">
-				<div class="hr-month">
-					<button type="button" class="ss-icon-btn" aria-label="เดือนก่อน" title="เดือนก่อน" @click="shift(-1)">
-						<Icon name="chevron-left" :size="17" />
-					</button>
-					<DateInput v-model="month" picker="month" variant="tool" :max="this_month" label="เลือกเดือน" />
-					<button
-						type="button"
-						class="ss-icon-btn"
-						aria-label="เดือนถัดไป"
-						title="เดือนถัดไป"
-						:disabled="month >= this_month"
-						@click="shift(1)"
-					>
-						<Icon name="chevron-right" :size="17" />
-					</button>
-				</div>
-				<div v-if="wide" class="ss-list-tools">
-					<button
-						type="button"
-						class="ss-icon-btn"
-						:class="{ 'is-spinning': loading }"
-						aria-label="โหลดใหม่"
-						title="โหลดใหม่"
-						@click="load"
-					>
-						<Icon name="refresh" :size="17" />
-					</button>
+			<ListHead :loading="loading" :on-refresh="wide ? load : undefined">
+				<template #lead>
+					<div class="hr-month">
+						<button type="button" class="ss-icon-btn" aria-label="เดือนก่อน" title="เดือนก่อน" @click="shift(-1)">
+							<Icon name="chevron-left" :size="17" />
+						</button>
+						<DateInput v-model="month" picker="month" variant="tool" :max="this_month" label="เลือกเดือน" />
+						<button
+							type="button"
+							class="ss-icon-btn"
+							aria-label="เดือนถัดไป"
+							title="เดือนถัดไป"
+							:disabled="month >= this_month"
+							@click="shift(1)"
+						>
+							<Icon name="chevron-right" :size="17" />
+						</button>
+					</div>
+				</template>
+				<template v-if="wide && (step === 2 || step === 3)" #tools>
 					<button
 						v-if="step === 2"
 						type="button"
@@ -58,7 +50,7 @@
 						<span>สร้างสลิปเงินเดือน</span>
 					</button>
 					<button
-						v-else-if="step === 3"
+						v-else
 						type="button"
 						class="ss-btn ss-btn--primary ss-list-create"
 						:disabled="busy || !ready || !data.slips.length"
@@ -67,8 +59,8 @@
 						<Icon name="check" :size="18" :stroke="2.6" />
 						<span>ยืนยันสลิป {{ data.slips.length }} ใบ</span>
 					</button>
-				</div>
-			</div>
+				</template>
+			</ListHead>
 
 			<Skeleton v-if="data === null" :rows="5" />
 			<template v-else>
@@ -229,6 +221,7 @@ import Sheet from "../../../shared/components/Sheet.vue";
 import DataTable from "../../../shared/components/DataTable.vue";
 import DateInput from "../../../shared/components/DateInput.vue";
 import RichText from "../../../shared/components/RichText.vue";
+import ListHead from "../../../shared/components/ListHead.vue";
 import { use_wide } from "../../../shared/table.js";
 import { call, go, money, post, replace_params, show_error, state, thai_date, toast } from "../../../shared/api.js";
 
