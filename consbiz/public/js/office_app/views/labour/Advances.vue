@@ -4,9 +4,6 @@
 <template>
 	<div>
 		<TopBar title="เบิกล่วงหน้า" :subtitle="state.project?.project_name">
-			<template #search>
-				<HeaderSearch v-if="wide" v-model="txt" placeholder="ค้นหาชื่อคนงาน เลขที่" />
-			</template>
 			<template #actions>
 				<button
 					v-if="!wide"
@@ -64,6 +61,10 @@
 							<Icon name="plus" :size="18" :stroke="2.6" />
 							<span>เบิกล่วงหน้า</span>
 						</button>
+					</div>
+					<!-- แถวตัวกรอง: ค้นหา -->
+					<div class="ss-list-filterbar">
+						<ListSearch v-model="txt" placeholder="ค้นหาชื่อคนงาน เลขที่" />
 					</div>
 				</div>
 				<Segmented v-else v-model="tab" :options="tabs" />
@@ -211,7 +212,7 @@ import Empty from "../../../shared/components/Empty.vue";
 import StatusTabs from "../../../shared/components/StatusTabs.vue";
 import Segmented from "../../../shared/components/Segmented.vue";
 import DataTable from "../../../shared/components/DataTable.vue";
-import HeaderSearch from "../../../shared/components/HeaderSearch.vue";
+import ListSearch from "../../../shared/components/ListSearch.vue";
 import Sheet from "../../../shared/components/Sheet.vue";
 import Picker from "../../../shared/components/Picker.vue";
 import MoneyInput from "../../../shared/components/MoneyInput.vue";

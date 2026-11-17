@@ -44,8 +44,7 @@ app_include_js = [
 
 
 # แอป ConsERP: ทุกหมวดอยู่ระดับเดียวกันใต้ /conserp/<หมวด> (PWA ตัวเดียว scope /conserp)
-# หมวดจัดซื้อ/ขาย = bundle ออฟฟิศ (www/office.html, ชื่อหมวดตรงกับ site_app.office_sections) ที่เหลือ = bundle หน้างาน (www/site.html)
-_OFFICE_SECTIONS = ("purchase", "sales", "boq", "hr", "saraban", "subcontract", "accounting", "master")
+# หน้างาน + ออฟฟิศ = bundle เดียว (www/site.html, รวม 2026-11-17) Self Service แยก bundle (www/self.html)
 # bundle self_app (www/self.html): Self Service ของพนักงานทุกคน (consbiz/self_service.py) + โมดูลอนุมัติ (consbiz/approvals.py)
 _SELF_SECTIONS = ("self", "approve")
 website_route_rules = [
@@ -55,14 +54,6 @@ website_route_rules = [
 		for rule in (
 			{"from_route": f"/conserp/{section}", "to_route": "self"},
 			{"from_route": f"/conserp/{section}/<path:app_path>", "to_route": "self"},
-		)
-	),
-	*(
-		rule
-		for section in _OFFICE_SECTIONS
-		for rule in (
-			{"from_route": f"/conserp/{section}", "to_route": "office"},
-			{"from_route": f"/conserp/{section}/<path:app_path>", "to_route": "office"},
 		)
 	),
 	# แอปผู้รับเหมาช่วง (คนนอก, www/contractor.html) แยกจาก ConsERP
@@ -87,6 +78,13 @@ website_redirects = [
 	_redirect(r"(?:conserp|site)/finance/finance-cost", r"/conserp/pm/finance/cost"),
 	_redirect(r"(?:conserp|site)/finance/finance-evm", r"/conserp/pm/finance/evm"),
 	_redirect(r"(?:conserp|site)/finance(/.*)?", r"/conserp/pm/finance"),
+	# ทรัพยากรเคยเป็นหมวดของตัวเอง ย้ายเป็นเมนูในแผนงาน (ยอดวัสดุ/คน-เครื่อง/... เป็น tab)
+	_redirect(r"(?:conserp|site)/resources/(resource-[a-z]+)", r"/conserp/pm/\1"),
+	_redirect(r"(?:conserp|site)/resources(/.*)?", r"/conserp/pm/resources"),
+	# คนงานเคยเป็นหมวด admin ของ bundle หน้างาน ย้ายไป bundle ออฟฟิศชื่อหมวด labour
+	_redirect(r"conserp/admin(/.*)?", r"/conserp/labour\1"),
+	# ตัดเหล็กเคยเป็นเมนูในควบคุมงาน ย้ายเป็นหมวดแผนการตัด
+	_redirect(r"(?:conserp|site)/work/(rebar(?:-plan)?(?:/.*)?)", r"/conserp/rebar/\1"),
 	_redirect(r"site/sell(/.*)?", r"/conserp/sales\1"),
 	_redirect(r"site/buy/(po|pi)(/.*)?", r"/conserp/purchase/\1\2"),
 	_redirect(r"site/buy/(buy-doc|buy-form)/(po|pi)(/.*)?", r"/conserp/purchase/\1/\2\3"),

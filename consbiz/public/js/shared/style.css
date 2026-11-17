@@ -173,6 +173,10 @@ a {
 	min-height: 100dvh;
 	margin: 0 auto;
 	position: relative;
+	/* ตัดส่วนที่ล้นด้านข้างตอนเปลี่ยนหน้า (หน้าใหม่เลื่อนเข้าจาก translateX 42%) ไม่งั้นหน้าเว็บกว้างเกินจอชั่วขณะ
+	   มือถือย่อทั้งหน้าให้พอดีแล้วขยายกลับ (กดแก้ไข/ย้อนกลับแล้วหน้าย่อแวบหนึ่ง) clip ไม่สร้างกล่องเลื่อน แถบบน sticky ยังทำงาน
+	   ต้องตัดที่ .ss-app (เต็มจอ) ห้ามตัดที่ .ss-stage: แถบบนหน้าตาใหม่ใช้ margin ติดลบยื่นไปใต้ Dock จะถูกตัดหัว */
+	overflow-x: clip;
 }
 
 .ss-stage {
@@ -419,6 +423,15 @@ a {
 	display: flex;
 	flex-direction: column;
 	gap: 12px;
+}
+/* tab ของเมนูทรัพยากร (แผนงาน) */
+.ss-res-head {
+	margin-bottom: 12px;
+}
+.ss-res-head .ss-segmented button {
+	white-space: nowrap;
+	padding-inline: 2px;
+	font-size: var(--ss-fs-sm);
 }
 .ss-fin-date > :nth-child(2) {
 	flex: 0 0 170px;
@@ -969,6 +982,8 @@ button.ss-card:active {
 	overflow: hidden;
 	text-overflow: ellipsis;
 }
+/* ชิปที่ห้ามตัด (วันที่ ยอดเงิน) ให้ชิปอื่นหดแทน */
+.ss-chips > .ss-chip--keep,
 .ss-chips > .ss-chip--more,
 .ss-chips > .ss-tag {
 	flex-shrink: 0;
@@ -3110,7 +3125,7 @@ svg.ss-check {
 	--ss-brand-2: #a16207;
 	--ss-brand-soft: #fdf0dc;
 }
-[data-section="admin"] {
+[data-section="labour"] {
 	--ss-brand: #475569;
 	--ss-brand-2: #0f766e;
 	--ss-brand-soft: #e2e8f0;
@@ -3169,7 +3184,7 @@ svg.ss-check {
 		--ss-brand-2: #e0b84a;
 		--ss-brand-soft: rgba(240, 169, 75, 0.16);
 	}
-	[data-section="admin"] {
+	[data-section="labour"] {
 		--ss-brand: #94a3b8;
 		--ss-brand-2: #2dd4bf;
 		--ss-brand-soft: rgba(148, 163, 184, 0.16);
@@ -7425,6 +7440,41 @@ a.ss-btn--soft {
 		display: none;
 	}
 }
+/* มือถือแคบ: ปุ่มซูมซ่อน (ซูมสองนิ้ว/แตะสองครั้งแทน) ให้ที่ปุ่มพิมพ์/แชร์/ดาวน์โหลด */
+@media (max-width: 480px) {
+	.ss-pdf-zoom {
+		display: none;
+	}
+}
+/* พิมพ์ PDF (PdfViewer print_pdf): แสดงเฉพาะรูปของแต่ละหน้า 1 รูป = 1 แผ่น */
+.ss-pdf-print {
+	display: none;
+}
+@media print {
+	html.ss-printing,
+	html.ss-printing body {
+		height: auto !important;
+		overflow: visible !important;
+		background: #fff !important;
+	}
+	html.ss-printing body > :not(.ss-pdf-print) {
+		display: none !important;
+	}
+	html.ss-printing .ss-pdf-print {
+		display: block;
+	}
+	.ss-pdf-print img {
+		display: block;
+		width: 100%;
+		height: auto;
+		break-after: page;
+		page-break-after: always;
+	}
+	.ss-pdf-print img:last-child {
+		break-after: auto;
+		page-break-after: auto;
+	}
+}
 
 /* ================================================================ Dock (แท็บเล็ต/จอใหญ่) .ss-rail ใน AppShell.vue
    แถบเดียวกว้าง 56px เท่า Dock ของ Frappe: โลโก้ (หน้าแรก) / บริษัท / หมวดของกลุ่มแอปนี้ + ระบบเต็ม (กลุ่มอื่นเปิดจากหน้าแรก)
@@ -7638,124 +7688,126 @@ a.ss-btn--soft {
 		object-fit: cover;
 	}
 
-	/* เมนูท้าย Dock (DockMenu.vue): ขนาด/เงา/การเคลื่อนไหวตาม es-menu ของ Frappe */
-	.ss-menu {
-		position: fixed;
-		z-index: 40;
-		min-width: 160px;
-		max-width: min(320px, calc(100vw - var(--ss-side) - 24px));
-		overflow-x: hidden;
-		overflow-y: auto;
-		border-radius: 12px;
-		background: var(--ss-surface);
-		box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.05), 0 0 1.5px rgba(0, 0, 0, 0.25),
-			0 0 10px 2px rgba(0, 0, 0, 0.03), 0 44px 52px -10px rgba(0, 0, 0, 0.1);
-		transform-origin: left bottom;
-	}
-	.ss-menu-enter-active {
-		transition: opacity 180ms cubic-bezier(0.23, 1, 0.32, 1),
-			transform 180ms cubic-bezier(0.23, 1, 0.32, 1);
-	}
-	.ss-menu-leave-active {
-		transition: opacity 140ms cubic-bezier(0.23, 1, 0.32, 1),
-			transform 140ms cubic-bezier(0.23, 1, 0.32, 1);
-		pointer-events: none;
-	}
-	.ss-menu-enter-from,
-	.ss-menu-leave-to {
-		opacity: 0;
-		transform: scale(0.97) translateY(2px);
-	}
-	.ss-menu-group {
-		display: flex;
-		flex-direction: column;
-		gap: 2px;
-		padding: 6px;
-	}
-	.ss-menu-group + .ss-menu-group {
-		border-top: 1px solid var(--ss-border);
-	}
-	.ss-menu-label {
-		padding: 6px;
-		font-size: var(--ss-fs-sm);
-		font-weight: 500;
-		color: var(--ss-muted);
-	}
+}
+
+/* เมนู DockMenu.vue ใช้ได้ทุกขนาดจอ (มือถือเปิดจาก avatar บนแถบบน) */
+/* เมนูท้าย Dock (DockMenu.vue): ขนาด/เงา/การเคลื่อนไหวตาม es-menu ของ Frappe */
+.ss-menu {
+	position: fixed;
+	z-index: 40;
+	min-width: 160px;
+	max-width: min(320px, calc(100vw - var(--ss-side) - 24px));
+	overflow-x: hidden;
+	overflow-y: auto;
+	border-radius: 12px;
+	background: var(--ss-surface);
+	box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.05), 0 0 1.5px rgba(0, 0, 0, 0.25),
+		0 0 10px 2px rgba(0, 0, 0, 0.03), 0 44px 52px -10px rgba(0, 0, 0, 0.1);
+	transform-origin: left bottom;
+}
+.ss-menu-enter-active {
+	transition: opacity 180ms cubic-bezier(0.23, 1, 0.32, 1),
+		transform 180ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+.ss-menu-leave-active {
+	transition: opacity 140ms cubic-bezier(0.23, 1, 0.32, 1),
+		transform 140ms cubic-bezier(0.23, 1, 0.32, 1);
+	pointer-events: none;
+}
+.ss-menu-enter-from,
+.ss-menu-leave-to {
+	opacity: 0;
+	transform: scale(0.97) translateY(2px);
+}
+.ss-menu-group {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	padding: 6px;
+}
+.ss-menu-group + .ss-menu-group {
+	border-top: 1px solid var(--ss-border);
+}
+.ss-menu-label {
+	padding: 6px;
+	font-size: var(--ss-fs-sm);
+	font-weight: 500;
+	color: var(--ss-muted);
+}
+.ss-menu-item {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	width: 100%;
+	padding: 6px 8px;
+	border: 0;
+	border-radius: 8px;
+	outline: none;
+	background: transparent;
+	font-size: var(--ss-fs);
+	color: var(--ss-text);
+	text-align: left;
+	text-decoration: none;
+	cursor: pointer;
+}
+.ss-menu-item:hover,
+.ss-menu-item:focus-visible {
+	background: color-mix(in srgb, var(--ss-text) 5%, transparent);
+}
+.ss-menu-item.is-selected {
+	background: color-mix(in srgb, var(--ss-text) 9%, transparent);
+}
+.ss-menu-item.is-selected:hover,
+.ss-menu-item.is-selected:focus-visible {
+	background: color-mix(in srgb, var(--ss-text) 13%, transparent);
+}
+.ss-menu-item > svg {
+	flex: none;
+	color: var(--ss-text-2);
+}
+.ss-menu-image {
+	flex: none;
+	width: 16px;
+	height: 16px;
+	object-fit: contain;
+	border-radius: 4px;
+}
+.ss-menu-text {
+	flex: 1 1 auto;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+/* แถวผู้ใช้บนสุดของเมนู avatar: ขนาด avatar เท่าใน Dock */
+.ss-menu-avatar {
+	flex: none;
+	width: 30px;
+	height: 30px;
+	border-radius: 50%;
+	overflow: hidden;
+	font-size: var(--ss-fs-sm);
+}
+.ss-menu-text--two {
+	display: flex;
+	flex-direction: column;
+	line-height: 1.25;
+}
+.ss-menu-text--two span {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	font-weight: 600;
+}
+.ss-menu-text--two small {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	font-size: var(--ss-fs-sm);
+	color: var(--ss-muted);
+}
+/* จอสัมผัส: แถวสูงพอให้แตะ */
+@media (pointer: coarse) {
 	.ss-menu-item {
-		display: flex;
-		align-items: center;
-		gap: 8px;
-		width: 100%;
-		padding: 6px 8px;
-		border: 0;
-		border-radius: 8px;
-		outline: none;
-		background: transparent;
-		font-size: var(--ss-fs);
-		color: var(--ss-text);
-		text-align: left;
-		text-decoration: none;
-		cursor: pointer;
-	}
-	.ss-menu-item:hover,
-	.ss-menu-item:focus-visible {
-		background: color-mix(in srgb, var(--ss-text) 5%, transparent);
-	}
-	.ss-menu-item.is-selected {
-		background: color-mix(in srgb, var(--ss-text) 9%, transparent);
-	}
-	.ss-menu-item.is-selected:hover,
-	.ss-menu-item.is-selected:focus-visible {
-		background: color-mix(in srgb, var(--ss-text) 13%, transparent);
-	}
-	.ss-menu-item > svg {
-		flex: none;
-		color: var(--ss-text-2);
-	}
-	.ss-menu-image {
-		flex: none;
-		width: 16px;
-		height: 16px;
-		object-fit: contain;
-		border-radius: 4px;
-	}
-	.ss-menu-text {
-		flex: 1 1 auto;
-		min-width: 0;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
-	}
-	/* แถวผู้ใช้บนสุดของเมนู avatar: ขนาด avatar เท่าใน Dock */
-	.ss-menu-avatar {
-		flex: none;
-		width: 30px;
-		height: 30px;
-		border-radius: 50%;
-		overflow: hidden;
-		font-size: var(--ss-fs-sm);
-	}
-	.ss-menu-text--two {
-		display: flex;
-		flex-direction: column;
-		line-height: 1.25;
-	}
-	.ss-menu-text--two span {
-		overflow: hidden;
-		text-overflow: ellipsis;
-		font-weight: 600;
-	}
-	.ss-menu-text--two small {
-		overflow: hidden;
-		text-overflow: ellipsis;
-		font-size: var(--ss-fs-sm);
-		color: var(--ss-muted);
-	}
-	/* จอสัมผัส: แถวสูงพอให้แตะ */
-	@media (pointer: coarse) {
-		.ss-menu-item {
-			padding: 10px 8px;
-		}
+		padding: 10px 8px;
 	}
 }
 
@@ -7796,13 +7848,7 @@ a.ss-btn--soft {
 	display: flex;
 	align-items: center;
 	gap: 12px;
-	padding: calc(20px + var(--ss-top)) 16px 10px;
-}
-.ss-desktop-logo {
-	width: 44px;
-	height: 44px;
-	border-radius: 12px;
-	animation: ss-rise 0.45s var(--ss-ease) both;
+	padding: 10px 0 14px;
 }
 .ss-desktop-greet {
 	font-size: var(--ss-fs);
@@ -7830,7 +7876,7 @@ a.ss-btn--soft {
 }
 @media (min-width: 768px) {
 	.ss-desktop-head {
-		padding: calc(24px + var(--ss-top)) 24px 12px;
+		padding: 14px 0 18px;
 	}
 	.ss-desktop .ss-content {
 		max-width: 1180px;
@@ -13307,4 +13353,1709 @@ html.ss-boq-grabbing * {
 /* Picker ในช่องตาราง: ชื่อคอลัมน์อยู่หัวตารางแล้ว */
 .ss-md-cell-picker .ss-field-label {
 	display: none;
+}
+
+/* ================================================================
+   หน้าตาใหม่ (กรมท่า + ทอง) เริ่มที่ควบคุมงาน 2026-11-16 ใช้กับหมวดใน NEW_LOOK (shared/modules.js)
+   ผ่าน data-look="new" ที่ .ss-app และ <html> (api.js set_section)
+   ตั้งที่ html ด้วย เพราะ sheet/หน้าต่าง Teleport ไป body (อยู่นอก .ss-app) */
+.ss-app[data-look="new"],
+html[data-look="new"] {
+	--ss-brand: #17233f;
+	--ss-brand-2: #2c416d;
+	--ss-brand-soft: #edf1f7;
+	--ss-accent: #f0b429;
+	--ss-accent-soft: #fef3d7;
+	--ss-accent-ink: #17233f;
+	--ss-work-canvas: #eceeed;
+	--ss-work-card: #ffffff;
+	--ss-work-ink: #171b25;
+	--ss-work-muted: #737a87;
+	--ss-work-line: #e7e8e6;
+}
+
+html[data-theme="dark"] .ss-app[data-look="new"],
+html[data-theme="dark"][data-look="new"] {
+	--ss-brand: #90a5cf;
+	--ss-brand-2: #b7c5df;
+	--ss-brand-soft: #26324a;
+	--ss-accent: #f5c451;
+	--ss-accent-soft: #3a2f17;
+	--ss-accent-ink: #f4e7b3;
+	--ss-work-canvas: #0d1119;
+	--ss-work-card: #171d29;
+	--ss-work-ink: #f2f4f8;
+	--ss-work-muted: #9ca6b7;
+	--ss-work-line: #293142;
+}
+
+/* The reference uses a quiet white header and a dark active pill. */
+.ss-app[data-look="new"] .ss-topbar {
+	color: var(--ss-work-ink);
+	background: color-mix(in srgb, var(--ss-work-card) 96%, transparent);
+	border: 1px solid var(--ss-work-line);
+	box-shadow: 0 10px 34px rgba(23, 35, 63, 0.07);
+	backdrop-filter: blur(18px);
+}
+.ss-app[data-look="new"] .ss-topbar-module,
+.ss-app[data-look="new"] .ss-topbar-iconbtn,
+.ss-app[data-look="new"] .ss-topbar-project {
+	color: var(--ss-work-ink);
+}
+.ss-app[data-look="new"] .ss-topbar-module-icon {
+	color: #fff;
+	background: var(--ss-brand);
+	box-shadow: none;
+}
+.ss-app[data-look="new"] .ss-sectabs {
+	padding: 3px;
+	border: 0;
+	border-radius: 999px;
+	background: color-mix(in srgb, var(--ss-work-card) 72%, var(--ss-work-canvas));
+}
+.ss-app[data-look="new"] .ss-sectab {
+	min-height: 32px;
+	padding-inline: 14px;
+	border-radius: 999px;
+	color: var(--ss-work-muted);
+}
+.ss-app[data-look="new"] .ss-sectab.is-active {
+	color: #fff;
+	background: #17233f;
+	box-shadow: 0 6px 14px rgba(23, 35, 63, 0.2);
+}
+html[data-theme="dark"] .ss-app[data-look="new"] .ss-sectab.is-active {
+	color: #17233f;
+	background: var(--ss-accent);
+}
+.ss-app[data-look="new"] .ss-topbar-project,
+.ss-app[data-look="new"] .ss-topbar-iconbtn {
+	border-color: var(--ss-work-line);
+	background: color-mix(in srgb, var(--ss-work-card) 90%, var(--ss-work-canvas));
+}
+
+/* ---------------------------------------------------------------- หน้าภาพรวมควบคุมงาน (pilot)
+   พื้นหน้าเป็นพื้นเดียว ไม่มีกรอบครอบเนื้อหา การ์ดทุกใบใช้ .ss-work-card ชุดเดียว (ไม่ซ้อนการ์ดในการ์ด)
+   เลย์เอาต์ดูจากความกว้างเนื้อหา (container query) เพราะ Dock กาง/พับแล้วเนื้อหากว้างไม่เท่ากัน */
+.ss-app[data-look="new"] {
+	min-height: 100dvh;
+	background: var(--ss-work-canvas);
+}
+/* พื้นใต้ .ss-app (ท้ายหน้าบนมือถือ) ให้สีเดียวกัน */
+body:has(.ss-app[data-look="new"]) {
+	background: #eceeed;
+}
+html[data-theme="dark"] body:has(.ss-app[data-look="new"]) {
+	background: #0d1119;
+}
+.ss-work-pilot .ss-home-project {
+	display: none;
+}
+.ss-work-content {
+	container: work-dash / inline-size;
+	max-width: 1500px;
+}
+.ss-work-greeting {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 16px;
+	margin: 4px 0 10px;
+}
+.ss-work-greeting h1 {
+	margin: 0;
+	color: var(--ss-work-ink);
+	font-size: 26px;
+	font-weight: 650;
+	line-height: 1.25;
+}
+.ss-work-greeting p {
+	margin: 4px 0 0;
+	color: var(--ss-work-muted);
+	font-size: var(--ss-fs);
+}
+.ss-work-create {
+	flex: none;
+	height: 40px;
+	padding: 0 18px;
+	border-radius: 999px;
+	color: #fff;
+	background: var(--ss-brand);
+}
+
+.ss-work-grid,
+.ss-work-loading {
+	display: grid;
+	gap: 12px;
+	grid-template-columns: minmax(0, 1fr);
+	grid-template-areas: "prog" "stats" "quick" "curve" "cat" "fol";
+}
+.ss-work-loading { grid-template-areas: none; }
+.ss-work-progress { grid-area: prog; }
+.ss-work-stats { grid-area: stats; }
+.ss-work-quick { grid-area: quick; }
+.ss-work-curve { grid-area: curve; }
+.ss-work-categories { grid-area: cat; }
+.ss-work-followups { grid-area: fol; }
+
+@container work-dash (min-width: 640px) {
+	.ss-work-grid {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		grid-template-areas: "prog stats" "curve curve" "quick cat" "fol fol";
+	}
+	.ss-work-grid:not(:has(.ss-work-quick)) {
+		grid-template-areas: "prog stats" "curve curve" "cat cat" "fol fol";
+	}
+	.ss-work-loading { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@container work-dash (min-width: 1080px) {
+	.ss-work-grid {
+		grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.15fr);
+		grid-template-rows: auto auto 1fr;
+		grid-template-areas: "prog stats curve" "cat fol fol" "quick fol fol";
+	}
+	.ss-work-grid:not(:has(.ss-work-quick)) {
+		grid-template-rows: auto 1fr;
+		grid-template-areas: "prog stats curve" "cat fol fol";
+	}
+	.ss-work-loading { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+/* การ์ดชุดเดียวของหน้า */
+.ss-work-card,
+.ss-work-stats > button {
+	min-width: 0;
+	border: 1px solid var(--ss-work-line);
+	border-radius: 16px;
+	background: var(--ss-work-card);
+	color: var(--ss-work-ink);
+}
+.ss-work-card {
+	display: flex;
+	flex-direction: column;
+	padding: 16px;
+}
+.ss-work-head {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 12px;
+	margin-bottom: 12px;
+}
+.ss-work-head h2 {
+	margin: 0;
+	font-size: var(--ss-fs-title);
+	font-weight: 650;
+}
+.ss-work-head p,
+.ss-work-head > span {
+	margin: 2px 0 0;
+	color: var(--ss-work-muted);
+	font-size: var(--ss-fs-sm);
+}
+
+/* ความก้าวหน้า */
+.ss-work-progress .ss-work-head > div > span {
+	color: var(--ss-work-muted);
+	font-size: var(--ss-fs-sm);
+}
+.ss-work-progress strong {
+	display: block;
+	margin-top: 4px;
+	font-size: 38px;
+	font-weight: 700;
+	line-height: 1;
+	font-variant-numeric: tabular-nums;
+}
+.ss-work-progress strong small {
+	margin-left: 2px;
+	font-size: var(--ss-fs-lg);
+	font-weight: 600;
+}
+.ss-work-variance {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	flex: none;
+	padding: 3px 8px;
+	border-radius: 999px;
+	font-size: var(--ss-fs-sm);
+	font-weight: 600;
+}
+.ss-work-variance.is-green { color: #1f7a5a; background: #e3f4ec; }
+.ss-work-variance.is-amber { color: #8a6116; background: #fbefd2; }
+.ss-work-variance.is-rose { color: #b4323b; background: #fbe6e7; }
+html[data-theme="dark"] .ss-work-variance.is-green { color: #75d6b3; background: #18382f; }
+html[data-theme="dark"] .ss-work-variance.is-amber { color: #f0cd7a; background: #3b3120; }
+html[data-theme="dark"] .ss-work-variance.is-rose { color: #f0a0a6; background: #41252b; }
+.ss-work-track {
+	position: relative;
+	height: 8px;
+	overflow: hidden;
+	border-radius: 999px;
+	background: var(--ss-brand-soft);
+}
+.ss-work-track span {
+	position: absolute;
+	inset: 0 auto 0 0;
+	border-radius: inherit;
+}
+.ss-work-track .is-plan { background: var(--ss-accent); }
+.ss-work-track .is-actual { background: var(--ss-brand); }
+.ss-work-facts {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 1px;
+	margin: 14px 0 0;
+	overflow: hidden;
+	border: 1px solid var(--ss-work-line);
+	border-radius: 12px;
+	background: var(--ss-work-line);
+}
+.ss-work-facts > div {
+	padding: 8px 12px;
+	background: var(--ss-work-card);
+}
+.ss-work-facts dt {
+	color: var(--ss-work-muted);
+	font-size: var(--ss-fs-sm);
+}
+.ss-work-facts dd {
+	margin: 2px 0 0;
+	font-size: var(--ss-fs);
+	font-weight: 600;
+	font-variant-numeric: tabular-nums;
+}
+.ss-work-progress-actions {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 8px;
+	margin-top: auto;
+	padding-top: 16px;
+}
+.ss-work-progress-actions .ss-btn {
+	width: 100%;
+	height: 38px;
+	justify-content: center;
+	border-radius: 999px;
+}
+
+/* ตัวเลขสรุป 2 x 2 */
+.ss-work-stats {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 12px;
+}
+.ss-work-stats > button {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: 6px;
+	padding: 14px;
+	text-align: left;
+	cursor: pointer;
+	transition: border-color 0.15s ease, background 0.15s ease;
+}
+.ss-work-stats > button:hover { border-color: color-mix(in srgb, var(--ss-brand) 30%, var(--ss-work-line)); }
+.ss-work-stats > button.is-featured {
+	border-color: transparent;
+	color: var(--ss-accent-ink);
+	background: linear-gradient(140deg, var(--ss-accent-soft), color-mix(in srgb, var(--ss-accent) 70%, var(--ss-accent-soft)));
+}
+.ss-work-stats > button > span {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	width: 100%;
+	gap: 6px;
+	font-size: var(--ss-fs-sm);
+	font-weight: 600;
+}
+.ss-work-stats > button > span i {
+	display: grid;
+	place-items: center;
+	flex: none;
+	width: 28px;
+	height: 28px;
+	border-radius: 50%;
+	background: color-mix(in srgb, var(--ss-work-ink) 6%, transparent);
+	font-style: normal;
+}
+.ss-work-stats > button strong {
+	margin-top: auto;
+	font-size: 30px;
+	font-weight: 700;
+	line-height: 1;
+	font-variant-numeric: tabular-nums;
+}
+.ss-work-stats > button small {
+	color: var(--ss-work-muted);
+	font-size: var(--ss-fs-sm);
+}
+.ss-work-stats > button.is-featured small { color: color-mix(in srgb, var(--ss-accent-ink) 70%, transparent); }
+
+/* S-Curve */
+.ss-work-curve .ss-chart { flex: 1 1 auto; min-height: 180px; }
+
+/* ทำรายการด่วน: แถวปุ่มเตี้ย */
+.ss-work-quick-list {
+	display: grid;
+	gap: 8px;
+}
+.ss-work-quick-list button {
+	display: grid;
+	grid-template-columns: 34px minmax(0, 1fr) auto;
+	align-items: center;
+	gap: 10px;
+	min-height: 52px;
+	padding: 8px 10px;
+	border: 1px solid var(--ss-work-line);
+	border-radius: 12px;
+	background: transparent;
+	color: var(--ss-work-ink);
+	text-align: left;
+	cursor: pointer;
+}
+.ss-work-quick-list button:hover:not(:disabled) { background: var(--ss-brand-soft); }
+.ss-work-quick-list button:disabled { opacity: 0.5; cursor: default; }
+.ss-work-quick-list button > i {
+	display: grid;
+	place-items: center;
+	width: 34px;
+	height: 34px;
+	border-radius: 10px;
+	color: var(--ss-accent-ink);
+	background: var(--ss-accent-soft);
+}
+.ss-work-quick-list b { display: block; font-size: var(--ss-fs); font-weight: 600; }
+.ss-work-quick-list small { display: block; color: var(--ss-work-muted); font-size: var(--ss-fs-sm); }
+.ss-work-quick-list button > .ss-icon:last-child { color: var(--ss-work-muted); }
+
+/* หมวดงาน */
+.ss-work-cat-list {
+	display: grid;
+	gap: 12px;
+}
+.ss-work-cat-row {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) auto;
+	gap: 6px 10px;
+	font-size: var(--ss-fs);
+}
+.ss-work-cat-row > span {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.ss-work-cat-row > span small { margin-right: 6px; color: var(--ss-work-muted); }
+.ss-work-cat-row > b { font-variant-numeric: tabular-nums; }
+.ss-work-cat-row .ss-work-track { grid-column: 1 / -1; height: 6px; }
+
+/* งานที่ต้องติดตาม */
+.ss-work-table-wrap { overflow-x: auto; }
+.ss-work-followups table {
+	width: 100%;
+	border-collapse: collapse;
+	font-size: var(--ss-fs);
+}
+.ss-work-followups th {
+	padding: 8px;
+	border-bottom: 1px solid var(--ss-work-line);
+	color: var(--ss-work-muted);
+	font-size: var(--ss-fs-sm);
+	font-weight: 500;
+	text-align: left;
+	white-space: nowrap;
+}
+.ss-work-followups td {
+	height: 44px;
+	padding: 0 8px;
+	border-bottom: 1px solid var(--ss-work-line);
+	white-space: nowrap;
+}
+.ss-work-followups td:nth-child(2) { white-space: normal; }
+.ss-work-followups td:nth-child(3) { color: var(--ss-work-muted); }
+.ss-work-followups th:first-child,
+.ss-work-followups td:first-child { padding-left: 0; }
+.ss-work-followups td:last-child { width: 20px; padding-right: 0; color: var(--ss-work-muted); }
+.ss-work-followups tr:last-child td { border-bottom: 0; }
+.ss-work-followups tbody tr.is-clickable { cursor: pointer; }
+.ss-work-followups tbody tr.is-clickable:hover { background: var(--ss-brand-soft); }
+.ss-work-row-title {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+.ss-work-row-icon {
+	display: grid;
+	place-items: center;
+	flex: none;
+	width: 26px;
+	height: 26px;
+	border-radius: 8px;
+	color: var(--ss-accent-ink);
+	background: var(--ss-accent-soft);
+}
+.ss-work-row-status {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+}
+.ss-work-row-status i { width: 6px; height: 6px; border-radius: 50%; }
+.ss-work-row-status.is-ready i { background: #2a9d78; }
+.ss-work-row-status.is-late i { background: #d39a2d; }
+.ss-work-row-status.is-critical i { background: #d24f57; }
+.ss-work-empty {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 8px;
+	min-height: 120px;
+	color: var(--ss-work-muted);
+}
+
+/* จอแคบ: ตารางติดตามเป็นแถว 2 บรรทัด, ปุ่มสร้างเป็นไอคอน */
+@container work-dash (max-width: 639px) {
+	.ss-work-followups thead { display: none; }
+	.ss-work-followups table,
+	.ss-work-followups tbody { display: block; }
+	.ss-work-followups tr {
+		display: grid;
+		grid-template-columns: auto minmax(0, 1fr) auto;
+		grid-template-areas: "title title status" "ref detail chev";
+		gap: 4px 8px;
+		padding: 10px 0;
+		border-bottom: 1px solid var(--ss-work-line);
+	}
+	.ss-work-followups tr:last-child { border-bottom: 0; }
+	.ss-work-followups td { height: auto; padding: 0; border: 0; }
+	.ss-work-followups td:nth-child(1) { grid-area: ref; color: var(--ss-work-muted); font-size: var(--ss-fs-sm); }
+	.ss-work-followups td:nth-child(2) { grid-area: title; font-weight: 600; }
+	.ss-work-followups td:nth-child(3) { grid-area: detail; font-size: var(--ss-fs-sm); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+	.ss-work-followups td:nth-child(4) { grid-area: status; font-size: var(--ss-fs-sm); }
+	.ss-work-followups td:nth-child(5) { display: none; }
+	.ss-work-followups td:nth-child(6) { grid-area: chev; width: auto; }
+}
+@media (max-width: 767px) {
+	.ss-work-greeting h1 { font-size: var(--ss-fs-xl); }
+	.ss-work-create { width: 40px; padding: 0; font-size: 0; justify-content: center; }
+	.ss-work-stats { gap: 10px; }
+	.ss-work-grid { gap: 10px; }
+}
+
+@media (min-width: 768px) {
+	.ss-app[data-look="new"] .ss-rail {
+		background: color-mix(in srgb, var(--ss-work-card) 92%, transparent);
+		border-right-color: var(--ss-work-line);
+	}
+	.ss-app[data-look="new"] .ss-rail-mod.is-open .ss-rail-icon {
+		color: #fff;
+		background: #17233f;
+		box-shadow: none;
+	}
+}
+
+/* ----------------------------------------------------------------
+   Work renovation shell — structural, not a palette swap.
+   The workspace, floating navigation rail and header now form one inset app frame. */
+@media (min-width: 768px) {
+	.ss-app[data-look="new"] {
+		--ss-side: 78px;
+		min-height: 100dvh;
+		background: var(--ss-work-canvas);
+	}
+	html[data-side="expanded"] .ss-app[data-look="new"] {
+		--ss-side: 250px;
+	}
+	html[data-peek] .ss-app[data-look="new"] .ss-rail {
+		width: 226px;
+	}
+
+	/* Floating rail: three separate surfaces instead of a full-height sidebar slab. */
+	.ss-app[data-look="new"] .ss-rail {
+		top: 12px;
+		bottom: 12px;
+		left: 12px;
+		width: calc(var(--ss-side) - 24px);
+		gap: 10px;
+		padding: 0;
+		overflow: visible;
+		border: 0;
+		background: transparent;
+		box-shadow: none;
+	}
+	.ss-app[data-look="new"] .ss-rail-logo,
+	.ss-app[data-look="new"] .ss-rail-list,
+	.ss-app[data-look="new"] .ss-rail-foot {
+		border: 1px solid var(--ss-work-line);
+		background: var(--ss-work-card);
+		box-shadow: 0 10px 30px rgba(23, 35, 63, 0.075);
+	}
+	.ss-app[data-look="new"] .ss-rail-logo {
+		min-height: 54px;
+		padding: 6px;
+		border-radius: 17px;
+	}
+	.ss-app[data-look="new"] .ss-rail-logo-img {
+		width: 36px;
+		height: 36px;
+		margin: 0;
+		border-radius: 11px;
+	}
+	.ss-app[data-look="new"] .ss-rail-brand {
+		font-size: 14px;
+		font-weight: 720;
+		color: var(--ss-work-ink);
+	}
+	.ss-app[data-look="new"] .ss-rail-list {
+		flex: 1 1 auto;
+		min-height: 0;
+		gap: 5px;
+		margin: 0;
+		padding: 7px;
+		overflow-x: hidden;
+		overflow-y: auto;
+		border-radius: 18px;
+		scrollbar-width: none;
+	}
+	.ss-app[data-look="new"] .ss-rail-list::-webkit-scrollbar { display: none; }
+	.ss-app[data-look="new"] .ss-rail-foot {
+		gap: 4px;
+		margin: 0;
+		padding: 7px;
+		border-radius: 18px;
+	}
+	.ss-app[data-look="new"] .ss-rail-row {
+		min-height: 40px;
+		padding: 2px;
+		border-radius: 12px;
+		color: var(--ss-work-muted);
+	}
+	.ss-app[data-look="new"] .ss-rail-row:hover,
+	.ss-app[data-look="new"] .ss-rail-ctx.is-open {
+		color: var(--ss-work-ink);
+		background: var(--ss-brand-soft);
+	}
+	.ss-app[data-look="new"] .ss-rail-icon {
+		width: 36px;
+		height: 36px;
+		border-radius: 11px;
+		color: var(--ss-work-muted);
+	}
+	.ss-app[data-look="new"] .ss-rail-mod .ss-rail-icon {
+		color: var(--ss-work-muted);
+	}
+	.ss-app[data-look="new"] .ss-rail-mod.is-open {
+		color: var(--ss-work-ink);
+		background: transparent;
+	}
+	.ss-app[data-look="new"] .ss-rail-mod.is-open .ss-rail-icon {
+		color: #fff;
+		background: #17233f;
+		box-shadow: 0 8px 18px rgba(23, 35, 63, 0.22);
+	}
+	.ss-app[data-look="new"] .ss-rail-mod.is-open .ss-rail-text {
+		font-weight: 650;
+	}
+	.ss-app[data-look="new"] .ss-rail-text {
+		font-size: 12px;
+		color: var(--ss-work-ink);
+	}
+	.ss-app[data-look="new"] .ss-rail-toggle {
+		color: var(--ss-work-muted);
+	}
+	.ss-app[data-look="new"] .ss-rail-ctx .ss-avatar {
+		width: 34px;
+		height: 34px;
+		margin: 0 1px;
+		border-radius: 11px;
+	}
+	.ss-app[data-look="new"] .ss-rail-user .ss-avatar {
+		border-radius: 50%;
+	}
+	.ss-app[data-look="new"] .ss-rail-badge {
+		top: -4px;
+		right: -4px;
+		border-color: var(--ss-work-card);
+	}
+
+	/* Header is part of the frame: quiet white surface, centered pill nav, compact utilities. */
+	.ss-app[data-look="new"] .ss-topbar {
+		top: 10px;
+		height: 58px;
+		margin: 10px 24px 0;
+		padding: 8px 10px;
+		gap: 8px;
+		border-radius: 18px;
+		background: color-mix(in srgb, var(--ss-work-card) 97%, transparent);
+		box-shadow: 0 9px 28px rgba(23, 35, 63, 0.075);
+	}
+	.ss-app[data-look="new"] .ss-topbar::before { display: none; }
+	.ss-app[data-look="new"] .ss-topbar-module {
+		width: 138px;
+		gap: 9px;
+		margin: 0 8px 0 0;
+		padding: 0 12px 0 0;
+		border-right: 1px solid var(--ss-work-line);
+		color: var(--ss-work-ink);
+	}
+	.ss-app[data-look="new"] .ss-topbar-module-icon {
+		width: 34px;
+		height: 34px;
+		border-radius: 11px;
+		color: #fff;
+		background: #17233f;
+	}
+	.ss-app[data-look="new"] .ss-topbar-module-name {
+		font-size: 13px;
+		font-weight: 650;
+	}
+	.ss-app[data-look="new"] .ss-sectabs {
+		gap: 2px;
+		padding: 4px;
+		border: 1px solid color-mix(in srgb, var(--ss-work-line) 82%, transparent);
+		background: color-mix(in srgb, var(--ss-work-canvas) 76%, var(--ss-work-card));
+	}
+	.ss-app[data-look="new"] .ss-sectab {
+		height: 34px;
+		padding: 0 13px;
+		border-radius: 999px;
+		color: var(--ss-work-muted);
+		font-size: 11px;
+		font-weight: 570;
+	}
+	.ss-app[data-look="new"] .ss-sectab:hover {
+		color: var(--ss-work-ink);
+		background: var(--ss-work-card);
+	}
+	.ss-app[data-look="new"] .ss-topbar .ss-sectab.is-active {
+		color: #fff;
+		background: #17233f;
+		box-shadow: 0 7px 16px rgba(23, 35, 63, 0.2);
+	}
+	.ss-app[data-look="new"] .ss-topbar-project {
+		height: 38px;
+		margin-left: auto;
+		padding: 0 10px 0 5px;
+		border: 1px solid var(--ss-work-line);
+		border-radius: 13px;
+		color: var(--ss-work-ink);
+		background: var(--ss-work-card);
+	}
+	.ss-app[data-look="new"] .ss-topbar .ss-topbar-project:hover {
+		color: var(--ss-work-ink);
+		border-color: color-mix(in srgb, #17233f 22%, var(--ss-work-line));
+		background: var(--ss-brand-soft);
+	}
+	.ss-app[data-look="new"] .ss-topbar-project .ss-avatar {
+		min-width: 28px;
+		height: 28px;
+		border-radius: 9px;
+	}
+	.ss-app[data-look="new"] .ss-topbar .ss-icon-btn {
+		width: 38px;
+		height: 38px;
+		border: 1px solid var(--ss-work-line);
+		color: var(--ss-work-ink);
+		background: var(--ss-work-card);
+	}
+	.ss-app[data-look="new"] .ss-topbar .ss-icon-btn:hover:not(:disabled),
+	.ss-app[data-look="new"] .ss-topbar .ss-icon-btn.is-on {
+		color: #17233f;
+		background: var(--ss-accent-soft);
+	}
+
+}
+
+/* ----------------------------------------------------------------
+   Work shell refinement — gold accent, header account, adaptive tabs,
+   flatter content density and a project picker that belongs to the same system. */
+.ss-app[data-look="new"],
+html[data-look="new"] {
+	--ss-accent: #f0b429;
+	--ss-accent-strong: #c98a0b;
+	--ss-accent-soft: #fef3d7;
+}
+html[data-theme="dark"] .ss-app[data-look="new"],
+html[data-theme="dark"][data-look="new"] {
+	--ss-accent: #f5c451;
+	--ss-accent-strong: #f8d57c;
+	--ss-accent-soft: #3a2f17;
+}
+
+/* User identity belongs to the header; the utility rail no longer repeats it. */
+.ss-app[data-look="new"] .ss-rail-user {
+	display: none;
+}
+.ss-header-user {
+	position: relative;
+	flex: none;
+	display: grid;
+	place-items: center;
+	width: 40px;
+	height: 40px;
+	margin-left: 2px;
+	border: 1px solid var(--ss-work-line);
+	border-radius: 13px;
+	background: var(--ss-work-card);
+	transition: border-color 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
+}
+.ss-header-user:hover,
+.ss-header-user:focus-visible {
+	border-color: color-mix(in srgb, #17233f 28%, var(--ss-work-line));
+	background: var(--ss-accent-soft);
+	box-shadow: 0 7px 16px rgba(23, 35, 63, 0.1);
+}
+.ss-header-user:focus-visible {
+	outline: 2px solid #17233f;
+	outline-offset: 2px;
+}
+.ss-header-user .ss-avatar {
+	width: 30px;
+	height: 30px;
+	margin: 0;
+	border: 2px solid var(--ss-work-card);
+	border-radius: 50%;
+	font-size: 10px;
+	color: #17233f;
+	background: var(--ss-accent);
+}
+
+/* Text-first submenu. Icons return only after the top bar becomes constrained. */
+@media (min-width: 768px) {
+	.ss-app[data-look="new"] .ss-sectab > .ss-icon {
+		display: none;
+	}
+	.ss-app[data-look="new"] .ss-sectab,
+	.ss-app[data-look="new"] .ss-sectab:not(.is-active) {
+		width: auto;
+		padding-inline: 13px;
+		justify-content: center;
+	}
+	.ss-app[data-look="new"] .ss-sectab .ss-sectab-label,
+	.ss-app[data-look="new"] .ss-sectab:not(.is-active) .ss-sectab-label {
+		display: inline;
+	}
+}
+@container topbar (max-width: 760px) {
+	.ss-app[data-look="new"] .ss-sectab:not(.is-active) {
+		width: 34px;
+		padding-inline: 0;
+	}
+	.ss-app[data-look="new"] .ss-sectab:not(.is-active) > .ss-icon {
+		display: block;
+	}
+	.ss-app[data-look="new"] .ss-sectab:not(.is-active) .ss-sectab-label {
+		display: none;
+	}
+}
+
+/* Project selector: one neutral identity color, stronger hierarchy, no rainbow avatars. */
+.ss-app[data-look="new"] .ss-topbar-project .ss-avatar,
+.ss-app[data-look="new"] .ss-project-bar .ss-avatar,
+html[data-look="new"] .ss-option--project .ss-avatar {
+	color: #17233f;
+	background: var(--ss-accent-soft);
+	box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ss-accent) 52%, transparent);
+}
+.ss-app[data-look="new"] .ss-topbar-project.is-active .ss-avatar,
+html[data-look="new"] .ss-option--project.is-active .ss-avatar {
+	color: #17233f;
+	background: var(--ss-accent);
+}
+html[data-look="new"] .ss-sheet:has(.ss-option--project) {
+	border: 1px solid var(--ss-work-line);
+	border-radius: 22px;
+	background: var(--ss-work-canvas);
+	box-shadow: 0 28px 70px rgba(23, 35, 63, 0.2);
+}
+html[data-look="new"] .ss-sheet:has(.ss-option--project) .ss-search {
+	height: 44px;
+	margin-bottom: 12px;
+	border: 1px solid var(--ss-work-line);
+	border-radius: 13px;
+	background: var(--ss-work-card);
+}
+html[data-look="new"] .ss-sheet:has(.ss-option--project) .ss-options {
+	gap: 7px;
+}
+html[data-look="new"] .ss-option--project {
+	min-height: 54px;
+	padding: 8px 10px;
+	border: 1px solid var(--ss-work-line);
+	border-radius: 14px;
+	background: var(--ss-work-card);
+	animation: none;
+	transition: border-color 0.16s ease, background 0.16s ease, transform 0.16s ease;
+}
+html[data-look="new"] .ss-option--project:hover {
+	border-color: color-mix(in srgb, #17233f 22%, var(--ss-work-line));
+	background: var(--ss-brand-soft);
+}
+html[data-look="new"] .ss-option--project.is-active {
+	color: var(--ss-work-ink);
+	border-color: color-mix(in srgb, #17233f 38%, var(--ss-work-line));
+	background: var(--ss-brand-soft);
+}
+html[data-look="new"] .ss-option--project .ss-option-label {
+	color: var(--ss-work-ink);
+	font-weight: 620;
+}
+
+@media (max-width: 767px) {
+	.ss-header-user {
+		width: 38px;
+		height: 38px;
+		border-radius: 12px;
+	}
+}
+
+html[data-theme="dark"] .ss-app[data-look="new"] {
+	background: #080c13;
+}
+html[data-theme="dark"] .ss-app[data-look="new"] .ss-topbar-module-icon,
+html[data-theme="dark"] .ss-app[data-look="new"] .ss-rail-mod.is-open .ss-rail-icon {
+	color: #17233f;
+	background: var(--ss-accent);
+}
+
+@media (min-width: 768px) and (max-width: 1099px) {
+	.ss-app[data-look="new"] .ss-topbar-module {
+		width: auto;
+		padding-right: 9px;
+	}
+	.ss-app[data-look="new"] .ss-topbar-module-name { display: none; }
+	.ss-app[data-look="new"] .ss-sectab:not(.is-active) {
+		width: 34px;
+		padding: 0;
+		justify-content: center;
+	}
+}
+
+@media (max-width: 767px) {
+	.ss-app[data-look="new"] {
+		background: var(--ss-work-canvas);
+	}
+	.ss-app[data-look="new"] .ss-topbar {
+		top: 8px;
+		height: calc(54px + var(--ss-top));
+		margin: 8px 10px 0;
+		padding-inline: 9px;
+		border: 1px solid var(--ss-work-line);
+		border-radius: 17px;
+		color: var(--ss-work-ink);
+		background: color-mix(in srgb, var(--ss-work-card) 96%, transparent);
+		box-shadow: 0 9px 28px rgba(23, 35, 63, 0.08);
+	}
+	.ss-app[data-look="new"] .ss-topbar-module,
+	.ss-app[data-look="new"] .ss-topbar .ss-icon-btn {
+		color: var(--ss-work-ink);
+	}
+	.ss-app[data-look="new"] .ss-project-bar {
+		margin-top: 16px;
+		border-radius: 15px;
+		box-shadow: 0 7px 22px rgba(23, 35, 63, 0.055);
+	}
+	.ss-app[data-look="new"] .ss-nav {
+		border: 1px solid var(--ss-work-line);
+		border-radius: 19px;
+		background: color-mix(in srgb, var(--ss-work-card) 96%, transparent);
+		box-shadow: 0 16px 38px rgba(23, 35, 63, 0.16);
+		backdrop-filter: blur(18px);
+	}
+}
+
+/* Final cascade guard: labels lead on roomy headers; icons replace only labels that no longer fit. */
+@media (min-width: 768px) {
+	.ss-app[data-look="new"] .ss-sectab,
+	.ss-app[data-look="new"] .ss-sectab:not(.is-active) {
+		width: auto;
+		padding-inline: 13px;
+	}
+	.ss-app[data-look="new"] .ss-sectab > .ss-icon {
+		display: none;
+	}
+	.ss-app[data-look="new"] .ss-sectab .ss-sectab-label,
+	.ss-app[data-look="new"] .ss-sectab:not(.is-active) .ss-sectab-label {
+		display: inline;
+	}
+}
+@container topbar (max-width: 760px) {
+	.ss-app[data-look="new"] .ss-sectab:not(.is-active) {
+		width: 34px;
+		padding-inline: 0;
+	}
+	.ss-app[data-look="new"] .ss-sectab:not(.is-active) > .ss-icon {
+		display: block;
+	}
+	.ss-app[data-look="new"] .ss-sectab:not(.is-active) .ss-sectab-label {
+		display: none;
+	}
+}
+
+/* ---------------------------------------------------------------- 2026-11-16 รอบ 2
+   ปุ่ม/กล่องของ Dock และแถบบนเป็นทรงกลม (pill) ทั้งหมด, avatar ไม่มีกรอบ */
+@media (min-width: 768px) {
+	.ss-app[data-look="new"] .ss-rail-logo,
+	.ss-app[data-look="new"] .ss-rail-foot {
+		border-radius: 999px;
+	}
+	.ss-app[data-look="new"] .ss-rail-list {
+		border-radius: 28px;
+	}
+	.ss-app[data-look="new"] .ss-rail-logo-img,
+	.ss-app[data-look="new"] .ss-rail-row,
+	.ss-app[data-look="new"] .ss-rail-icon,
+	.ss-app[data-look="new"] .ss-rail-ctx .ss-avatar {
+		border-radius: 999px;
+	}
+	.ss-app[data-look="new"] .ss-topbar {
+		border-radius: 999px;
+		padding-inline: 10px 12px;
+	}
+	.ss-app[data-look="new"] .ss-topbar-project {
+		border-radius: 999px;
+		padding-left: 4px;
+	}
+	.ss-app[data-look="new"] .ss-topbar-project .ss-avatar {
+		border-radius: 50%;
+	}
+}
+.ss-app[data-look="new"] .ss-topbar-module-icon,
+.ss-app[data-look="new"] .ss-topbar .ss-icon-btn {
+	border-radius: 50%;
+}
+.ss-app[data-look="new"] .ss-project-bar .ss-avatar,
+html[data-look="new"] .ss-option--project .ss-avatar {
+	border-radius: 50%;
+}
+.ss-header-user,
+.ss-header-user:hover,
+.ss-header-user:focus-visible {
+	width: auto;
+	height: auto;
+	padding: 0;
+	border: 0;
+	border-radius: 50%;
+	background: transparent;
+	box-shadow: none;
+}
+.ss-header-user .ss-avatar {
+	width: 36px;
+	height: 36px;
+	border: 0;
+	font-size: var(--ss-fs-sm);
+	transition: box-shadow 0.15s ease;
+}
+.ss-header-user:hover .ss-avatar {
+	box-shadow: 0 0 0 3px var(--ss-accent-soft);
+}
+.ss-header-user:focus-visible {
+	outline: 2px solid var(--ss-brand);
+	outline-offset: 2px;
+}
+/* การ์ดเด่นสีทอง: ไล่จากทองอ่อนไปทองน้ำผึ้ง ตัวหนังสือกรมท่า */
+.ss-work-stats > button.is-featured {
+	background: linear-gradient(140deg, #fff6dd, #f7cf6a);
+}
+html[data-theme="dark"] .ss-work-stats > button.is-featured {
+	background: linear-gradient(140deg, #3a2f17, #6b5114);
+}
+
+/* ---------------------------------------------------------------- 2026-11-16 รอบ 3
+   แถบบนยาวเต็มจอ (ซ้าย 12px เท่าขอบ Dock), Dock เริ่มใต้แถบบนและเป็นแผ่นเดียว (โลโก้ + เมนู + ปุ่มพับ/กาง)
+   เนื้อหาห่างจาก Dock 16px ขวาเว้น 12px เท่าแถบบน */
+@media (min-width: 768px) {
+	.ss-app[data-look="new"] .ss-topbar {
+		margin: 10px 12px 0 calc(12px - var(--ss-side));
+	}
+	.ss-app[data-look="new"] .ss-rail {
+		top: 80px;
+		bottom: 12px;
+		gap: 4px;
+		padding: 7px;
+		border: 1px solid var(--ss-work-line);
+		border-radius: 28px;
+		background: var(--ss-work-card);
+		box-shadow: 0 10px 30px rgba(23, 35, 63, 0.06);
+	}
+	.ss-app[data-look="new"] .ss-rail-logo,
+	.ss-app[data-look="new"] .ss-rail-list,
+	.ss-app[data-look="new"] .ss-rail-foot {
+		min-height: 0;
+		padding: 0;
+		border: 0;
+		border-radius: 0;
+		background: transparent;
+		box-shadow: none;
+	}
+	.ss-app[data-look="new"] .ss-rail-logo {
+		padding-bottom: 6px;
+		border-bottom: 1px solid var(--ss-work-line);
+	}
+	.ss-app[data-look="new"] .ss-rail-foot {
+		padding-top: 6px;
+		border-top: 1px solid var(--ss-work-line);
+	}
+	.ss-app[data-look="new"] .ss-work-content {
+		padding-left: 4px;
+		padding-right: 12px;
+	}
+}
+/* ไอคอนในรายการไม่มีพื้นหลัง */
+.ss-work-quick-list button > i,
+.ss-work-row-icon {
+	width: auto;
+	height: auto;
+	border-radius: 0;
+	color: var(--ss-work-ink);
+	background: transparent;
+}
+.ss-work-quick-list button {
+	grid-template-columns: 20px minmax(0, 1fr) auto;
+	gap: 12px;
+	padding-inline: 14px;
+}
+
+/* ไอคอนในตารางงานที่ต้องติดตาม: สีตามสถานะ (ตรงกับจุดในคอลัมน์สถานะ) */
+.ss-work-row-icon.is-critical { color: #d24f57; }
+.ss-work-row-icon.is-late { color: #d39a2d; }
+.ss-work-row-icon.is-ready { color: #2a9d78; }
+
+/* ---------------------------------------------------------------- ค้นหาทั้งระบบ (GlobalSearch.vue)
+   ปุ่มบนแถบบน: แว่นขยาย + คีย์ลัด (มือถือ = ไอคอนอย่างเดียว) ใช้ currentColor ให้เข้ากับแถบบนทุกหมวด */
+.ss-global-search-btn {
+	flex: none;
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	height: 38px;
+	padding: 0 8px 0 12px;
+	border: 1px solid color-mix(in srgb, currentColor 22%, transparent);
+	border-radius: 999px;
+	color: inherit;
+	background: color-mix(in srgb, currentColor 6%, transparent);
+	cursor: pointer;
+	transition: background 0.15s ease;
+}
+.ss-global-search-btn:hover { background: color-mix(in srgb, currentColor 12%, transparent); }
+.ss-global-search-btn kbd {
+	padding: 2px 7px;
+	border-radius: 999px;
+	font: inherit;
+	font-size: var(--ss-fs-sm);
+	font-weight: 600;
+	letter-spacing: 0.02em;
+	background: color-mix(in srgb, currentColor 10%, transparent);
+}
+.ss-app[data-look="new"] .ss-global-search-btn {
+	border-color: var(--ss-work-line);
+	color: var(--ss-work-ink);
+	background: var(--ss-work-card);
+}
+.ss-app[data-look="new"] .ss-global-search-btn:hover { background: var(--ss-accent-soft); }
+.ss-app[data-look="new"] .ss-global-search-btn kbd { color: var(--ss-work-muted); background: var(--ss-brand-soft); }
+@media (max-width: 767px) {
+	.ss-global-search-btn { width: 38px; padding: 0; justify-content: center; }
+	.ss-global-search-btn kbd { display: none; }
+}
+.ss-global-results { display: grid; gap: 6px; }
+.ss-global-group {
+	margin: 8px 4px 2px;
+	color: var(--ss-muted);
+	font-size: var(--ss-fs-sm);
+	font-weight: 600;
+}
+.ss-global-results .ss-option.is-active { background: var(--ss-brand-soft); }
+.ss-global-state {
+	flex: none;
+	padding: 2px 8px;
+	border-radius: 999px;
+	font-size: var(--ss-fs-sm);
+	color: var(--ss-muted);
+	background: var(--ss-surface-2);
+}
+.ss-global-state.is-2 { color: #b4323b; background: #fbe6e7; }
+
+/* ---------------------------------------------------------------- 2026-11-16 รอบ 5
+   badge แจ้งเตือนเป็นจุด (ตัวเลขหลายหลักล้นปุ่ม) จำนวนอยู่ในหัวแผงแจ้งเตือน */
+.ss-bell-count.is-dot,
+.ss-topbar-launch-dot.is-dot {
+	min-width: 0;
+	width: 9px;
+	height: 9px;
+	padding: 0;
+	border: 2px solid var(--ss-surface);
+	border-radius: 50%;
+	box-sizing: content-box;
+}
+.ss-bell-count.is-dot { top: 6px; right: 7px; }
+.ss-topbar-launch-dot.is-dot { top: -2px; left: 24px; }
+.ss-bell-unread {
+	margin-left: 8px;
+	color: var(--ss-muted);
+	font-size: var(--ss-fs-sm);
+	font-weight: 500;
+}
+/* หน้าตาใหม่: แถบบนใช้โลโก้แอป, หัว Dock = ไอคอนหน้าแรก (วงกลม 4 จุด) */
+.ss-topbar-module-icon.is-logo {
+	overflow: hidden;
+	background: transparent !important;
+	box-shadow: none !important;
+}
+.ss-topbar-module-icon.is-logo img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	border-radius: 50%;
+}
+.ss-rail-home-icon {
+	display: grid;
+	place-items: center;
+	flex: none;
+	color: var(--ss-work-ink, var(--ss-text));
+}
+.ss-rail-logo.is-active .ss-rail-home-icon {
+	color: #fff;
+	background: var(--ss-brand);
+}
+
+/* ---------------------------------------------------------------- 2026-11-16 ขยายหน้าตาใหม่ทั้งหมวดควบคุมงาน
+   ใช้ html[data-section] เพื่อให้ sheet ที่ Teleport ไป body ได้ด้วย */
+@media (min-width: 768px) {
+	/* ทุกหน้าของหมวด: เนื้อหาห่าง Dock 16px ขวาเว้น 12px เท่าแถบบน */
+	.ss-app[data-look="new"] .ss-content {
+		padding-left: 4px;
+		padding-right: 12px;
+	}
+}
+/* ปุ่มทรงแคปซูล */
+html[data-look="new"] .ss-btn {
+	border-radius: 999px;
+}
+/* การ์ดตัวเลขสรุป: แบบเดียวกับการ์ดของหน้าภาพรวม (ขาว เส้นบาง ไม่มีเงา/วงกลมสีตกแต่ง) */
+.ss-app[data-look="new"] .ss-stat {
+	border: 1px solid var(--ss-work-line);
+	border-radius: 16px;
+	background: var(--ss-work-card);
+	box-shadow: none;
+}
+.ss-app[data-look="new"] .ss-stat::after {
+	display: none;
+}
+.ss-app[data-look="new"] .ss-stat-icon {
+	border-radius: 50%;
+	color: var(--ss-work-ink);
+	background: color-mix(in srgb, var(--ss-work-ink) 6%, transparent);
+}
+/* หัวรายการ: การ์ดมุม 16px แท็บทรงแคปซูล */
+.ss-app[data-look="new"] .ss-list-head {
+	border-color: var(--ss-work-line);
+	border-radius: 16px;
+	background: var(--ss-work-card);
+}
+.ss-app[data-look="new"] .ss-list-tabs {
+	align-items: center;
+	gap: 4px;
+	padding: 5px 6px;
+	border-bottom-color: var(--ss-work-line);
+}
+.ss-app[data-look="new"] .ss-list-tab {
+	margin-bottom: 0;
+	border: 0;
+	border-radius: 999px;
+}
+.ss-app[data-look="new"] .ss-list-tab:hover:not(.is-active) {
+	color: var(--ss-work-ink);
+	background: var(--ss-brand-soft);
+}
+/* ช่องค้นหาของหน้า (HeaderSearch) บนแถบบนสีขาว */
+.ss-app[data-look="new"] .ss-topbar .ss-toolbar-search {
+	border: 1px solid var(--ss-work-line);
+	border-radius: 999px;
+	color: var(--ss-work-ink);
+	background: var(--ss-work-card);
+}
+.ss-app[data-look="new"] .ss-topbar .ss-toolbar-search input {
+	color: var(--ss-work-ink);
+}
+.ss-app[data-look="new"] .ss-topbar .ss-toolbar-search input::placeholder {
+	color: var(--ss-work-muted);
+}
+/* แถบล่างของหน้าดู/ฟอร์ม: แคปซูลลอย ห่าง Dock 16px ขวา 12px ล่าง 12px (แบบเดียวกับแถบบน) */
+@media (min-width: 768px) {
+	.ss-app[data-look="new"] .ss-bottom-bar {
+		left: calc(var(--ss-side) + 4px);
+		right: calc(var(--ss-rside, 0px) + 12px);
+		bottom: calc(12px + var(--ss-bottom));
+		padding: 8px;
+		border: 1px solid var(--ss-work-line);
+		border-radius: 999px;
+		background: color-mix(in srgb, var(--ss-work-card) 94%, transparent);
+		box-shadow: 0 10px 30px rgba(23, 35, 63, 0.1);
+	}
+	/* เว้นท้ายหน้าให้เนื้อหาไม่จมใต้แถบ */
+	.ss-app[data-look="new"] .ss-stage > .ss-view {
+		padding-bottom: calc(96px + var(--ss-bottom));
+	}
+}
+
+/* ---------------------------------------------------------------- 2026-11-16 หัวรายการหน้าตาใหม่
+   แถว 1 = แท็บ + ปุ่ม (หัวท้ายกลมแบบแถบบน), แถว 2 = แถวตัวกรอง .ss-list-filterbar (ค้นหา ListSearch.vue + ตัวกรองของหน้า)
+   มีตารางตามมา: มุมล่างของหัวรายการเหลี่ยม ต่อกับตารางเป็นการ์ดเดียว มุมล่างของตาราง/ท้ายตารางโค้ง */
+.ss-app[data-look="new"] .ss-list-head {
+	border-radius: 22px;
+}
+.ss-app[data-look="new"] .ss-content .ss-list-head:has(~ * .ss-table-wrap) {
+	border-radius: 22px 22px 0 0;
+}
+.ss-app[data-look="new"] .ss-content .ss-list-head ~ * .ss-table-wrap {
+	border-color: var(--ss-work-line);
+}
+.ss-app[data-look="new"] .ss-content .ss-list-head ~ * .ss-table-wrap:not(:has(+ .ss-list-foot)) {
+	border-radius: 0 0 22px 22px;
+}
+.ss-app[data-look="new"] .ss-content .ss-list-head ~ * .ss-list-foot {
+	border-color: var(--ss-work-line);
+	border-radius: 0 0 22px 22px;
+}
+.ss-app[data-look="new"] .ss-list-tabs,
+.ss-app[data-look="new"] .ss-list-tools {
+	border-bottom-color: var(--ss-work-line);
+}
+.ss-app[data-look="new"] .ss-list-tabs {
+	padding-left: 7px;
+}
+/* แถวตัวกรองใช้ความสูงเดียวกับแถวแท็บ (--ss-tool-h ของ .ss-list-tools): ช่องค้นหาและตัวกรองที่ย้ายลงมาสูงเท่ากันทุกช่อง */
+.ss-list-filterbar .ss-select--tool,
+.ss-list-filterbar .ss-tool {
+	height: var(--ss-tool-h);
+	min-height: var(--ss-tool-h);
+}
+.ss-list-filterbar {
+	--ss-tool-h: 30px;
+	flex: 1 1 100%;
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 8px;
+	min-width: 0;
+	padding: 7px;
+}
+.ss-list-filterbar .ss-list-search {
+	flex: 0 1 240px;
+	height: var(--ss-tool-h); /* เท่าปุ่ม/ตัวกรองในแถวแท็บ (.ss-list-tools): จอสัมผัส 30px / จอเมาส์ 28px */
+	min-height: var(--ss-tool-h); /* ทับ min-height 32px ของ .ss-toolbar-search บนจอเมาส์ */
+	border-color: var(--ss-work-line, var(--ss-border-strong));
+	border-radius: 999px;
+}
+.ss-list-filterbar .ss-list-search input {
+	min-width: 0;
+	flex: 1;
+	border: 0;
+	outline: 0;
+	background: transparent;
+	font: inherit;
+	color: var(--ss-text);
+}
+/* ช่องวันที่/ตัวเลือกในแถบเครื่องมือเป็นแคปซูล */
+html[data-look="new"] .ss-select--tool {
+	border-radius: 999px;
+}
+@media (hover: hover) and (pointer: fine) {
+	.ss-list-filterbar {
+		--ss-tool-h: 28px;
+	}
+}
+
+/* ---------------------------------------------------------------- 2026-11-16 หน้าตาใหม่: ของกลางที่หมวดอื่นใช้ (สโตร์ ฯลฯ) */
+/* แถบชื่อโครงการใต้แถบบนของหน้าหลักหมวด: ปุ่มโครงการบอกแล้ว */
+.ss-app[data-look="new"] .ss-home-project {
+	display: none;
+}
+/* การ์ดทำรายการ (หน้าหลักหมวด): ขาว เส้นบาง ไอคอนกรมท่าในวงกลมทองอ่อน แทนไอคอนไล่สีตามหมวด */
+.ss-app[data-look="new"] .ss-action {
+	border: 1px solid var(--ss-work-line);
+	border-radius: 16px;
+	background: var(--ss-work-card);
+	box-shadow: none;
+}
+.ss-app[data-look="new"] .ss-action-icon {
+	width: 44px;
+	height: 44px;
+	border-radius: 50%;
+	color: var(--ss-accent-ink);
+	background: var(--ss-accent-soft);
+	box-shadow: none;
+}
+/* ปุ่มสลับตัวกรอง (เช่น เกินกำหนด) เป็นแคปซูล */
+html[data-look="new"] .ss-tool {
+	border-radius: 999px;
+}
+/* ตัวสลับแท็บ (Segmented, มือถือ/ในหน้า): แคปซูลขาวเส้นบาง ตัวที่เลือกเป็นแคปซูลกรมท่าแบบเมนูบนแถบบน */
+html[data-look="new"] .ss-segmented {
+	border: 1px solid var(--ss-work-line);
+	border-radius: 999px;
+	background: var(--ss-work-card);
+}
+html[data-look="new"] .ss-segmented-thumb {
+	border-radius: 999px;
+	background: var(--ss-brand);
+	box-shadow: none;
+}
+html[data-look="new"] .ss-segmented button.is-active {
+	color: #fff;
+}
+
+/* หน้าแผนงานเต็มจอ (.ss-planner, overflow: hidden) ตัดแถบบนที่ยื่นไปซ้าย: ขยายตัวหน้าไปชิดซ้าย 12px แทน
+   แล้วเลื่อนเนื้อหาอื่นกลับมาห่าง Dock 16px เท่าหน้าอื่น */
+@media (min-width: 768px) {
+	.ss-app[data-look="new"] .ss-stage > .ss-view.ss-planner {
+		width: calc(100% + var(--ss-side) - 12px);
+		margin-left: calc(12px - var(--ss-side));
+	}
+	.ss-app[data-look="new"] .ss-planner > .ss-topbar {
+		margin-left: 0;
+	}
+	.ss-app[data-look="new"] .ss-planner > :not(.ss-topbar):not(.ss-project-bar) {
+		margin-left: calc(var(--ss-side) - 8px);
+	}
+}
+/* HeaderSearch ที่ย้ายลงแถวตัวกรอง: อยู่ซ้ายสุดของแถว, ที่เหลือบนแถบบนไม่กินที่ */
+.ss-header-search-anchor {
+	display: contents;
+}
+.ss-list-filterbar > .ss-list-search {
+	order: -1;
+}
+/* ปุ่ม X ท้ายช่องค้นหา (มีคำค้น) ซ่อนปุ่มล้างของเบราว์เซอร์แทน */
+.ss-list-search input::-webkit-search-cancel-button {
+	-webkit-appearance: none;
+	display: none;
+}
+.ss-list-search-clear {
+	flex: none;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 20px;
+	height: 20px;
+	margin-right: -4px;
+	padding: 0;
+	border: 0;
+	border-radius: 50%;
+	color: var(--ss-muted);
+	background: transparent;
+	cursor: pointer;
+}
+.ss-list-search-clear:hover {
+	color: var(--ss-text);
+	background: var(--ss-work-line, var(--ss-border));
+}
+/* ตัวควบคุมที่ย้ายจากแถวแท็บลงแถวตัวกรอง สูงเท่ากันทั้งแถว แคปซูล */
+.ss-list-filterbar .ss-icon-btn,
+.ss-list-filterbar .ss-tool-picker .ss-picker-value {
+	height: var(--ss-tool-h);
+	min-height: var(--ss-tool-h);
+}
+.ss-list-filterbar .ss-icon-btn {
+	width: var(--ss-tool-h);
+}
+.ss-list-filterbar .ss-tool-picker .ss-picker-value {
+	border-radius: 999px;
+}
+.ss-list-filterbar .ss-project-filter-clear {
+	width: 22px;
+	height: var(--ss-tool-h);
+}
+/* แถวตัวกรองของรายการเอกสาร (DocList): ค้นหา → ตัวกรองแบบเลือกเรียงจากซ้าย (ที่ไม่พอซ่อน) → ปุ่มตัวกรองรวมขวาสุด */
+.ss-list-filterbar--doc {
+	flex-wrap: nowrap;
+}
+.ss-list-filterbar--doc .ss-list-filters {
+	justify-content: flex-start;
+	height: var(--ss-tool-h);
+}
+.ss-list-filterbar--doc > .ss-tool--filter {
+	flex: none;
+	margin-left: auto;
+}
+/* avatar บริษัทท้าย Dock (ออฟฟิศ): ทองอ่อนแบบ avatar โครงการ */
+.ss-app[data-look="new"] .ss-rail-ctx .ss-avatar {
+	color: #17233f;
+	background: var(--ss-accent-soft);
+	box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ss-accent) 52%, transparent);
+}
+
+/* ---------------------------------------------------------------- 2026-11-16 badge ของ Dock / แถบล่างมือถือ = จุดอย่างเดียว (จำนวนอยู่ใน tooltip และในแท็บของหมวด)
+   และเมนูที่เลือกใน Dock ไม่มีเงา */
+.ss-app[data-look="new"] .ss-rail-badge,
+.ss-app[data-look="new"] .ss-nav-icon > .ss-badge {
+	top: -1px;
+	right: -1px;
+	left: auto;
+	width: 9px;
+	min-width: 0;
+	height: 9px;
+	padding: 0;
+	border: 2px solid var(--ss-work-card);
+	border-radius: 50%;
+	box-sizing: content-box;
+	font-size: 0;
+	line-height: 0;
+	color: transparent;
+	background: var(--ss-danger);
+}
+.ss-app[data-look="new"] .ss-rail-mod.is-open,
+.ss-app[data-look="new"] .ss-rail-mod.is-open .ss-rail-icon,
+.ss-app[data-look="new"] .ss-rail-logo.is-active .ss-rail-home-icon {
+	box-shadow: none;
+}
+
+/* ---------------------------------------------------------------- 2026-11-16 แถบล่างของหน้าดูเอกสาร (DocView)
+   สูงเท่าแถบบน (มือถือ 54px, จอ ≥768 58px) ปุ่มพิมพ์ซ้ายสุด ปุ่มอื่นชิดขวา */
+.ss-bottom-bar.ss-docview-bar {
+	gap: 8px;
+	padding: 7px 12px calc(7px + var(--ss-bottom));
+}
+.ss-docview-bar .ss-btn--lg {
+	min-height: 40px;
+	padding-block: 6px;
+	border-radius: 999px;
+}
+.ss-docview-bar .ss-docview-print {
+	flex: 0 0 auto;
+	margin-right: auto;
+}
+.ss-has-bar.ss-has-slim-bar {
+	padding-bottom: calc(74px + var(--ss-bottom)) !important;
+}
+@media (min-width: 768px) {
+	.ss-bottom-bar.ss-docview-bar {
+		padding: 7px 28px calc(7px + var(--ss-bottom));
+	}
+	.ss-docview-bar .ss-btn--lg {
+		min-height: 40px;
+	}
+	.ss-app[data-look="new"] .ss-bottom-bar.ss-docview-bar {
+		height: 58px;
+		padding: 0 8px;
+	}
+	.ss-app[data-look="new"] .ss-docview-bar .ss-btn--lg {
+		min-height: 42px;
+	}
+}
+@media (max-width: 420px) {
+	.ss-docview-print-label {
+		display: none;
+	}
+}
+
+/* ---------------------------------------------------------------- 2026-11-16 ปุ่มหน้าแรกบนสุดของ Dock (.ss-rail-logo)
+   หน้าตาใหม่: แถวนี้มีเส้นคั่นด้านล่าง พื้น hover/active ของแถว (เหลี่ยม เต็มความกว้าง) จึงห้ามมี
+   สถานะแสดงที่วงกลม .ss-rail-home-icon แทน (จอสัมผัส hover ค้างหลังแตะ) */
+@media (min-width: 768px) {
+	.ss-app[data-look="new"] .ss-rail-logo,
+	.ss-app[data-look="new"] .ss-rail-logo:hover,
+	.ss-app[data-look="new"] .ss-rail-logo.is-active {
+		background: transparent;
+	}
+	.ss-app[data-look="new"] .ss-rail-logo .ss-rail-home-icon {
+		border-radius: 999px;
+		transition: background 0.15s ease, color 0.15s ease;
+	}
+	.ss-app[data-look="new"] .ss-rail-logo:hover:not(.is-active) .ss-rail-home-icon {
+		background: var(--ss-brand-soft);
+	}
+}
+
+/* ---------------------------------------------------------------- 2026-11-16 แท็บล้นแถบ (StatusTabs.vue)
+   แท็บที่ไม่พอซ่อนแล้วรวมที่ปุ่ม "…" ท้ายแถว แถวเงา .ss-list-tabs-measure ใช้วัดความกว้างเท่านั้น (มองไม่เห็น ไม่กินที่ ไม่ทำให้เลื่อน) */
+.ss-list-tabs {
+	position: relative;
+}
+.ss-list-tabs-measure {
+	position: absolute;
+	top: 0;
+	left: 0;
+	display: flex;
+	gap: inherit;
+	width: 0;
+	height: 0;
+	overflow: hidden;
+	visibility: hidden;
+	pointer-events: none;
+}
+.ss-list-tabs-measure > * {
+	flex: none;
+}
+.ss-list-tab--more {
+	position: relative;
+	justify-content: center;
+	padding: 0 10px;
+}
+.ss-list-tab--more .ss-tab-dot {
+	position: absolute;
+	top: 4px;
+	right: 4px;
+	margin: 0;
+}
+.ss-list-tab--more.is-open {
+	color: var(--ss-text);
+	background: var(--ss-brand-soft);
+}
+/* มีปุ่ม "…" แล้ว ไม่ต้องเลื่อนแนวนอน */
+.ss-list-head--many .ss-list-tabs {
+	overflow: visible;
+}
+
+/* ---------------------------------------------------------------- 2026-11-16 หน้าแผนงาน (PlanEdit.vue) หน้าตาใหม่
+   แท็บทรงแคปซูลแบบหัวรายการ, ปุ่ม "แก้ไขแผนงาน" สีเข้มขวาสุด, ช่องวันที่แคปซูล */
+.ss-app[data-look="new"] .pl-ribbon {
+	border-color: var(--ss-work-line);
+	border-radius: 22px 22px 0 0;
+	background: var(--ss-work-card);
+}
+.ss-app[data-look="new"] .pl-tabs-row {
+	align-items: center;
+	border-bottom-color: var(--ss-work-line);
+}
+.ss-app[data-look="new"] .pl-tabs {
+	align-items: center;
+	gap: 4px;
+	padding: 5px 7px;
+}
+.ss-app[data-look="new"] .pl-tabs button {
+	margin-bottom: 0;
+	border: 0;
+	border-radius: 999px;
+}
+.ss-app[data-look="new"] .pl-tabs button:hover:not(.is-active) {
+	color: var(--ss-work-ink);
+	background: var(--ss-brand-soft);
+}
+.ss-app[data-look="new"] .pl-tabs-actions {
+	gap: 6px;
+	padding: 4px 8px;
+}
+.ss-app[data-look="new"] .pl-tabs-actions .ss-icon-btn {
+	border-radius: 50%;
+}
+.ss-app[data-look="new"] .pl-tabs-actions .ss-plan-edit-btn {
+	margin: 0;
+	padding: 0 14px;
+	border-radius: 999px;
+}
+@media (max-width: 599px) {
+	.ss-app[data-look="new"] .pl-tabs-actions .ss-plan-edit-btn {
+		padding: 0;
+		border-radius: 50%;
+	}
+}
+.ss-app[data-look="new"] .pl-tools {
+	border-bottom-color: var(--ss-work-line);
+}
+.ss-app[data-look="new"] .pl-date .ss-select--cell,
+.ss-app[data-look="new"] .pl-group .ss-select--tool {
+	padding: 0 10px;
+	border-radius: 999px;
+}
+.ss-app[data-look="new"] .pl-date {
+	width: 124px;
+}
+
+/* ---------------------------------------------------------------- 2026-11-16 Look-ahead (pm/Lookahead.vue): หัวรายการ = แท็บสัปดาห์ + ณ วันที่ / พิมพ์ / โหลดใหม่ */
+.ss-la-head {
+	margin-bottom: 12px;
+}
+.ss-la-head .ss-list-tools .ss-select--tool {
+	width: 150px;
+}
+.ss-la-mobile-tools {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin-bottom: 10px;
+}
+.ss-la-mobile-tools > :first-child {
+	flex: 1;
+	min-width: 0;
+}
+@media print {
+	.ss-la-printing .ss-la-table {
+		font-size: 10px;
+	}
+}
+
+/* ---------------------------------------------------------------- 2026-11-16 เมนูของหมวดบนแถบบน (SectionTabs.vue): ที่ไม่พอ = ปุ่ม "…"
+   กรอบนอกกินที่ว่างระหว่างโลโก้กับปุ่มโครงการ (วัดที่ว่างจากกรอบนี้) nav กว้างเท่าเมนูที่แสดง
+   ชื่อเมนูแสดงเสมอ (เลิกย่อเมนูที่ไม่ได้เลือกเหลือไอคอน) */
+.ss-sectabs-wrap {
+	display: none;
+}
+@media (min-width: 768px) {
+	.ss-sectabs-wrap {
+		position: relative;
+		display: flex;
+		align-items: center;
+		flex: 1 1 0;
+		min-width: 0;
+	}
+	.ss-sectabs-wrap > .ss-sectabs,
+	.ss-topbar.has-tabs .ss-sectabs-wrap > .ss-sectabs {
+		flex: 0 1 auto;
+		min-width: 0;
+		margin-right: 0;
+		overflow: visible;
+	}
+	.ss-sectabs-measure {
+		position: absolute;
+		top: 0;
+		left: 0;
+		width: max-content;
+		visibility: hidden;
+		pointer-events: none;
+		/* แถวเงาไม่กินที่ ไม่ดันแถบบน */
+		height: 0;
+		overflow: hidden;
+	}
+	.ss-app .ss-sectabs-wrap .ss-sectabs-measure {
+		display: flex;
+	}
+	.ss-sectab--more {
+		justify-content: center;
+	}
+	.ss-sectab-more-dot {
+		position: absolute;
+		top: 5px;
+		right: 6px;
+		width: 7px;
+		height: 7px;
+		border-radius: 50%;
+		background: var(--ss-danger, var(--tone-rose));
+	}
+	.ss-app[data-look="new"] .ss-sectab.ss-sectab--more {
+		width: 38px;
+		padding: 0;
+	}
+	.ss-app[data-look="new"] .ss-sectab--more > .ss-icon {
+		display: block !important;
+	}
+	.ss-app[data-look="new"] .ss-sectab--more.is-open {
+		color: var(--ss-work-ink);
+		background: var(--ss-work-card);
+	}
+	/* หน้าตาใหม่: ชื่อเมนูแสดงทุกขนาดจอ (แทนกฎย่อเป็นไอคอนที่ ≤760px / <1100px ด้านบน) */
+	.ss-app[data-look="new"] .ss-sectab:not(.ss-sectab--more),
+	.ss-app[data-look="new"] .ss-sectab:not(.is-active):not(.ss-sectab--more) {
+		width: auto;
+		padding-inline: 13px;
+	}
+	.ss-app[data-look="new"] .ss-sectab:not(.ss-sectab--more) > .ss-icon {
+		display: none;
+	}
+	.ss-app[data-look="new"] .ss-sectab .ss-sectab-label,
+	.ss-app[data-look="new"] .ss-sectab:not(.is-active) .ss-sectab-label {
+		display: inline;
+	}
 }

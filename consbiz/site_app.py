@@ -1,17 +1,21 @@
 # Copyright (c) 2026, Siricons and contributors
 # For license information, please see license.txt
 
-"""แอปหน้างาน (/site, www/site.html + public/js/site_app/) แอปเดียวแบ่งเป็นหมวดงาน สลับในแอป
+"""แอป ConsERP (/conserp/<หมวด>, www/site.html + public/js/site_app/site_app.bundle.js) หน้างาน + ออฟฟิศใน bundle เดียว
+สลับทุกหมวดในหน้าเดียว (รวม 2026-11-17) boot_data = หมวดของทั้งสองแอป หมวดของออฟฟิศอยู่ office_sections / add_office_boot
 
 - store (สโตร์): รับของ / เบิก / ยืม-คืน / คลัง  API อยู่ที่ consbiz/store_app.py
-- buy (ขอซื้อ): ใบขอซื้อ + ติดตามสถานะ (consbiz/site_docs.py) สั่งซื้อ/แจ้งหนี้/ขายอยู่แอปออฟฟิศ (/office)
+- buy (ขอซื้อ): หน้างานขอวัสดุ/สิ่งของไปยังออฟฟิศ หน้าใบขอซื้อชุดเดียวกับหมวดจัดซื้อ (purchase) ของออฟฟิศ
 - pm (แผนงาน): ภาพรวมสัญญา/ความล่าช้า, แผนงาน (Gantt ดูอย่างเดียว), Look-ahead, เอกสารโครงการ,
   การเงิน (Cash Flow, ต้นทุนตามหมวด, Earned Value) เฉพาะผู้ที่เห็นงบต้นทุน (budget_cost permlevel 1)
   ข้อมูลชุดเดียวกับ Tab ของ Construction Management (dashboard.py / lookahead.py) แก้แผนที่หน้า Gantt ในระบบเต็ม
 - work (ควบคุมงาน): โฟร์แมน/วิศวกร ความคืบหน้า + S-Curve, ปฏิทินรายงานประจำวัน, บันทึกคอนกรีต (API ที่ store_app.py),
   กรอก/ส่ง Daily Report และขอ/อนุมัติ Daily Request ในแอป (ทีละขั้น), ดูขอตรวจงาน / Punch List
   API อยู่ในไฟล์นี้ (ฟอร์มขอตรวจงาน / Punch List / งานลด-เพิ่ม / EOT อยู่ project_docs.py)
-- resources (ทรัพยากร): วัสดุที่ต้องสั่ง/ยอดวัสดุ/คนและเครื่องจักร ทุกคนที่เข้าหมวดหน้างานได้ ไม่มีมูลค่างาน
+  เมนูทรัพยากร (วัสดุที่ต้องสั่ง/ยอดวัสดุ/คนและเครื่องจักร) ทุกคนที่เข้าหมวดหน้างานได้ ไม่มีมูลค่างาน
+  ผู้ที่อ่านแผนงานไม่ได้ เห็นหมวดแผนงานเฉพาะเมนูทรัพยากร (boot can.view_plan)
+- rebar (แผนการตัด): แผนตัดเหล็ก (consbiz/bar_cut_app.py)
+- admin (คนงาน, กลุ่มธุรการโครงการในหน้า Desktop): ลงเวลาคนงานรายวัน เบิกล่วงหน้า ทะเบียนคนงาน
 หมวดที่ผู้ใช้เห็น = หมวดที่มีสิทธิ์อ่าน/สร้างเอกสารอย่างน้อย 1 ชนิด (SECTIONS) ทุก API ยังตรวจสิทธิ์ของเอกสารเอง
 """
 
@@ -42,39 +46,48 @@ def readable_any(doctypes):
 
 def office_sections():
 	"""หมวดของแอปออฟฟิศ (/conserp/purchase, /conserp/sales) ที่ผู้ใช้มีสิทธิ์
-	ชื่อหมวดต้องตรงกับ website_route_rules ใน hooks.py (server เลือก bundle ออฟฟิศตามชื่อหมวด)"""
+	ชื่อหมวดต้องตรงกับ website_route_rules ใน hooks.py (server เลือก bundle ออฟฟิศตามชื่อหมวด)
+	ลำดับ = ลำดับในหน้า Desktop/Dock (GROUPS ใน shared/modules.js เรียงอีกชั้น สารบรรณ/ผู้รับเหมา อยู่กลุ่มธุรการโครงการ)"""
+	from consbiz import accounting_app, hr_attendance, master_data, saraban, subcontract_app
+
 	sections = []
-	if readable_any(BUY_DOCTYPES):
+	# จัดซื้อ = ฝ่ายจัดซื้อ (สั่งซื้อ/แจ้งหนี้) คนที่อ่านได้แค่ใบขอซื้อใช้หมวดขอซื้อของหน้างาน
+	if readable_any(("Purchase Order", "Purchase Invoice")):
 		sections.append("purchase")
 	if readable_any(SELL_DOCTYPES):
 		sections.append("sales")
+	# บัญชี: รับ/จ่ายชำระ ภาษี หัก ณ ที่จ่าย (consbiz/accounting_app.py) + เงินประกันผลงาน (consbiz/retention_app.py)
+	if accounting_app.can_account():
+		sections.append("accounting")
+	# บุคคล: สรุปวันทำงาน / Attendance (consbiz/hr_attendance.py) เฉพาะ HR
+	sections += hr_attendance.hr_sections()
 	if frappe.has_permission("BOQ", "read"):
 		sections.append("boq")
-	# บุคคล: สรุปวันทำงาน / Attendance (consbiz/hr_attendance.py) เฉพาะ HR
-	from consbiz import hr_attendance
-
-	sections += hr_attendance.hr_sections()
 	# สารบรรณ: หนังสือเข้า-ออก ใบนำส่ง ใบปะหน้า (consbiz/saraban.py) เห็นเมื่ออ่านได้อย่างน้อย 1 ชนิด
-	from consbiz import saraban
-
 	if saraban.saraban_kinds():
 		sections.append("saraban")
 	# ผู้รับเหมาช่วง: สัญญา + ใบเบิกงวด (consbiz/subcontract_app.py)
-	from consbiz import subcontract_app
-
 	if subcontract_app.readable_kinds():
 		sections.append("subcontract")
-	# บัญชี: รับ/จ่ายชำระ ภาษี หัก ณ ที่จ่าย (consbiz/accounting_app.py) + เงินประกันผลงาน (consbiz/retention_app.py)
-	from consbiz import accounting_app
-
-	if accounting_app.can_account():
-		sections.append("accounting")
+	# คนงาน (กลุ่มธุรการโครงการ, เดิมหมวด admin ของหน้างาน): ลงเวลาคนงานรายวัน / เบิกล่วงหน้า / ทะเบียนคนงาน
+	if readable_any(LABOUR_DOCTYPES):
+		sections.append("labour")
 	# ข้อมูลหลัก: พนักงาน สินค้า ลูกค้า ผู้ขาย โครงการ (consbiz/master_data.py) เห็นเมื่ออ่านได้อย่างน้อย 1 ชนิด
-	from consbiz import master_data
-
 	if master_data.readable_kinds():
 		sections.append("master")
 	return sections
+
+
+LABOUR_DOCTYPES = ("Labour Timesheet", "Daily Worker", "Labour Advance")
+
+
+def labour_permissions():
+	"""เมนูของหมวดคนงาน (office_app/sections.js)"""
+	return {
+		"view_labour": readable("Labour Timesheet"),
+		"view_workers": readable("Daily Worker"),
+		"view_advances": readable("Labour Advance"),
+	}
 
 
 def can_view_finance():
@@ -89,22 +102,22 @@ def site_sections(can=None):
 	"""หมวดของแอปหน้างาน (/site) ที่ผู้ใช้มีสิทธิ์ can = สิทธิ์สโตร์จาก store_app.boot_data"""
 	can = can if can is not None else store_app.boot_data()["can"]
 	sections = []
-	if any(can.get(key) for key in ("receive", "receive_employer", "issue", "borrow")):
-		sections.append("store")
-	if readable_any(WORK_DOCTYPES) or can.get("concrete") or can.get("bar_cut"):
-		sections.append("work")
-	if frappe.has_permission("Construction Management", "read"):
-		sections.append("pm")
 	can_buy = frappe.has_permission("Material Request", "read")
-	# ทรัพยากรดูได้ทุกคนที่เข้าหมวดหน้างานได้ (API ไม่ส่งมูลค่างาน)
-	if sections or can_buy:
-		sections.append("resources")
-	# หน้างานขอซื้อได้อย่างเดียว (สั่งซื้อ/แจ้งหนี้/ขาย ทำที่แอปออฟฟิศ)
+	can_store = any(can.get(key) for key in ("receive", "receive_employer", "issue", "borrow"))
+	can_work = readable_any(WORK_DOCTYPES) or can.get("concrete")
+	# แผนงาน: อ่านแผนงานได้ หรือเข้าหน้างานได้ (เมนูทรัพยากรดูได้ทุกคนของหน้างาน API ไม่ส่งมูลค่างาน)
+	if frappe.has_permission("Construction Management", "read") or can_store or can_work or can_buy:
+		sections.append("pm")
+	if can_work:
+		sections.append("work")
+	if can_store:
+		sections.append("store")
+	# ขอซื้อ: หน้างานขอวัสดุ/สิ่งของไปยังออฟฟิศ (หน้าใบขอซื้อชุดเดียวกับหมวดจัดซื้อ)
 	if can_buy:
 		sections.append("buy")
-	# ธุรการโครงการ: ลงเวลาคนงานรายวัน / ทะเบียนคนงาน
-	if readable_any(("Labour Timesheet", "Daily Worker", "Labour Advance")):
-		sections.append("admin")
+	# แผนการตัด: แผนตัดเหล็ก (consbiz/bar_cut_app.py) can ของ store_app ไม่มี bar_cut (เรียกจากแอปอื่น)
+	if can["bar_cut"] if "bar_cut" in can else frappe.has_permission("Bar Cut Plan", "read"):
+		sections.append("rebar")
 	return sections
 
 
@@ -118,9 +131,11 @@ APP_SECTIONS = {"site": site_sections, "office": office_sections, "self": self_s
 
 
 def sections_by_app(current=None):
-	"""{แอป: หมวดที่ผู้ใช้มีสิทธิ์} current = (แอปที่เปิดอยู่, หมวดของแอปนั้น) ไม่ต้องคำนวณซ้ำ"""
+	"""{แอป: หมวดที่ผู้ใช้มีสิทธิ์} current = หมวดที่คำนวณแล้ว ไม่ต้องคำนวณซ้ำ:
+	(แอป, หมวด) หรือ {แอป: หมวด} (ConsERP รวมหน้างาน + ออฟฟิศใน bundle เดียว)"""
+	known = dict([current]) if isinstance(current, tuple) else dict(current or {})
 	return {
-		config["key"]: current[1] if current and current[0] == config["key"] else APP_SECTIONS[config["key"]]()
+		config["key"]: known[config["key"]] if config["key"] in known else APP_SECTIONS[config["key"]]()
 		for config in APPS
 	}
 
@@ -181,13 +196,14 @@ def get_my_profile():
 
 
 def office_boot_data():
-	"""ข้อมูลตั้งต้นของแอปออฟฟิศ (/office)"""
-	boot = store_app.boot_data()
-	sections = office_sections()
+	"""เดิมเป็น boot ของ bundle ออฟฟิศ รวมเข้า ConsERP แล้ว (2026-11-17) คงชื่อไว้ให้ที่เรียกเดิม"""
+	return boot_data()
+
+
+def add_office_boot(boot, sections):
+	"""ข้อมูลตั้งต้นของหมวดออฟฟิศ (จัดซื้อ ขาย บัญชี บุคคล BOQ สารบรรณ ผู้รับเหมา คนงาน ข้อมูลหลัก)"""
 	boot.update(
 		{
-			"sections": sections,
-			"desk": bool(sections),
 			# ตัวเลือกบริษัท (กรองรายการ/ตัวเลข + บริษัทของเอกสารใหม่) เฉพาะบริษัทที่ผู้ใช้มีสิทธิ์
 			"companies": frappe.get_list(
 				"Company", fields=["name", "abbr", "company_logo"], order_by="name asc", limit_page_length=0
@@ -198,6 +214,7 @@ def office_boot_data():
 	from consbiz import hr_payroll
 
 	boot["can"]["payroll"] = "hr" in sections and hr_payroll.can_manage()
+	boot["can"].update(labour_permissions())
 	from consbiz import hr_docs
 
 	# สัญญาจ้าง / 50 ทวิ พนักงาน (เมนูในหมวดบุคคล) ตามสิทธิ์ของ DocType
@@ -219,8 +236,6 @@ def office_boot_data():
 	from consbiz import master_data
 
 	boot["master"] = master_data.boot_permissions()
-	add_apps(boot, ("office", sections))
-	return boot
 
 
 def boot_data():
@@ -237,19 +252,21 @@ def boot_data():
 			"finance": can_view_finance(),
 			"create_inspection": bool(frappe.has_permission("Inspection Request", "create")),
 			"create_punch_list": bool(frappe.has_permission("Punch List", "create")),
-			"view_labour": readable("Labour Timesheet"),
-			"view_workers": readable("Daily Worker"),
-			"view_advances": readable("Labour Advance"),
 		}
 	)
 	# แผนตัดเหล็ก (consbiz/bar_cut_app.py)
 	from consbiz import bar_cut_app
 
 	boot["can"].update(bar_cut_app.boot_permissions())
+	# แผนงาน: เมนูภาพรวม/แผนงาน/Look-ahead/เอกสาร (ไม่มีสิทธิ์ = เห็นแค่ทรัพยากร)
+	boot["can"]["view_plan"] = readable("Construction Management")
+	# ConsERP = หน้างาน + ออฟฟิศ ใน bundle เดียว (www/site.html, 2026-11-17) หมวดของทั้งสองแอปอยู่ใน boot เดียว
 	sections = site_sections(boot["can"])
-	boot["sections"] = sections
-	add_apps(boot, ("site", sections))
-	boot["desk"] = boot["desk"] or any(can_work.values())
+	office = office_sections()
+	add_office_boot(boot, office)
+	boot["sections"] = sections + office
+	add_apps(boot, {"site": sections, "office": office})
+	boot["desk"] = boot["desk"] or any(can_work.values()) or bool(office)
 	return boot
 
 
@@ -287,6 +304,67 @@ def get_doc_project(doctype, name):
 		return None
 	names = frappe.get_list("Project", filters={"name": project, "status": "Open"}, pluck="name", limit_page_length=1)
 	return names[0] if names else None
+
+
+# ---------------------------------------------------------------- ค้นหาทั้งระบบ (ปุ่มค้นหาบนแถบบน, Ctrl/⌘ + G)
+# เอกสารที่ค้นหาได้ เรียงตามลำดับกลุ่มที่แสดง ค้นจากเลขที่และ title_field ของแต่ละ doctype
+# เพิ่ม doctype ที่นี่ได้เลย เปิดผลลัพธ์ด้วย open_document() ใน shared/notifications.js (ไม่มีหน้าในแอป = เปิดระบบเต็ม)
+GLOBAL_SEARCH_DOCTYPES = (
+	("Daily Report", "รายงานประจำวัน"),
+	("Daily Request", "ขออนุมัติล่วงหน้า"),
+	("Inspection Request", "ใบขอตรวจงาน"),
+	("Punch List", "Punch List"),
+	("Concrete Usage", "เทคอนกรีต"),
+	("Variation Order", "งานเพิ่ม-ลด (VO)"),
+	("Extension of Time", "ขยายเวลา (EOT)"),
+	("BOQ", "BOQ"),
+	("Material Request", "ใบขอซื้อ"),
+	("Purchase Order", "ใบสั่งซื้อ"),
+	("Purchase Receipt", "ใบรับของ"),
+	("Purchase Invoice", "ใบแจ้งหนี้ซื้อ"),
+	("Quotation", "ใบเสนอราคา"),
+	("Sales Order", "ใบสั่งขาย"),
+	("Sales Invoice", "ใบแจ้งหนี้ขาย"),
+	("Subcontract Claim", "ใบเบิกงวดผู้รับเหมา"),
+	("Equipment Borrowing", "ยืมเครื่องมือ"),
+	("Leave Application", "ใบลา"),
+	("Employee Advance", "เงินทดรองจ่าย"),
+	("Expense Claim", "เบิกค่าใช้จ่าย"),
+)
+GLOBAL_SEARCH_LIMIT = 5
+
+
+@frappe.whitelist()
+def global_search(txt):
+	"""เอกสารที่เลขที่หรือชื่อเรื่องมีคำค้น เฉพาะ doctype ที่ผู้ใช้อ่านได้ (get_list ตรวจสิทธิ์รายใบให้)
+	คืน [{doctype, label, rows: [{name, title, project, docstatus}]}] กลุ่มละไม่เกิน GLOBAL_SEARCH_LIMIT ใบ ใบที่แก้ล่าสุดก่อน"""
+	txt = (txt or "").strip()
+	if len(txt) < 2:
+		return []
+	like = f"%{txt}%"
+	groups = []
+	for doctype, label in GLOBAL_SEARCH_DOCTYPES:
+		if not frappe.db.exists("DocType", doctype) or not readable(doctype):
+			continue
+		meta = frappe.get_meta(doctype)
+		title = meta.title_field if meta.title_field and meta.has_field(meta.title_field) else None
+		fields = ["name", "docstatus"]
+		or_filters = [["name", "like", like]]
+		if title:
+			fields.append(f"`{title}` as title")
+			or_filters.append([title, "like", like])
+		if meta.has_field("project"):
+			fields.append("project")
+		rows = frappe.get_list(
+			doctype,
+			fields=fields,
+			or_filters=or_filters,
+			order_by="modified desc",
+			limit_page_length=GLOBAL_SEARCH_LIMIT,
+		)
+		if rows:
+			groups.append({"doctype": doctype, "label": label, "rows": rows})
+	return groups
 
 
 # ---------------------------------------------------------------- หน้าหลักของหมวดควบคุมงาน
@@ -1070,12 +1148,15 @@ def get_resource_board(project):
 		get_holiday_dates,
 		schedule_version,
 	)
-	from consbiz.consbiz.doctype.construction_management.resources import material_plan_data, resource_plan_data
+	from consbiz.consbiz.doctype.construction_management.resources import (
+		material_plan_data,
+		resource_plan_data,
+	)
 
 	_info, cm = check_project(project)
 	if not cm:
 		return None
-	if "resources" not in site_sections():
+	if "pm" not in site_sections():
 		frappe.throw(_("ไม่มีสิทธิ์ดูทรัพยากร"), frappe.PermissionError)
 	doc = frappe.get_doc("Construction Management", cm)
 	return {
@@ -1089,7 +1170,7 @@ def get_resource_board(project):
 		"modified": str(doc.modified),
 		"version": schedule_version(doc.name),
 		"can_write": False,
-		# ฟอร์มขอซื้ออยู่หมวด buy ต้องเปิดหมวดนั้นได้ด้วย
+		# ฟอร์มขอซื้ออยู่หมวดจัดซื้อ (purchase) ต้องเปิดหมวดนั้นได้ด้วย
 		"can_request": bool(
 			frappe.has_permission("Material Request", "create") and frappe.has_permission("Material Request", "read")
 		),

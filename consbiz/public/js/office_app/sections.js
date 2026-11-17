@@ -3,7 +3,9 @@
 // บัญชี: รับ/จ่ายชำระ ภาษี หัก ณ ที่จ่าย + เงินประกันผลงาน (หมวดขาย/จัดซื้อมีเมนูเงินประกันของฝั่งตัวเองด้วย) เพิ่มหมวดใหม่: SECTIONS + ROUTES + views.js + สิทธิ์ใน site_app.office_sections
 // ชื่อหน้า (view) ห้ามซ้ำข้ามหมวด เพราะ go("<view>") หาหมวดจากชื่อหน้า
 
-import { boot } from "../shared/api.js";
+import { boot, scope_args } from "../shared/api.js";
+import { DOC_PAGES as RETENTION_PAGES } from "./views/retention/kinds.js";
+import { DOC_PAGES as ACCOUNTING_PAGES } from "./views/accounting/kinds.js";
 import { MODULE_META } from "../shared/modules.js";
 
 export const SECTIONS = {
@@ -281,6 +283,21 @@ export const SECTIONS = {
 			(s?.retention_in?.count || 0) +
 			(s?.retention_out?.count || 0),
 	},
+	// คนงาน (กลุ่มธุรการโครงการ, เดิมหมวด admin ของ bundle หน้างาน URL /conserp/admin): ลงเวลาคนงานรายวัน (Labour Timesheet รายรอบ)
+	// + เบิกล่วงหน้า + ทะเบียนคนงาน อยู่ bundle เดียวกับสารบรรณ/ผู้รับเหมา สลับในกลุ่มไม่โหลดหน้าใหม่
+	// ทุกหน้าต้องมีโครงการ (needs_project ใน views.js) ออฟฟิศโครงการเป็นแค่ตัวกรอง
+	labour: {
+		key: "labour",
+		...MODULE_META.office.labour,
+		get home() {
+			return (this.tabs.find((t) => t.when(boot)) || this.tabs[0]).view;
+		},
+		tabs: [
+			{ view: "labour", label: "ลงเวลาคนงาน", icon: "clock", when: (b) => b.can.view_labour },
+			{ view: "advances", label: "เบิกล่วงหน้า", icon: "calculator", when: (b) => b.can.view_advances },
+			{ view: "workers", label: "ทะเบียนคนงาน", icon: "users", when: (b) => b.can.view_workers },
+		],
+	},
 	// ข้อมูลหลัก: 1 ชนิด = 1 เมนู (views/master/kinds.js + MasterPage.vue, API consbiz/master_data.py)
 	master: {
 		key: "master",
@@ -396,4 +413,29 @@ export const ROUTES = {
 	"md-suppliers": { section: "master", params: ["tab"] },
 	"md-projects": { section: "master", params: ["tab"] },
 	"md-doc": { section: "master", params: ["kind", "name"] },
+	// คนงาน: day = วันใดก็ได้ในรอบ (ว่าง = รอบปัจจุบัน)
+	labour: { section: "labour", params: ["day"] },
+	advances: { section: "labour", params: [] },
+	workers: { section: "labour", params: [] },
+};
+
+// ค่าของหมวดออฟฟิศที่ bundle ConsERP (site_app.bundle.js) รวมเข้า configure() (เดิมอยู่ office_app.bundle.js)
+export const PARENT_TAB = {
+	"boq-form": "boq",
+	agreement: "agreements",
+	claim: "claims",
+	variation: "variations",
+	...RETENTION_PAGES,
+	...ACCOUNTING_PAGES,
+};
+// หน้าดู/ฟอร์มไฮไลต์เมนูตาม params.kind (สารบรรณ: kind = ชื่อหน้ารายการ เช่น letters-in)
+export const KIND_PAGES = ["buy-doc", "sell-doc", "buy-form", "sell-form", "saraban-doc", "saraban-form", "hr-doc", "acc-payment", "acc-tax-doc", "md-doc"];
+// ตัวเลขบนเมนู: ขอบเขต = ตัวกรองโครงการ + บริษัท (scope_args ของหมวดนั้น เพราะโหลดพร้อมหมวดอื่น)
+export const SUMMARY_API = {
+	purchase: () => ["consbiz.site_docs.get_summary", { section: "buy", ...scope_args("purchase") }],
+	sales: () => ["consbiz.site_docs.get_summary", { section: "sell", ...scope_args("sales") }],
+	hr: () => ["consbiz.hr_attendance.get_summary", scope_args("hr")],
+	saraban: () => ["consbiz.saraban.get_summary", scope_args("saraban")],
+	subcontract: () => ["consbiz.subcontract_app.get_summary", scope_args("subcontract")],
+	accounting: () => ["consbiz.accounting_app.get_summary", scope_args("accounting")],
 };

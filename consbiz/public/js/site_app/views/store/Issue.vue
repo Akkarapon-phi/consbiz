@@ -1,15 +1,6 @@
 <template>
 	<div :class="{ 'ss-has-bar': tab === 'new' && cart.length }">
 		<TopBar title="เบิกวัสดุ" :subtitle="state.project?.project_name">
-			<template #search>
-				<HeaderSearch
-					v-if="wide"
-					v-model="txt"
-					:placeholder="
-						tab === 'new' ? 'ค้นหาวัสดุในคลัง' : 'ค้นหาเลขที่ ผู้เบิก หรือวัสดุ'
-					"
-				/>
-			</template>
 			<template #actions>
 				<button
 					v-if="!wide"
@@ -37,6 +28,13 @@
 					>
 						<Icon name="refresh" :size="17" />
 					</button>
+				</div>
+				<!-- แถวตัวกรอง: ค้นหา + ตัวกรองของหน้า -->
+				<div class="ss-list-filterbar">
+					<ListSearch
+						v-model="txt"
+						:placeholder="tab === 'new' ? 'ค้นหาวัสดุในคลัง' : 'ค้นหาเลขที่ ผู้เบิก หรือวัสดุ'"
+					/>
 				</div>
 			</div>
 			<Segmented v-else v-model="tab" :options="TABS" />
@@ -353,7 +351,7 @@ import Stepper from "../../../shared/components/Stepper.vue";
 import Picker from "../../../shared/components/Picker.vue";
 import DataTable from "../../../shared/components/DataTable.vue";
 import StatusTabs from "../../../shared/components/StatusTabs.vue";
-import HeaderSearch from "../../../shared/components/HeaderSearch.vue";
+import ListSearch from "../../../shared/components/ListSearch.vue";
 import { matches, use_wide } from "../../../shared/table.js";
 import {
 	call,

@@ -1,8 +1,9 @@
-<!-- หมวดทรัพยากร: วัสดุที่ต้องสั่ง / ยอดวัสดุ / คนและเครื่องจักร / Gantt / สรุปรายเดือน ทุกเมนูคือหน้านี้ แสดงตามชื่อ view
+<!-- เมนูทรัพยากรของหมวดแผนงาน: tab วัสดุที่ต้องสั่ง / ยอดวัสดุ / คนและเครื่องจักร / Gantt / สรุปรายเดือน
+     แต่ละ tab คือ view ของตัวเอง (URL เดิม, sections.js tab.sub) ทุก tab คือหน้านี้ แสดงตามชื่อ view
      ปุ่มขอซื้อแสดงตามสิทธิ์สร้างใบขอซื้อ (p.data.can_request) -->
 <template>
 	<div>
-		<TopBar :title="PANES[view].title" :subtitle="state.project?.project_name">
+		<TopBar title="ทรัพยากร" :subtitle="state.project?.project_name">
 			<template #actions>
 				<button
 					v-if="pane === 'material' && boot.sections.includes('buy')"
@@ -26,6 +27,10 @@
 			</template>
 		</TopBar>
 		<div class="ss-content">
+			<div :class="wide ? 'ss-list-head ss-res-head' : 'ss-res-head'">
+				<StatusTabs v-if="wide" :model-value="view" :options="TABS" @update:model-value="open_pane" />
+				<Segmented v-else :model-value="view" :options="TABS" @update:model-value="open_pane" />
+			</div>
 			<Skeleton v-if="!board.loaded.value" :rows="6" />
 			<Empty
 				v-else-if="!board.planner.data"
@@ -43,17 +48,24 @@ import Icon from "../../../shared/components/Icon.vue";
 import TopBar from "../../../shared/components/TopBar.vue";
 import Skeleton from "../../../shared/components/Skeleton.vue";
 import Empty from "../../../shared/components/Empty.vue";
+import StatusTabs from "../../../shared/components/StatusTabs.vue";
+import Segmented from "../../../shared/components/Segmented.vue";
 import ResourcePane from "../pm/planner/ResourcePane.vue";
 import { boot, go, state } from "../../../shared/api.js";
+import { use_wide } from "../../../shared/table.js";
 import { load_board, resource_board } from "./resource_board.js";
 
 const PANES = {
-	resources: { pane: "material", title: "วัสดุที่ต้องสั่ง" },
-	"resource-supply": { pane: "supply", title: "ยอดวัสดุ" },
-	"resource-people": { pane: "people", title: "คนและเครื่องจักร" },
-	"resource-gantt": { pane: "gantt", title: "Gantt ทรัพยากร" },
-	"resource-monthly": { pane: "monthly", title: "สรุปรายเดือน" },
+	resources: { pane: "material", title: "วัสดุที่ต้องสั่ง", short: "ต้องสั่ง" },
+	"resource-supply": { pane: "supply", title: "ยอดวัสดุ", short: "ยอดวัสดุ" },
+	"resource-people": { pane: "people", title: "คนและเครื่องจักร", short: "คน/เครื่อง" },
+	"resource-gantt": { pane: "gantt", title: "Gantt ทรัพยากร", short: "Gantt" },
+	"resource-monthly": { pane: "monthly", title: "สรุปรายเดือน", short: "รายเดือน" },
 };
+const wide = use_wide();
+const TABS = Object.entries(PANES).map(([value, p]) => ({ value, label: wide.value ? p.title : p.short }));
+// สลับ tab = เปลี่ยน view (แทนที่ประวัติ ปุ่มย้อนกลับไม่ไล่ทีละ tab) ข้อมูลใช้ board ชุดเดิม ไม่โหลดใหม่
+const open_pane = (value) => value !== view && go(value, {}, { replace: true });
 
 // จับค่าตอนสร้างหน้า: ระหว่าง animation ออก route เปลี่ยนแล้ว หน้าเก่าต้องแสดงของเดิม
 const view = state.route.view;

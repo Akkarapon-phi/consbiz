@@ -13,13 +13,14 @@
 		@click="toggle"
 	>
 		<Icon name="bell" :size="18" />
-		<span v-if="unread" class="ss-bell-count">{{ unread > 9 ? "9+" : unread }}</span>
+		<!-- ยังไม่อ่าน = จุด (จำนวนอยู่ในหัวแผง) ตัวเลขล้นปุ่มเมื่อหลายหลัก -->
+		<span v-if="unread" class="ss-bell-count is-dot"></span>
 	</button>
 	<Teleport to="body">
 		<Transition name="ss-pop-menu">
 			<div v-if="open" ref="panel" class="ss-bell-pop" role="dialog" aria-label="การแจ้งเตือน" :style="position">
 				<div class="ss-bell-head">
-					<b>การแจ้งเตือน</b>
+					<b>การแจ้งเตือน<small v-if="unread" class="ss-bell-unread">ยังไม่อ่าน {{ unread }}</small></b>
 					<button v-if="unread" type="button" @click="mark_all_read">อ่านทั้งหมด</button>
 				</div>
 				<ul v-if="notifications.items.length" class="ss-bell-list">

@@ -1,14 +1,6 @@
 <template>
 	<div>
 		<TopBar title="รายงานประจำวัน" :subtitle="state.project?.project_name">
-			<template #search>
-				<HeaderSearch
-					v-if="active_tab !== 'calendar'"
-					:key="active_tab"
-					v-model="txt"
-					placeholder="ค้นหาเลขที่ ผู้จัดทำ หรือปัญหา"
-				/>
-			</template>
 			<template #actions>
 				<button
 					v-if="!wide"
@@ -29,7 +21,7 @@
 				:kind="active_tab === 'report' ? 'dr' : 'drq'"
 				:tab="active_tab"
 				:tabs="tabs"
-				:search="txt"
+				v-model:search="txt"
 				@update:tab="set_tab"
 			/>
 		</div>
@@ -239,7 +231,6 @@
 import { computed, ref } from "vue";
 import ReportList from "./ReportList.vue";
 import Icon from "../../../shared/components/Icon.vue";
-import HeaderSearch from "../../../shared/components/HeaderSearch.vue";
 import StatusTabs from "../../../shared/components/StatusTabs.vue";
 import TopBar from "../../../shared/components/TopBar.vue";
 import Skeleton from "../../../shared/components/Skeleton.vue";

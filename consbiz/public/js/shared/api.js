@@ -2,7 +2,8 @@
 // router (<base>/<หมวด>/<หน้า>/...), สลับหมวดงาน, toast, รูปแบบตัวเลข/วันที่
 // ค่าของแต่ละแอป (หมวด/หน้า/base) อยู่ใน app.js (configure ใน bundle ของแอป)
 import { reactive } from "vue";
-import { app, is_desktop, is_tab, section_of } from "./app.js";
+import { app, is_desktop, is_filter_section, is_tab, route_in, section_for, section_of } from "./app.js";
+import { NEW_LOOK } from "./modules.js";
 
 const API = "consbiz.store_app.";
 const section_key = () => `${app.storage}.section`;
@@ -66,6 +67,14 @@ export const state = reactive({
 
 export class ApiError extends Error {}
 
+// กำลังออกจากหน้า (สลับไปหมวดของอีก bundle = โหลดหน้าใหม่ / ออกจากระบบ): เบราว์เซอร์ตัดคำขอที่ค้างอยู่
+// fetch จึง error แบบเดียวกับเน็ตหลุด ห้ามขึ้น "เชื่อมต่อเซิร์ฟเวอร์ไม่ได้" ให้เงียบแทน (silent)
+let leaving = false;
+window.addEventListener("pagehide", () => (leaving = true));
+window.addEventListener("beforeunload", () => (leaving = true));
+// กลับมาจาก bfcache (กดย้อนกลับ) หน้าเดิมใช้ต่อ
+window.addEventListener("pageshow", () => (leaving = false));
+
 function server_messages(data) {
 	try {
 		return JSON.parse(data._server_messages || "[]")
@@ -116,7 +125,8 @@ export async function call(method, args = {}, { post = false } = {}) {
 	let response;
 	try {
 		response = await fetch(request, options);
-	} catch {
+	} catch (error) {
+		if (leaving || error?.name === "AbortError") throw Object.assign(new ApiError("ยกเลิกคำขอ"), { silent: true });
 		throw new ApiError("เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ ตรวจสอบสัญญาณอินเทอร์เน็ต");
 	}
 	let data = {};
@@ -208,6 +218,7 @@ export function toast(message, type = "info", timeout = 3200) {
 }
 
 export function show_error(error) {
+	if (error?.silent) return;
 	toast(error?.message || String(error), "error", 5200);
 	vibrate([30, 40, 30]);
 }
@@ -278,21 +289,26 @@ function set_section(section, force = false) {
 	if (!is_desktop(section)) remember_section(section);
 	// สีหลักตามหมวด: ใส่ที่ <html> ด้วย (sheet ถูก Teleport ไปที่ body อยู่นอก .ss-app)
 	document.documentElement.dataset.section = section;
-	// สีแถบสถานะของมือถือตามหมวด
-	document.getElementById("theme-color")?.setAttribute("content", app.sections[section].theme);
+	// หน้าตาใหม่ (NEW_LOOK) = data-look="new" สีกรมท่าทุกหมวด
+	const new_look = NEW_LOOK.has(section);
+	if (new_look) document.documentElement.dataset.look = "new";
+	else delete document.documentElement.dataset.look;
+	// สีแถบสถานะของมือถือ/แถบเบราว์เซอร์ตามหมวด
+	document.getElementById("theme-color")?.setAttribute("content", new_look ? "#17233f" : app.sections[section].theme);
 }
 
 // สลับหมวด: ไปหน้าหลักล่าสุดของหมวดนั้น (ไม่สร้างประวัติ: ปุ่มย้อนกลับไม่วนสลับหมวด)
 export function switch_section(section) {
 	if (!allowed(section)) return;
 	if (section === state.section) {
-		go(app.sections[section].home, {}, { replace: true });
+		go(app.sections[section].home, {}, { replace: true, section });
 		return;
 	}
 	const last = state.last_tab[section] || { view: app.sections[section].home, params: {} };
 	// จากหน้าแรกเพิ่มประวัติ (ย้อนกลับมาหน้าแรกได้)
 	go(last.view, last.params, {
 		replace: is_tab(state.route.view) && !is_desktop(state.section),
+		section,
 	});
 }
 
@@ -309,7 +325,8 @@ export function init_app() {
 	document.documentElement.dataset.app = app.key;
 	// บริษัท: ที่จำไว้ (ยังมีสิทธิ์) > มีบริษัทเดียว = บริษัทนั้น > ทุกบริษัท
 	const companies = (boot.companies || []).map((c) => c.name);
-	const saved = remembered(`${app.storage}.company`, "");
+	// ConsERP รวม bundle ออฟฟิศเข้ามา (2026-11-17): ยังไม่เคยจำ = ใช้ค่าที่ออฟฟิศเดิมจำไว้
+	const saved = remembered(`${app.storage}.company`, "") || remembered("consbiz.office.company", "");
 	state.company = companies.includes(saved) ? saved : companies.length === 1 ? companies[0] : "";
 }
 
@@ -324,8 +341,9 @@ export function set_company(company) {
 
 // ขอบเขตของรายการ/ตัวเลขเอกสารซื้อ-ขาย (site_docs.get_docs / get_summary)
 // หน้างาน: โครงการที่เลือก หรือทุกโครงการ (state.doc_scope) / ออฟฟิศ: ตัวกรองโครงการ + บริษัท
-export function scope_args() {
-	if (app.project_filter) {
+// section = หมวดที่ขอ (ตัวเลขของหมวดอื่นโหลดพร้อมกัน) ไม่ระบุ = หมวดที่เปิดอยู่
+export function scope_args(section = state.section) {
+	if (is_filter_section(section)) {
 		return {
 			project: state.project?.name,
 			scope: state.project ? "project" : "all",
@@ -339,8 +357,9 @@ export const scope_key = () => JSON.stringify(scope_args());
 
 // ---------------------------------------------------------------- router (<base>/<หมวด>/<หน้า>/<params...>)
 
-function to_path({ view, params }) {
-	const section = section_of(view);
+// route.section = หมวดของหน้าที่อยู่หลายหมวด (section_for ตอน go / หมวดใน URL) ไม่มี = หมวดตาม routes
+function to_path({ view, params, section: target }) {
+	const section = target || section_of(view);
 	const parts = (app.routes[view]?.params || [])
 		.map((key) => params[key])
 		.filter((v) => v !== undefined && v !== null && v !== "");
@@ -366,7 +385,7 @@ export function parse_path(pathname = location.pathname) {
 	let view = parts[0];
 	// หน้าหลักของหมวดไม่มีชื่อหน้าใน URL (to_path ตัดออก) params จึงเริ่มที่ส่วนแรก เช่น /conserp/hr/2026-10
 	let offset = 1;
-	if (!app.routes[view] || section_of(view) !== section) {
+	if (!app.routes[view] || !route_in(view, section)) {
 		view = app.sections[section].home;
 		offset = 0;
 	}
@@ -380,11 +399,15 @@ export function parse_path(pathname = location.pathname) {
 	app.routes[view].params.forEach((key, i) => {
 		if (parts[i + offset] !== undefined) params[key] = parts[i + offset];
 	});
-	return { view, params };
+	// หมวดที่เปิดได้เฉพาะบางชนิดเอกสาร (ขอซื้อ = ใบขอซื้อ) ชนิดอื่นใน URL = เปิดในหมวดหลักของหน้านั้น (จัดซื้อ)
+	const kinds = app.sections[section].kinds;
+	if (kinds && params.kind && !kinds.includes(params.kind) && allowed(app.routes[view].section))
+		section = app.routes[view].section;
+	return { view, params, section };
 }
 
 function apply_route(route, direction) {
-	const section = section_of(route.view);
+	const section = route.section || section_of(route.view);
 	state.direction = section !== state.section ? "section" : direction;
 	set_section(section);
 	if (is_tab(route.view))
@@ -406,12 +429,14 @@ async function can_leave() {
 	return ok;
 }
 
-export function go(view, params = {}, { replace = false } = {}) {
+// section = หมวดปลายทาง (หน้าที่อยู่หลายหมวด เช่น สลับหมวด) ไม่ระบุ = section_for
+export function go(view, params = {}, { replace = false, section = null } = {}) {
 	if (leave_guard) {
-		can_leave().then((ok) => ok && go(view, params, { replace }));
+		can_leave().then((ok) => ok && go(view, params, { replace, section }));
 		return;
 	}
-	const route = { view, params: { ...params } };
+	const target = section && route_in(view, section) ? section : section_for(view, params);
+	const route = { view, params: { ...params }, section: target };
 	apply_route(route, is_tab(view) && is_tab(state.route.view) ? "fade" : "forward");
 	const depth = (history.state?.depth || 0) + (replace ? 0 : 1);
 	history[replace ? "replaceState" : "pushState"]({ route, depth }, "", to_path(route));
@@ -426,7 +451,7 @@ export function back(fallback = "home", params = {}) {
 	if ((history.state?.depth || 0) > 0) {
 		history.back();
 	} else {
-		const route = { view: fallback, params: { ...params } };
+		const route = { view: fallback, params: { ...params }, section: section_for(fallback, params) };
 		apply_route(route, "back");
 		history.replaceState({ route, depth: 0 }, "", to_path(route));
 	}
@@ -434,14 +459,14 @@ export function back(fallback = "home", params = {}) {
 
 // แท็บย่อยในหน้า: จำใน URL/history โดยไม่สร้างหน้าใหม่ (ย้อนกลับมาแล้วอยู่แท็บเดิม)
 export function remember_tab(view, tab, default_tab) {
-	const route = { view, params: tab === default_tab ? {} : { tab } };
+	const route = { view, params: tab === default_tab ? {} : { tab }, section: section_of(view) };
 	if (is_tab(view)) state.last_tab[section_of(view)] = route;
 	history.replaceState({ ...(history.state || {}), route }, "", to_path(route));
 }
 
 // เปลี่ยน params ของหน้าเดิมใน URL โดยไม่สร้างประวัติ (เช่น วันที่เลือกในปฏิทิน)
 export function replace_params(view, params) {
-	const route = { view, params: { ...params } };
+	const route = { view, params: { ...params }, section: section_of(view) };
 	if (is_tab(view)) state.last_tab[section_of(view)] = route;
 	history.replaceState({ ...(history.state || {}), route }, "", to_path(route));
 }
@@ -456,7 +481,7 @@ export function iso_date(date) {
 export function start_router() {
 	// history.state เก็บได้เฉพาะ object ธรรมดา (Proxy ของ Vue clone ไม่ได้)
 	const route = parse_path();
-	set_section(section_of(route.view), true);
+	set_section(route.section, true);
 	apply_route(route, "fade");
 	history.replaceState({ route, depth: 0 }, "", to_path(route));
 	window.addEventListener("popstate", (event) => {

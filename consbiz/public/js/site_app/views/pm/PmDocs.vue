@@ -4,9 +4,6 @@
 <template>
 	<div>
 		<TopBar title="เอกสารโครงการ" :subtitle="state.project?.project_name">
-			<template #search>
-				<HeaderSearch v-if="wide && active" v-model="txt" placeholder="ค้นหาเลขที่ หรือเรื่อง" />
-			</template>
 			<template #actions>
 				<button
 					v-if="!wide"
@@ -52,6 +49,10 @@
 						>
 							<Icon name="refresh" :size="17" />
 						</button>
+					</div>
+					<!-- แถวตัวกรอง: ค้นหา -->
+					<div v-if="active" class="ss-list-filterbar">
+						<ListSearch v-model="txt" placeholder="ค้นหาเลขที่ หรือเรื่อง" />
 					</div>
 				</div>
 				<nav v-else class="ss-tabs" aria-label="ชนิดเอกสาร">
@@ -188,7 +189,7 @@ import TopBar from "../../../shared/components/TopBar.vue";
 import Skeleton from "../../../shared/components/Skeleton.vue";
 import Empty from "../../../shared/components/Empty.vue";
 import DataTable from "../../../shared/components/DataTable.vue";
-import HeaderSearch from "../../../shared/components/HeaderSearch.vue";
+import ListSearch from "../../../shared/components/ListSearch.vue";
 import StatusTabs from "../../../shared/components/StatusTabs.vue";
 import {
 	boot,

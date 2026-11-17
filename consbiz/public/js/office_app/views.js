@@ -4,6 +4,10 @@ import DocsHome from "../shared/docs/DocsHome.vue";
 import DocList from "../shared/docs/DocList.vue";
 import DocView from "../shared/docs/DocView.vue";
 import DocForm from "../shared/docs/DocForm.vue";
+import { needs_project } from "../shared/components/needs_project.js";
+import Labour from "./views/labour/Labour.vue";
+import Workers from "./views/labour/Workers.vue";
+import Advances from "./views/labour/Advances.vue";
 import BoqList from "./views/boq/BoqList.vue";
 import BoqForm from "./views/boq/BoqForm.vue";
 import HrAttendance from "./views/hr/HrAttendance.vue";
@@ -85,4 +89,7 @@ export default {
 	"md-suppliers": KindList,
 	"md-projects": KindList,
 	"md-doc": MasterPage,
+	labour: needs_project(Labour, "ลงเวลาคนงาน"),
+	advances: needs_project(Advances, "เบิกล่วงหน้า"),
+	workers: needs_project(Workers, "ทะเบียนคนงาน"),
 };

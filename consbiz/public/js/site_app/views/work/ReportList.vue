@@ -4,11 +4,6 @@
 	<div class="ss-list-head">
 		<StatusTabs :model-value="tab" :options="tabs" @update:model-value="$emit('update:tab', $event)" />
 		<div class="ss-list-tools">
-			<span class="ss-report-range">
-				<DateInput v-model="from_date" variant="tool" label="ตั้งแต่วันที่" />
-				<span>ถึง</span>
-				<DateInput v-model="to_date" variant="tool" label="ถึงวันที่" />
-			</span>
 			<button
 				v-if="can_create"
 				type="button"
@@ -27,6 +22,19 @@
 			>
 				<Icon name="refresh" :size="17" />
 			</button>
+		</div>
+		<!-- แถวตัวกรอง: ค้นหา + ช่วงวันที่ -->
+		<div class="ss-list-filterbar">
+			<ListSearch
+				:model-value="search"
+				placeholder="ค้นหาเลขที่ ผู้จัดทำ หรือปัญหา"
+				@update:model-value="$emit('update:search', $event)"
+			/>
+			<span class="ss-report-range">
+				<DateInput v-model="from_date" variant="tool" label="ตั้งแต่วันที่" />
+				<span>ถึง</span>
+				<DateInput v-model="to_date" variant="tool" label="ถึงวันที่" />
+			</span>
 		</div>
 	</div>
 
@@ -110,6 +118,7 @@ import Empty from "../../../shared/components/Empty.vue";
 import StatusTabs from "../../../shared/components/StatusTabs.vue";
 import DataTable from "../../../shared/components/DataTable.vue";
 import DateInput from "../../../shared/components/DateInput.vue";
+import ListSearch from "../../../shared/components/ListSearch.vue";
 import PdfViewer from "../../../shared/components/PdfViewer.vue";
 import { matches } from "../../../shared/table.js";
 import { boot, call, go, show_error, state, thai_date, today } from "../../../shared/api.js";
@@ -120,7 +129,7 @@ const props = defineProps({
 	tabs: Array,
 	search: String,
 });
-defineEmits(["update:tab"]);
+defineEmits(["update:tab", "update:search"]);
 
 const REPORT_COLUMNS = [
 	{ key: "name", label: "เลขที่", sort: true, class: "col-no" },

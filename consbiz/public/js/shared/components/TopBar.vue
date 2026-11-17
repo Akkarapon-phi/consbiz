@@ -16,11 +16,18 @@
 			:aria-label="show_launcher ? 'เปลี่ยนหมวดงาน' : undefined"
 			@click="show_launcher && open_launcher()"
 		>
-			<span class="ss-topbar-module-icon"
+			<!-- หน้าตาใหม่: โลโก้แอป (ไอคอนหมวดอยู่ใน Dock แล้ว) -->
+			<span v-if="new_look" class="ss-topbar-module-icon is-logo"><img :src="LOGO" alt="" /></span>
+			<span v-else class="ss-topbar-module-icon"
 				><Icon :name="section.icon" :size="16" :stroke="2.2"
 			/></span>
 			<span class="ss-topbar-module-name">{{ section.title }}</span>
-			<span v-if="show_launcher && others" class="ss-topbar-launch-dot">{{ others }}</span>
+			<!-- มีงานรอในหมวดอื่น = จุด (หน้าตาใหม่ไม่มี: ดูที่ Dock/ตารางหมวด) -->
+			<span
+				v-if="show_launcher && others && !new_look"
+				class="ss-topbar-launch-dot is-dot"
+				:title="`งานรอในหมวดอื่น ${others} รายการ`"
+			></span>
 		</component>
 		<button
 			v-if="back_to"
@@ -54,9 +61,36 @@
 			<Icon name="chevron-down" :size="14" />
 		</button>
 		<slot name="search" />
+		<!-- ค้นหาทั้งระบบ (GlobalSearch ใน AppShell, Ctrl/⌘ + G) คนละอย่างกับ slot search ของหน้ารายการ -->
+		<button
+			v-if="open_global_search"
+			type="button"
+			class="ss-global-search-btn"
+			:title="`ค้นหาทั้งระบบ (${search_key})`"
+			aria-label="ค้นหาทั้งระบบ"
+			@click="open_global_search()"
+		>
+			<Icon name="search" :size="17" />
+			<kbd>{{ search_key }}</kbd>
+		</button>
 		<!-- ผู้ที่เปิดจากลิงก์โดยไม่ login (boot.guest, แอปผู้รับเหมา) ไม่มีการแจ้งเตือน -->
 		<NotificationBell v-if="!boot.guest" />
 		<slot name="actions" />
+		<button
+			v-if="show_header_user"
+			ref="header_user_button"
+			type="button"
+			class="ss-header-user"
+			:title="boot.full_name"
+			aria-label="เปิดเมนูผู้ใช้"
+			aria-haspopup="menu"
+			@click="toggle_header_user"
+		>
+			<span class="ss-avatar ss-user-avatar" :class="`tone-${tone(boot.user || '')}`">
+				<img v-if="boot.user_image" :src="boot.user_image" alt="" />
+				<template v-else>{{ user_initials }}</template>
+			</span>
+		</button>
 	</header>
 	<!-- มือถือ: ปุ่มโครงการเต็มแถวใต้แถบบน แสดงชื่อเต็ม (จอ ≥768 ใช้ปุ่มในแถบบน) -->
 	<button v-if="show_project" type="button" class="ss-project-bar" @click="open_picker()">
@@ -77,8 +111,8 @@ import Icon from "./Icon.vue";
 import SectionTabs from "./SectionTabs.vue";
 import NotificationBell from "./NotificationBell.vue";
 import { app } from "../app.js";
-import { back, boot, project_abbr, state, tone } from "../api.js";
-import { module_list } from "../modules.js";
+import { back, boot, initials, project_abbr, state, tone } from "../api.js";
+import { module_list, NEW_LOOK } from "../modules.js";
 
 const props = defineProps({
 	title: String,
@@ -92,7 +126,16 @@ const props = defineProps({
 
 const open_picker = inject("open_project_picker", null);
 const open_launcher = inject("open_launcher", null);
+const open_user_menu = inject("open_user_menu", null);
+const open_global_search = inject("open_global_search", null);
+// ป้ายคีย์ลัดเป็น ⌘G ทุกเครื่อง (ตกลง 2026-11-16) Windows/Linux ไม่มีปุ่ม ⌘ กด Ctrl+G ได้เหมือนกัน (AppShell)
+const search_key = "⌘G";
+const header_user_button = ref(null);
 const section = computed(() => app.sections[state.section]);
+const new_look = computed(() => NEW_LOOK.has(state.section));
+const LOGO = "/assets/consbiz/site_app/logo-96.png";
+const show_header_user = computed(() => NEW_LOOK.has(state.section) && !boot.guest && open_user_menu);
+const user_initials = computed(() => initials(boot.full_name || boot.user || ""));
 const project_name = computed(() => state.project?.project_name || state.project?.name || "");
 const project_initials = computed(() =>
 	state.project ? project_abbr(state.project) : app.project_filter ? "ทั้ง" : "?"
@@ -117,8 +160,10 @@ const others = computed(() =>
 		.filter((key) => key !== state.section)
 		.reduce((sum, key) => sum + (app.sections[key]?.badge?.(state.summaries[key]) || 0), 0)
 );
-// แท็บเมนูของหมวด: เฉพาะหน้าเมนูหลัก (หน้าดู/ฟอร์มไม่ให้กดออกกลางคัน)
-const show_tabs = computed(() => !props.back_to);
+// แท็บเมนูของหมวด: เฉพาะหน้าเมนูหลัก (หน้าดู/ฟอร์มไม่ให้กดออกกลางคัน) และหมวดมีเมนูมากกว่า 1 (เงื่อนไขเดียวกับ SectionTabs)
+// ไม่มีแท็บ (เช่น หน้าแรก) = แสดงชื่อหน้าแทน ชื่อหน้าดันปุ่มขวาไปชิดขวา
+const section_nav = inject("section_nav", null);
+const show_tabs = computed(() => !props.back_to && (section_nav?.tabs.value.length || 0) > 1);
 // คำอธิบาย = ชื่อโครงการ: จอ ≥768 ซ่อน (ปุ่มโครงการบอกแล้ว)
 const sub_is_project = computed(() => show_project.value && props.subtitle === project_name.value);
 
@@ -129,5 +174,9 @@ onBeforeUnmount(() => window.removeEventListener("scroll", on_scroll));
 
 function go_back() {
 	back(typeof props.back_to === "string" ? props.back_to : "home", props.back_params);
+}
+
+function toggle_header_user() {
+	open_user_menu?.(header_user_button.value);
 }
 </script>

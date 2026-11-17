@@ -3,6 +3,7 @@
 		<TopBar title="Look-ahead" :subtitle="state.project?.project_name">
 			<template #actions>
 				<button
+					v-if="!wide"
 					type="button"
 					class="ss-icon-btn"
 					:class="{ 'is-spinning': loading }"
@@ -23,19 +24,44 @@
 				text="สร้างแผนงานก่อสร้างของโครงการในระบบเต็มก่อน"
 			/>
 			<template v-else>
-				<!-- เลือกสัปดาห์ (สัปดาห์ที่แล้ว + 3 สัปดาห์ข้างหน้า ตามแผนปัจจุบัน) -->
-				<div v-if="!xl" class="ss-filters">
-					<button
-						v-for="w in weeks"
-						:key="w.start"
-						type="button"
-						class="ss-filter"
-						:class="{ 'is-active': week === w.start }"
-						@click="choose_week(w.start)"
-					>
-						{{ w.label }} <span class="ss-filter-count">{{ w.range }}</span>
-					</button>
+				<!-- เลือกสัปดาห์ (สัปดาห์ที่แล้ว + 3 สัปดาห์ข้างหน้า นับจากวันที่ดู) ช่วงวันที่ดูจากหัวตาราง/แถววัน
+				     แท็บเล็ต/จอใหญ่ = หัวรายการ: แท็บ + ณ วันที่ / พิมพ์ / โหลดใหม่ -->
+				<div v-if="wide" class="ss-list-head ss-list-head--many ss-la-head">
+					<StatusTabs :model-value="shown_week" :options="week_tabs" @update:model-value="choose_week" />
+					<div class="ss-list-tools">
+						<DateInput :model-value="ref_date" variant="tool" label="ณ วันที่" @update:model-value="set_date" />
+						<button type="button" class="ss-icon-btn" aria-label="พิมพ์" title="พิมพ์" @click="print">
+							<Icon name="printer" :size="17" />
+						</button>
+						<button
+							type="button"
+							class="ss-icon-btn"
+							:class="{ 'is-spinning': loading }"
+							aria-label="โหลดใหม่"
+							title="โหลดใหม่"
+							@click="load"
+						>
+							<Icon name="refresh" :size="17" />
+						</button>
+					</div>
 				</div>
+				<template v-else>
+					<div class="ss-la-mobile-tools">
+						<DateInput :model-value="ref_date" label="ณ วันที่" @update:model-value="set_date" />
+					</div>
+					<div class="ss-filters">
+						<button
+							v-for="w in weeks"
+							:key="w.start"
+							type="button"
+							class="ss-filter"
+							:class="{ 'is-active': shown_week === w.start }"
+							@click="choose_week(w.start)"
+						>
+							{{ w.label }}
+						</button>
+					</div>
+				</template>
 
 				<div class="ss-cal-summary">
 					<span class="ss-tag tone-blue">{{ summary.total }} งาน</span>
@@ -49,7 +75,7 @@
 				</div>
 
 				<!-- แท็บเล็ต/จอใหญ่: ตารางงาน × วัน (แท็บเล็ต 2 สัปดาห์, จอใหญ่ทั้งช่วง 4 สัปดาห์) -->
-				<div v-if="wide && groups.length" class="ss-la-table" :style="{ '--n': days.length }">
+				<div v-if="wide && groups.length" ref="table" class="ss-la-table" :style="{ '--n': days.length }">
 					<div class="ss-la-tr ss-la-weeks">
 						<div class="ss-la-corner"></div>
 						<div
@@ -209,6 +235,8 @@ import Icon from "../../../shared/components/Icon.vue";
 import TopBar from "../../../shared/components/TopBar.vue";
 import Skeleton from "../../../shared/components/Skeleton.vue";
 import Empty from "../../../shared/components/Empty.vue";
+import StatusTabs from "../../../shared/components/StatusTabs.vue";
+import DateInput from "../../../shared/components/DateInput.vue";
 import { call, iso_date, replace_params, show_error, state, thai_date } from "../../../shared/api.js";
 
 // สถานะของวัน: ชุดเดียวกับ Tab Look-ahead ของ CM (project_dashboard/LookAhead.vue day_state)
@@ -232,7 +260,9 @@ const DOW = ["อา", "จ", "อ", "พ", "พฤ", "ศ", "ส"];
 
 const data = ref(null);
 const loading = ref(false);
-const week = ref(state.route.params.week || null);
+const week = ref(state.route.params.week || null); // วันจันทร์ของสัปดาห์ที่เลือก หรือ "all" (จอใหญ่: ทั้งช่วง)
+const ref_date = ref(null); // ณ วันที่ (ว่าง = วันนี้ของ server ได้ค่าจริงหลังโหลด)
+const table = ref(null);
 
 const pct = (v) => (Number(v) || 0).toLocaleString("th-TH", { maximumFractionDigits: 0 });
 const add_days = (date, n) => {
@@ -255,6 +285,7 @@ const weeks = computed(() => {
 				? "สัปดาห์หน้า"
 				: `อีก ${diff} สัปดาห์`;
 		out.push({ start, label, range: `${thai_date(start)}–${thai_date(add_days(start, 6))}` });
+
 	}
 	return out;
 });
@@ -275,11 +306,25 @@ onBeforeUnmount(() => {
 	mq_xl.removeEventListener("change", on_resize);
 });
 
+// สัปดาห์ที่แสดง: "all" ใช้ได้เฉพาะจอใหญ่ จอเล็กกว่ากลับเป็นสัปดาห์ของวันที่ดู
+const shown_week = computed(() => {
+	if (!data.value) return week.value;
+	if (week.value === "all" ? xl.value : weeks.value.some((w) => w.start === week.value)) return week.value;
+	return xl.value ? "all" : String(data.value.this_week);
+});
+const week_tabs = computed(() => [
+	...(xl.value ? [{ value: "all", label: "ทั้งหมด" }] : []),
+	...weeks.value.map((w) => ({ value: w.start, label: w.label })),
+]);
+
 const holidays = computed(() => new Set((data.value?.holidays || []).map(String)));
-const first_day = computed(() => (xl.value && data.value ? String(data.value.start) : week.value));
+const show_all = computed(() => xl.value && shown_week.value === "all");
+const first_day = computed(() => (!data.value ? null : show_all.value ? String(data.value.start) : shown_week.value));
+// จอใหญ่เลือกสัปดาห์ = ตั้งแต่สัปดาห์นั้นถึงท้ายช่วง, แท็บเล็ต 2 สัปดาห์, มือถือ 1 สัปดาห์
 const span = computed(() => {
-	if (!xl.value) return wide.value ? 14 : 7;
-	return Math.round((new Date(String(data.value.end)) - new Date(String(data.value.start))) / 86400000) + 1;
+	if (!wide.value) return 7;
+	if (!xl.value) return 14;
+	return Math.round((new Date(String(data.value.end)) - new Date(first_day.value)) / 86400000) + 1;
 });
 const days = computed(() =>
 	!first_day.value
@@ -365,15 +410,70 @@ function choose_week(start) {
 	replace_params("lookahead", { week: start });
 }
 
+function set_date(value) {
+	if (!value || value === ref_date.value) return;
+	ref_date.value = value;
+	load();
+}
+
+// พิมพ์ตารางที่เห็นอยู่ (แนวนอน A4): หน้าต่างใหม่ใช้ CSS ชุดเดียวกับแอป (คัดลอก <link>/<style> และค่า data-* ของ <html>)
+function print() {
+	if (!table.value) return;
+	const win = window.open("", "_blank");
+	if (!win) return;
+	const esc = (v) => String(v ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+	const styles = [...document.querySelectorAll("link[rel='stylesheet'], style")].map((el) => el.outerHTML).join("");
+	const attrs = [...document.documentElement.attributes]
+		.filter((a) => a.name.startsWith("data-") && a.name !== "data-theme")
+		.map((a) => `${a.name}="${esc(a.value)}"`)
+		.join(" ");
+	const legend = Object.entries(DAY_STATES)
+		.map(([key, label]) => `<span><i class="ss-la-box is-${key}"></i>${esc(label)}</span>`)
+		.join("");
+	const shown = days.value;
+	const title = `Look-ahead · ${state.project?.project_name || ""}`;
+	win.document.write(`<!doctype html><html ${attrs} data-theme="light"><head><meta charset="utf-8"><title>${esc(title)}</title>
+		<base href="${esc(location.origin)}/">${styles}
+		<style>
+			@page { size: A4 landscape; margin: 8mm; }
+			html, body { height: auto !important; overflow: visible !important; background: #fff !important; }
+			body { margin: 0; padding: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+			.ss-la-print-title { font-size: 15px; font-weight: 700; margin-bottom: 2px; }
+			.ss-la-print-sub { color: #666; font-size: 11px; margin-bottom: 8px; }
+			.ss-la-table { overflow: visible !important; box-shadow: none !important; animation: none !important; border: 1px solid #ddd; font-size: 10px; }
+			.ss-la-tr { min-width: 0 !important; grid-template-columns: 230px repeat(var(--n), minmax(0, 1fr)) !important; break-inside: avoid; }
+			.ss-la-name { padding: 5px 8px !important; gap: 2px !important; }
+			.ss-la-sub { flex-wrap: wrap; row-gap: 2px; }
+			.ss-cal-legend { margin-top: 8px; }
+		</style></head><body>
+		<div class="ss-app" data-look="new" style="min-height:0;padding:0">
+			<div class="ss-la-print-title">${esc(title)}</div>
+			<div class="ss-la-print-sub">ณ วันที่ ${esc(thai_date(ref_date.value, { year: true }))} · ${esc(
+		thai_date(shown[0].date)
+	)} – ${esc(thai_date(shown[shown.length - 1].date, { year: true }))}</div>
+			${table.value.outerHTML}
+			<div class="ss-cal-legend">${legend}</div>
+		</div>
+		</body></html>`);
+	win.document.close();
+	const go_print = () => {
+		win.focus();
+		win.print();
+	};
+	if (win.document.readyState === "complete") setTimeout(go_print, 300);
+	else win.addEventListener("load", go_print);
+}
+
 async function load() {
 	loading.value = true;
 	try {
 		const result = await call("consbiz.site_app.get_lookahead", {
 			project: state.project.name,
+			date: ref_date.value,
 			weeks: 3,
 		});
 		data.value = result || false;
-		if (result && !weeks.value.some((w) => w.start === week.value)) week.value = String(result.this_week);
+		if (result) ref_date.value = String(result.date);
 	} catch (error) {
 		show_error(error);
 		data.value ??= false;

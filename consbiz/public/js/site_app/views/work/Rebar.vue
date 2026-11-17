@@ -1,11 +1,8 @@
-<!-- แผนตัดเหล็กของโครงการ (เมนู "ตัดเหล็ก" หมวดควบคุมงาน) ลอกหน้าตาจากคอนกรีต (Concrete.vue)
+<!-- แผนตัดเหล็กของโครงการ (หมวดแผนการตัด) ลอกหน้าตาจากคอนกรีต (Concrete.vue)
      API consbiz/bar_cut_app.py หน้าแผน = RebarPlan.vue -->
 <template>
 	<div>
-		<TopBar title="ตัดเหล็ก" :subtitle="state.project?.project_name">
-			<template #search>
-				<HeaderSearch v-if="wide" v-model="txt" placeholder="ค้นหาแผนตัดเหล็ก" />
-			</template>
+		<TopBar title="แผนการตัด" :subtitle="state.project?.project_name">
 			<template #actions>
 				<button
 					v-if="!wide"
@@ -65,6 +62,10 @@
 						>
 							<Icon name="refresh" :size="17" />
 						</button>
+					</div>
+					<!-- แถวตัวกรอง: ค้นหา -->
+					<div class="ss-list-filterbar">
+						<ListSearch v-model="txt" placeholder="ค้นหาแผนตัดเหล็ก" />
 					</div>
 				</div>
 				<label v-else class="ss-search">
@@ -157,7 +158,7 @@
 import { computed, ref } from "vue";
 import DataTable from "../../../shared/components/DataTable.vue";
 import Empty from "../../../shared/components/Empty.vue";
-import HeaderSearch from "../../../shared/components/HeaderSearch.vue";
+import ListSearch from "../../../shared/components/ListSearch.vue";
 import Icon from "../../../shared/components/Icon.vue";
 import Skeleton from "../../../shared/components/Skeleton.vue";
 import StatusTabs from "../../../shared/components/StatusTabs.vue";

@@ -1,9 +1,9 @@
-<!-- ตารางหมวดงาน: ไอคอน + ชื่อ จัดกลุ่มตามแอป
-     หน้าแรก (Desktop.vue) = ทุกแอป, ตารางหมวดของมือถือ (SectionLauncher.vue) = local_only เฉพาะกลุ่มแอปนี้
+<!-- ตารางหมวดงาน: ไอคอน + ชื่อ จัดกลุ่มตาม GROUPS (modules.js)
+     หน้าแรก (Desktop.vue) = ทุกกลุ่ม, ตารางหมวดของมือถือ (SectionLauncher.vue) = local_only เฉพาะกลุ่มของหมวดที่เปิดอยู่
      หมวดของแอปนี้สลับในแอป หมวดของแอปอื่นเป็นลิงก์ (โหลด bundle ของแอปนั้น) -->
 <template>
 	<div class="ss-modules">
-		<section v-for="g in groups" :key="g.app" class="ss-module-group">
+		<section v-for="g in groups" :key="g.key" class="ss-module-group">
 			<h2 v-if="groups.length > 1" class="ss-module-group-title">{{ g.label }}</h2>
 			<div class="ss-module-grid">
 				<component
@@ -45,13 +45,12 @@
 
 <script setup>
 import Icon from "./Icon.vue";
-import { app } from "../app.js";
 import { boot, state, vibrate } from "../api.js";
-import { module_badge, module_groups } from "../modules.js";
+import { group_of, module_badge, module_groups } from "../modules.js";
 
 const props = defineProps({ local_only: Boolean });
 const emit = defineEmits(["choose"]);
-const groups = module_groups().filter((g) => !props.local_only || g.app === app.key);
+const groups = module_groups().filter((g) => !props.local_only || g.key === group_of(state.section));
 const badge = (m) => module_badge(m, state);
 
 function choose(section) {

@@ -9,9 +9,6 @@
 <template>
 	<div>
 		<TopBar title="ลงเวลาคนงาน" :subtitle="state.project?.project_name">
-			<template #search>
-				<HeaderSearch v-if="wide" v-model="txt" placeholder="ค้นหาชื่อ ตำแหน่ง ทีม" />
-			</template>
 			<template #actions>
 				<button
 					v-if="!wide"
@@ -139,6 +136,10 @@
 							<Icon name="check" :size="18" :stroke="2.6" />
 							<span>อนุมัติรอบนี้</span>
 						</button>
+					</div>
+					<!-- แถวตัวกรอง: ค้นหา -->
+					<div class="ss-list-filterbar">
+						<ListSearch v-model="txt" placeholder="ค้นหาชื่อ ตำแหน่ง ทีม" />
 					</div>
 				</div>
 
@@ -507,7 +508,7 @@ import StatusTabs from "../../../shared/components/StatusTabs.vue";
 import Stepper from "../../../shared/components/Stepper.vue";
 import DateInput from "../../../shared/components/DateInput.vue";
 import WorkerSheet from "./WorkerSheet.vue";
-import HeaderSearch from "../../../shared/components/HeaderSearch.vue";
+import ListSearch from "../../../shared/components/ListSearch.vue";
 import SelectBox from "../../../shared/components/SelectBox.vue";
 import { matches } from "../../../shared/table.js";
 import Sheet from "../../../shared/components/Sheet.vue";

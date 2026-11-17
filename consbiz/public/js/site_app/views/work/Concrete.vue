@@ -1,12 +1,9 @@
 <template>
 	<div>
 		<TopBar title="คอนกรีต" :subtitle="state.project?.project_name">
-			<template #search>
-				<HeaderSearch v-if="wide" v-model="txt" placeholder="ค้นหางาน WBS หรือตำแหน่ง" />
-			</template>
 			<template #actions>
 				<button
-					v-if="!wide || !data?.construction_management"
+					v-if="!wide || (data && !data.construction_management)"
 					type="button"
 					class="ss-icon-btn"
 					:class="{ 'is-spinning': loading }"
@@ -71,6 +68,10 @@
 						>
 							<Icon name="refresh" :size="17" />
 						</button>
+					</div>
+					<!-- แถวตัวกรอง: ค้นหา -->
+					<div class="ss-list-filterbar">
+						<ListSearch v-model="txt" placeholder="ค้นหางาน WBS หรือตำแหน่ง" />
 					</div>
 				</div>
 
@@ -200,7 +201,7 @@ import Skeleton from "../../../shared/components/Skeleton.vue";
 import Empty from "../../../shared/components/Empty.vue";
 import StatusTabs from "../../../shared/components/StatusTabs.vue";
 import DataTable from "../../../shared/components/DataTable.vue";
-import HeaderSearch from "../../../shared/components/HeaderSearch.vue";
+import ListSearch from "../../../shared/components/ListSearch.vue";
 import { matches, use_wide } from "../../../shared/table.js";
 import {
 	call,

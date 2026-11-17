@@ -110,12 +110,12 @@
 						}}</span>
 					</div>
 					<div class="ss-chips">
-						<span v-if="row[kind.date]" class="ss-chip">
+						<span v-if="row[kind.date]" class="ss-chip ss-chip--keep">
 							<Icon name="calendar" :size="12" />
 							{{ thai_date(row[kind.date], { year: true }) }}
 						</span>
 						<span v-if="row.project" class="ss-chip">{{ row.project }}</span>
-						<span v-if="kind.amount" class="ss-chip"
+						<span v-if="kind.amount" class="ss-chip ss-chip--keep"
 							><b>{{ money(row[kind.amount]) }}</b></span
 						>
 						<span v-if="kind.note?.(row)" class="ss-chip">

@@ -1,26 +1,8 @@
 <!-- รายละเอียดเอกสารจัดซื้อ/ขาย: หัวเอกสาร, ความคืบหน้า, รายการ, ยอดรวม, เอกสารต้นทาง/ปลายทาง, PDF, ส่งเอกสาร -->
 <template>
-	<div :class="{ 'ss-has-bar': has_bar }">
+	<div :class="{ 'ss-has-bar ss-has-slim-bar': has_bar }">
 		<TopBar :title="config.label" :subtitle="params.name" :back_to="params.kind">
 			<template #actions>
-				<button
-					v-if="doc"
-					type="button"
-					class="ss-icon-btn"
-					aria-label="PDF / พิมพ์ / แชร์"
-					title="PDF / พิมพ์ / แชร์"
-					@click="pdf = true"
-				>
-					<Icon name="printer" :size="19" />
-				</button>
-				<a
-					class="ss-icon-btn"
-					:href="desk_url(config.doctype, params.name)"
-					aria-label="เปิดในระบบเต็ม"
-					title="เปิดในระบบเต็ม"
-				>
-					<Icon name="external" :size="19" />
-				</a>
 				<!-- เปิด/ปิด sidebar ขวา (มอบหมาย ไฟล์แนบ ความคิดเห็น ความเคลื่อนไหว) -->
 				<button
 					v-if="doc"
@@ -445,7 +427,16 @@
 
 		<Teleport to="#ss-layer">
 			<Transition name="ss-bar">
-				<div v-if="has_bar" class="ss-bottom-bar">
+				<div v-if="has_bar" class="ss-bottom-bar ss-docview-bar">
+					<!-- ปุ่มพิมพ์ซ้ายสุด: เปิด PdfViewer (พิมพ์ / แชร์ / ดาวน์โหลด) -->
+					<button
+						type="button"
+						class="ss-btn ss-btn--ghost ss-btn--lg ss-docview-print"
+						title="PDF / พิมพ์ / แชร์ (p)"
+						@click="pdf = true"
+					>
+						<Icon name="printer" :size="17" /> <span class="ss-docview-print-label">พิมพ์</span>
+					</button>
 					<button
 						v-if="doc.can_delete"
 						type="button"
@@ -716,13 +707,8 @@ const next_kind = computed(() =>
 	doc.value?.next_kind && in_app(doc.value.next_kind) ? doc.value.next_kind : null
 );
 
-const has_bar = computed(
-	() =>
-		!!(
-			doc.value &&
-			(doc.value.can_edit || doc.value.can_submit || doc.value.can_delete || next_kind.value || doc.value.can_pay)
-		)
-);
+// แถบล่างแสดงเสมอเมื่อโหลดเอกสารแล้ว (มีปุ่มพิมพ์ทุกใบ)
+const has_bar = computed(() => !!doc.value);
 
 // รับ/จ่ายชำระ: หน้ารายการของหมวดบัญชี (เปิดรายการที่สร้างในแอปถ้าเข้าหมวดบัญชีได้)
 const PAYMENT_LIST = { si: "acc-receipts", pi: "acc-payments" };

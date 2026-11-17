@@ -3,6 +3,7 @@
 		class="ss-app"
 		:class="{ 'has-nav': show_nav, 'has-side': has_shell }"
 		:data-section="state.section"
+		:data-look="NEW_LOOK.has(state.section) ? 'new' : null"
 	>
 		<!-- แถบล่าง/ปุ่มลอยของแต่ละหน้า (Teleport มาที่นี่: ไม่ให้ transform ตอนเปลี่ยนหน้าดึงตำแหน่ง fixed) -->
 		<div id="ss-layer"></div>
@@ -29,7 +30,10 @@
 					title="หน้าแรก"
 					@click="switch_section('desktop')"
 				>
-					<img class="ss-rail-logo-img" :src="LOGO" alt="" />
+					<span v-if="NEW_LOOK.has(state.section)" class="ss-rail-icon ss-rail-home-icon"
+						><Icon name="grid-circles" :size="20"
+					/></span>
+					<img v-else class="ss-rail-logo-img" :src="LOGO" alt="" />
 					<span class="ss-rail-text ss-rail-brand">ConsERP</span>
 				</button>
 				<nav class="ss-rail-list">
@@ -49,7 +53,7 @@
 						>
 							<span class="ss-rail-icon">
 								<Icon :name="m.icon" :size="18" :stroke="2.1" />
-								<span v-if="module_badge(m, state)" class="ss-rail-badge">{{
+								<span v-if="module_badge(m, state)" class="ss-rail-badge" :title="`งานรอ ${module_badge(m, state)} รายการ`">{{
 									module_badge(m, state)
 								}}</span>
 							</span>
@@ -126,6 +130,7 @@
 
 		<AppTooltip />
 		<ProfileSheet :open="profile_open" @close="profile_open = false" />
+		<GlobalSearch v-if="!boot.guest" :open="search_open" @close="search_open = false" />
 		<SettingsDialog v-if="boot.can?.settings || boot.can?.labour_settings" :open="settings_open" @close="settings_open = false" />
 
 		<DockMenu
@@ -136,7 +141,8 @@
 		/>
 		<DockMenu
 			:open="dock_menu === 'user'"
-			:anchor="user_button"
+			:anchor="header_user_anchor || user_button"
+			:placement="header_user_anchor ? 'below' : 'side'"
 			:groups="user_groups"
 			@close="dock_menu = ''"
 		/>
@@ -311,11 +317,12 @@ import Sheet from "./components/Sheet.vue";
 import DockMenu from "./components/DockMenu.vue";
 import AppTooltip from "./components/AppTooltip.vue";
 import ProfileSheet from "./components/ProfileSheet.vue";
+import GlobalSearch from "./components/GlobalSearch.vue";
 import SettingsDialog from "./components/SettingsDialog.vue";
 import SectionLauncher from "./components/SectionLauncher.vue";
 import Desktop from "./components/Desktop.vue";
-import { app, is_desktop, is_tab } from "./app.js";
-import { module_badge, module_list, MODULE_META } from "./modules.js";
+import { app, app_of, is_desktop, is_filter_section, is_tab } from "./app.js";
+import { group_of, module_badge, module_list, MODULE_META, NEW_LOOK } from "./modules.js";
 import {
 	boot,
 	call,
@@ -356,10 +363,14 @@ const ready = computed(
 );
 
 // มือถือ: แถบล่างเฉพาะหน้าหลักของเมนู (หน้าแรกไม่มี)
-const show_nav = computed(() => is_tab(state.route.view) && has_shell.value && !desktop.value);
+// หมวดที่มีเมนูเดียว (เช่น แผนการตัด) ไม่มีแถบล่าง ชื่อหมวดอยู่บนแถบบนแล้ว
+const show_nav = computed(
+	() => is_tab(state.route.view) && has_shell.value && !desktop.value && mobile_tabs.value.length > 1
+);
 
 // tab.when(boot) = เมนูที่เห็นตามสิทธิ์ (ไม่มี when = ทุกคน)
-const visible_tabs = (s) => s.tabs.filter((tab) => !tab.when || tab.when(boot));
+// tab.sub = หน้าระดับเมนูแต่ไม่แสดงเป็นเมนู (tab ในหน้าของเมนู PARENT_TAB เช่น ยอดวัสดุ ในทรัพยากร)
+const visible_tabs = (s) => s.tabs.filter((tab) => !tab.sub && (!tab.when || tab.when(boot)));
 
 const tabs = computed(() => {
 	const summary = state.summaries[state.section];
@@ -389,23 +400,26 @@ const nav_tabs = computed(() => {
 	return [...mobile_tabs.value.slice(0, NAV_MAX - 1), more];
 });
 
-// Dock: เฉพาะหมวดของกลุ่มแอปนี้ (กลุ่มอื่นเปิดจากหน้าแรก) + หมวดที่เปิดอยู่ถ้าไม่อยู่ในรายการ
-// (เช่น ขอซื้อของหน้างานที่ซ่อนเพราะมีจัดซื้อของออฟฟิศ)
-const ALL_MODULES = module_list().filter((m) => m.app === app.key);
+// Dock: เฉพาะหมวดของกลุ่มที่หมวดที่เปิดอยู่สังกัด (GROUPS ใน modules.js กลุ่มอื่นเปิดจากหน้าแรก)
+// + หมวดที่เปิดอยู่ถ้าไม่อยู่ในรายการ (เช่น ขอซื้อของหน้างานที่ซ่อนเพราะมีจัดซื้อของออฟฟิศ)
+const MODULES = module_list();
 const rail_modules = computed(() => {
-	if (desktop.value || ALL_MODULES.some((m) => m.local && m.section === state.section))
-		return ALL_MODULES;
-	const meta = MODULE_META[app.key]?.[state.section];
-	if (!meta) return ALL_MODULES;
+	const group = group_of(state.section);
+	const list = MODULES.filter((m) => m.group === group);
+	if (desktop.value || list.some((m) => m.local && m.section === state.section)) return list;
+	const owner = app_of(state.section);
+	const meta = MODULE_META[owner]?.[state.section];
+	if (!meta) return list;
 	const current = {
 		...meta,
-		app: app.key,
+		app: owner,
 		section: state.section,
-		key: `${app.key}:${state.section}`,
+		key: `${owner}:${state.section}`,
+		group,
 		local: true,
 	};
-	const at = ALL_MODULES.findLastIndex((m) => m.app === app.key) + 1;
-	return [...ALL_MODULES.slice(0, at), current, ...ALL_MODULES.slice(at)];
+	const at = list.findLastIndex((m) => m.app === owner) + 1;
+	return [...list.slice(0, at), current, ...list.slice(at)];
 });
 const is_open = (m) => m.local && m.section === state.section;
 // หน้าเอกสารจัดซื้อ/ขาย (ดู/ฟอร์ม) ไฮไลต์เมนูของชนิดเอกสาร (params.kind)
@@ -530,10 +544,13 @@ const SUMMARY_API = app.summary_api;
 
 async function load_summary(key = state.section) {
 	// หน้างานต้องมีโครงการ / ออฟฟิศ: โครงการเป็นตัวกรอง (ไม่มี = ทุกโครงการ) / Self Service: ไม่ใช้โครงการ
-	if ((!state.project && !app.project_filter && !app.no_project) || !SUMMARY_API[key]) return;
+	if ((!state.project && !is_filter_section(key) && !app.no_project) || !SUMMARY_API[key]) return;
 	const stamp = scope_key();
 	try {
-		const [method, args] = SUMMARY_API[key]();
+		// summary_api คืน null = ผู้ใช้นี้ไม่ต้องโหลด (เช่น ไม่มีสิทธิ์ภาพรวมแผนงาน)
+		const request = SUMMARY_API[key]();
+		if (!request) return;
+		const [method, args] = request;
 		const summary = await call(method, { project: state.project?.name, ...args });
 		// เปลี่ยนโครงการ/บริษัทระหว่างโหลด: ทิ้งผลของขอบเขตเดิม
 		if (scope_key() === stamp) state.summaries[key] = summary;
@@ -617,8 +634,14 @@ function close_peek(event) {
 const dock_menu = ref("");
 const company_button = ref(null);
 const user_button = ref(null);
+const header_user_anchor = ref(null);
 function toggle_dock_menu(name) {
+	if (name === "user") header_user_anchor.value = null;
 	dock_menu.value = dock_menu.value === name ? "" : name;
+}
+function toggle_header_user_menu(anchor) {
+	header_user_anchor.value = anchor;
+	dock_menu.value = dock_menu.value === "user" ? "" : "user";
 }
 const profile_open = ref(false);
 const settings_open = ref(false);
@@ -657,6 +680,20 @@ async function logout() {
 document.addEventListener("pointerdown", close_peek);
 onBeforeUnmount(() => document.removeEventListener("pointerdown", close_peek));
 provide("open_launcher", () => (launcher.value = true));
+// ค้นหาทั้งระบบ: ปุ่มบนแถบบน + Ctrl/⌘ + G (ทับ "ค้นหาถัดไป" ของเบราว์เซอร์) ผู้เปิดจากลิงก์ไม่ login ไม่มี
+const search_open = ref(false);
+function on_search_key(event) {
+	if (!(event.ctrlKey || event.metaKey) || event.altKey || event.shiftKey) return;
+	if (event.key.toLowerCase() !== "g") return;
+	event.preventDefault();
+	search_open.value = true;
+}
+if (!boot.guest) {
+	provide("open_global_search", () => (search_open.value = true));
+	window.addEventListener("keydown", on_search_key);
+	onBeforeUnmount(() => window.removeEventListener("keydown", on_search_key));
+}
+provide("open_user_menu", toggle_header_user_menu);
 // เมนูของหมวดบนแถบบน (SectionTabs.vue ใน TopBar จอ ≥768)
 provide("section_nav", { tabs, active_view, open_tab });
 

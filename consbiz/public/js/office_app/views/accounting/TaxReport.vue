@@ -9,6 +9,30 @@
 			<div v-if="wide" class="ss-list-head">
 				<StatusTabs v-model="report" :options="tabs" />
 				<div class="ss-list-tools">
+					<button
+						type="button"
+						class="ss-icon-btn"
+						:class="{ 'is-spinning': loading }"
+						aria-label="โหลดใหม่"
+						title="โหลดใหม่"
+						@click="load"
+					>
+						<Icon name="refresh" :size="17" />
+					</button>
+					<a
+						class="ss-icon-btn"
+						:href="desk_report_url"
+						title="พิมพ์แบบยื่นในระบบเต็ม"
+						aria-label="พิมพ์แบบยื่นในระบบเต็ม"
+					>
+						<Icon name="printer" :size="17" />
+					</a>
+					<a class="ss-btn ss-btn--primary ss-list-create" :href="excel_url">
+						<Icon name="file" :size="18" /> <span>Excel</span>
+					</a>
+				</div>
+				<!-- แถวตัวกรอง: เดือน → ที่อยู่บริษัท -->
+				<div class="ss-list-filterbar">
 					<span class="acc-month">
 						<button
 							type="button"
@@ -42,27 +66,6 @@
 						label="ที่อยู่บริษัท (สาขา)"
 						variant="tool"
 					/>
-					<button
-						type="button"
-						class="ss-icon-btn"
-						:class="{ 'is-spinning': loading }"
-						aria-label="โหลดใหม่"
-						title="โหลดใหม่"
-						@click="load"
-					>
-						<Icon name="refresh" :size="17" />
-					</button>
-					<a
-						class="ss-icon-btn"
-						:href="desk_report_url"
-						title="พิมพ์แบบยื่นในระบบเต็ม"
-						aria-label="พิมพ์แบบยื่นในระบบเต็ม"
-					>
-						<Icon name="printer" :size="17" />
-					</a>
-					<a class="ss-btn ss-btn--primary ss-list-create" :href="excel_url">
-						<Icon name="file" :size="18" /> <span>Excel</span>
-					</a>
 				</div>
 			</div>
 			<template v-else>

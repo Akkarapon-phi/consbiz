@@ -44,7 +44,6 @@ MODULES = (
 			("Inspection Request", "ขอตรวจงาน", 0),
 			("Punch List", "Punch List", 0),
 			("Concrete Usage", "คอนกรีต", 0),
-			("Bar Cut Plan", "แผนตัดเหล็ก", 0),
 		),
 	),
 	(
@@ -56,20 +55,15 @@ MODULES = (
 			("Variation Order", "งานลด-เพิ่ม", 0),
 			("Extension of Time", "ขยายเวลา (EOT)", 0),
 			("Construction Baseline", "Baseline", 0),
-		),
-	),
-	(
-		"site",
-		"resources",
-		(
 			("Construction Resource Plan", "แผนคนและเครื่องจักร", 0),
 			("Construction Material Plan", "แผนวัสดุ", 0),
 		),
 	),
 	("site", "buy", (("Material Request", "ใบขอซื้อ", 0),)),
+	("site", "rebar", (("Bar Cut Plan", "แผนตัดเหล็ก", 0),)),
 	(
-		"site",
-		"admin",
+		"office",
+		"labour",
 		(
 			("Labour Timesheet", "ลงเวลา/ค่าแรงคนงาน", 0),
 			("Labour Advance", "เบิกล่วงหน้า", 0),
