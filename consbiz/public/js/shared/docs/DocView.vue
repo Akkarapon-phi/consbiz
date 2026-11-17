@@ -1,26 +1,8 @@
 <!-- รายละเอียดเอกสารจัดซื้อ/ขาย: หัวเอกสาร, ความคืบหน้า, รายการ, ยอดรวม, เอกสารต้นทาง/ปลายทาง, PDF, ส่งเอกสาร -->
 <template>
-	<div :class="{ 'ss-has-bar': has_bar }">
+	<div :class="{ 'ss-has-bar ss-has-slim-bar': has_bar }">
 		<TopBar :title="config.label" :subtitle="params.name" :back_to="params.kind">
 			<template #actions>
-				<button
-					v-if="doc"
-					type="button"
-					class="ss-icon-btn"
-					aria-label="PDF / พิมพ์ / แชร์"
-					title="PDF / พิมพ์ / แชร์"
-					@click="pdf = true"
-				>
-					<Icon name="printer" :size="19" />
-				</button>
-				<a
-					class="ss-icon-btn"
-					:href="desk_url(config.doctype, params.name)"
-					aria-label="เปิดในระบบเต็ม"
-					title="เปิดในระบบเต็ม"
-				>
-					<Icon name="external" :size="19" />
-				</a>
 				<!-- เปิด/ปิด sidebar ขวา (มอบหมาย ไฟล์แนบ ความคิดเห็น ความเคลื่อนไหว) -->
 				<button
 					v-if="doc"
@@ -148,6 +130,36 @@
 						</div>
 					</dl>
 				</section>
+
+				<!-- PO ที่แก้ตามใบงานเพิ่ม ผรม.: Rev. ปัจจุบัน + รอส่งผู้รับเหมา (ใครในฝ่ายจัดซื้อก็กดส่งได้) + PDF ฉบับก่อนๆ -->
+				<div v-if="doc.revision" class="ss-banner" :class="doc.revision.pending ? 'tone-amber' : 'tone-blue'">
+					<Icon :name="doc.revision.pending ? 'alert' : 'check'" :size="22" />
+					<div class="ss-grow">
+						<div class="ss-banner-title">
+							Rev.{{ doc.revision.revision }}
+							{{ doc.revision.pending ? "รอส่งฉบับนี้ให้ผู้รับเหมา" : "ส่งผู้รับเหมาแล้ว" }}
+						</div>
+						<div class="ss-banner-text">
+							{{ doc.revision.note || "ฉบับตามสัญญาเดิม" }}
+							<template v-if="!doc.revision.pending && doc.revision.sent_by_name">
+								· ส่งโดย {{ doc.revision.sent_by_name }}
+								{{ thai_date(doc.revision.sent_on, { year: true }) }}
+							</template>
+							<template v-for="f in doc.revision.snapshots" :key="f.file_url">
+								· <a :href="f.file_url" target="_blank">{{ f.file_name }}</a>
+							</template>
+						</div>
+					</div>
+					<button
+						v-if="doc.revision.can_mark_sent"
+						type="button"
+						class="ss-btn ss-btn--primary"
+						:disabled="busy"
+						@click="mark_sent"
+					>
+						ส่งผู้รับเหมาแล้ว
+					</button>
+				</div>
 
 				<div class="ss-dv-body">
 					<div class="ss-dv-main">
@@ -415,7 +427,16 @@
 
 		<Teleport to="#ss-layer">
 			<Transition name="ss-bar">
-				<div v-if="has_bar" class="ss-bottom-bar">
+				<div v-if="has_bar" class="ss-bottom-bar ss-docview-bar">
+					<!-- ปุ่มพิมพ์ซ้ายสุด: เปิด PdfViewer (พิมพ์ / แชร์ / ดาวน์โหลด) -->
+					<button
+						type="button"
+						class="ss-btn ss-btn--ghost ss-btn--lg ss-docview-print"
+						title="PDF / พิมพ์ / แชร์ (p)"
+						@click="pdf = true"
+					>
+						<Icon name="printer" :size="17" /> <span class="ss-docview-print-label">พิมพ์</span>
+					</button>
 					<button
 						v-if="doc.can_delete"
 						type="button"
@@ -456,6 +477,16 @@
 						"
 					>
 						<Icon name="plus" :size="18" :stroke="2.4" /> สร้าง{{ DOC_KINDS[next_kind].label }}
+					</button>
+					<!-- ใบแจ้งหนี้ที่ยังค้าง: รับชำระ / จ่ายชำระ (Payment Entry, PaymentSheet.vue) -->
+					<button
+						v-if="doc.can_pay"
+						type="button"
+						class="ss-btn ss-btn--primary ss-btn--lg ss-grow"
+						@click="paying = true"
+					>
+						<Icon :name="params.kind === 'si' ? 'receive' : 'send'" :size="18" />
+						{{ params.kind === "si" ? "รับชำระ" : "จ่ายชำระ" }}
 					</button>
 				</div>
 			</Transition>
@@ -498,6 +529,15 @@
 			@deleted="after_delete"
 		/>
 
+		<PaymentSheet
+			v-if="doc?.can_pay"
+			:open="paying"
+			:kind="params.kind"
+			:name="params.name"
+			@close="paying = false"
+			@done="after_pay"
+		/>
+
 		<PdfViewer
 			:open="pdf"
 			:url="doc?.pdf_url"
@@ -518,10 +558,12 @@ import PdfViewer from "../components/PdfViewer.vue";
 import DeleteSheet from "../components/DeleteSheet.vue";
 import RichText from "../components/RichText.vue";
 import DocActivity from "./DocActivity.vue";
+import PaymentSheet from "./PaymentSheet.vue";
 import InlineEdit from "../components/InlineEdit.vue";
 import { use_shortcuts } from "../shortcuts.js";
 import { DOC_KINDS, in_app, open_doc } from "./kinds.js";
 import {
+	boot,
 	call,
 	celebrate,
 	desk_url,
@@ -665,9 +707,21 @@ const next_kind = computed(() =>
 	doc.value?.next_kind && in_app(doc.value.next_kind) ? doc.value.next_kind : null
 );
 
-const has_bar = computed(
-	() => !!(doc.value && (doc.value.can_edit || doc.value.can_submit || doc.value.can_delete || next_kind.value))
-);
+// แถบล่างแสดงเสมอเมื่อโหลดเอกสารแล้ว (มีปุ่มพิมพ์ทุกใบ)
+const has_bar = computed(() => !!doc.value);
+
+// รับ/จ่ายชำระ: หน้ารายการของหมวดบัญชี (เปิดรายการที่สร้างในแอปถ้าเข้าหมวดบัญชีได้)
+const PAYMENT_LIST = { si: "acc-receipts", pi: "acc-payments" };
+const paying = ref(false);
+const payment_list = (kind = params.kind) =>
+	boot.sections?.includes("accounting") && boot.accounting?.[PAYMENT_LIST[kind]] ? PAYMENT_LIST[kind] : null;
+async function after_pay(result) {
+	paying.value = false;
+	reload_summary();
+	const list = payment_list();
+	if (list) go("acc-payment", { kind: list, name: result.name });
+	else await load();
+}
 
 const deleting = ref(false);
 function after_delete() {
@@ -719,6 +773,7 @@ function item_progress(it) {
 // เอกสารจัดซื้อ/ขาย: ชนิดที่แอปนี้ดูแลเปิดในแอป ชนิดอื่นไปแอปที่ดูแล (open_doc) ที่เหลือ (ใบรับของ, ใบส่งของ, รับ/จ่ายเงิน) เปิดในระบบเต็ม
 function open_link(l) {
 	if (l.kind) open_doc(l.kind, l.name);
+	else if (l.doctype === "Payment Entry" && payment_list()) go("acc-payment", { kind: payment_list(), name: l.name });
 	else window.location.href = desk_url(l.doctype, l.name);
 }
 
@@ -727,6 +782,20 @@ async function load() {
 		doc.value = await call("consbiz.site_docs.get_doc", { kind: params.kind, name: params.name });
 	} catch (error) {
 		show_error(error);
+	}
+}
+
+async function mark_sent() {
+	busy.value = true;
+	try {
+		await post("consbiz.subcontract.mark_po_sent", { name: params.name });
+		toast("บันทึกว่าส่งผู้รับเหมาแล้ว", "success");
+		reload_summary();
+		await load();
+	} catch (error) {
+		show_error(error);
+	} finally {
+		busy.value = false;
 	}
 }
 

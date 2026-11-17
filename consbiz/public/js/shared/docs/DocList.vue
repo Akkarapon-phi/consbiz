@@ -4,14 +4,6 @@
 <template>
 	<div :class="{ 'ss-has-bar': selected.size }">
 		<TopBar :title="config.label" :subtitle="subtitle" no_project>
-			<template #search>
-				<HeaderSearch
-					v-if="wide"
-					ref="search_input"
-					v-model="search"
-					:placeholder="search_placeholder"
-				/>
-			</template>
 			<template #actions>
 				<button
 					v-if="!wide"
@@ -68,21 +60,45 @@
 				<template v-if="wide">
 					<StatusTabs v-model="filter" :options="status_options" />
 					<div class="ss-list-tools">
-						<!-- กันที่ไว้เสมอ (ซ่อนด้วย visibility) ความกว้างของแถวตัวกรองจึงไม่เปลี่ยนตามปุ่มนี้ -->
+						<button
+							v-if="can_export"
+							type="button"
+							class="ss-icon-btn"
+							:disabled="exporting"
+							aria-label="ส่งออก CSV"
+							title="ส่งออก CSV (ตามตัวกรอง)"
+							@click="export_csv()"
+						>
+							<Icon name="receive" :size="19" />
+						</button>
+						<button
+							v-if="can_create"
+							type="button"
+							class="ss-btn ss-btn--primary ss-list-create"
+							:aria-label="`สร้าง${config.label}`"
+							@click="go(`${config.section}-form`, { kind, name: 'new' })"
+						>
+							<Icon name="plus" :size="18" :stroke="2.6" />
+							<span>สร้าง{{ config.label }}</span>
+						</button>
 						<button
 							type="button"
-							class="ss-tool ss-tool--filter"
-							:class="{ 'is-active': filter_count }"
-							:style="{ visibility: filters_hidden ? 'visible' : 'hidden' }"
-							aria-label="ตัวกรองเพิ่มเติม"
-							title="ตัวกรองเพิ่มเติม"
-							@click="filter_sheet = true"
+							class="ss-icon-btn"
+							:class="{ 'is-spinning': loading }"
+							aria-label="โหลดใหม่"
+							title="โหลดใหม่"
+							@click="reload"
 						>
-							<Icon name="sliders" :size="17" />
-							<span v-if="filter_count" class="ss-tab-count">{{
-								filter_count
-							}}</span>
+							<Icon name="refresh" :size="17" />
 						</button>
+					</div>
+					<!-- แถวตัวกรอง: ค้นหา → ตัวกรองแบบเลือก (ที่ไม่พอซ่อนด้วย use_overflow_row) → ปุ่มตัวกรองรวมขวาสุด -->
+					<div class="ss-list-filterbar ss-list-filterbar--doc">
+						<ListSearch
+							ref="search_input"
+							v-model="search"
+							:placeholder="search_placeholder"
+						/>
 						<div ref="filters_box" class="ss-list-filters">
 							<SelectBox
 								v-model="range"
@@ -141,35 +157,17 @@
 							/>
 						</div>
 						<button
-							v-if="can_export"
 							type="button"
-							class="ss-icon-btn"
-							:disabled="exporting"
-							aria-label="ส่งออก CSV"
-							title="ส่งออก CSV (ตามตัวกรอง)"
-							@click="export_csv()"
+							class="ss-tool ss-tool--filter"
+							:class="{ 'is-active': filter_count }"
+							aria-label="ตัวกรองทั้งหมด"
+							title="ตัวกรองทั้งหมด"
+							@click="filter_sheet = true"
 						>
-							<Icon name="receive" :size="19" />
-						</button>
-						<button
-							v-if="can_create"
-							type="button"
-							class="ss-btn ss-btn--primary ss-list-create"
-							:aria-label="`สร้าง${config.label}`"
-							@click="go(`${config.section}-form`, { kind, name: 'new' })"
-						>
-							<Icon name="plus" :size="18" :stroke="2.6" />
-							<span>สร้าง{{ config.label }}</span>
-						</button>
-						<button
-							type="button"
-							class="ss-icon-btn"
-							:class="{ 'is-spinning': loading }"
-							aria-label="โหลดใหม่"
-							title="โหลดใหม่"
-							@click="reload"
-						>
-							<Icon name="refresh" :size="17" />
+							<Icon name="sliders" :size="17" />
+							<span v-if="filter_count" class="ss-tab-count">{{
+								filter_count
+							}}</span>
 						</button>
 					</div>
 				</template>
@@ -485,7 +483,7 @@ import PdfViewer from "../components/PdfViewer.vue";
 import SelectBox from "../components/SelectBox.vue";
 import StatusTabs from "../components/StatusTabs.vue";
 import { use_overflow_row } from "../table.js";
-import HeaderSearch from "../components/HeaderSearch.vue";
+import ListSearch from "../components/ListSearch.vue";
 import DateInput from "../components/DateInput.vue";
 import DocCard from "./DocCard.vue";
 import DocTable from "./DocTable.vue";
@@ -669,7 +667,7 @@ const filter_count = computed(
 		(app.project_filter && config.project && state.project ? 1 : 0)
 );
 const filters_box = ref(null);
-const filters_hidden = use_overflow_row(filters_box, [
+use_overflow_row(filters_box, [
 	range,
 	date_from,
 	date_to,

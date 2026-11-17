@@ -1,0 +1,150 @@
+{
+ "actions": [],
+ "creation": "2026-11-13 12:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "description",
+  "from_date",
+  "to_date",
+  "column_break_rate",
+  "employee_rate",
+  "employer_rate",
+  "min_base",
+  "max_base"
+ ],
+ "fields": [
+  {
+   "fieldname": "description",
+   "fieldtype": "Data",
+   "label": "คำอธิบาย",
+   "in_list_view": 1,
+   "description": "เช่น อัตราปกติ / ลดเงินสมทบชั่วคราว"
+  },
+  {
+   "fieldname": "from_date",
+   "fieldtype": "Date",
+   "label": "ตั้งแต่",
+   "reqd": 1,
+   "in_list_view": 1,
+   "search_index": 1,
+   "description": "ใส่วันที่ 1 ของเดือน ระบบใช้อัตราตามเดือนของวันทำงาน"
+  },
+  {
+   "fieldname": "to_date",
+   "fieldtype": "Date",
+   "label": "ถึง",
+   "in_list_view": 1,
+   "description": "ว่าง = ใช้ต่อไปจนกว่าจะมีแถวใหม่ ช่วงที่แคบกว่าชนะ (ใช้ใส่การลดอัตราชั่วคราว)"
+  },
+  {
+   "fieldname": "column_break_rate",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "employee_rate",
+   "fieldtype": "Percent",
+   "label": "ลูกจ้าง (%)",
+   "reqd": 1,
+   "default": "5",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "employer_rate",
+   "fieldtype": "Percent",
+   "label": "นายจ้าง (%)",
+   "reqd": 1,
+   "default": "5",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "min_base",
+   "fieldtype": "Currency",
+   "label": "ฐานค่าจ้างต่ำสุด (บาท/เดือน)",
+   "reqd": 1,
+   "default": "1650"
+  },
+  {
+   "fieldname": "max_base",
+   "fieldtype": "Currency",
+   "label": "เพดานค่าจ้าง (บาท/เดือน)",
+   "reqd": 1,
+   "default": "17500",
+   "in_list_view": 1
+  }
+ ],
+ "grid_page_length": 50,
+ "links": [],
+ "modified": "2026-11-13 12:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "ConsBiz",
+ "name": "Social Security Rate",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "create": 1,
+   "write": 1,
+   "delete": 1,
+   "share": 1,
+   "email": 1,
+   "role": "System Manager"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "create": 1,
+   "write": 1,
+   "delete": 1,
+   "share": 1,
+   "email": 1,
+   "role": "HR Manager"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "create": 1,
+   "write": 1,
+   "delete": 1,
+   "share": 1,
+   "email": 1,
+   "role": "Accounts Manager"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "role": "Projects Manager"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "role": "HR User"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "role": "Accounts User"
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "from_date",
+ "sort_order": "DESC",
+ "states": [],
+ "autoname": "hash",
+ "naming_rule": "Random",
+ "description": "อัตราเงินสมทบประกันสังคม (มาตรา 33) ตามช่วงเวลา ใช้คิดค่าแรงคนงานรายวัน",
+ "title_field": "description"
+}

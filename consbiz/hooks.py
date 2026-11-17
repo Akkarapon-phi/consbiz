@@ -11,7 +11,9 @@ add_to_apps_screen = [
         "name": "consbiz",
         "logo": "/assets/consbiz/images/logo.png",
         "title": "ConsBiz",
-        "route": "/app/consbiz"
+        "route": "/app/consbiz",
+        # คนนอก (Website User เช่น ผู้รับเหมา) เข้า desk ไม่ได้: ไม่ให้ login พาไป /app/consbiz (ไปตาม role_home_page แทน)
+        "has_permission": "erpnext.check_app_permission",
     }
 ]
 
@@ -42,8 +44,7 @@ app_include_js = [
 
 
 # แอป ConsERP: ทุกหมวดอยู่ระดับเดียวกันใต้ /conserp/<หมวด> (PWA ตัวเดียว scope /conserp)
-# หมวดจัดซื้อ/ขาย = bundle ออฟฟิศ (www/office.html, ชื่อหมวดตรงกับ site_app.office_sections) ที่เหลือ = bundle หน้างาน (www/site.html)
-_OFFICE_SECTIONS = ("purchase", "sales", "boq", "hr")
+# หน้างาน + ออฟฟิศ = bundle เดียว (www/site.html, รวม 2026-11-17) Self Service แยก bundle (www/self.html)
 # bundle self_app (www/self.html): Self Service ของพนักงานทุกคน (consbiz/self_service.py) + โมดูลอนุมัติ (consbiz/approvals.py)
 _SELF_SECTIONS = ("self", "approve")
 website_route_rules = [
@@ -55,14 +56,8 @@ website_route_rules = [
 			{"from_route": f"/conserp/{section}/<path:app_path>", "to_route": "self"},
 		)
 	),
-	*(
-		rule
-		for section in _OFFICE_SECTIONS
-		for rule in (
-			{"from_route": f"/conserp/{section}", "to_route": "office"},
-			{"from_route": f"/conserp/{section}/<path:app_path>", "to_route": "office"},
-		)
-	),
+	# แอปผู้รับเหมาช่วง (คนนอก, www/contractor.html) แยกจาก ConsERP
+	{"from_route": "/contractor/<path:app_path>", "to_route": "contractor"},
 	{"from_route": "/conserp", "to_route": "site"},
 	{"from_route": "/conserp/<path:app_path>", "to_route": "site"},
 ]
@@ -83,6 +78,13 @@ website_redirects = [
 	_redirect(r"(?:conserp|site)/finance/finance-cost", r"/conserp/pm/finance/cost"),
 	_redirect(r"(?:conserp|site)/finance/finance-evm", r"/conserp/pm/finance/evm"),
 	_redirect(r"(?:conserp|site)/finance(/.*)?", r"/conserp/pm/finance"),
+	# ทรัพยากรเคยเป็นหมวดของตัวเอง ย้ายเป็นเมนูในแผนงาน (ยอดวัสดุ/คน-เครื่อง/... เป็น tab)
+	_redirect(r"(?:conserp|site)/resources/(resource-[a-z]+)", r"/conserp/pm/\1"),
+	_redirect(r"(?:conserp|site)/resources(/.*)?", r"/conserp/pm/resources"),
+	# คนงานเคยเป็นหมวด admin ของ bundle หน้างาน ย้ายไป bundle ออฟฟิศชื่อหมวด labour
+	_redirect(r"conserp/admin(/.*)?", r"/conserp/labour\1"),
+	# ตัดเหล็กเคยเป็นเมนูในควบคุมงาน ย้ายเป็นหมวดแผนการตัด
+	_redirect(r"(?:conserp|site)/work/(rebar(?:-plan)?(?:/.*)?)", r"/conserp/rebar/\1"),
 	_redirect(r"site/sell(/.*)?", r"/conserp/sales\1"),
 	_redirect(r"site/buy/(po|pi)(/.*)?", r"/conserp/purchase/\1\2"),
 	_redirect(r"site/buy/(buy-doc|buy-form)/(po|pi)(/.*)?", r"/conserp/purchase/\1/\2\3"),
@@ -261,9 +263,9 @@ scheduler_events = {
 # home_page = "login"
 
 # website user home page (by Role)
-# role_home_page = {
-# 	"Role": "home_page"
-# }
+# ผู้รับเหมา (Website User ใน Portal Users ของ Supplier) เข้าระบบ/เปิดหน้าแรกแล้วไปแอปผู้รับเหมา
+# ห้ามใช้ role_home_page ของ Role Supplier: Administrator/System Manager มีทุก Role จะถูกพาไป /contractor ด้วย
+get_website_user_home_page = "consbiz.contractor_app.website_user_home_page"
 
 # Generators
 # ----------

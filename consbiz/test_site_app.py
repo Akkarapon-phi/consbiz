@@ -42,25 +42,22 @@ class IntegrationTestSiteApp(IntegrationTestCase):
 			frappe.db.set_value("Construction Management", name, "project", None)
 
 	def test_sections_follow_permissions(self):
-		# หน้างาน: ขอซื้ออย่างเดียว (สั่งซื้อ/แจ้งหนี้/ขาย อยู่แอปออฟฟิศ)
+		# ConsERP = หน้างาน + ออฟฟิศ ใน boot เดียว (bundle เดียว) ขอซื้อ (หน้างาน) ใช้หน้าเดียวกับจัดซื้อ ทรัพยากรอยู่ในแผนงาน
 		boot = site_app.boot_data()
-		self.assertEqual(boot["sections"], ["store", "work", "pm", "resources", "buy"])
+		self.assertEqual(boot["sections"][:5], ["pm", "work", "store", "buy", "rebar"])
+		for section in ("purchase", "sales", "boq", "hr", "labour"):
+			self.assertIn(section, boot["sections"])
+		self.assertTrue(boot["can"]["view_plan"])
 		self.assertTrue(boot["can"]["daily_report"])
 		self.assertTrue(boot["can"]["finance"])
+		self.assertTrue(boot["can"]["view_labour"])
+		self.assertTrue(boot["companies"])
 		# Administrator มี System Manager = เห็นโมดูลอนุมัติ (กลุ่มแอป self)
 		self.assertEqual([a["key"] for a in boot["apps"]], ["site", "office", "self"])
-
-		office = site_app.office_boot_data()
-		self.assertEqual(office["sections"], ["purchase", "sales", "boq", "hr"])
-		self.assertTrue(office["companies"])
-		self.assertEqual([a["key"] for a in office["apps"]], ["site", "office", "self"])
-		# Desktop: หมวดของทุกแอป มีทั้งขอซื้อของหน้างานและจัดซื้อของออฟฟิศ
-		modules = [(m["app"], m["section"]) for m in office["modules"]]
-		self.assertIn(("site", "buy"), modules)
-		self.assertIn(("office", "purchase"), modules)
-		self.assertIn({"app": "office", "section": "sales", "url": "/conserp/sales"}, office["modules"])
+		# Desktop: หมวดของทุกแอป
+		self.assertIn({"app": "office", "section": "sales", "url": "/conserp/sales"}, boot["modules"])
 		self.assertIn({"app": "site", "section": "store", "url": "/conserp/store"}, boot["modules"])
-		self.assertEqual(boot["modules"], office["modules"])
+		self.assertEqual(site_app.office_boot_data()["sections"], boot["sections"])
 
 	def test_my_profile_returns_session_user(self):
 		self.addCleanup(frappe.set_user, frappe.session.user)

@@ -6,13 +6,12 @@
 			name="viewport"
 			content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no"
 		/>
-		<meta name="theme-color" content="#0d9488" id="theme-color" />
+		<meta name="theme-color" content="#9a3412" id="theme-color" />
 		<meta name="apple-mobile-web-app-capable" content="yes" />
 		<meta name="mobile-web-app-capable" content="yes" />
 		<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-		<meta name="apple-mobile-web-app-title" content="ConsERP" />
-		<title>ConsERP</title>
-		<link rel="manifest" href="/assets/consbiz/site_app/manifest.webmanifest?v=5" />
+		<meta name="apple-mobile-web-app-title" content="ผู้รับเหมา" />
+		<title>ConsERP ผู้รับเหมา</title>
 		<link rel="icon" type="image/png" href="/assets/consbiz/site_app/conserp-round-192.png" />
 		<link rel="apple-touch-icon" href="/assets/consbiz/site_app/conserp-round-192.png" />
 		<link rel="preload" as="font" type="font/woff2" crossorigin
@@ -74,7 +73,7 @@
 		</style>
 	</head>
 	<body>
-		<div id="office-app">
+		<div id="contractor-app">
 			<div class="boot-splash">
 				<img class="logo" src="/assets/consbiz/site_app/conserp-round-192.png" alt="ConsERP" />
 			</div>
@@ -91,6 +90,6 @@
 			window.APP_BOOT = {{ boot | safe }};
 		</script>
 		<!-- csrf_token -->
-		{{ include_script("office_app.bundle.js") }}
+		{{ include_script("contractor_app.bundle.js") }}
 	</body>
 </html>

@@ -59,6 +59,8 @@ const props = defineProps({
 	open: Boolean,
 	anchor: { type: Object, default: null },
 	groups: { type: Array, required: true },
+	// "side" = ข้าง Dock ชิดล่างของปุ่ม (ค่าเดิม), "below" = ใต้ปุ่มบนแถบบน ชิดขวาของปุ่ม
+	placement: { type: String, default: "side" },
 });
 const emit = defineEmits(["close"]);
 
@@ -115,12 +117,20 @@ watch(
 		unbind();
 		if (!open || !props.anchor) return;
 		const rect = props.anchor.getBoundingClientRect();
-		position.value = {
-			left: `${rect.right + OFFSET}px`,
-			bottom: `${window.innerHeight - rect.bottom}px`,
-			// เมนูชิดล่างของปุ่ม รายการยาวเลื่อนในเมนู ไม่ล้นขอบจอบน
-			maxHeight: `${rect.bottom - 8}px`,
-		};
+		position.value =
+			props.placement === "below"
+				? {
+						top: `${rect.bottom + 8}px`,
+						right: `${window.innerWidth - rect.right}px`,
+						maxHeight: `${window.innerHeight - rect.bottom - 16}px`,
+						transformOrigin: "top right",
+				  }
+				: {
+						left: `${rect.right + OFFSET}px`,
+						bottom: `${window.innerHeight - rect.bottom}px`,
+						// เมนูชิดล่างของปุ่ม รายการยาวเลื่อนในเมนู ไม่ล้นขอบจอบน
+						maxHeight: `${rect.bottom - 8}px`,
+				  };
 		document.addEventListener("pointerdown", on_pointerdown);
 		document.addEventListener("keydown", on_keydown);
 		window.addEventListener("resize", on_resize);

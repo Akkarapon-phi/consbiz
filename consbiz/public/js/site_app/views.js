@@ -17,6 +17,8 @@ import Reports from "./views/work/Reports.vue";
 import Inspections from "./views/work/Inspections.vue";
 import Concrete from "./views/work/Concrete.vue";
 import ConcreteForm from "./views/work/ConcreteForm.vue";
+import Rebar from "./views/work/Rebar.vue";
+import RebarPlan from "./views/work/RebarPlan.vue";
 // แผนงาน
 import PmHome from "./views/pm/PmHome.vue";
 import Plan from "./views/pm/Plan.vue";
@@ -29,11 +31,6 @@ import ProjectDocView from "./views/project_docs/ProjectDocView.vue";
 import Resources from "./views/resources/Resources.vue";
 // การเงิน
 import Finance from "./views/finance/Finance.vue";
-// ขอซื้อ (ชุดเดียวกับแอปออฟฟิศ เฉพาะ kind = mr)
-import DocsHome from "../shared/docs/DocsHome.vue";
-import DocList from "../shared/docs/DocList.vue";
-import DocView from "../shared/docs/DocView.vue";
-import DocForm from "../shared/docs/DocForm.vue";
 
 export default {
 	home: Home,
@@ -43,6 +40,8 @@ export default {
 	issue: Issue,
 	concrete: Concrete,
 	"concrete-form": ConcreteForm,
+	rebar: Rebar,
+	"rebar-plan": RebarPlan,
 	borrow: Borrow,
 	"borrow-detail": BorrowDetail,
 	"borrow-new": BorrowNew,
@@ -67,8 +66,4 @@ export default {
 	"resource-gantt": Resources,
 	"resource-monthly": Resources,
 	finance: Finance,
-	buy: DocsHome,
-	mr: DocList,
-	"buy-doc": DocView,
-	"buy-form": DocForm,
 };

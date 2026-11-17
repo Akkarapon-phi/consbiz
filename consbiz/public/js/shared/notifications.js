@@ -53,6 +53,11 @@ const APP_PAGES = {
 	"Equipment Borrowing": { section: "store", view: "borrow-detail", args: {}, project: true },
 	"Purchase Receipt": { section: "store", view: "receipt", args: { doctype: "Purchase Receipt" } },
 	BOQ: { section: "boq", view: "boq-form", args: {} },
+	// ใบเบิกงวด ผรม.: เจ้าหน้าที่ = หมวด ผรม. ของออฟฟิศ / ผู้รับเหมา (คนนอก) = แอป /contractor
+	"Subcontract Claim": [
+		{ section: "subcontract", view: "claim", args: {} },
+		{ section: "contractor", view: "contractor-claim", args: {} },
+	],
 	// งาน HR: ผู้อนุมัติ = โมดูลอนุมัติ (เปิดใบนั้น) ไม่มีสิทธิ์ = หน้าของตัวเองใน Self Service (หน้าแรกที่เข้าหมวดได้)
 	"Employee Checkin": [
 		{ section: "approve", view: "approve", args: {} },
@@ -78,7 +83,9 @@ export async function open_document(doctype, name) {
 	if (kind) return open_doc(kind, name);
 
 	// หลายหน้า = หน้าแรกที่ผู้ใช้เข้าหมวดนั้นได้
-	const can_open = (p) => (boot.modules || []).some((m) => m.section === p.section);
+	// แอปที่ไม่มี boot.modules (แอปผู้รับเหมา) = เฉพาะหมวดของแอปนี้
+	const modules = boot.modules || (boot.sections || []).map((section) => ({ section }));
+	const can_open = (p) => modules.some((m) => m.section === p.section);
 	const pages = [APP_PAGES[doctype]].flat().filter(Boolean);
 	const page = pages.find(can_open);
 	if (!page) {

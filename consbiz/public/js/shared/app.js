@@ -19,8 +19,13 @@
 // side_default sidebar เริ่มต้น "collapsed" (ไอคอน) / "expanded" (กาง) ผู้ใช้ปักหมุด/พับเองแล้วจำในเครื่อง
 // shortcuts  คีย์ลัดของรายการ/หน้าดูเอกสาร (จอใช้คีย์บอร์ด)
 // doc_kinds  ชนิดเอกสารซื้อ-ขาย (shared/docs/kinds.js) ที่แอปนี้ดูแล ชนิดอื่นเปิดในแอปที่ดูแล (DOC_APP)
+// section_apps  bundle ที่รวมหลายแอป (ConsERP = หน้างาน + ออฟฟิศ, 2026-11-17): หมวด → แอป (site/office) ใช้หา MODULE_META/กลุ่ม
+//            ไม่ระบุ = ทุกหมวดเป็นของ key
+// filter_sections  หมวดที่โครงการเป็นแค่ตัวกรอง (หมวดของออฟฟิศ) ระบุแล้ว project_filter = ค่าของหมวดที่เปิดอยู่ (getter)
+//            หมวดอื่นต้องเลือกโครงการ ทุกหมวดใช้โครงการที่เลือกชุดเดียวกัน
 
-import { DESKTOP } from "./modules.js";
+import { DESKTOP, group_of } from "./modules.js";
+import { boot, state } from "./api.js";
 
 export const app = {
 	key: "",
@@ -40,6 +45,8 @@ export const app = {
 	project_key: "consbiz.store.project",
 	side_default: "collapsed",
 	shortcuts: false,
+	section_apps: {},
+	filter_sections: null,
 };
 
 // หน้าแรก (Desktop): หมวดพิเศษของทุกแอป /<base>/desktop (component ใส่ใน AppShell)
@@ -49,9 +56,48 @@ export function configure(config) {
 	Object.assign(app, config);
 	app.sections = { [DESKTOP_KEY]: DESKTOP, ...config.sections };
 	app.routes = { [DESKTOP_KEY]: { section: DESKTOP_KEY, params: [] }, ...config.routes };
+	if (config.filter_sections) {
+		// อ่านตอนใช้งาน (state.section เป็น reactive: computed/template ที่อ่านค่านี้อัปเดตเมื่อสลับหมวด)
+		Object.defineProperty(app, "project_filter", {
+			get: () => is_filter_section(state.section),
+			configurable: true,
+		});
+	}
 }
+
+// หมวดนี้ใช้โครงการเป็นตัวกรอง (ไม่บังคับเลือก) ไหม
+export const is_filter_section = (section) =>
+	app.filter_sections ? app.filter_sections.includes(section) : !!app.project_filter;
+// แอป (site/office/self) ที่เป็นเจ้าของหมวด (MODULE_META[แอป][หมวด])
+export const app_of = (section) => app.section_apps?.[section] || app.key;
+// แอปที่อยู่ใน bundle นี้ (หมวดของแอปเหล่านี้สลับในหน้าเดียว)
+export const local_apps = () => [app.key, ...Object.values(app.section_apps || {})];
 
 export const is_desktop = (section) => section === DESKTOP_KEY;
 
-export const section_of = (view) => app.routes[view]?.section || app.fallback || Object.keys(app.sections)[0];
+// หน้าที่อยู่หลายหมวดได้ (routes[view].sections เช่น ใบขอซื้อ: หมวดขอซื้อของหน้างาน + จัดซื้อของออฟฟิศ)
+// = หมวดที่เปิดอยู่ถ้าหน้านั้นอยู่ในหมวดนี้ ไม่งั้นหมวดหลัก (section)
+export function section_of(view) {
+	const route = app.routes[view];
+	if (!route) return app.fallback || Object.keys(app.sections)[0];
+	if (route.sections?.includes(state.section)) return state.section;
+	return route.section;
+}
+// หน้านี้อยู่ในหมวดนี้ไหม (URL /<หมวด>/<หน้า>)
+export const route_in = (view, section) =>
+	app.routes[view]?.section === section || !!app.routes[view]?.sections?.includes(section);
+// หมวดปลายทางตอนเปิดหน้า (go): หน้าที่อยู่หลายหมวด เลือกหมวดที่ผู้ใช้เข้าได้ + รับชนิดเอกสารนั้น (sections[].kinds)
+// ลำดับ: หมวดที่เปิดอยู่ > หมวดในกลุ่มเดียวกัน (หน้างานไปขอซื้อ, ออฟฟิศไปจัดซื้อ) > หมวดแรกที่เข้าได้
+export function section_for(view, params = {}) {
+	const route = app.routes[view];
+	if (!route?.sections) return section_of(view);
+	const ok = route.sections.filter(
+		(key) =>
+			boot.sections?.includes(key) &&
+			(!app.sections[key]?.kinds || !params.kind || app.sections[key].kinds.includes(params.kind))
+	);
+	if (ok.includes(state.section)) return state.section;
+	const group = group_of(state.section);
+	return ok.find((key) => group_of(key) === group) || ok[0] || route.section;
+}
 export const is_tab = (view) => app.sections[section_of(view)].tabs.some((t) => t.view === view);

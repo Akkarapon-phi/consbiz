@@ -1,9 +1,6 @@
 <template>
 	<div>
 		<TopBar title="คลังวัสดุ" :subtitle="data?.warehouse || state.project?.project_name">
-			<template #search>
-				<HeaderSearch v-if="wide" v-model="txt" :placeholder="'ค้นหาวัสดุ'" />
-			</template>
 			<template #actions>
 				<button
 					v-if="!wide"
@@ -31,6 +28,13 @@
 					>
 						<Icon name="refresh" :size="17" />
 					</button>
+				</div>
+				<!-- แถวตัวกรอง: ค้นหา + ตัวกรองของหน้า -->
+				<div class="ss-list-filterbar">
+					<ListSearch
+						v-model="txt"
+						:placeholder="'ค้นหาวัสดุ'"
+					/>
 				</div>
 			</div>
 			<div v-else class="ss-search ss-search--sticky">
@@ -190,7 +194,7 @@ import Empty from "../../../shared/components/Empty.vue";
 import Sheet from "../../../shared/components/Sheet.vue";
 import DataTable from "../../../shared/components/DataTable.vue";
 import StatusTabs from "../../../shared/components/StatusTabs.vue";
-import HeaderSearch from "../../../shared/components/HeaderSearch.vue";
+import ListSearch from "../../../shared/components/ListSearch.vue";
 import { matches, use_wide } from "../../../shared/table.js";
 import { boot, call, go, num, show_error, state } from "../../../shared/api.js";
 

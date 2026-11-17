@@ -4,6 +4,10 @@
 // ชื่อหน้า (view) ห้ามซ้ำข้ามหมวด เพราะ go("<view>") หาหมวดจากชื่อหน้า
 
 import { MODULE_META } from "../shared/modules.js";
+import { boot } from "../shared/api.js";
+
+// เมนูของแผนงานที่ต้องอ่าน Construction Management ได้ (ทรัพยากรเปิดได้ทุกคนที่เข้าหน้างานได้)
+const view_plan = (b) => b.can.view_plan !== false;
 
 export const SECTIONS = {
 	store: {
@@ -62,40 +66,46 @@ export const SECTIONS = {
 	pm: {
 		key: "pm",
 		...MODULE_META.site.pm,
-		home: "pm",
+		// ไม่มีสิทธิ์อ่านแผนงาน (เข้าได้เพื่อดูทรัพยากร) = เปิดหน้าทรัพยากร
+		get home() {
+			return view_plan(boot) ? "pm" : "resources";
+		},
 		// summary หนัก (ทั้งแผนงาน) โหลดเมื่อเปิดหมวดนี้เท่านั้น
 		lazy: true,
 		tabs: [
-			{ view: "pm", label: "ภาพรวม", icon: "home" },
-			{ view: "plan", label: "แผนงาน", icon: "gantt" },
-			{ view: "lookahead", label: "Look-ahead", icon: "calendar" },
+			{ view: "pm", label: "ภาพรวม", icon: "home", when: view_plan },
+			{ view: "plan", label: "แผนงาน", icon: "gantt", when: view_plan },
+			{ view: "lookahead", label: "Look-ahead", icon: "calendar", when: view_plan },
+			// ทรัพยากร (เดิมเป็นหมวดแยก) ต้องสั่ง / ยอดวัสดุ / คน-เครื่อง / Gantt / รายเดือน เป็น tab ในหน้า (views/resources)
+			{ view: "resources", label: "ทรัพยากร", icon: "users" },
+			{ view: "resource-supply", label: "ยอดวัสดุ", icon: "package", sub: true },
+			{ view: "resource-people", label: "คน/เครื่อง", icon: "users", sub: true },
+			{ view: "resource-gantt", label: "Gantt ทรัพยากร", icon: "gantt", sub: true },
+			{ view: "resource-monthly", label: "รายเดือน", icon: "calendar", sub: true },
 			// เฉพาะผู้ที่เห็นงบต้นทุน (site_app.can_view_finance) Cash Flow / ต้นทุน / Earned Value เป็น tab ในหน้า
 			{ view: "finance", label: "การเงิน", icon: "trending", when: (boot) => boot.can?.finance },
-			{ view: "pm-docs", label: "เอกสาร", icon: "file" },
+			{ view: "pm-docs", label: "เอกสาร", icon: "file", when: view_plan },
 		],
 	},
-	resources: {
-		key: "resources",
-		...MODULE_META.site.resources,
-		home: "resources",
-		tabs: [
-			{ view: "resources", label: "ต้องสั่ง", icon: "cart" },
-			{ view: "resource-supply", label: "ยอดวัสดุ", icon: "package" },
-			{ view: "resource-people", label: "คน/เครื่อง", icon: "users" },
-			{ view: "resource-gantt", label: "Gantt", icon: "gantt" },
-			{ view: "resource-monthly", label: "รายเดือน", icon: "calendar" },
-		],
-	},
-	// ขอซื้อ: หน้างานสร้าง/ติดตามใบขอซื้อ สั่งซื้อ/แจ้งหนี้/ขาย ทำที่แอปออฟฟิศ (/office)
+	// ขอซื้อ: หน้างานขอวัสดุ/สิ่งของที่ต้องการไปยังออฟฟิศ (ใบขอซื้ออย่างเดียว ไม่มีหน้าหลัก) จัดซื้อทำต่อที่หมวดจัดซื้อ
+	// หน้ารายการ/ดู/ฟอร์มใบขอซื้อ (mr, buy-doc, buy-form) เป็นหน้าเดียวกับหมวดจัดซื้อ (shares → routes[].sections ใน site_app.bundle.js)
+	// เปิดจากกลุ่มหน้างาน = หมวดนี้ จากกลุ่มออฟฟิศ = จัดซื้อ (section_for ใน app.js) kinds = ชนิดเอกสารที่หมวดนี้เปิด
 	buy: {
 		key: "buy",
 		...MODULE_META.site.buy,
-		home: "buy",
-		tabs: [
-			{ view: "buy", label: "หน้าหลัก", icon: "home" },
-			{ view: "mr", label: "ขอซื้อ", icon: "clipboard", badge: (s) => s?.mr_todo?.count },
-		],
+		docs: "buy",
+		home: "mr",
+		kinds: ["mr"],
+		shares: ["mr", "buy-doc", "buy-form"],
+		tabs: [{ view: "mr", label: "ขอซื้อ", icon: "clipboard", badge: (s) => s?.mr_todo?.count }],
 		badge: (s) => s?.mr_todo?.count,
+	},
+	// แผนการตัด: แผนตัดเหล็ก (views/work/Rebar*.vue, API consbiz/bar_cut_app.py) เดิมเป็นเมนูในควบคุมงาน
+	rebar: {
+		key: "rebar",
+		...MODULE_META.site.rebar,
+		home: "rebar",
+		tabs: [{ view: "rebar", label: "แผนการตัด", icon: "list-ordered" }],
 	},
 };
 
@@ -123,6 +133,9 @@ export const ROUTES = {
 	"site-form": { section: "work", params: ["kind", "name", "source"] },
 	concrete: { section: "work", params: [] },
 	"concrete-form": { section: "work", params: ["name"] },
+	// แผนตัดเหล็ก: name = new (แผนใหม่) หรือเลขที่ tab = รายการ / ผลการตัด / ตั้งค่า
+	rebar: { section: "rebar", params: [] },
+	"rebar-plan": { section: "rebar", params: ["name", "tab"] },
 	// แผนงาน
 	pm: { section: "pm", params: [] },
 	plan: { section: "pm", params: [] },
@@ -135,17 +148,13 @@ export const ROUTES = {
 	"pm-doc-form": { section: "pm", params: ["kind", "name", "source"] },
 	// การเงิน (tab = cost / evm ว่าง = Cash Flow)
 	finance: { section: "pm", params: ["tab"] },
-	// ทรัพยากร
-	resources: { section: "resources", params: [] },
-	"resource-supply": { section: "resources", params: [] },
-	"resource-people": { section: "resources", params: [] },
-	"resource-gantt": { section: "resources", params: [] },
-	"resource-monthly": { section: "resources", params: [] },
-	// ขอซื้อ: รายการ (filter) รายละเอียด และฟอร์ม (kind = mr เท่านั้น ชนิดอื่นเปิดในแอปออฟฟิศ)
-	buy: { section: "buy", params: [] },
-	mr: { section: "buy", params: ["filter"] },
-	"buy-doc": { section: "buy", params: ["kind", "name"] },
-	"buy-form": { section: "buy", params: ["kind", "name", "source"] },
+	// ทรัพยากร (tab ของหน้าทรัพยากรในแผนงาน)
+	resources: { section: "pm", params: [] },
+	"resource-supply": { section: "pm", params: [] },
+	"resource-people": { section: "pm", params: [] },
+	"resource-gantt": { section: "pm", params: [] },
+	"resource-monthly": { section: "pm", params: [] },
+	// ขอซื้อ (หมวด buy เดิม) รวมเข้าหมวดจัดซื้อ (office_app purchase) ตอนรวม bundle 2026-11-17
 };
 
 // หน้าย่อยนับเป็นเมนูไหน (ไฮไลต์ในแถบข้างของจอใหญ่)
@@ -153,6 +162,7 @@ export const PARENT_TAB = {
 	"receive-form": "receive",
 	receipt: "receive",
 	"concrete-form": "concrete",
+	"rebar-plan": "rebar",
 	"borrow-detail": "borrow",
 	"borrow-new": "borrow",
 	"report-form": "reports",
@@ -162,6 +172,10 @@ export const PARENT_TAB = {
 	"pm-doc-form": "pm-docs",
 	"site-doc": "inspections",
 	"site-form": "inspections",
+	"resource-supply": "resources",
+	"resource-people": "resources",
+	"resource-gantt": "resources",
+	"resource-monthly": "resources",
 };
 
 export const REPORT_KINDS = {

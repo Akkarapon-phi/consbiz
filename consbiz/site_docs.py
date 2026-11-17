@@ -513,8 +513,12 @@ def get_summary(section, project=None, scope="project", company=None):
 		# ร่างแยกชนิด: แอปหน้างานนับเฉพาะใบขอซื้อ แอปออฟฟิศนับทุกชนิด (doc_kinds ของแต่ละแอป)
 		return {k: count_and_sum(k, scoped(k, {"docstatus": 0}))["count"] for k in kinds}
 
+	from consbiz.retention_app import sides_summary
+
 	if section == "buy":
 		return {
+			# เงินประกันผลงานฝั่งจ่าย (เมนูในหมวดจัดซื้อ) เฉพาะผู้ที่มีสิทธิ์
+			**sides_summary(company, project if scope == "project" else None, sides=("out",)),
 			"mr_todo": count_and_sum("mr", scoped("mr", DOCS["mr"]["todo"])),
 			"po_receive": count_and_sum(
 				"po",
@@ -529,6 +533,12 @@ def get_summary(section, project=None, scope="project", company=None):
 				"pi", scoped("pi", {**DOCS["pi"]["todo"], "due_date": ("<", today)}), "outstanding_amount"
 			),
 			"drafts_by_kind": drafts(("mr", "po", "pi")),
+			# PO ที่แก้ตามใบงานเพิ่ม ผรม. แล้วยังไม่ส่งฉบับใหม่ให้ผู้รับเหมา (งานกลางของฝ่ายจัดซื้อ)
+			"po_resend": top(
+				"po", scoped("po", {"docstatus": 1, "custom_revision_pending": 1}), "modified asc"
+			)
+			if frappe.get_meta("Purchase Order").has_field("custom_revision_pending")
+			else [],
 			"due_soon": top(
 				"po",
 				scoped(
@@ -547,6 +557,7 @@ def get_summary(section, project=None, scope="project", company=None):
 		}
 	if section == "sell":
 		return {
+			**sides_summary(company, project if scope == "project" else None, sides=("in",)),
 			"qtn_open": count_and_sum("qtn", scoped("qtn", DOCS["qtn"]["todo"]), "grand_total"),
 			"so_todo": count_and_sum("so", scoped("so", DOCS["so"]["todo"]), "grand_total"),
 			"si_unpaid": count_and_sum("si", scoped("si", DOCS["si"]["todo"]), "outstanding_amount"),
@@ -634,7 +645,8 @@ def links_of(doc):
 		payments = set(
 			frappe.get_all(
 				"Payment Entry Reference",
-				filters={"reference_doctype": doc.doctype, "reference_name": doc.name, "docstatus": 1},
+				# ร่างรับ/จ่ายชำระด้วย (ร่างจากแอปที่รอผู้มีสิทธิ์ยืนยัน)
+				filters={"reference_doctype": doc.doctype, "reference_name": doc.name, "docstatus": ("<", 2)},
 				pluck="parent",
 			)
 		)
@@ -787,6 +799,7 @@ def progress_of(doc, config):
 
 @frappe.whitelist()
 def get_doc(kind, name):
+	from consbiz import accounting_app
 	from consbiz.site_app import pdf_url
 
 	config = config_of(kind)
@@ -850,7 +863,44 @@ def get_doc(kind, name):
 		"can_delete": store_app.can_delete(doc),
 		"after_submit": after_submit_info(doc, kind),
 		"next_kind": next_of(doc, kind),
+		# รับ/จ่ายชำระต่อจากใบแจ้งหนี้ (consbiz/accounting_app.py)
+		"can_pay": kind in ("si", "pi") and accounting_app.can_pay(doc),
 		"pdf_url": pdf_url(doc.doctype, doc.name),
+		"revision": revision_of(doc) if kind == "po" else None,
+	}
+
+
+def revision_of(doc):
+	"""PO ที่แก้ตามใบงานเพิ่ม ผรม. (consbiz/subcontract_variation.py): Rev. ปัจจุบัน, รอส่งผู้รับเหมา, PDF ฉบับก่อนๆ"""
+	from consbiz.subcontract import PURCHASE_ROLES
+
+	if not doc.meta.has_field("custom_revision_pending"):
+		return None
+	if not (cint(doc.custom_revision) or doc.custom_revision_pending or doc.custom_revision_sent_by):
+		return None
+	files = frappe.get_all(
+		"File",
+		filters={
+			"attached_to_doctype": doc.doctype,
+			"attached_to_name": doc.name,
+			"file_name": ("like", f"{doc.name}-Rev%.pdf"),
+		},
+		fields=["file_name", "file_url"],
+		order_by="creation asc",
+	)
+	return {
+		"revision": cint(doc.custom_revision),
+		"note": doc.custom_revision_note,
+		"pending": cint(doc.custom_revision_pending),
+		"sent_by_name": frappe.utils.get_fullname(doc.custom_revision_sent_by)
+		if doc.custom_revision_sent_by
+		else None,
+		"sent_on": doc.custom_revision_sent_on,
+		"snapshots": files,
+		"can_mark_sent": bool(
+			cint(doc.custom_revision_pending)
+			and (doc.has_permission("write") or set(PURCHASE_ROLES) & set(frappe.get_roles()))
+		),
 	}
 
 

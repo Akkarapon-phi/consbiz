@@ -1,0 +1,119 @@
+{
+ "actions": [],
+ "creation": "2026-11-14 16:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "variation",
+  "wbs",
+  "item_name",
+  "uom",
+  "qty",
+  "rate",
+  "amount",
+  "claimed_qty",
+  "claimed_amount",
+  "purchase_order_item"
+ ],
+ "fields": [
+  {
+   "fieldname": "wbs",
+   "fieldtype": "Data",
+   "label": "WBS",
+   "in_list_view": 1,
+   "columns": 1
+  },
+  {
+   "fieldname": "item_name",
+   "fieldtype": "Data",
+   "label": "รายการ",
+   "reqd": 1,
+   "in_list_view": 1,
+   "columns": 3
+  },
+  {
+   "fieldname": "uom",
+   "fieldtype": "Link",
+   "label": "หน่วย",
+   "options": "UOM",
+   "in_list_view": 1,
+   "columns": 1
+  },
+  {
+   "fieldname": "qty",
+   "fieldtype": "Float",
+   "label": "ปริมาณ",
+   "reqd": 1,
+   "in_list_view": 1,
+   "columns": 1
+  },
+  {
+   "fieldname": "rate",
+   "fieldtype": "Currency",
+   "label": "ราคาต่อหน่วย",
+   "options": "Company:company:default_currency",
+   "in_list_view": 1,
+   "columns": 1
+  },
+  {
+   "fieldname": "amount",
+   "fieldtype": "Currency",
+   "label": "มูลค่า",
+   "options": "Company:company:default_currency",
+   "in_list_view": 1,
+   "columns": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "claimed_qty",
+   "fieldtype": "Float",
+   "label": "เบิกแล้ว",
+   "in_list_view": 1,
+   "columns": 1,
+   "read_only": 1,
+   "no_copy": 1,
+   "allow_on_submit": 1
+  },
+  {
+   "fieldname": "claimed_amount",
+   "fieldtype": "Currency",
+   "label": "มูลค่าเบิกแล้ว",
+   "options": "Company:company:default_currency",
+   "read_only": 1,
+   "no_copy": 1,
+   "allow_on_submit": 1
+  },
+  {
+   "fieldname": "purchase_order_item",
+   "fieldtype": "Data",
+   "label": "รายการใน PO",
+   "hidden": 1,
+   "read_only": 1,
+   "no_copy": 1,
+   "allow_on_submit": 1
+  },
+  {
+   "fieldname": "variation",
+   "fieldtype": "Link",
+   "label": "งานเพิ่ม (แนบท้าย)",
+   "options": "Subcontract Variation",
+   "read_only": 1,
+   "no_copy": 1,
+   "description": "ว่าง = งานหลักตามสัญญา"
+  }
+ ],
+ "grid_page_length": 50,
+ "links": [],
+ "modified": "2026-11-15 16:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "ConsBiz",
+ "name": "Subcontract Agreement Item",
+ "owner": "Administrator",
+ "row_format": "Dynamic",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "permissions": [],
+ "istable": 1,
+ "editable_grid": 1
+}

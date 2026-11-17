@@ -1,8 +1,11 @@
 // หมวดงานของแอปออฟฟิศ (/conserp/purchase, /conserp/sales: /conserp/<หมวด>/<หน้า>/<params...>) ตั้งค่าแอปที่ office_app.bundle.js (configure)
 // งานออฟฟิศบนจอใหญ่: จัดซื้อ (ขอซื้อ → สั่งซื้อ → แจ้งหนี้) / ขาย (เสนอราคา → สั่งขาย → แจ้งหนี้)
-// ต่อไป: บัญชี ประกันผลงาน แอดมิน เพิ่มหมวดใหม่: SECTIONS + ROUTES + views.js + สิทธิ์ใน site_app.office_sections
+// บัญชี: รับ/จ่ายชำระ ภาษี หัก ณ ที่จ่าย + เงินประกันผลงาน (หมวดขาย/จัดซื้อมีเมนูเงินประกันของฝั่งตัวเองด้วย) เพิ่มหมวดใหม่: SECTIONS + ROUTES + views.js + สิทธิ์ใน site_app.office_sections
 // ชื่อหน้า (view) ห้ามซ้ำข้ามหมวด เพราะ go("<view>") หาหมวดจากชื่อหน้า
 
+import { boot, scope_args } from "../shared/api.js";
+import { DOC_PAGES as RETENTION_PAGES } from "./views/retention/kinds.js";
+import { DOC_PAGES as ACCOUNTING_PAGES } from "./views/accounting/kinds.js";
 import { MODULE_META } from "../shared/modules.js";
 
 export const SECTIONS = {
@@ -14,7 +17,13 @@ export const SECTIONS = {
 		home: "buy",
 		tabs: [
 			{ view: "buy", label: "หน้าหลัก", icon: "home" },
-			{ view: "mr", label: "ขอซื้อ", icon: "clipboard", badge: (s) => s?.mr_todo?.count, when: (b) => b.docs?.mr?.read },
+			{
+				view: "mr",
+				label: "ขอซื้อ",
+				icon: "clipboard",
+				badge: (s) => s?.mr_todo?.count,
+				when: (b) => b.docs?.mr?.read,
+			},
 			{ view: "po", label: "สั่งซื้อ", icon: "cart", when: (b) => b.docs?.po?.read },
 			{
 				view: "pi",
@@ -23,6 +32,15 @@ export const SECTIONS = {
 				icon: "file",
 				alert: (s) => s?.pi_overdue?.count,
 				badge: (s) => s?.pi_overdue?.count,
+			},
+			// เงินประกันที่หัก ผรม. (retention_app, สิทธิ์ของ Retention Payable / Release)
+			{
+				view: "buy-retention",
+				label: "เงินประกัน",
+				icon: "shield",
+				when: (b) => b.retention?.sides?.out,
+				badge: (s) => s?.retention_out?.count,
+				alert: (s) => s?.retention_out?.late,
 			},
 		],
 		badge: (s) => s?.mr_todo?.count,
@@ -34,8 +52,19 @@ export const SECTIONS = {
 		home: "sell",
 		tabs: [
 			{ view: "sell", label: "หน้าหลัก", icon: "home" },
-			{ view: "qtn", label: "เสนอราคา", icon: "file", badge: (s) => s?.qtn_open?.count, when: (b) => b.docs?.qtn?.read },
-			{ view: "so", label: "สั่งขาย", icon: "clipboard-check", when: (b) => b.docs?.so?.read },
+			{
+				view: "qtn",
+				label: "เสนอราคา",
+				icon: "file",
+				badge: (s) => s?.qtn_open?.count,
+				when: (b) => b.docs?.qtn?.read,
+			},
+			{
+				view: "so",
+				label: "สั่งขาย",
+				icon: "clipboard-check",
+				when: (b) => b.docs?.so?.read,
+			},
 			{
 				view: "si",
 				label: "แจ้งหนี้",
@@ -43,6 +72,15 @@ export const SECTIONS = {
 				icon: "receive",
 				alert: (s) => s?.si_overdue?.count,
 				badge: (s) => s?.si_overdue?.count,
+			},
+			// เงินประกันที่ผู้ว่าจ้างหัก (retention_app, สิทธิ์ของ Retention Receivable / Invoice)
+			{
+				view: "sell-retention",
+				label: "เงินประกัน",
+				icon: "shield",
+				when: (b) => b.retention?.sides?.in,
+				badge: (s) => s?.retention_in?.count,
+				alert: (s) => s?.retention_in?.late,
 			},
 		],
 		badge: (s) => s?.si_overdue?.count,
@@ -65,13 +103,240 @@ export const SECTIONS = {
 				badge: (s) => s?.flag,
 				alert: (s) => s?.flag,
 			},
-			{ view: "hr-adjustments", label: "เพิ่ม/หัก", icon: "list", when: (b) => b.can?.payroll },
-			{ view: "hr-payroll", label: "เงินเดือน", icon: "receive", when: (b) => b.can?.payroll },
-			{ view: "hr-salaries", label: "ค่าจ้างพนักงาน", icon: "users", when: (b) => b.can?.payroll },
+			{
+				view: "hr-adjustments",
+				label: "เพิ่ม/หัก",
+				icon: "list",
+				when: (b) => b.can?.payroll,
+			},
+			{
+				view: "hr-payroll",
+				label: "เงินเดือน",
+				icon: "receive",
+				when: (b) => b.can?.payroll,
+			},
+			{
+				view: "hr-salaries",
+				label: "ค่าจ้างพนักงาน",
+				icon: "users",
+				when: (b) => b.can?.payroll,
+			},
 			{ view: "hr-advances", label: "เบิกเงิน", icon: "swap" },
+			// สัญญาจ้าง / 50 ทวิ พนักงาน (views/hr/kinds.js + HrDocPage.vue, API consbiz/hr_docs.py)
+			{
+				view: "hr-contracts",
+				label: "สัญญาจ้าง",
+				icon: "file",
+				when: (b) => b.hr_docs?.["hr-contracts"],
+				badge: (s) => s?.probation_due?.count,
+			},
+			{
+				view: "hr-wht",
+				label: "50 ทวิ",
+				icon: "receive",
+				when: (b) => b.hr_docs?.["hr-wht"],
+			},
 			{ view: "hr-setup", label: "ตั้งค่า HR", icon: "sliders" },
 		],
 		badge: (s) => s?.flag,
+	},
+	// สารบรรณ: 1 ชนิดเอกสาร = 1 เมนู (views/saraban/kinds.js, API consbiz/saraban.py)
+	saraban: {
+		key: "saraban",
+		...MODULE_META.office.saraban,
+		// หน้าแรกของหมวด = เมนูแรกที่ผู้ใช้เปิดได้ (สิทธิ์แยกตามชนิดเอกสาร)
+		get home() {
+			return (this.tabs.find((t) => t.when(boot)) || this.tabs[0]).view;
+		},
+		tabs: [
+			{
+				view: "letters-in",
+				label: "หนังสือเข้า",
+				icon: "inbox",
+				when: (b) => b.saraban?.["letters-in"],
+				badge: (s) => s?.to_approve?.count,
+				alert: (s) => s?.to_approve?.count,
+			},
+			{
+				view: "letters-out",
+				label: "หนังสือออก",
+				icon: "send",
+				when: (b) => b.saraban?.["letters-out"],
+			},
+			{
+				view: "transmittals",
+				label: "ใบนำส่งเอกสาร",
+				icon: "layers",
+				when: (b) => b.saraban?.transmittals,
+				badge: (s) => s?.to_send?.count,
+			},
+			{
+				view: "envelopes",
+				label: "ใบปะหน้าซอง",
+				icon: "mail",
+				when: (b) => b.saraban?.envelopes,
+			},
+		],
+		badge: (s) => s?.to_approve?.count,
+	},
+	// ผู้รับเหมาช่วง: สัญญา + ใบเบิกงวด + ใบงานเพิ่ม (views/subcontract, API consbiz/subcontract_app.py)
+	subcontract: {
+		key: "subcontract",
+		...MODULE_META.office.subcontract,
+		get home() {
+			return (this.tabs.find((t) => t.when(boot)) || this.tabs[0]).view;
+		},
+		tabs: [
+			{
+				view: "agreements",
+				label: "สัญญา",
+				icon: "file",
+				when: (b) => b.subcontract?.agreements,
+			},
+			{
+				view: "claims",
+				label: "ใบเบิกงวด",
+				icon: "receive",
+				when: (b) => b.subcontract?.claims,
+				badge: (s) => (s?.claims_draft?.count || 0) + (s?.to_invoice?.count || 0),
+				alert: (s) => s?.claims_draft?.count,
+			},
+			{
+				view: "variations",
+				label: "ใบงานเพิ่ม",
+				icon: "plus",
+				when: (b) => b.subcontract?.variations,
+				badge: (s) => s?.variations_draft?.count,
+				alert: (s) => s?.variations_draft?.count,
+			},
+		],
+		badge: (s) => s?.claims_draft?.count,
+	},
+	// บัญชี: รับ/จ่ายชำระ, หัก ณ ที่จ่าย, ภาษีขาย/ซื้อ, รายงานภาษี (views/accounting, API consbiz/accounting_app.py)
+	// + เงินประกันผลงาน 2 ฝั่ง (views/retention, API consbiz/retention_app.py)
+	accounting: {
+		key: "accounting",
+		...MODULE_META.office.accounting,
+		get home() {
+			return (this.tabs.find((t) => t.when(boot)) || this.tabs[0]).view;
+		},
+		tabs: [
+			{
+				view: "acc-receipts",
+				label: "รับชำระ",
+				icon: "receive",
+				when: (b) => b.accounting?.["acc-receipts"],
+				badge: (s) => s?.receipts_draft?.count,
+			},
+			{
+				view: "acc-payments",
+				label: "จ่ายชำระ",
+				icon: "send",
+				when: (b) => b.accounting?.["acc-payments"],
+				badge: (s) => s?.payments_draft?.count,
+			},
+			{
+				view: "acc-wht",
+				label: "หัก ณ ที่จ่าย",
+				icon: "file",
+				when: (b) => b.accounting?.["acc-wht"],
+				badge: (s) => s?.wht_to_issue?.count,
+				alert: (s) => s?.wht_to_issue?.count,
+			},
+			{
+				view: "acc-sales-tax",
+				label: "ภาษีขาย",
+				icon: "trending",
+				when: (b) => b.accounting?.["acc-sales-tax"],
+			},
+			{
+				view: "acc-purchase-tax",
+				label: "ภาษีซื้อ",
+				icon: "cart",
+				when: (b) => b.accounting?.["acc-purchase-tax"],
+			},
+			{
+				view: "acc-tax-report",
+				label: "รายงานภาษี",
+				icon: "list",
+				when: (b) => b.accounting?.reports?.length,
+			},
+			{
+				view: "acc-retention-in",
+				label: "ประกันรับ",
+				icon: "shield",
+				when: (b) => b.retention?.sides?.in,
+				badge: (s) => s?.retention_in?.count,
+				alert: (s) => s?.retention_in?.late,
+			},
+			{
+				view: "acc-retention-out",
+				label: "ประกันจ่าย",
+				icon: "shield",
+				when: (b) => b.retention?.sides?.out,
+				badge: (s) => s?.retention_out?.count,
+				alert: (s) => s?.retention_out?.late,
+			},
+		],
+		badge: (s) =>
+			(s?.wht_to_issue?.count || 0) +
+			(s?.retention_in?.count || 0) +
+			(s?.retention_out?.count || 0),
+	},
+	// คนงาน (กลุ่มธุรการโครงการ, เดิมหมวด admin ของ bundle หน้างาน URL /conserp/admin): ลงเวลาคนงานรายวัน (Labour Timesheet รายรอบ)
+	// + เบิกล่วงหน้า + ทะเบียนคนงาน อยู่ bundle เดียวกับสารบรรณ/ผู้รับเหมา สลับในกลุ่มไม่โหลดหน้าใหม่
+	// ทุกหน้าต้องมีโครงการ (needs_project ใน views.js) ออฟฟิศโครงการเป็นแค่ตัวกรอง
+	labour: {
+		key: "labour",
+		...MODULE_META.office.labour,
+		get home() {
+			return (this.tabs.find((t) => t.when(boot)) || this.tabs[0]).view;
+		},
+		tabs: [
+			{ view: "labour", label: "ลงเวลาคนงาน", icon: "clock", when: (b) => b.can.view_labour },
+			{ view: "advances", label: "เบิกล่วงหน้า", icon: "calculator", when: (b) => b.can.view_advances },
+			{ view: "workers", label: "ทะเบียนคนงาน", icon: "users", when: (b) => b.can.view_workers },
+		],
+	},
+	// ข้อมูลหลัก: 1 ชนิด = 1 เมนู (views/master/kinds.js + MasterPage.vue, API consbiz/master_data.py)
+	master: {
+		key: "master",
+		...MODULE_META.office.master,
+		get home() {
+			return (this.tabs.find((t) => t.when(boot)) || this.tabs[0]).view;
+		},
+		tabs: [
+			{
+				view: "md-employees",
+				label: "พนักงาน",
+				icon: "users",
+				when: (b) => b.master?.["md-employees"],
+			},
+			{
+				view: "md-items",
+				label: "สินค้า/วัสดุ",
+				icon: "package",
+				when: (b) => b.master?.["md-items"],
+			},
+			{
+				view: "md-customers",
+				label: "ลูกค้า",
+				icon: "building",
+				when: (b) => b.master?.["md-customers"],
+			},
+			{
+				view: "md-suppliers",
+				label: "ผู้ขาย",
+				icon: "truck",
+				when: (b) => b.master?.["md-suppliers"],
+			},
+			{
+				view: "md-projects",
+				label: "โครงการ",
+				icon: "briefcase",
+				when: (b) => b.master?.["md-projects"],
+			},
+		],
 	},
 };
 
@@ -100,4 +365,77 @@ export const ROUTES = {
 	"hr-adjustments": { section: "hr", params: ["month"] },
 	"hr-salaries": { section: "hr", params: ["filter"] },
 	"hr-advances": { section: "hr", params: ["filter"] },
+	// สัญญาจ้าง / 50 ทวิ: รายการ (tab) / หน้าเอกสาร kind = ชื่อหน้ารายการ (ไฮไลต์เมนูผ่าน kind_pages)
+	"hr-contracts": { section: "hr", params: ["tab"] },
+	"hr-wht": { section: "hr", params: ["tab"] },
+	"hr-doc": { section: "hr", params: ["kind", "name"] },
+	// สารบรรณ: รายการ (tab = แท็บสถานะ) / ดู / ฟอร์ม (kind = letter_in/letter_out/transmittal/envelope)
+	// source ของฟอร์ม = ใบนำส่งต้นทางของใบปะหน้าใหม่
+	"letters-in": { section: "saraban", params: ["tab"] },
+	"letters-out": { section: "saraban", params: ["tab"] },
+	transmittals: { section: "saraban", params: ["tab"] },
+	envelopes: { section: "saraban", params: ["tab"] },
+	"saraban-doc": { section: "saraban", params: ["kind", "name"] },
+	"saraban-form": { section: "saraban", params: ["kind", "name", "source"] },
+	// ผรม.: name = new (ใหม่) หรือเลขที่ / ใบเบิกใหม่: agreement = สัญญาที่จะเบิก
+	agreements: { section: "subcontract", params: ["tab"] },
+	claims: { section: "subcontract", params: ["tab"] },
+	agreement: { section: "subcontract", params: ["name"] },
+	claim: { section: "subcontract", params: ["name", "agreement"] },
+	variations: { section: "subcontract", params: ["tab"] },
+	variation: { section: "subcontract", params: ["name", "agreement"] },
+	// บัญชี: รายการ (tab) / หน้าเอกสาร kind = ชื่อหน้ารายการ (ไฮไลต์เมนูผ่าน kind_pages): รับ/จ่ายชำระ (acc-receipts/acc-payments),
+	// ใบกำกับภาษี (acc-sales-tax/acc-purchase-tax) / หนังสือรับรอง: name = new + source = จ่ายชำระต้นทาง
+	// รายงานภาษี: report = sales/purchase/pnd3/pnd53, month = YYYY-MM
+	"acc-receipts": { section: "accounting", params: ["tab"] },
+	"acc-payments": { section: "accounting", params: ["tab"] },
+	"acc-wht": { section: "accounting", params: ["tab"] },
+	"acc-sales-tax": { section: "accounting", params: ["tab"] },
+	"acc-purchase-tax": { section: "accounting", params: ["tab"] },
+	"acc-payment": { section: "accounting", params: ["kind", "name"] },
+	"acc-wht-doc": { section: "accounting", params: ["name", "source"] },
+	"acc-tax-doc": { section: "accounting", params: ["kind", "name"] },
+	"acc-tax-report": { section: "accounting", params: ["report", "month"] },
+	// เงินประกันผลงาน: รายการ (tab) / หน้าเอกสาร `<รายการ>-doc` (type = rr/ri/rp/rl, name = new = ใบขอคืน/ใบคืนใหม่,
+	// source = เงินประกันต้นทางของใบใหม่)
+	"acc-retention-in": { section: "accounting", params: ["tab"] },
+	"acc-retention-out": { section: "accounting", params: ["tab"] },
+	"acc-retention-in-doc": { section: "accounting", params: ["type", "name", "source"] },
+	"acc-retention-out-doc": { section: "accounting", params: ["type", "name", "source"] },
+	"sell-retention": { section: "sales", params: ["tab"] },
+	"sell-retention-doc": { section: "sales", params: ["type", "name", "source"] },
+	"buy-retention": { section: "purchase", params: ["tab"] },
+	"buy-retention-doc": { section: "purchase", params: ["type", "name", "source"] },
+	// ข้อมูลหลัก: รายการ (tab) / หน้าข้อมูล kind = ชื่อหน้ารายการ (ไฮไลต์เมนูผ่าน kind_pages) name = new (ใหม่) หรือรหัส
+	"md-employees": { section: "master", params: ["tab"] },
+	"md-items": { section: "master", params: ["tab"] },
+	"md-customers": { section: "master", params: ["tab"] },
+	"md-suppliers": { section: "master", params: ["tab"] },
+	"md-projects": { section: "master", params: ["tab"] },
+	"md-doc": { section: "master", params: ["kind", "name"] },
+	// คนงาน: day = วันใดก็ได้ในรอบ (ว่าง = รอบปัจจุบัน)
+	labour: { section: "labour", params: ["day"] },
+	advances: { section: "labour", params: [] },
+	workers: { section: "labour", params: [] },
+};
+
+// ค่าของหมวดออฟฟิศที่ bundle ConsERP (site_app.bundle.js) รวมเข้า configure() (เดิมอยู่ office_app.bundle.js)
+export const PARENT_TAB = {
+	"boq-form": "boq",
+	agreement: "agreements",
+	claim: "claims",
+	variation: "variations",
+	...RETENTION_PAGES,
+	...ACCOUNTING_PAGES,
+};
+// หน้าดู/ฟอร์มไฮไลต์เมนูตาม params.kind (สารบรรณ: kind = ชื่อหน้ารายการ เช่น letters-in)
+export const KIND_PAGES = ["buy-doc", "sell-doc", "buy-form", "sell-form", "saraban-doc", "saraban-form", "hr-doc", "acc-payment", "acc-tax-doc", "md-doc"];
+// ตัวเลขบนเมนู: ขอบเขต = ตัวกรองโครงการ + บริษัท (scope_args ของหมวดนั้น เพราะโหลดพร้อมหมวดอื่น)
+export const SUMMARY_API = {
+	purchase: () => ["consbiz.site_docs.get_summary", { section: "buy", ...scope_args("purchase") }],
+	sales: () => ["consbiz.site_docs.get_summary", { section: "sell", ...scope_args("sales") }],
+	hr: () => ["consbiz.hr_attendance.get_summary", scope_args("hr")],
+	saraban: () => ["consbiz.saraban.get_summary", scope_args("saraban")],
+	subcontract: () => ["consbiz.subcontract_app.get_summary", scope_args("subcontract")],
+	accounting: () => ["consbiz.accounting_app.get_summary", scope_args("accounting")],
 };

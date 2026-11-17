@@ -25,6 +25,29 @@
 			<div v-if="wide" class="ss-list-head">
 				<StatusTabs v-model="filter" :options="tabs" />
 				<div class="ss-list-tools">
+					<button
+						type="button"
+						class="ss-icon-btn"
+						:class="{ 'is-spinning': loading }"
+						aria-label="โหลดใหม่"
+						title="โหลดใหม่"
+						@click="load"
+					>
+						<Icon name="refresh" :size="17" />
+					</button>
+					<button
+						type="button"
+						class="ss-btn ss-btn--primary ss-list-create"
+						:disabled="busy || !to_close"
+						:title="close_hint"
+						@click="close_period"
+					>
+						<Icon name="check" :size="18" :stroke="2.6" />
+						<span>บันทึก Attendance{{ to_close ? ` (${num(to_close)})` : "" }}</span>
+					</button>
+				</div>
+				<!-- แถวตัวกรอง: ค้นหา (HeaderSearch ย้ายมาเอง) → เดือน → โครงการ -->
+				<div class="ss-list-filterbar">
 					<span class="hr-month">
 						<button type="button" class="ss-icon-btn" aria-label="เดือนก่อน" title="เดือนก่อน" @click="shift(-1)">
 							<Icon name="chevron-left" :size="17" />
@@ -48,26 +71,6 @@
 						</button>
 					</span>
 					<ProjectFilter />
-					<button
-						type="button"
-						class="ss-icon-btn"
-						:class="{ 'is-spinning': loading }"
-						aria-label="โหลดใหม่"
-						title="โหลดใหม่"
-						@click="load"
-					>
-						<Icon name="refresh" :size="17" />
-					</button>
-					<button
-						type="button"
-						class="ss-btn ss-btn--primary ss-list-create"
-						:disabled="busy || !to_close"
-						:title="close_hint"
-						@click="close_period"
-					>
-						<Icon name="check" :size="18" :stroke="2.6" />
-						<span>บันทึก Attendance{{ to_close ? ` (${num(to_close)})` : "" }}</span>
-					</button>
 				</div>
 			</div>
 			<template v-else>

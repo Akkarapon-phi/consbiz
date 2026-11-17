@@ -90,16 +90,6 @@
 					</div>
 					<div v-if="readonly" class="pl-tabs-actions">
 						<button
-							v-if="p.data?.can_write"
-							type="button"
-							class="ss-btn ss-btn--soft ss-plan-edit-btn"
-							aria-label="แก้ไขแผนงาน"
-							title="แก้ไขแผนงาน"
-							@click="go('plan-edit', { cm: p.name })"
-						>
-							<Icon name="pen" :size="15" /> <span>แก้ไขแผนงาน</span>
-						</button>
-						<button
 							type="button"
 							class="ss-icon-btn"
 							:class="{ 'is-spinning': p.loading }"
@@ -108,6 +98,17 @@
 							@click="reload"
 						>
 							<Icon name="refresh" :size="17" />
+						</button>
+						<!-- ปุ่มหลักของหน้า: ขวาสุดของแถวแท็บ สีเข้ม -->
+						<button
+							v-if="p.data?.can_write"
+							type="button"
+							class="ss-btn ss-btn--primary ss-plan-edit-btn"
+							aria-label="แก้ไขแผนงาน"
+							title="แก้ไขแผนงาน"
+							@click="go('plan-edit', { cm: p.name })"
+						>
+							<Icon name="pen" :size="15" /> <span>แก้ไขแผนงาน</span>
 						</button>
 					</div>
 				</div>

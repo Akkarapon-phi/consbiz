@@ -24,3 +24,4 @@ consbiz.patches.add_conserp_to_desktop_layouts
 consbiz.patches.add_consoffice_to_desktop_layouts
 consbiz.patches.create_concrete_item_group
 consbiz.patches.set_payroll_based_on_attendance
+consbiz.patches.seed_social_security_rates

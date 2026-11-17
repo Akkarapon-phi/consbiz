@@ -29,7 +29,7 @@ class IntegrationTestHrSetup(IntegrationTestCase):
 	def test_sso_formula_uses_actual_wage(self):
 		from hrms.payroll.utils import COMPONENT_EVAL_GLOBALS
 
-		run = lambda **d: frappe.safe_eval(hr_setup.SSO_FORMULA, COMPONENT_EVAL_GLOBALS, {"OT": 0, **d})  # noqa: E731
+		run = lambda **d: frappe.safe_eval(hr_setup.sso_formula("2026-05-01"), COMPONENT_EVAL_GLOBALS, {"OT": 0, **d})  # noqa: E731
 		self.assertEqual(run(base=30000, payment_days=30, total_working_days=30), 875)
 		self.assertEqual(run(base=15000, payment_days=15, total_working_days=30), 375)
 		self.assertEqual(run(base=12000, payment_days=30, total_working_days=30, OT=2000), 700)

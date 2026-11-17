@@ -1,0 +1,242 @@
+{#-
+	ใบลงเวลาและค่าแรงคนงานรายวัน (Labour Timesheet) A4 แนวนอน 1 แผ่นต่อรอบ = ใบลงเวลา + ใบเซ็นรับเงิน
+	- ตาราง: คนงาน x วันของรอบ (ชั่วโมงทำงาน, วันหยุดพื้นเทา) + รวมวัน/OT + ค่าแรง หักเบิก ประกันสังคม หักอื่นๆ สุทธิ + ช่องเซ็นรับเงิน
+	- แบ่งกลุ่มตามผู้รับเงิน: บริษัทจ่ายเอง / ผ่าน ผรม. แต่ละราย (ยอดรวมกลุ่ม) แถวคนงานจาก doc.pay ชั่วโมงจาก doc.days
+	- ท้าย: ยอดรวม + ผู้จัดทำ / ผู้ตรวจสอบ / ผู้อนุมัติ
+-#}
+{%- set money = "{:,.2f}" -%}
+{%- set company = frappe.db.get_value("Company", doc.company, ["company_name"], as_dict=True) or {} -%}
+{%- set project_name = frappe.db.get_value("Project", doc.project, "project_name") or doc.project -%}
+{%- set start = frappe.utils.getdate(doc.from_date) -%}
+{%- set end = frappe.utils.getdate(doc.to_date) -%}
+{%- set dows = ["จ", "อ", "พ", "พฤ", "ศ", "ส", "อา"] -%}
+{%- set holidays = doc.holidays | map(attribute="date") | map("string") | list -%}
+{%- set ns = namespace(days=[]) -%}
+{%- for i in range((end - start).days + 1) -%}
+	{%- set ns.days = ns.days + [frappe.utils.add_days(start, i)] -%}
+{%- endfor -%}
+{%- set hours = {} -%}
+{%- for d in doc.days -%}
+	{%- set _ = hours.update({d.worker ~ "|" ~ (d.date | string): d.hours}) -%}
+{%- endfor -%}
+{#- ตำแหน่ง + ค่าแรง/วัน ณ วันสุดท้ายของรอบ (ค่าแรงเป็นประวัติ ปรับกลางรอบแล้วแต่ละวันคิดตามอัตราของวันนั้น) -#}
+{%- set positions = {} -%}
+{%- set rates = {} -%}
+{%- for p in doc.pay -%}
+	{%- set w = frappe.get_doc("Daily Worker", p.worker) -%}
+	{%- set _ = positions.update({p.worker: w.position or ""}) -%}
+	{%- set _ = rates.update({p.worker: w.rate_on(doc.to_date)}) -%}
+{%- endfor -%}
+{%- set groups = [] -%}
+{%- set direct = doc.pay | selectattr("payee_type", "equalto", "Company") | list -%}
+{%- if direct %}{% set _ = groups.append({"label": "บริษัทจ่าย", "rows": direct}) %}{% endif -%}
+{%- for supplier in doc.pay | selectattr("payee_type", "equalto", "Subcontractor") | map(attribute="supplier") | unique | list -%}
+	{%- set _ = groups.append({"label": "ผ่าน " ~ (frappe.db.get_value("Supplier", supplier, "supplier_name") or supplier), "rows": doc.pay | selectattr("supplier", "equalto", supplier) | list}) -%}
+{%- endfor -%}
+{%- set cols = ns.days | length + 11 -%}
+{%- macro num(v) -%}{{ "" if not v else ("{:,.2f}".format(v)).rstrip("0").rstrip(".") }}{%- endmacro -%}
+
+{% include "consbiz/templates/print/print_style.html" %}
+
+<style>
+	.print-format {
+		orientation: Landscape;
+	}
+	@page {
+		size: A4 landscape;
+	}
+	.pf-lt {
+		font-size: 7.5pt;
+	}
+	.pf-lt-head {
+		display: flex;
+		justify-content: space-between;
+		align-items: flex-end;
+		gap: 16px;
+		padding-bottom: 6px;
+		margin-bottom: 8px;
+		border-bottom: 2px solid var(--pf-ink);
+	}
+	.pf-lt-head h1 {
+		margin: 0;
+		font-size: 13pt;
+		color: var(--pf-ink);
+	}
+	.pf-lt-head .pf-lt-meta {
+		text-align: right;
+		line-height: 1.5;
+	}
+	.pf .pf-lt-grid {
+		width: 100%;
+		border-collapse: collapse;
+		table-layout: fixed;
+	}
+	.pf .pf-lt-grid th,
+	.pf .pf-lt-grid td {
+		border: 1px solid var(--pf-line);
+		padding: 2px 3px;
+		vertical-align: middle;
+		text-align: center;
+		white-space: nowrap;
+		overflow: hidden;
+	}
+	.pf .pf-lt-grid thead th {
+		background: var(--pf-head);
+		color: var(--pf-ink);
+		font-weight: 600;
+		font-size: 7pt;
+	}
+	.pf .pf-lt-grid .pf-lt-name {
+		text-align: left;
+		width: 120px;
+	}
+	.pf .pf-lt-grid .pf-lt-name small {
+		display: block;
+		color: var(--pf-muted);
+		font-size: 6.5pt;
+	}
+	.pf .pf-lt-grid .pf-lt-day {
+		width: 20px;
+	}
+	.pf .pf-lt-grid .pf-lt-off {
+		background: var(--pf-soft);
+	}
+	.pf .pf-lt-grid .pf-lt-n {
+		text-align: right;
+		width: 52px;
+	}
+	.pf .pf-lt-grid .pf-lt-s {
+		width: 30px;
+	}
+	.pf .pf-lt-grid .pf-lt-sign {
+		width: 70px;
+	}
+	.pf .pf-lt-grid .pf-lt-group td {
+		background: var(--pf-soft);
+		text-align: left;
+		font-weight: 600;
+		color: var(--pf-ink);
+	}
+	.pf .pf-lt-grid .pf-lt-sum td {
+		font-weight: 600;
+		color: var(--pf-ink);
+	}
+	.pf .pf-lt-grid tbody tr {
+		height: 22px;
+	}
+	.pf-lt-foot {
+		display: flex;
+		justify-content: space-between;
+		gap: 24px;
+		margin-top: 18px;
+	}
+	.pf-lt-foot > div {
+		flex: 1;
+		text-align: center;
+		color: var(--pf-muted);
+	}
+	.pf-lt-foot .line {
+		margin-bottom: 4px;
+	}
+	.pf-lt-note {
+		margin-top: 6px;
+		color: var(--pf-muted);
+		font-size: 6.5pt;
+	}
+</style>
+
+<div class="pf pf-lt">
+	<div class="pf-lt-head">
+		<div>
+			<div class="muted">{{ company.company_name or doc.company }}</div>
+			<h1>ใบลงเวลาและค่าแรงคนงานรายวัน</h1>
+			<div>โครงการ <b>{{ project_name }}</b></div>
+		</div>
+		<div class="pf-lt-meta">
+			<div>รอบ <b>{{ thai_date(doc.from_date) }} – {{ thai_date(doc.to_date) }}</b></div>
+			<div>เลขที่ {{ doc.name }} · {{ "อนุมัติแล้ว" if doc.docstatus == 1 else ("ยกเลิก" if doc.docstatus == 2 else "ร่าง") }}</div>
+		</div>
+	</div>
+
+	<table class="pf-lt-grid">
+		<thead>
+			<tr>
+				<th class="pf-lt-s" rowspan="2">#</th>
+				<th class="pf-lt-name" rowspan="2">ชื่อ-สกุล / ตำแหน่ง</th>
+				{%- for d in ns.days %}
+				<th class="pf-lt-day {{ 'pf-lt-off' if (d | string) in holidays }}">{{ d.day }}</th>
+				{%- endfor %}
+				<th class="pf-lt-s" rowspan="2">วัน</th>
+				<th class="pf-lt-s" rowspan="2">OT</th>
+				<th class="pf-lt-n" rowspan="2">ค่าแรง/วัน</th>
+				<th class="pf-lt-n" rowspan="2">รวมค่าแรง</th>
+				<th class="pf-lt-n" rowspan="2">หักเบิก</th>
+				<th class="pf-lt-n" rowspan="2">ประกันสังคม</th>
+				<th class="pf-lt-n" rowspan="2">หักอื่นๆ</th>
+				<th class="pf-lt-n" rowspan="2">สุทธิ</th>
+				<th class="pf-lt-sign" rowspan="2">ลายมือชื่อ<br />ผู้รับเงิน</th>
+			</tr>
+			<tr>
+				{%- for d in ns.days %}
+				<th class="pf-lt-day {{ 'pf-lt-off' if (d | string) in holidays }}">{{ "ห" if (d | string) in holidays else dows[d.weekday()] }}</th>
+				{%- endfor %}
+			</tr>
+		</thead>
+		<tbody>
+			{%- set counter = namespace(i=0) -%}
+			{%- for g in groups %}
+			<tr class="pf-lt-group"><td colspan="{{ cols }}">{{ g.label }}</td></tr>
+			{%- for p in g.rows %}
+			{%- set counter.i = counter.i + 1 %}
+			<tr>
+				<td class="pf-lt-s">{{ counter.i }}</td>
+				<td class="pf-lt-name">{{ p.worker_name }}<small>{{ positions[p.worker] }}</small></td>
+				{%- for d in ns.days %}
+				<td class="pf-lt-day {{ 'pf-lt-off' if (d | string) in holidays }}">{{ num(hours.get(p.worker ~ "|" ~ (d | string))) }}</td>
+				{%- endfor %}
+				<td class="pf-lt-s">{{ num(p.days_worked) }}</td>
+				<td class="pf-lt-s">{{ num(p.ot_hours) }}</td>
+				<td class="pf-lt-n">{{ money.format(rates[p.worker]) }}</td>
+				<td class="pf-lt-n">{{ money.format(p.gross) }}</td>
+				<td class="pf-lt-n">{{ money.format(p.advance) if p.advance else "" }}</td>
+				<td class="pf-lt-n">{{ money.format(p.sso) if p.sso else "" }}</td>
+				<td class="pf-lt-n" title="{{ p.deduction_remark or '' }}">{{ money.format(p.other_deduction) if p.other_deduction else "" }}</td>
+				<td class="pf-lt-n"><b>{{ money.format(p.net) }}</b></td>
+				<td class="pf-lt-sign"></td>
+			</tr>
+			{%- endfor %}
+			{%- if groups | length > 1 %}
+			<tr class="pf-lt-sum">
+				<td colspan="{{ ns.days | length + 5 }}" class="text-right">รวม{{ g.label }}</td>
+				<td class="pf-lt-n">{{ money.format(g.rows | sum(attribute="gross")) }}</td>
+				<td class="pf-lt-n">{{ money.format(g.rows | sum(attribute="advance")) }}</td>
+				<td class="pf-lt-n">{{ money.format(g.rows | sum(attribute="sso")) }}</td>
+				<td class="pf-lt-n">{{ money.format(g.rows | sum(attribute="other_deduction")) }}</td>
+				<td class="pf-lt-n">{{ money.format(g.rows | sum(attribute="net")) }}</td>
+				<td></td>
+			</tr>
+			{%- endif %}
+			{%- endfor %}
+			<tr class="pf-lt-sum">
+				<td colspan="{{ ns.days | length + 5 }}" class="text-right">รวมทั้งสิ้น</td>
+				<td class="pf-lt-n">{{ money.format(doc.total_gross) }}</td>
+				<td class="pf-lt-n">{{ money.format(doc.total_advance) }}</td>
+				<td class="pf-lt-n">{{ money.format(doc.total_sso) }}</td>
+				<td class="pf-lt-n">{{ money.format(doc.total_other_deduction) }}</td>
+				<td class="pf-lt-n">{{ money.format(doc.total_net) }}</td>
+				<td></td>
+			</tr>
+		</tbody>
+	</table>
+	<div class="pf-lt-note">
+		ช่องวันที่ = ชั่วโมงทำงาน (8 = 1 วัน เกิน 8 = OT) พื้นเทา = วันหยุด (ค่าแรง x 2, OT x 3) · OT = ค่าแรง ÷ 8 x 1.5 ต่อชั่วโมง
+		{%- set remarks = doc.pay | selectattr("deduction_remark") | list %}
+		{%- if remarks %} · หักอื่นๆ: {% for p in remarks %}{{ p.worker_name }} {{ p.deduction_remark }}{{ ", " if not loop.last }}{% endfor %}{% endif %}
+	</div>
+
+	<div class="pf-lt-foot">
+		<div><div class="line">...................................................</div>ผู้จัดทำ (ธุรการ)</div>
+		<div><div class="line">...................................................</div>ผู้ตรวจสอบ</div>
+		<div><div class="line">...................................................</div>ผู้อนุมัติ</div>
+	</div>
+</div>

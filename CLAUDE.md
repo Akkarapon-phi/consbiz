@@ -171,9 +171,9 @@ pre-commit run --all-files                               # ruff + prettier (ต�
   | URL | คนใช้ | เนื้อหา |
   |---|---|---|
   | `/conserp` | หน้างาน (มือถือ) | ควบคุมงาน, สโตร์, แผนงาน, ทรัพยากร, การเงิน, ขอซื้อ/ขอเบิก + ติดตามสถานะ |
-  | `/conserp/purchase`, `/conserp/sales`, ... | ออฟฟิศ (จอใหญ่) | ซื้อ, ขาย, บัญชี, ประกันผลงาน, แอดมิน (หนังสือเข้า-ออก, สัญญา ผรม., ใบนำส่ง, ใบปะหน้า, ค่าแรงรายวัน) |
+  | `/conserp/purchase`, `/conserp/sales`, ... | ออฟฟิศ (จอใหญ่) | ซื้อ, ขาย, บัญชี (รับ/จ่ายชำระ, ภาษีซื้อ-ขาย, หัก ณ ที่จ่าย, รายงานภาษี, เงินประกันผลงาน (ตกลง 2026-11-15: อยู่ในบัญชี + เมนูของฝั่งตัวเองในขาย/จัดซื้อ)), สารบรรณ (หนังสือเข้า-ออก, ใบนำส่ง, ใบปะหน้า), ผู้รับเหมาช่วง (สัญญา, ใบเบิกงวด) (ค่าแรงรายวันอยู่หมวดธุรการของหน้างาน) |
   | `/conserp/self` | พนักงานทุกคน | Self Service: ลงเวลา, ลา, สลิป, วันหยุดประจำสัปดาห์ + ตารางทีม, เบิกเงินเดือนล่วงหน้า/เงินสำรองจ่าย/เบิกคืน + อนุมัติ หน้าจอครอบ HRMS (แทนแผน `/hr-app` เดิม) |
-  | `/contractor` | ผู้รับเหมาช่วง (คนนอก) | อัปเดตผลงาน, ดูสัญญา/งวดของตัวเอง API แยกและตรวจสิทธิ์ทุกคำขอ |
+  | `/contractor` | ผู้รับเหมาช่วง (คนนอก) | ดูสัญญา/งวด/ยอดของตัวเอง, ร่างใบเบิกงวด + แนบรูป แล้วส่งให้ตรวจ API แยกและตรวจสิทธิ์ทุกคำขอ |
   ห้ามใช้ `/me` (หน้า My Account ของ Frappe), `/hr/...` (Roster ของ HRMS), `/hrms` (ESS ของ HRMS)
   โค้ดหน้าจอกลางอยู่ `public/js/shared/`: `AppShell.vue` (Dock/แถบล่าง/เลือกโครงการ/toast), `api.js` (เรียก API, router, state, รูปแบบ),
   `app.js` (`configure()` ค่าของแต่ละแอป: base, storage, sections, routes, views, summary_api), `components/`, `docs/` (เอกสารซื้อ-ขาย + `kinds.js` = DOC_KINDS),
@@ -182,27 +182,27 @@ pre-commit run --all-files                               # ruff + prettier (ต�
   ผู้ใช้เห็นเป็นแอปเดียว "ConsERP" (ตกลง 2026-11-08): PWA ตัวเดียว `site_app/manifest.webmanifest` (scope `/conserp`, start_url `/conserp/desktop`,
   id `/site` คงไว้จากแอปเดิม ห้ามเปลี่ยน) แก้ manifest แล้วเพิ่มเลข `?v=` ที่ลิงก์ใน www/*.html (`/assets` cache 12 ชม.)
   ทุกหมวดของทุกแอปอยู่ระดับเดียวกัน `/conserp/<หมวด>` (ทุก bundle `base: "/conserp"`) server เลือก bundle ตามชื่อหมวด (`website_route_rules`:
-  `_OFFICE_SECTIONS` ใน hooks.py = bundle ออฟฟิศ ตรงกับ `site_app.office_sections` ที่เหลือ = bundle หน้างาน) ชื่อหมวดจึงห้ามซ้ำข้ามแอป
-  หมวดใหม่ของออฟฟิศต้องเพิ่มใน `_OFFICE_SECTIONS` ด้วย URL เดิม `/site`, `/office`, `/conserp/office`, `/store` เด้งมาที่ใหม่ (`website_redirects` ข้อแรกที่ตรงชนะ)
+  หน้างาน + ออฟฟิศ = bundle เดียว (`site_app.bundle.js` ที่ www/site.html, รวม 2026-11-17) Self Service = www/self.html (`_SELF_SECTIONS`) ชื่อหมวด/ชื่อหน้า (view) ห้ามซ้ำทั้ง bundle
+  URL เดิม `/site`, `/office`, `/conserp/office`, `/store`, `/conserp/admin` (→ `labour`) เด้งมาที่ใหม่ (`website_redirects` ข้อแรกที่ตรงชนะ)
   หมวดออฟฟิศ `purchase`/`sales` ใช้ชุดเอกสาร `buy`/`sell` (`sections[].docs`, `DOC_KINDS[].section`, ชื่อหน้า `buy-doc` ฯลฯ) ภาพรวมออฟฟิศเลิกใช้แล้ว
   Dock พับ/กางจำค่าเดียวทุก bundle (`consbiz.conserp.sidebar`) หน้าแรก/ตารางหมวด = ไอคอน + ชื่อ (`ModuleGrid.vue`, คำอธิบายอยู่ใน tooltip)
   ทุกหน้า www ของแอปลิงก์ manifest นี้ ไอคอน = `public/images/logo.png` (สร้าง `conserp-round-*.png` (ขอบมน) + `conserp-maskable.png` (เต็มกรอบ ให้ Android ตัดเอง), `logo-96.png` เปลี่ยนรูปต้องเปลี่ยนชื่อไฟล์ เพราะ Chrome จำไอคอนตาม URL ใน `public/site_app/`) ข้างในยังแยก bundle ต่อแอป
   หน้าแรก (Desktop) = หมวดพิเศษ `desktop` ที่ `configure()` ใส่ให้ทุกแอป (`shared/components/Desktop.vue`, ไม่ต้องเลือกโครงการ)
   ชื่อ/ไอคอน/สีของหมวดทุกแอปอยู่ `shared/modules.js` (`MODULE_META`) ที่เดียว sections.js ดึงไปใช้
-  หมวดที่มีสิทธิ์ของทุกแอป = `site_app.app_modules` → `boot.modules` (แสดงทั้งขอซื้อ `buy` ของหน้างานและจัดซื้อ `purchase` ของออฟฟิศ) หมวดของแอปอื่น = ลิงก์ (โหลด bundle นั้น)
+  หมวดที่มีสิทธิ์ของทุกแอป = `site_app.app_modules` → `boot.modules` หมวดของแอปใน bundle เดียวกัน (`app.section_apps`, `local_apps()` ใน app.js) = สลับในหน้า แอปอื่น (self) = ลิงก์
   สิทธิ์ของหน้าจอ: เมนู = `tab.when(boot)` (สิทธิ์อ่าน `boot.can.view_*` / `boot.docs.<kind>.read`, เปิดจาก URL ตรงก็กลับหน้าหลักหมวด), ปุ่มสร้าง/ส่ง/ส่งออก = `boot.can.*` / `can_doc(kind, ptype)` (`site_docs.doc_permissions`), ปุ่มรายใบ = `can_*` จาก server ไม่มีสิทธิ์ = ไม่แสดง (ไม่ใช่ disabled) API ตรวจซ้ำเสมอ เมนู/ปุ่มใหม่ต้องผูกสิทธิ์ด้วย
   หน้าตั้งค่า (เมนู avatar เฉพาะ System Manager, `boot.can.settings`): `shared/components/SettingsDialog.vue` เพิ่มหัวข้อที่ `PAGES` สิทธิ์ (เลือกหมวดแล้วเพิ่ม Role) = `settings/PermissionSettings.vue` + `consbiz/app_settings.py` (ครอบ Custom DocPerm ของ Frappe เอกสารของหมวดอยู่ใน `MODULES` เพิ่มหมวด/เอกสารใหม่ต้องเพิ่มที่นั่น)
   ลบเอกสารในแอป: `shared/components/DeleteSheet.vue` + `store_app.can_delete` / `delete_document` (ร่างหรือยกเลิกแล้ว + สิทธิ์ลบ) เอกสารใหม่ที่มีหน้าดูต้องส่ง `can_delete`
-  build ของ Frappe ไม่แบ่งโหลด (code splitting) จึงแยกเป็น bundle ต่อกลุ่มแอป ไม่ใช่ต่อหมวด และไม่รวมเป็น bundle เดียว (ตกลง 2026-11-08:
-  แอปจะเพิ่มอีกมาก bundle เดียวโตเรื่อยๆ มือถือเปิดช้า) สลับหมวดในกลุ่มลื่น ข้ามกลุ่มโหลดหน้าใหม่ (ผ่านหน้าแรกเท่านั้น)
+  build ของ Frappe ไม่แบ่งโหลด (code splitting) เดิมแยก bundle ต่อกลุ่มแอป (ตกลง 2026-11-08) แล้วรวมหน้างาน + ออฟฟิศเป็น bundle เดียว (ตกลง 2026-11-17:
+  สลับข้ามกลุ่มเคยโหลดหน้าใหม่ ขนาด production gzip 430KB จาก 311KB) หมวดหน้างานต้องเลือกโครงการ หมวดออฟฟิศ (`filter_sections`) โครงการเป็นตัวกรอง (`app.project_filter` = getter ตามหมวดที่เปิด, `is_filter_section`) โครงการที่เลือกชุดเดียวกันทุกหมวด Self Service / ผู้รับเหมา ยังแยก bundle
 - แอปหน้างาน `/conserp` (มือถือ, ติดตั้งลงหน้าจอได้) = หน้า www (`consbiz/www/site.html`) + Vue (`public/js/site_app/`) แอปเดียวแบ่งหมวดงาน
-  หมวดขอซื้อของหน้างาน = ใบขอซื้ออย่างเดียว (`doc_kinds: ["mr"]`) สั่งซื้อ/แจ้งหนี้/ขาย อยู่แอปออฟฟิศ
+  หมวดขอซื้อ (`buy`, กลุ่มหน้างาน): หน้างานขอวัสดุ/สิ่งของไปยังออฟฟิศ ใบขอซื้ออย่างเดียว ไม่มีหน้าหลัก หน้า `mr`/`buy-doc`/`buy-form` ใช้ร่วมกับหมวดจัดซื้อ (`shares` ใน sections.js → `routes[view].sections`) หน้าที่อยู่หลายหมวด: `go` เลือกหมวดด้วย `section_for` (หมวดที่เปิดอยู่ > กลุ่มเดียวกัน > หมวดแรกที่เข้าได้, `kinds` = ชนิดเอกสารที่หมวดรับ) route เก็บ `section` สลับหมวดส่ง `{ section }` ให้ go ตรง จัดซื้อเห็นเมื่ออ่าน PO/PI ได้
 - BOQ (หมวด `boq` ของแอปออฟฟิศ `/conserp/boq`, `office_app/views/boq/`, API `consbiz/boq_app.py`): สร้าง/แก้ร่าง นำเข้า-ส่งออก Excel Submit สร้างแผนงาน ใช้แทนฟอร์มระบบเต็ม เฉพาะ Projects Manager / System Manager
   สร้างแผนงานได้ตั้งแต่ BOQ เป็นร่าง แก้ร่างแล้วกด "อัปเดตแผนงาน" (`construction_management/boq_sync.py`, แสดงสรุปก่อน): แถวเดิมคงวันที่/งานก่อนหน้า ชื่อ/ปริมาณ/ราคา/ลำดับ/WBS ตาม BOQ จับคู่ด้วย `boq_detail` แล้วชื่องาน + หน่วย งานเหมาคงมูลค่าในแผน แถวที่ถูกใช้ห้ามลบ/เปลี่ยนเลข/เป็นหัวกลุ่ม ใช้ได้เมื่อยังไม่มี Baseline/VO `boq_app.fill` ต้องคงรหัสแถว BOQ (แผนอ้างด้วยรหัสนี้)
   Baseline ต้องการ BOQ ที่ Submit แล้ว Submit BOQ ต้องให้แผนตรงกันก่อน (`BOQ.before_submit`) หลัง Submit งานเพิ่ม-ลดเป็นหน้าที่ของ VO BOQ ที่มีแผนแล้วยกเลิกไม่ได้ (`BOQ.before_cancel`) ยอด/เลข WBS ใน `BoqForm.vue` ต้องตรงกับ `calculate_row` / `assign_wbs` ใน `boq.py`
 - มูลค่าในแผนงาน: ช่องเงินของ CM และ Task เป็น permlevel 1 ผู้ไม่มีสิทธิ์ `get_schedule_data` ส่งมูลค่าเป็นสัดส่วนของสัญญา (`hide_values`, รวม = 100 ให้ % และ S-Curve คำนวณได้) `get_dashboard` ตัดจำนวนเงิน (`hide_money`) หน้าจอซ่อนด้วย `can_view_value` / `show_values`
-- แอปออฟฟิศ (`/conserp/purchase`, `/conserp/sales`, จอใหญ่) = `consbiz/www/office.html` + `public/js/office_app/` (sections/views/bundle) หมวดจัดซื้อ/ขายเต็ม (`doc_kinds` ทั้ง 6 ชนิด)
-  boot = `site_app.office_boot_data` หมวดตามสิทธิ์ `site_app.office_sections` / ของหน้างาน `site_app.site_sections`
+- หมวดออฟฟิศ (`/conserp/purchase`, `/conserp/sales`, ... จอใหญ่) = `public/js/office_app/` (sections.js มี `PARENT_TAB`/`KIND_PAGES`/`SUMMARY_API` ที่ site_app.bundle.js รวมเข้า) หมวดจัดซื้อ/ขายเต็ม (`doc_kinds` ทั้ง 6 ชนิด)
+  boot = `site_app.boot_data` (หมวดหน้างาน `site_sections` + ออฟฟิศ `office_sections`, ข้อมูลออฟฟิศ `add_office_boot`; `office_boot_data` = ชื่อเดิม)
   `site_app.APPS` + `available_apps` → `boot.apps` (ใช้หาแอปที่ดูแลเอกสาร `doc_url`)
   เอกสารชนิดที่แอปไม่ได้ดูแล: `open_doc` / `doc_url` (`shared/docs/kinds.js`) เปิดในแอปออฟฟิศ (ไม่มีสิทธิ์ = ระบบเต็ม) ปุ่มสร้างเอกสารถัดไปซ่อน (`in_app`)
   URL เดิม `/site/sell/...`, `/site/buy/(po|pi)...`, `/site/buy/(buy-doc|buy-form)/(po|pi)/...` เด้งไป `/conserp/purchase`, `/conserp/sales` (`website_redirects`)
@@ -245,17 +245,17 @@ pre-commit run --all-files                               # ruff + prettier (ต�
   แก้ได้: วันเริ่ม/จบ/จำนวนวัน, งานก่อนหน้า, % แผนรายช่วง (แท็บ "% แผน" `planner/PlanDistribution.vue` ตรงกับ `plan_dialog.js` ของระบบเต็ม), คน/เครื่องจักร + วัสดุ (แท็บ "ทรัพยากร" `planner/PlanResources.vue` ตรงกับ `TaskPanel.vue`, บันทึกพร้อม `save_tasks`), % จริง ณ วัน Cut-off, คลิกขวาที่แถว = เมนู (`planner/PlanMenu.vue` รายการอยู่ใน `open_menu` ของ PlanEdit) พิมพ์ = แท็บ "พิมพ์" (`planner/PlanPrint.vue`: Preview ซ้าย + Properties ขวา, สั่งพิมพ์จาก iframe ของ Preview จึงตรงกัน, ป้ายท้ายแถบจัดตำแหน่งเอง (`placed_end_texts` ใน print.js) ขวา/ซ้าย/ตัดชื่อ และเผื่อท้าย Timeline เท่าป้ายสถานะ, ปุ่มดู PDF = `print_pdf.get_plan_pdf` (Chromium ฝั่ง server ตรวจ HTML แบบ allowlist: ถ้า print.js ใช้แท็ก/แอตทริบิวต์ใหม่ต้องเพิ่มใน `ALLOWED_*`), แบบเอกสาร = `THEMES` ใน print.js (ตามหน้าจอ/ทางการ/แถบข้าง desk ใช้แบบเดิม), ตัวเทียบหลักของหัวกระดาษ/ตารางสรุป/S-Curve = Baseline, ย่อ-หุบ WBS ของงานพิมพ์แยกจากตาราง ค่าจำในเครื่องแยกตามแผน `consbiz.planner.print.<CM>`, ข้อมูล `planner/print_model.js` ตัวสร้าง `build_print` ใน `construction_management/print.js` ชุดเดียวกับระบบเต็ม, `print_env.js` แทนฟังก์ชันของ desk) ส่วน Excel/บันทึก Baseline/แผนทรัพยากร ยังเปิดหน้า Gantt ของระบบเต็ม (แท็บใหม่)
   แก้โครงสร้างงาน (แท็บ "แผนงาน" เพิ่มงาน/งานย่อย/Indent/Outdent/ลบ, Shift เลือกหลายงาน) = `construction_management/structure.py` บันทึกทันที Undo ไม่ได้ งานเพิ่มในแผน (`boq_detail` ว่าง) มูลค่า 0 งาน BOQ เป็นหัวกลุ่มหรือถูกลบไม่ได้ บันทึก Baseline ชุดแรก = ยืนยันแผน: ปิดคำสั่งโครงสร้างทั้งหมด (WBS มาจาก BOQ/VO เท่านั้น) ยกเลิกการยืนยัน (`unconfirm_plan` ลบ Baseline ทุกชุด) ได้เฉพาะแผนที่ยังไม่มีความคืบหน้า/เอกสารอ้าง WBS/งาน VO ก่อนยืนยัน: ไม่มีเอกสารอ้าง = รันเลข WBS ใหม่ทั้งแผน มีเอกสารอ้าง = งานที่ถูกใช้ล็อก งานใหม่ได้เลขถัดไปท้ายกลุ่ม งานที่เพิ่มเองไม่ขึ้นใน Daily Report / Daily Request (`is_planning_task`) ผู้วางแผนอัปเดต % ในหน้าแก้แผน คอลัมน์ "เลข BOQ" (`boq_wbs`) = เลขเดิมใน BOQ เอกสารที่อ้าง WBS เพิ่มใหม่ต้องเพิ่มใน `CHILD_REFERENCES` / `HEADER_REFERENCES`
   ออกจากหน้าผ่าน `set_leave_guard` (api.js) บันทึกงานค้างก่อน (`planner.flush`) แก้ logic ฝั่ง App.vue ของระบบเต็มต้องแก้ planner.js ด้วย
-  Look-ahead: มือถือ = การ์ดทีละสัปดาห์, แท็บเล็ต = ตาราง 2 สัปดาห์, จอใหญ่ = ตารางทั้งช่วง (matchMedia ใน `Lookahead.vue`)
+  Look-ahead: มือถือ = การ์ดทีละสัปดาห์, แท็บเล็ต = ตาราง 2 สัปดาห์ตั้งแต่สัปดาห์ที่เลือก, จอใหญ่ = แท็บ "ทั้งหมด" (ทั้งช่วง) หรือตั้งแต่สัปดาห์ที่เลือก (matchMedia ใน `Lookahead.vue`) หัวรายการ = แท็บสัปดาห์ + ณ วันที่ (`date` ของ `get_lookahead`) + พิมพ์ (หน้าต่างใหม่ คัดลอก CSS ของแอป, A4 แนวนอน) + โหลดใหม่
   summary ของหมวดที่ `lazy` (แผนงาน) โหลดเมื่อเปิดหมวดนั้นเท่านั้น
   หมวดที่เห็นตามสิทธิ์ (`site_app.boot_data` → `sections`) สลับหมวด: มือถือ = ตารางหมวดทุกแอป (`SectionLauncher.vue` → `ModuleGrid.vue`) เปิดจากปุ่มซ้ายสุดของ `TopBar.vue`
   แท็บเล็ต/จอใหญ่ = Dock แถบเดียว `.ss-rail` ใน AppShell กว้าง 56px เท่า Dock ของ Frappe (ไม่มี sidebar แยก) โลโก้ = หน้าแรก, หมวดของกลุ่มแอปนี้เท่านั้น
   (หน้าแรกแสดงทุกกลุ่ม ตารางหมวดของมือถือ = กลุ่มนี้ + ปุ่มหน้าแรก `ModuleGrid local_only`),
   เมนูของหมวด = แท็บบนแถบบน (`SectionTabs.vue`, ข้อมูลจาก AppShell `provide("section_nav")`): อยู่ใน `TopBar` แทนชื่อหน้า
-  (เฉพาะหน้าที่ไม่มีปุ่มย้อนกลับ) จอ < 1100 แท็บที่ไม่ได้เลือกเหลือไอคอน Dock ค่าเริ่มต้นพับ (ไอคอน)
+  (เฉพาะหน้าที่ไม่มีปุ่มย้อนกลับ) ชื่อเมนูแสดงเสมอ ที่ไม่พอ = เมนูที่ล้นรวมไว้ที่ปุ่ม "…" (เหมือน `StatusTabs`) Dock ค่าเริ่มต้นพับ (ไอคอน)
   ชี้เมาส์แล้วไม่กางเอง (ชื่อเมนูดูจาก tooltip) จอสัมผัส = ปุ่มพับ/กางกางชั่วคราวทับเนื้อหา (`html[data-peek]`) เลือกเมนู/แตะนอกแถบแล้วพับ
   Dock ไม่มีปุ่มเลือกโครงการ: เลือกที่ปุ่มโครงการบน `TopBar.vue` (มือถือ = แถบเต็มแถวใต้แถบบน `.ss-project-bar`, เฉพาะหน้าเมนูหลักที่ไม่มีปุ่มย้อนกลับ
   หน้าดู/ฟอร์มไม่ให้เปลี่ยนโครงการกลางคัน, `no_project` = ซ่อน) Dock มีแค่ตัวเลือกบริษัทของออฟฟิศ
-  หน้ารายการจอ ≥768: หัวรายการ `.ss-list-head` = แท็บสถานะ (`StatusTabs.vue` หน้าตาเดียวกับ `.pl-tabs`) + ตัวกรอง → ปุ่มส่งออก/สร้าง แถวเดียวเสมอ ต่อเป็นการ์ดเดียวกับตาราง (ไม่มีปุ่มลอย) ตัวกรองที่ไม่พอซ่อนแล้วกำหนดที่ปุ่มตัวกรอง (`use_overflow_row` ใน `table.js`, ปุ่มแสดงจำนวนตัวกรองที่ใช้ ไม่แสดงชิปบนจอ ≥768) ช่องค้นหาอยู่แถบบน (`HeaderSearch.vue` ผ่าน slot `search`, จอ < 1180 = ปุ่มแว่นขยาย กดแล้วกางทับแถบบน) ปุ่มสร้างอยู่ขวาสุดของหัวรายการ ถัดจากปุ่มโหลดใหม่ แถบบนด้านขวาเรียง โครงการ → ค้นหา → แจ้งเตือน ปุ่มโครงการตัดชื่อด้วย … แถบแคบ (≤660px) = `Project.custom_abbr` ไม่ตั้ง = ตัวย่อจากชื่อ
+  หน้ารายการจอ ≥768: หัวรายการ `.ss-list-head` = แท็บสถานะ (`StatusTabs.vue` หน้าตาเดียวกับ `.pl-tabs`) + ตัวกรอง → ปุ่มส่งออก/สร้าง แถวเดียวเสมอ ต่อเป็นการ์ดเดียวกับตาราง (ไม่มีปุ่มลอย) หน้าตาใหม่: แถว 2 = แถวตัวกรอง ค้นหา (มีปุ่ม X) → ตัวกรองแบบเลือก → ปุ่มตัวกรองรวมขวาสุด (แสดงเสมอ) ตัวกรองที่ไม่พอซ่อนแล้วกำหนดที่ปุ่มตัวกรอง (`use_overflow_row` ใน `table.js`, ปุ่มแสดงจำนวนตัวกรองที่ใช้ ไม่แสดงชิปบนจอ ≥768) ช่องค้นหาอยู่แถบบน (`HeaderSearch.vue` ผ่าน slot `search`, จอ < 1180 = ปุ่มแว่นขยาย กดแล้วกางทับแถบบน) ปุ่มสร้างอยู่ขวาสุดของหัวรายการ ถัดจากปุ่มโหลดใหม่ แถบบนด้านขวาเรียง โครงการ → ค้นหา → ค้นหาทั้งระบบ → แจ้งเตือน (ค้นหาทั้งระบบ = `shared/components/GlobalSearch.vue` ปุ่มใน TopBar + Ctrl/⌘+G ใน AppShell, API `site_app.global_search` ค้นเลขที่/title_field ของ `GLOBAL_SEARCH_DOCTYPES` ตามสิทธิ์ เปิดผลด้วย `open_document` ของ notifications.js เพิ่มชนิดเอกสารที่ค้นได้ที่ tuple นั้น) ปุ่มโครงการตัดชื่อด้วย … แถบแคบ (≤660px) = `Project.custom_abbr` ไม่ตั้ง = ตัวย่อจากชื่อ
   มือถือ = แท็บสถานะ + ค้นหาในแถบเครื่องมือ + ตัวกรองใน sheet สโตร์และตรวจงาน/คอนกรีตใช้หัวรายการเดียวกัน หน้ารับของ/เบิก/ยืม-คืน/คลัง + ตาราง `DataTable.vue` (เรียง/แบ่งหน้าในเครื่อง)
   ปุ่มพับ/กาง = แถวบนสุดของโซนท้าย Dock เหนือบริษัท/avatar (`.ss-rail-toggle`) จอเมาส์ = ปักหมุด
   (`html[data-side="expanded"]`) กางค้างและดันเนื้อหา จำในเครื่อง ท้าย Dock = บริษัท (ออฟฟิศ) + avatar ผู้ใช้วงกลม (เมนู: ชื่อเต็ม+User → `ProfileSheet.vue` ข้อมูลส่วนตัว / ระบบเต็ม / ออกจากระบบ)
@@ -286,7 +286,7 @@ pre-commit run --all-files                               # ruff + prettier (ต�
   ฟอร์มใหม่เก็บร่างใน localStorage ระหว่างกรอก (สัญญาณหลุดไม่หาย) ขอตรวจงาน / Punch List สร้างใน `views/project_docs/`
   ขออนุมัติได้ทุกวัน (ย้อนหลังได้) PDF/แชร์ไฟล์: `site_app.pdf_url` เลือกตัวสร้าง PDF แบบหน้าพิมพ์ของระบบเต็ม (Print Format → Print Settings)
   ดู PDF ในแอป (`PdfViewer.vue`) วาดด้วย PDF.js ที่ `public/js/lib/pdfjs/` (มือถือแสดง PDF ใน iframe ไม่ได้) โหลดเมื่อเปิดครั้งแรก
-  ไม่ใช้ desk: เรียก API ด้วย fetch เอง (`api.js`), router เอง (`<base>/<หมวด>/<view>/<params>`, หน้าหลักของหมวดไม่มี `<view>` ใน URL params เริ่มต่อจากหมวด, `website_route_rules`), CSS อยู่ `shared/style.css` (class `ss-`)
+  ไม่ใช้ desk: เรียก API ด้วย fetch เอง (`api.js`, คำขอที่ถูกตัดเพราะออกจากหน้า เช่น สลับไปหมวดของอีก bundle = error เงียบ `silent` ไม่ขึ้น "เชื่อมต่อเซิร์ฟเวอร์ไม่ได้"), router เอง (`<base>/<หมวด>/<view>/<params>`, หน้าหลักของหมวดไม่มี `<view>` ใน URL params เริ่มต่อจากหมวด, `website_route_rules`), CSS อยู่ `shared/style.css` (class `ss-`)
   `/store/...` เดิมเด้งไป `/conserp/store/...` (`website_redirects` ใน hooks.py) ไอคอนที่ติดตั้งไว้แล้วยังใช้ได้
   CSS ต้อง `@import` ใน `<style>` ของ `AppShell.vue` (Frappe ฝัง CSS เข้า bundle เฉพาะที่มาจาก .vue ถ้า import .css ตรงๆ ไฟล์ JS ถูกลบตอน build)
   ห้ามวาง comment ระดับ root ใน `<template>` (ข้าง root element) ให้วางเหนือ `<template>` หรือในตัว element:
@@ -365,6 +365,109 @@ pre-commit run --all-files                               # ruff + prettier (ต�
   ช่องติ๊ก "ไม่หักเงิน (ตักเตือน)" แยกจากสถานะ (ขาด/ครึ่งวัน, `WAIVABLE`): บันทึกเป็น Present ให้จ่ายค่าจ้าง สถานะจริงใน `Attendance.custom_waived_status`
   นับแยก (`totals.waived`) ไว้ใช้ทางวินัย ขาดบ่อยเกิน HR กด "หักเงินวันที่ยกเว้นไว้" (`charge_waived` = บันทึกเป็นสถานะจริง) ก่อนยืนยันสลิป
   "บันทึก Attendance" (`close_period`) = สร้างของวันมาทำงาน/ขาดถึงเมื่อวาน ต้องไม่มีวันรอตัดสิน ผูก `Employee Checkin.attendance` ของวันนั้น
+- สารบรรณ (หมวด `saraban` ของแอปออฟฟิศ `/conserp/saraban`, `consbiz/saraban.py`, `office_app/views/saraban/`, เริ่ม 2026-11-14):
+  หน้าจอครอบ `Letter In` / `Letter Out` / `Transmittal` / `Envelope` (กฎของเอกสารอยู่ใน DocType เหมือนเดิม) 1 ชนิด = 1 เมนู
+  ชนิด (kind) = ชื่อหน้ารายการ (`letters-in`, `letters-out`, `transmittals`, `envelopes`) ทั้งใน `KINDS` ของ saraban.py และ `kinds.js`
+  เพราะหน้าดู/ฟอร์ม (`saraban-doc`, `saraban-form`) ไฮไลต์เมนูตาม `params.kind` (`kind_pages`) หน้าแรกของหมวด = เมนูแรกที่เปิดได้ (getter `home` ใน sections.js)
+  สิทธิ์ต่อชนิด = `boot.saraban` (`boot_permissions`: อ่านได้ = มีเมนู, `create` = ปุ่มสร้าง) หมวดแสดงเมื่ออ่านได้อย่างน้อย 1 ชนิด (`saraban_kinds`)
+  หลัง Submit แก้ได้เฉพาะ `after` ของ KINDS: สถานะหนังสือออก (`document_status`), วันที่ส่ง/ผู้รับ/วันที่รับของใบนำส่ง ยกเลิกได้ในแอป แก้ฉบับ (Amend) ใช้ระบบเต็ม
+  หนังสือเข้า: บันทึกและลงรับ (Submit) → เสนออนุมัติ (`propose`, ผู้ใช้ Role `Approver`) → ผู้อนุมัติ `decide` (ไม่อนุมัติต้องมีเหตุผล) ระหว่างรอ `withdraw` / `change_approver`
+  ขั้นตอนเดียวกับปุ่มในฟอร์มระบบเต็ม (`letter_in.js`) แจ้งผู้อนุมัติด้วย Assign To (ปิดเมื่อพิจารณา ยกเลิกเมื่อถอน/เปลี่ยน) ผู้อนุมัติไม่ต้องมีสิทธิ์เขียน (ตรวจสิทธิ์ของขั้นแล้วบันทึกแบบ ignore_permissions)
+  ตัวเลขเมนู: หนังสือรอผู้ใช้คนนี้อนุมัติ (`to_approve`) และใบนำส่งรอส่ง (`to_send`)
+  ใบนำส่ง "ดึงเอกสาร" = `transmittal.get_documents` (ผ่าน `transmittal_documents`) ใบปะหน้าสร้างจากใบนำส่งผ่าน `envelope.make_envelope` (`saraban-form/envelopes/new/<ใบนำส่ง>`)
+  ใบปะหน้าพิมพ์ได้ 3 ขนาด (`ENVELOPE_FORMATS`: Print Format `Envelope`, `Envelope DL`, `Envelope 9/125`)
+- ผู้รับเหมาช่วง (หมวด `subcontract` ของแอปออฟฟิศ `/conserp/subcontract`, ตกลง 2026-11-14): กฎ/การคำนวณ `consbiz/subcontract.py`, API แอป `consbiz/subcontract_app.py`, หน้า `office_app/views/subcontract/`
+  `Subcontract Agreement` (สัญญา): รายการงาน (WBS ในแผน, ปริมาณ x ราคา) + เงินประกัน/เพดาน (% ของมูลค่าสัญญา), หัก ณ ที่จ่าย, เงินล่วงหน้า/% หักคืนต่องวด, ค่าปรับต่อวัน, ระยะรับประกัน
+  วิธีเบิก `Measured` (กรอกปริมาณงวดนี้รายแถว ระบบคิดสะสม/คงเหลือ, ตกลง 2026-11-15) / `Milestone` (เลือกงวด = % ของทุกแถว งวดสุดท้ายเบิกส่วนที่เหลือ, % งวดรวม 100) ทั้งสองแบบจึงเป็นปริมาณต่อแถว PO/PI ผูกรายแถว (`purchase_order_item`) ยอดผูกพันในหน้าการเงินถูก
+  บริษัทตามโครงการเสมอ (`set_company` ตอน before_insert ด้วย เพราะเลขที่ `.ABBR.` ตั้งก่อน validate และค่าตั้งต้นของผู้ใช้เติมบริษัทก่อน fetch)
+  Submit แล้ว "กดปุ่ม" สร้างร่าง PO (`make_purchase_order`, Item = `Labour Settings.subcontract_item` หน่วยของ Item ปริมาณ/หน่วยจริงอยู่ในคำอธิบาย) ไม่สร้างอัตโนมัติ (ผู้ใช้เลือก 2026-11-14)
+  เงินล่วงหน้า = ร่าง Payment Entry อ้าง PO (`make_advance_payment`) ยอดที่จ่ายแล้วอ่านจาก `Purchase Order.advance_paid`
+  `Subcontract Claim` (ใบเบิกงวด): ร่างโดยวิศวกร (Projects User) หรือ ผรม. (แอป `/contractor` ด้านล่าง) Submit = อนุมัติ (Projects/Purchase Manager) แล้วกดสร้างร่าง PI (`make_purchase_invoice`)
+  ยอดก่อน VAT: หักคืนเงินล่วงหน้า = % ของงวด ไม่เกินยอดที่จ่ายจริงที่ยังหักไม่หมด, เงินประกัน = % ของงวด ไม่เกินเพดานที่เหลือ, ค่าปรับ = วัน x ค่าปรับ
+  PI: หัก ณ ที่จ่าย/เงินประกันเป็นยอดจากใบเบิก (`set_deductions`, ระบบเดิมสร้าง Retention Payable ตอน Submit PI), เงินล่วงหน้าผ่านตาราง advances (จัดสรรไม่เกินยอดหักคืน), ค่าปรับเป็นแถวหักบัญชี `Labour Settings.penalty_income_account`
+  ยอดสรุปของสัญญาคำนวณใหม่จากใบเบิกที่ Submit ทุกครั้ง (`refresh_agreement`) ยกเลิกใบเบิก = ลบร่าง PI (PI ที่ Submit แล้วต้องยกเลิกก่อน)
+  % งานจริงต่อแถวมาจาก `Construction Management Task.progress` ตาม WBS เบิกเกินแสดงคำเตือน (ไม่บล็อก) ฟอร์มในแอปคำนวณยอดจาก server ทันที (`preview_claim`)
+  ตั้งค่าบัญชี: Labour Settings หัวข้อ "สัญญาจ้างเหมาช่วง" (`subcontract_expense_account`, `penalty_income_account`) ในหน้าตั้งค่าค่าแรงของแอป
+  ปริมาณจ้างรวมต่องานในแผน (`check_plan_quantity`, ตกลง 2026-11-15): สัญญานี้ + สัญญาอื่นที่ Submit แล้ว (สัญญาที่ปิดนับเฉพาะที่เบิกจริง) ต้องไม่เกินปริมาณในแผน
+  (แถวงานเพิ่ม VO ที่ `source_wbs` = งานเดิมรวมกองเดียวกัน) เกิน = ห้ามบันทึก ต้องทำ VO ผู้ว่าจ้างก่อน ตรวจเฉพาะแถวที่มี WBS + หน่วยตรงแผน งานเหมาไม่ตรวจ (ฟอร์มเติมหน่วยจากแผนให้: `wbs_options` มี `uom`)
+  ไม่มีงานลด ผรม. (ตกลง 2026-11-15): งานจบต่ำกว่าสัญญาหรือ ผรม. ไม่ทำต่อ = ปิดสัญญา (`close_agreement` สถานะ `Closed` + เหตุผล + `warranty_end`, ปิด PO ด้วย ERPNext Close, มีร่างค้างปิดไม่ได้) เปิดอีกครั้งได้ (`reopen_agreement`)
+  งานเพิ่ม = `Subcontract Variation` (ใบงานเพิ่ม `SCV-`, `consbiz/subcontract_variation.py`, หน้า `VariationPage.vue`) เป็น "รายการแนบท้าย" ทุกสัญญา (ตกลง 2026-11-15):
+  แถวใหม่ในสัญญาที่มี `variation` งานหลักไม่เปลี่ยน (% งวดคิดจากงานหลักเท่านั้น) แนบท้ายเบิกตามปริมาณจริงเสมอ สัญญางวดงานไม่เลือกงวด = เบิกเฉพาะแนบท้าย
+  สัญญาเก็บ `original_amount` (งานหลัก) + `variation_amount` + `revision` (ครั้ง) ใบเบิก/หน้าสัญญาแยกกลุ่มแนบท้ายตามใบงานเพิ่ม
+  Submit = อนุมัติ: PDF ของ PO ฉบับปัจจุบันแนบที่ PO (`<PO>-Rev<n>.pdf`, ลิงก์ `po_snapshot`, สร้างไม่ได้ = ไม่อนุมัติ) → แถวแนบท้ายในสัญญา
+  → PO เดิมเลขที่เดิมด้วย `update_child_qty_rate` ของ ERPNext + คำนวณหักใหม่ + `Purchase Order.custom_revision` / `custom_revision_note` (ใส่ในแบบพิมพ์ PO เอง)
+  ยกเลิกได้เฉพาะฉบับล่าสุดและแถวแนบท้ายยังไม่ถูกเบิก (ลบแถวในสัญญาและ PO, PO กลับ Rev. ก่อนหน้า)
+  แก้/ปิด PO ตามสัญญา "ระบบทำแทน" (`subcontract.as_system`, ตกลง 2026-11-15): ตรวจสิทธิ์อนุมัติใบงานเพิ่ม/ปิดสัญญาของผู้ใช้ ไม่ต้องมีสิทธิ์ PO
+  บันทึก Comment ที่ PO ว่าใครอนุมัติ แล้วแจ้งฝ่ายจัดซื้อทุกคนของบริษัท (`notify_purchasing`, Role ใน `PURCHASE_ROLES` + User Permission ของ Company) ไม่ผูกคนสร้าง PO
+  PO ที่ Submit แล้วถูกแก้ = `custom_revision_pending` (งานกลางของฝ่ายจัดซื้อ: หน้าหลักหมวดจัดซื้อ "PO แก้ไขแล้ว รอส่งผู้รับเหมา" `po_resend`, แถบในหน้าดู PO `revision_of` + PDF ฉบับก่อนๆ)
+  ใครในฝ่ายก็กด "ส่งผู้รับเหมาแล้ว" (`mark_po_sent` → `custom_revision_sent_by/on`) หน้าสัญญา/ใบงานเพิ่มแสดงสถานะส่ง
+- แอปผู้รับเหมาช่วง (`/contractor`, คนนอก, เริ่ม 2026-11-15): www `contractor.html`, bundle `public/js/contractor_app/` (ใช้ AppShell `no_project` หมวดเดียว `contractor`), API `consbiz/contractor_app.py`
+  เข้าได้ 2 แบบ หน้าจอชุดเดียวกัน: (1) ลิงก์ของสัญญา `/contractor/k/<Subcontract Agreement.contractor_token>` ไม่ต้อง login (ใช้หลัก, ตกลง 2026-11-15: ไม่มี PIN)
+  เห็นเฉพาะสัญญานั้น ใช้ได้จนสัญญาปิด (Closed) หรือยกเลิก (เปิดสัญญาอีกครั้ง = ลิงก์เดิมใช้ได้) เจ้าหน้าที่กด "ลิงก์ผู้รับเหมา" ในหน้าสัญญาของออฟฟิศ (`subcontract_app.contractor_link`, ผู้ที่อ่านสัญญาได้)
+  "สร้างลิงก์ใหม่" = ลิงก์เดิมใช้ไม่ได้ทันที (`reset_contractor_link`, ผู้อนุมัติสัญญา) server ส่งเฉพาะ path หน้าจอต่อ `location.origin` เอง (`get_url` ของเครื่อง dev ใส่พอร์ต 8000)
+  ลิงก์ใช้ base ของ router `/contractor/k/<token>` หน้าแรก = หน้าสัญญา (`boot.agreement`) ทุกคำขอส่ง `token` (`contractor_app/api.js`) ผู้เปิดจากลิงก์ = `boot.guest` (ไม่มีกระดิ่ง/เมนูผู้ใช้)
+  (2) บัญชีผู้ใช้: Website User ในตาราง Portal Users ของ Supplier เห็นทุกสัญญาของผู้รับเหมานั้น login / เปิด `/` แล้วไป `/contractor` (hook `get_website_user_home_page` = `contractor_app.website_user_home_page` เฉพาะ Website User ที่ผูก Supplier
+  ห้ามใช้ `role_home_page` ของ Role Supplier เพราะ Administrator/System Manager มีทุก Role จะถูกพาไปด้วย; `add_to_apps_screen` ของ consbiz มี `has_permission` = `erpnext.check_app_permission` ไม่งั้น login พาไป `/app/consbiz`)
+  ทุก endpoint เป็น `allow_guest` และเรียก `use(token)` บรรทัดแรก (ขอบเขต = ผู้รับเหมา + สัญญาของลิงก์) แล้วตรวจเอกสารกับขอบเขตก่อนอ่าน/เขียนแบบ ignore_permissions endpoint ใหม่ต้องทำแบบเดียวกัน
+  รับเฉพาะ `CLAIM_INPUT` + ปริมาณรายแถว (ค่าปรับ/% งานจริงในแผนเป็นของฝ่ายเรา ผรม. ไม่กรอก/ไม่เห็น)
+  ใบเบิกที่ ผรม. ร่าง (`Subcontract Claim.from_contractor`, `prepared_by` = ผู้ใช้ หรือว่างเมื่อมาจากลิงก์): Draft → ส่งให้ตรวจ (`Pending Review`, แจ้ง Role `CLAIM_REVIEW_ROLES` ของบริษัท)
+  → เจ้าหน้าที่แก้ปริมาณ/ค่าปรับแล้ว Submit หรือส่งกลับแก้ (`Returned` + `return_reason`, `subcontract.return_claim`) ระหว่างรอตรวจ ผรม. ถอนกลับได้ (`withdraw_claim`)
+  ระหว่าง Draft/Returned เจ้าหน้าที่แก้/อนุมัติไม่ได้ (`subcontract_app.contractor_busy`, `before_submit_claim`) 1 สัญญามีใบเบิกของ ผรม. ที่ยังไม่อนุมัติได้ใบเดียว ใบที่เจ้าหน้าที่ร่างเอง ผรม. เห็นเมื่ออนุมัติแล้ว
+  ไฟล์แนบ: `contractor_app.upload_file` (multipart, รูป/PDF ≤ 10MB, ≤ 30 ไฟล์ต่อใบ, private, ผูกใบเบิกทันที เพราะคนไม่ login ใช้ upload_file ของ Frappe ไม่ได้) เปิดผ่าน `open_file` เจ้าหน้าที่ดูไฟล์ในระบบเต็ม
+  การแจ้งเตือน Subcontract Claim เปิดหน้าในแอป (`APP_PAGES` ใน `shared/notifications.js`) ยังไม่ทำ: ดู PDF ของ PO, การ์ดไฟล์แนบในหน้าเจ้าหน้าที่
+- แผนตัดเหล็กในแอปหน้างาน (เมนู "ตัดเหล็ก" หมวดควบคุมงาน `/conserp/work/rebar`, เริ่ม 2026-11-15): API `consbiz/bar_cut_app.py` หน้า `site_app/views/work/Rebar.vue` (รายการตามโครงการ) + `RebarPlan.vue` (แท็บ รายการตัด / ผลการตัด / ตั้งค่า) ตัวช่วย `rebar.js`
+  ความยาวตัด/จัดตัดคำนวณใน validate ของ Bar Cut Plan เหมือนเดิม แอปส่ง `INPUT`/`ITEM`/`STOCK` แล้ว "คำนวณและบันทึก" ผลการตัดมาจาก server เสมอ ความยาวตัดก่อนเพิ่มแถว = `preview` (ฟังก์ชันเดียวกับหน้าต่างของระบบเต็ม)
+  เพิ่มเหล็ก = sheet 2 ขั้น: เลือกรูปทรงจากภาพ (แถวแรก, แถวต่อไปใช้รูปเดิม กด "เปลี่ยนรูปทรง") แล้วกรอกด้าน SVG ของ Bar Shape แสดงด้วย `shape_svg` ใน rebar.js (ตัด script/on* ก่อน v-html, ป้ายด้านตรงกับ bar_cut_plan.js / .py) สิทธิ์ `boot.can.bar_cut` / `bar_cut_write` แผนที่ไม่ผูกโครงการไม่ขึ้นในแอป
+- เอกสารพนักงานในหมวดบุคคล (เริ่ม 2026-11-15): API `consbiz/hr_docs.py` รายการ KindList (`office_app/views/hr/kinds.js`) หน้าเอกสาร `HrDocPage.vue` (`hr-doc/<kind>/<name>`, kind = หน้ารายการ ไฮไลต์ผ่าน `kind_pages`)
+  สัญญาจ้าง (`hr-contracts` = Employment Contract): วันสิ้นสุดทดลองงาน = วันเริ่ม + จำนวนวัน - 1 (เติมให้ แก้ได้) ยืนยันแล้วแก้ได้เฉพาะผลทดลองงาน (`probation` allow on submit, `after` ใน KINDS) ตัวเลขเมนู = ครบทดลองงานแล้วยังไม่ประเมิน (`get_summary` รวมใน `hr_attendance.get_summary`)
+  50 ทวิ พนักงาน (`hr-wht` = WHT Employee): เลือกพนักงานแล้วเติมชื่อ/เลขบัตร/ที่อยู่ ภาษีที่หัก = ฐาน x อัตรา (คำนวณที่ server) PDF ของแบบ Print Designer ใช้ chrome (`pdfs`)
+  เห็นเมนูตามสิทธิ์ DocType (`boot.hr_docs`) และต้องเข้าหมวดบุคคลได้ (HR) สิทธิ์ตั้งในหน้าตั้งค่า หมวดบุคคล (ค่าเริ่มต้น: สัญญาจ้าง = System Manager, 50 ทวิ = Accounts)
+- หน้ารายการกลางของออฟฟิศ `office_app/views/common/KindList.vue` (สารบรรณ + ผรม. + เงินประกันผลงาน) ชนิดเอกสารรวมที่ `common/kinds.js` (api, boot, open, create, `create_label` (ชื่อปุ่มสร้างถ้าต่างจากชื่อรายการ), คอลัมน์ วันที่/ยอดเงิน, แท็บสถานะ)
+- บัญชี (หมวด `accounting` ของแอปออฟฟิศ `/conserp/accounting`, เริ่ม 2026-11-15): รับชำระ / จ่ายชำระ, หัก ณ ที่จ่าย, ภาษีขาย / ภาษีซื้อ, รายงานภาษี, เงินประกันผลงาน 2 ฝั่ง
+  เห็นหมวดเมื่อเปิดเมนูใดได้ (`accounting_app.can_account`: อ่าน DocType ของเมนู / รายงาน หรือ `retention_app.can_account` = อ่าน Journal Entry + เงินประกันอย่างน้อย 1 ฝั่ง) ฝ่ายขาย/จัดซื้อที่ไม่ใช่บัญชีเห็นเฉพาะเมนูเงินประกันในหมวดของตัวเอง
+  API `consbiz/accounting_app.py` หน้า `office_app/views/accounting/` (`kinds.js` = รายการ KindList, `PaymentPage.vue`, `WhtPage.vue`, `TaxInvoicePage.vue`, `TaxReport.vue`) สิทธิ์ `boot.accounting` (`boot_permissions`)
+  รับ/จ่ายชำระ = Payment Entry ของ ERPNext: ปุ่ม "รับชำระ"/"จ่ายชำระ" ในหน้าดู SI/PI (`doc.can_pay` = ค้างชำระ + สร้าง PE ได้, sheet `shared/docs/PaymentSheet.vue`)
+  `payment_defaults` / `make_payment` (`get_payment_entry` แล้วตั้งบัญชีเงิน วิธีชำระ เลขอ้างอิง ยอดตัดหนี้ (บางส่วนได้) รายการหัก) สูตรเดียวกับ `payment_entry_deduction.js`: หักตาม `custom_payment_entry_deduction` ของใบแจ้งหนี้
+  (เติมเฉพาะครั้งแรกที่รับ/จ่าย, จ่าย = ยอดติดลบ) แถวบัญชีหัก ณ ที่จ่ายของ Company ใส่ `withholding_tax_type` (Withholding Tax Type ที่บัญชี+อัตราตรง) + `withholding_tax_base` (= net_total) ให้ออกหนังสือรับรองได้
+  ภาษีรอเรียกเก็บ: erpnext_thailand ล้างเองตอนบันทึก PE (`clear_invoice_undue_tax`) รับชำระ = ออกใบกำกับภาษีขายอัตโนมัติ จ่ายชำระที่ PI มีภาษีซื้อรอเรียกเก็บ ติ๊ก "ได้รับใบกำกับแล้ว" + เลขที่/วันที่ (`has_purchase_tax_invoice`)
+  Submit ทันทีถ้ามีสิทธิ์ ไม่มี = ร่าง หลังสร้างเปิดหน้ารับ/จ่ายชำระของหมวดบัญชี (`acc-payment/<acc-receipts|acc-payments>/<PE>`, ไฮไลต์เมนูผ่าน `kind_pages`) ถ้าเข้าหมวดบัญชีได้ "เอกสารที่เกี่ยวข้อง" ของ SI/PI แสดงร่าง PE ด้วย
+  ยกเลิกรับ/จ่ายชำระในแอป (`cancel_payment`) ยกเลิกหนังสือรับรอง + ใบกำกับภาษีที่อ้าง PE ก่อน (Dynamic Link ที่ Submit อยู่ทำให้ยกเลิก PE ไม่ได้)
+  หนังสือรับรองหัก ณ ที่จ่าย (Withholding Tax Cert, เฉพาะที่เราออก = จ่ายชำระผู้ขาย) ออกจากหน้าจ่ายชำระ (`acc-wht-doc/new/<PE>`, `cert_from_payment` แบบ `make_withholding_tax_cert` ของ erpnext_thailand)
+  แบบ PND3 = Supplier ประเภท Individual อื่น = PND53, ประเภทเงินได้เริ่มต้น `DEFAULT_INCOME` (5 ค่าจ้างทำของ) ช่อง description = ประเภทเงินได้ในรายงาน ภ.ง.ด. 1 PE มีหนังสือที่ไม่ยกเลิกได้ใบเดียว ตัวเลขเมนู = จ่ายชำระที่มีหัก ณ ที่จ่ายแต่ยังไม่ออก (`to_issue_count`)
+  ภาษีขาย/ซื้อ (Sales/Purchase Tax Invoice ระบบสร้างจาก GL) ดู + แก้ช่อง Allow on Submit (`TAX_EDIT`: ภาษีซื้อ = เลขที่/วันที่ใบกำกับผู้ขาย + ยื่นล่าช้า, ภาษีขาย = ยื่นล่าช้า)
+  รายงานภาษี (`acc-tax-report/<sales|purchase|pnd3|pnd53>/<YYYY-MM>`) เรียก `execute` ของ Script Report ของ erpnext_thailand แล้วกรองบริษัทเอง (รายงานเดิมกรองแค่ที่อยู่) Excel = `export_report` แบบฟอร์มยื่นพิมพ์จากรายงานในระบบเต็ม (ปุ่มเครื่องพิมพ์ส่งตัวกรองไปให้) สิทธิ์ = Role ของ Report + อ่าน DocType
+  เงินประกันผลงาน: API `consbiz/retention_app.py` (หน้าจอครอบ กฎ/ยอด/สถานะอยู่ `retention.py` เหมือนเดิม) หน้า `office_app/views/retention/` (`kinds.js` + `RetentionPage.vue`)
+  ฝั่ง `in` = RR + RI (ผู้ว่าจ้างหักเรา) / `out` = RP + Release (เราหัก ผรม.) ชนิดในหน้าจอ (`params.type`) = `rr`/`ri`/`rp`/`rl`
+  หน้ารายการ (KindList, รวมเงินประกันที่ถูกหัก + ใบขอคืน/ใบคืนของฝั่ง แยกด้วย `row.type`): `acc-retention-in`, `acc-retention-out` (บัญชี), `sell-retention` (ขาย, ฝั่ง in), `buy-retention` (จัดซื้อ, ฝั่ง out)
+  หน้าเอกสาร = `<หน้ารายการ>-doc` (อยู่หมวดเดียวกับรายการ ไม่พาไปหมวดอื่น, `parent_tab` จาก `DOC_PAGES`) เพิ่มหน้ารายการใหม่ต้องเพิ่ม `LISTS` ใน retention_app.py ด้วย
+  สิทธิ์ = สิทธิ์ DocType ของฝั่ง (`boot.retention.sides`) ตั้งได้ในหน้าตั้งค่า: เอกสารฝั่ง in อยู่หมวดขาย, ฝั่ง out อยู่หมวดจัดซื้อ, ทั้งหมด + Journal Entry อยู่หมวดบัญชี (`app_settings.MODULES`)
+  เงินประกันที่ถูกหัก (RR/RP ระบบสร้างจากใบแจ้งหนี้ ในแอปสร้างไม่ได้): ดู + แก้วันครบกำหนดคืน (`set_due_date`) + "ทำใบขอคืน/ใบคืน" (`get_doc(type, source=)` = `retention.make_claim`)
+  ใบขอคืน/ใบคืน: ร่างแก้ในหน้าเดียวกัน เลือกเงินประกันที่ยังคืนได้ของคู่ค้า (`open_sources`) แก้ยอดบางส่วนได้ (`save_claim`) ยืนยัน = Submit แล้ว PDF
+  "บันทึกรับ/จ่ายเงิน" (`record_payment`) = `retention.make_journal_entry` แล้ว Submit JE ทันทีถ้ามีสิทธิ์ (ไม่มีสิทธิ์ Submit JE = ร่างไว้ให้ผู้มีสิทธิ์) สถานะ Paid ตาม doc_events ของ JE เดิม
+  ตัวเลขเมนู (`side_counts`): ถึงกำหนดคืน (RR/RP Overdue) + รอรับ/จ่ายเงิน จุดแดง = ใบขอคืน/ใบคืนเลยกำหนด หมวดขาย/จัดซื้อได้ตัวเลขผ่าน `site_docs.get_summary` (`retention_in` / `retention_out`)
+- ข้อมูลหลัก (หมวด `master` ของแอปออฟฟิศ `/conserp/master`, เริ่ม 2026-11-15): ทะเบียนพนักงาน / สินค้า-วัสดุ / ลูกค้า / ผู้ขาย / โครงการ สร้าง-แก้ได้โดยไม่ต้องเข้าระบบเต็ม
+  ครอบ DocType เดิม (Employee, Item, Customer, Supplier, Project) ไม่มี DocType ใหม่ API `consbiz/master_data.py` รายการ KindList (`office_app/views/master/kinds.js`) หน้าเดียวดู+แก้ `MasterPage.vue` (`md-doc/<kind>/<name>`)
+  ฟอร์มสร้างจาก `KINDS[kind].sections` ที่ server (tab = หมวดของฟอร์ม) ชนิดช่อง/ตัวเลือก/บังคับกรอกอ่านจาก meta (`schema`) เพิ่มช่อง = เพิ่มใน KINDS ที่เดียว ป้ายไทยของ Select อยู่ `labels`
+  ตัวเลือกช่อง: `create_only` (แก้ได้ตอนสร้าง: บริษัท, ตัวย่อ/ชื่อคลังโครงการ, ราคาขายมาตรฐาน), `filters` (Link กรองตามช่องในฟอร์ม เช่น แผนกตามบริษัท), `show` (แสดงเมื่อ เช่น วันที่ออกเมื่อลาออก), `digits` (เลขบัตร/เลขภาษี 13 หลัก ตรวจที่ server ด้วย)
+  `save_doc` ตั้งเฉพาะช่องใน KINDS ที่ไม่ read only และอยู่ใน permlevel ที่เขียนได้ ค้นหา Link (`search`) ได้เฉพาะ DocType ที่อยู่ในฟอร์มของ kind นั้น (ผ่าน `search_link` ของ Frappe)
+  พนักงาน: ตั้ง `custom_year_of_joining` จากวันเริ่มงานแบบ `employee.js` (เลข EMP-<ปี>) โครงการ: ตัวย่อบังคับ (อยู่ในเลขโครงการ) คลังสร้างตาม `site_stock` เดิม
+  สินค้า: ตารางหน่วยแปลง (`uoms`, หน่วยหลัก = 1 เติมเอง หน่วยที่ซื้อต้องอยู่ในตาราง) สินค้าคู่ของวัสดุผู้ว่าจ้าง (`custom_base_item`) ไม่ขึ้นในรายการ เปิดแล้วแก้ไม่ได้
+  ลูกค้า/ผู้ขาย: tab ที่อยู่ = Address หลัก (`*_primary_address` หรือ Address ที่ผูกไว้, Billing ก่อน) แก้ตัวเดิมหรือสร้างใหม่ คัดลอกเลขภาษี/สาขาลง Address (ใบกำกับของ erpnext_thailand อ่านจากที่อยู่)
+  สิทธิ์ = สิทธิ์ DocType (`boot.master`) ตั้งในหน้าตั้งค่า หมวดข้อมูลหลัก (รวม Address) สีหมวดเขียวมะกอก (`[data-section="master"]`)
+- คนงานรายวัน (หมวด `labour` ของ bundle ออฟฟิศ `/conserp/labour` กลุ่มธุรการโครงการ เดิมหมวด `admin` ของหน้างาน `/conserp/admin` เด้งมา (ย้าย 2026-11-16 ให้สลับกับสารบรรณ/ผู้รับเหมาไม่โหลดหน้าใหม่) หน้า `office_app/views/labour/` ห่อด้วย `needs_project` (`shared/components/needs_project.js`: ออฟฟิศโครงการเป็นตัวกรอง ยังไม่เลือก = ปุ่มเลือกโครงการ), เริ่ม 2026-11-13, แยกจาก HRMS): `Daily Worker` (ทะเบียน, ค่าแรงเป็นประวัติใน `rates` คิดตามอัตราของแต่ละวัน, จ่ายผ่าน Company หรือ Subcontractor = Supplier)
+  `Labour Timesheet` 1 ใบต่อโครงการต่อรอบ (`period_of`: 1-15 / 16-สิ้นเดือน) แถว `days` = ชั่วโมงทำงานจริง 1 คนต่อวัน (เกิน 8 = OT) วันหยุดของทั้งวันในตาราง `holidays`
+  ค่าแรงตามชั่วโมง (6 ชม. = 6/8 วัน) วันหยุด x 2, OT ÷ 8 x 1.5 (วันหยุด x 3) หรือ OT เหมา (`ot_flat`) ตาราง `pay` คำนวณใหม่ทุกครั้ง (กรอกได้เฉพาะหักอื่นๆ)
+  Submit = อนุมัติ + ลงบัญชีตาม `Labour Settings` (1 ใบต่อบริษัท ตั้งในแอป: avatar > ตั้งค่า > หัวข้อ "บัญชี" > ค่าแรงคนงาน `settings/LabourSettings.vue`, Accounts Manager แก้ได้, ไม่มีบัญชีที่ตรง = ปุ่มสร้างบัญชี/Item ใหม่ `suggest_account` เสนอชื่อ กลุ่มแม่ เลขถัดไป):
+  บริษัทจ่าย = Journal Entry ผูก Project, ผ่าน ผรม. = ร่าง Purchase Invoice ต่อ ผรม. (หัก ณ ที่จ่ายผ่าน `deductions.calculate`) Cancel = ยกเลิก JE / ลบร่าง PI
+  บัญชีค้างจ่าย/เงินเบิกห้ามเป็น Payable/Receivable (JE บังคับคู่ค้า) erpnext_thailand บังคับแถวบริษัทใน Thai Tax Settings ก่อนลง JE (หน้าตั้งค่ามีรายการตรวจ)
+  เบิกล่วงหน้า `Labour Advance` (เฉพาะคนงานที่บริษัทจ่าย, Submit = จ่าย JE) ใบลงเวลาตัดใบที่ค้าง (เก่าก่อน ไม่เกินค่าแรงหลังหักประกันสังคม/หักอื่นๆ) ลง `advances` ยอดค้าง/สถานะคำนวณใหม่ (`update_deduction`)
+  ทะเบียนแก้ในแอป (`WorkerSheet.vue`, `get_worker` / `save_worker`: ค่าแรงใหม่ = เพิ่มแถวประวัติ, บัญชีธนาคาร + รับผ่านบัญชีผู้อื่น `account_holder*`)
+  ทีม (`Daily Worker.team`, ว่าง + ผ่าน ผรม. = ชื่อ ผรม., `labour.team_of`) จัดกลุ่มหน้าลงเวลา: แถวหัวทีมพับได้ ช่องแถวทีม = ใส่ทั้งทีม แท็บกรองทีม (จุดแดง = ทีมที่ยังไม่มีชั่วโมงในวันที่เลือก, เกิน 5 ทีม = แท็บทั้งหมด/ทีมที่เลือก + ปุ่มเลือกทีมแบบค้นหา เพราะแท็บล้นแถบ) ปุ่มพับ/กางทุกทีม วางจาก Excel ได้ ย้ายทีมหลายคนที่ทะเบียน (`set_team`)
+  หน้าแอป (`office_app/views/labour/`): `Labour.vue` (คลิกชื่อ = ยอดค่าแรง + หักอื่นๆ `set_deduction`, ปุ่มพิมพ์ = Print Format `Labour Timesheet` A4 แนวนอน = ใบลงเวลา + เซ็นรับเงิน), `Advances.vue`
+  Daily Report ปุ่ม "ดึงจำนวนจากลงเวลาคนงาน" (`labour_on`) สูตรประกันสังคมของ HR สร้างจากตารางเดียวกัน (`hr_setup.sso_formula`, ตรวจตั้งค่าแจ้งเมื่ออัตราเปลี่ยน)
+  `save_sheet` ส่งเฉพาะช่องที่แก้ ล็อก Project ก่อนหา/สร้างใบ ทะเบียน `office_app/views/labour/Workers.vue` (แก้รายละเอียดในระบบเต็ม)
+  ประกันสังคม `consbiz/social_security.py` + ตาราง `Social Security Rate` (ช่วงแคบกว่าชนะ = ลดอัตราชั่วคราว, อัตราตามเดือนที่ทำงาน)
+  เพดานรายเดือนคิดสะสมข้ามใบ (หักงวดนี้ = ควรหักถึงงวดนี้ - ถึงงวดก่อน) ฐานต่ำสุดเฉพาะใบที่ปิดเดือน ปัดบาทแบบ half up
 - แผนตัดเหล็ก: `Bar Cut Plan` ใช้ `Rebar Type` และ `Bar Shape` (สูตรความยาว + รูป SVG) ตัวจัดตัดอยู่ใน `bar_cut_plan/optimizer.py`
   ด้าน A-F, R (มม.), N (รอบ), T (องศา) สูตรใช้ `sqrt` และ `sin`/`cos`/`tan` (องศา) ได้
   ข้อมูลมาตรฐานสร้างด้วย patch `seed_bar_cut_masters`, `seed_more_bar_shapes`, `seed_more_rebar_types` (ข้ามที่มีอยู่แล้ว) รหัสรูปทรงไม่ใช่รหัส BS 8666
@@ -395,7 +498,7 @@ pre-commit run --all-files                               # ruff + prettier (ต�
 
 - DocType: ชื่ออังกฤษ Title Case คำเต็ม (เช่น `Daily Report`, `Retention Release`)
 - เอกสารที่ submit ได้: `autoname = naming_series:` ใช้ `.ABBR.` ถ้าต้องการตัวย่อบริษัท/โครงการ
-- prefix ที่ใช้แล้ว ห้ามใช้ซ้ำ: `BCP-` Bar Cut Plan, `CM-` Construction Management, `CU-` Concrete Usage, `DR-` Daily Report, `DRQ-` Daily Request, `EB-` Equipment Borrowing, `EOT-` Extension of Time, `IR-` Inspection Request, `OPO-` Material Request ผู้ว่าจ้างจัดหา, `PL-` Punch List, `TX-` Transmittal, `VO-` Variation Order, `WDO-` Weekly Day Off (ตั้งชื่อด้วยโค้ด), `WHTE-` WHT Employee
+- prefix ที่ใช้แล้ว ห้ามใช้ซ้ำ: `BCP-` Bar Cut Plan, `CM-` Construction Management, `CU-` Concrete Usage, `DR-` Daily Report, `DRQ-` Daily Request, `EB-` Equipment Borrowing, `EOT-` Extension of Time, `DW-` Daily Worker, `IR-` Inspection Request, `LA-` Labour Advance, `LT-` Labour Timesheet, `OPO-` Material Request ผู้ว่าจ้างจัดหา, `PL-` Punch List, `SCA-` Subcontract Agreement, `SCC-` Subcontract Claim, `SCV-` Subcontract Variation, `TX-` Transmittal, `VO-` Variation Order, `WDO-` Weekly Day Off (ตั้งชื่อด้วยโค้ด), `WHTE-` WHT Employee
 - master ที่ตั้งชื่อตามค่า field ใช้ `field:<fieldname>` (เช่น Rebar Type, Bar Shape)
 - fieldname ของ Custom Field ขึ้นต้นด้วย `custom_`
 - CSS ของ Print Format ใช้ class ขึ้นต้น `pf-` สีใหม่ใน `style.css` ใช้ตัวแปร `--consbiz-*`
@@ -417,6 +520,7 @@ pre-commit run --all-files                               # ruff + prettier (ต�
 
 ## หน้าตา (UI และเอกสารพิมพ์)
 
+- หน้าตาใหม่ (กรมท่า + ทอง, ตกลง 2026-11-16) ใช้ทุกหมวด (`NEW_LOOK` ใน `shared/modules.js`, ยกเว้นหมวดได้ที่ `OLD_LOOK`) `HeaderSearch.vue` ย้ายตัวเองลงแถวตัวกรองของหัวรายการเอง หน้าใหม่ไม่ต้องทำอะไรเพิ่ม (→ `data-look="new"` ที่ `.ss-app` และ `<html>`) CSS อยู่ท้าย `style.css` ใต้ selector `[data-look="new"]` เปิดหมวดใหม่แล้วตรวจทุกเมนูของหมวดนั้นทั้งจอเมาส์และมือถือ (เครื่อง dev: `bench start` มี `bench watch` build เองเมื่อไฟล์เปลี่ยน ถ้า `bench build` ซ้อนกับ watch ไฟล์ bundle อาจหายจนหน้าค้างที่โลโก้ ให้ build ซ้ำแล้วตรวจว่าไฟล์ใน assets.json มีจริง) หน้ารายการของหมวดที่เปิด: ย้ายช่องค้นหาจาก slot `search` ของ TopBar มาเป็น `ListSearch.vue` ในแถวตัวกรอง `.ss-list-filterbar` (ต่อท้าย `.ss-list-tools` ใน `.ss-list-head`) พร้อมย้ายตัวกรอง (ช่วงวันที่ ฯลฯ) ออกจาก `.ss-list-tools` มาแถวนี้ (ทำแล้ว: ควบคุมงาน, สโตร์, แผนงาน, ทรัพยากร)
 - แก้ UI ของแอป ConsERP (`/conserp`) ต้องอ่าน `Design.md` ก่อน: ขนาด/สี/พฤติกรรมของแต่ละ component ห้ามตั้งขนาดทับเป็นรายหน้า ตกลงเรื่องหน้าตาใหม่แล้วแก้ไฟล์นั้นด้วย
 - ฟอนต์: Inter สำหรับอังกฤษ (Frappe ส่งมาเอง), Noto Sans Thai สำหรับไทย (`@font-face` จาก `public/fonts`)
 - เปลี่ยนฟอนต์ทั้งระบบด้วยตัวแปร `--font-stack` ใน `:root` เท่านั้น ห้ามใส่ `font-family ... !important` ทุก element

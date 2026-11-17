@@ -299,6 +299,16 @@
 										เพิ่ม
 									</button>
 								</div>
+								<!-- คนงานรายวันที่ธุรการลงเวลาไว้ในวันนั้น (หมวดธุรการ) แทนจำนวนของตำแหน่งเดียวกัน -->
+								<button
+									v-if="boot.can?.view_labour"
+									type="button"
+									class="ss-btn ss-btn--soft ss-btn--sm"
+									:disabled="pulling"
+									@click="pull_labour"
+								>
+									<Icon name="clock" :size="15" /> ดึงจำนวนจากลงเวลาคนงาน
+								</button>
 							</div>
 							<div class="ss-form">
 								<h2 class="ss-section-title ss-section-title--first">
@@ -566,6 +576,7 @@ import Sheet from "../../../shared/components/Sheet.vue";
 import Stepper from "../../../shared/components/Stepper.vue";
 import { REPORT_KINDS } from "../../sections.js";
 import {
+	boot,
 	call,
 	celebrate,
 	go,
@@ -861,6 +872,24 @@ function add_role() {
 	if (!role) return;
 	if (!doc.value.labour.some((r) => r.role === role)) doc.value.labour.push({ role, qty: 1 });
 	new_role.value = "";
+}
+const pulling = ref(false);
+async function pull_labour() {
+	pulling.value = true;
+	try {
+		const rows = await call("consbiz.labour.labour_on", { project: state.project.name, date: doc.value.date });
+		if (!rows.length) return toast("วันนี้ยังไม่มีการลงเวลาคนงานรายวัน", "info");
+		for (const r of rows) {
+			const row = doc.value.labour.find((x) => x.role === r.role);
+			if (row) row.qty = r.qty;
+			else doc.value.labour.push({ role: r.role, qty: r.qty });
+		}
+		toast(`ดึงคนงาน ${rows.reduce((s, r) => s + r.qty, 0)} คนแล้ว`, "success");
+	} catch (error) {
+		show_error(error);
+	} finally {
+		pulling.value = false;
+	}
 }
 function add_equipment() {
 	const equipment = new_equipment.value.trim();

@@ -1,5 +1,5 @@
 <!-- ดู PDF ในแอปเต็มจอ (ไม่เปิดแท็บใหม่) วาดด้วย PDF.js (public/js/lib/pdfjs) เพราะมือถือแสดง PDF ใน iframe ไม่ได้
-     (Android ดาวน์โหลดแทน, iOS เห็นแค่หน้าแรก) แถบบน: ซูม / แชร์ไฟล์ / ดาวน์โหลด  url จาก site_app.pdf_url -->
+     (Android ดาวน์โหลดแทน, iOS เห็นแค่หน้าแรก) แถบบน: ซูม / พิมพ์ / แชร์ไฟล์ / ดาวน์โหลด  url จาก site_app.pdf_url -->
 <template>
 	<Teleport to="body">
 		<Transition name="ss-pdf">
@@ -36,15 +36,25 @@
 						</button>
 					</div>
 					<button
-						v-if="can_share"
 						type="button"
 						class="ss-icon-btn"
-						aria-label="แชร์ไฟล์ PDF"
-						title="แชร์ไฟล์ PDF"
+						aria-label="พิมพ์"
+						title="พิมพ์"
+						:disabled="!pdf || printing"
+						@click="print_pdf"
+					>
+						<span v-if="printing" class="ss-spinner"></span>
+						<Icon v-else name="printer" :size="19" />
+					</button>
+					<button
+						type="button"
+						class="ss-icon-btn"
+						aria-label="แชร์ไฟล์ PDF ไปแอปอื่น"
+						title="แชร์ไฟล์ PDF ไปแอปอื่น"
 						:disabled="!file"
 						@click="share"
 					>
-						<Icon name="send" :size="19" />
+						<Icon name="share" :size="19" />
 					</button>
 					<button
 						type="button"
@@ -87,7 +97,7 @@
 <script setup>
 import { nextTick, onBeforeUnmount, ref, shallowRef, watch } from "vue";
 import Icon from "./Icon.vue";
-import { show_error, strip_html } from "../api.js";
+import { show_error, strip_html, toast } from "../api.js";
 
 // fetch_file = สร้างไฟล์เอง คืน Response (ใช้แทน url), file_name = ชื่อไฟล์ตอนบันทึก/แชร์ (ไม่ใส่ = name)
 const props = defineProps({
@@ -113,7 +123,7 @@ const pages = ref(0);
 const zoom = ref(1);
 const file = shallowRef(null);
 const pdf = shallowRef(null);
-const can_share = typeof navigator !== "undefined" && !!navigator.canShare;
+const printing = ref(false);
 let render_id = 0;
 let pinch = null;
 let pending_scroll = null;
@@ -255,16 +265,88 @@ function save_file(f) {
 	setTimeout(() => URL.revokeObjectURL(href), 2000);
 }
 
+// แชร์ไฟล์ไปแอปอื่น (LINE, อีเมล, ไดรฟ์ ...) ผ่าน Web Share API ซึ่งใช้ได้เฉพาะเว็บที่เป็น https
+// ใช้ไม่ได้ (http หรือเบราว์เซอร์ไม่รองรับไฟล์) = ดาวน์โหลดแทน
 async function share() {
+	const data = { files: [file.value], title: `${props.title} ${props.name}` };
 	try {
-		if (navigator.canShare?.({ files: [file.value] })) {
-			await navigator.share({ files: [file.value], title: `${props.title} ${props.name}` });
+		if (navigator.canShare?.(data)) {
+			await navigator.share(data);
 		} else {
 			save_file(file.value);
+			toast(
+				window.isSecureContext
+					? "เบราว์เซอร์นี้แชร์ไฟล์ไม่ได้ ดาวน์โหลดไฟล์ให้แทน"
+					: "แชร์ไฟล์ได้เมื่อเปิดเว็บผ่าน https ดาวน์โหลดไฟล์ให้แทน",
+				"info",
+				4500
+			);
 		}
 	} catch (err) {
 		// ผู้ใช้ปิดหน้าต่างแชร์เอง ไม่ใช่ข้อผิดพลาด
 		if (err?.name !== "AbortError") show_error(err);
+	}
+}
+
+let print_job = null;
+function clear_print() {
+	if (!print_job) return;
+	print_job.box.remove();
+	print_job.style.remove();
+	print_job.urls.forEach((u) => URL.revokeObjectURL(u));
+	print_job = null;
+	document.documentElement.classList.remove("ss-printing");
+}
+
+// พิมพ์: วาดทุกหน้าเป็นรูปความละเอียดสูง วางในกล่องพิมพ์ (ซ่อนที่เหลือด้วย @media print) แล้ว window.print()
+// ใช้วิธีนี้แทนการพิมพ์ iframe ของ PDF เพราะมือถือ (Android/iOS) พิมพ์ PDF ใน iframe ไม่ได้
+async function print_pdf() {
+	const doc = pdf.value;
+	if (!doc || printing.value) return;
+	printing.value = true;
+	clear_print();
+	const box = document.createElement("div");
+	box.className = "ss-pdf-print";
+	const style = document.createElement("style");
+	print_job = { box, style, urls: [] };
+	const urls = print_job.urls;
+	try {
+		let size = null;
+		for (let n = 1; n <= doc.numPages; n++) {
+			const page = await doc.getPage(n);
+			const base = page.getViewport({ scale: 1 });
+			size ||= base;
+			// ~200 dpi แต่ไม่เกินขนาด canvas ที่ Safari มือถือวาดได้
+			const scale = Math.min(200 / 72, Math.sqrt(MAX_PAGE_PIXELS / (base.width * base.height)));
+			const viewport = page.getViewport({ scale });
+			const canvas = document.createElement("canvas");
+			canvas.width = Math.floor(viewport.width);
+			canvas.height = Math.floor(viewport.height);
+			await page.render({ canvasContext: canvas.getContext("2d"), viewport }).promise;
+			const blob = await new Promise((ok) => canvas.toBlob(ok, "image/png"));
+			canvas.width = canvas.height = 0;
+			const url = URL.createObjectURL(blob);
+			urls.push(url);
+			const img = new Image();
+			img.src = url;
+			await img.decode().catch(() => {});
+			box.appendChild(img);
+		}
+		// หน้ากระดาษตามขนาด PDF (pt) ไม่มีขอบ เพราะขอบอยู่ใน PDF แล้ว
+		style.textContent = `@page { size: ${size.width}pt ${size.height}pt; margin: 0; }`;
+		document.head.appendChild(style);
+		document.body.appendChild(box);
+		document.documentElement.classList.add("ss-printing");
+		printing.value = false;
+		await nextTick();
+		// ไม่ล้างตอน afterprint: Android/iOS คืนค่าจาก print() และยิง afterprint ก่อนเก็บภาพหน้าพิมพ์
+		// ถ้าล้างตอนนั้นจะพิมพ์ทั้งหน้าจอ กล่องพิมพ์ซ่อนบนจออยู่แล้ว จึงเก็บไว้จนปิดหน้าต่างหรือพิมพ์ครั้งถัดไป
+		window.print();
+	} catch (err) {
+		console.error(err);
+		clear_print();
+		printing.value = false;
+		show_error(err);
 	}
 }
 
@@ -290,6 +372,7 @@ watch(
 			load();
 		} else {
 			render_id++;
+			clear_print();
 			pdf.value?.destroy();
 			pdf.value = null;
 		}
@@ -301,6 +384,7 @@ onBeforeUnmount(() => {
 	document.body.classList.remove("ss-locked");
 	window.removeEventListener("keydown", on_key);
 	window.removeEventListener("resize", on_resize);
+	clear_print();
 	pdf.value?.destroy();
 });
 </script>

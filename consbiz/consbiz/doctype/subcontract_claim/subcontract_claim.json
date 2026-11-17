@@ -1,0 +1,426 @@
+{
+ "actions": [],
+ "creation": "2026-11-14 16:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "naming_series",
+  "subcontract_agreement",
+  "title",
+  "supplier",
+  "supplier_name",
+  "column_break_head",
+  "project",
+  "company",
+  "billing_method",
+  "claim_no",
+  "status",
+  "section_period",
+  "posting_date",
+  "column_break_period1",
+  "period_from",
+  "column_break_period2",
+  "period_to",
+  "milestone",
+  "milestone_description",
+  "milestone_percent",
+  "section_items",
+  "items",
+  "section_amounts",
+  "gross_amount",
+  "penalty_days",
+  "penalty_amount",
+  "column_break_amounts",
+  "advance_recovery",
+  "retention_amount",
+  "wht_amount",
+  "net_amount",
+  "section_contractor",
+  "from_contractor",
+  "prepared_by",
+  "submitted_on",
+  "column_break_contractor",
+  "return_reason",
+  "section_invoice",
+  "purchase_invoice",
+  "remarks",
+  "amended_from"
+ ],
+ "fields": [
+  {
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "label": "ชุดเลขที่",
+   "options": "SCC-.ABBR..YY..####",
+   "default": "SCC-.ABBR..YY..####",
+   "reqd": 1,
+   "hidden": 1
+  },
+  {
+   "fieldname": "subcontract_agreement",
+   "fieldtype": "Link",
+   "label": "สัญญา",
+   "options": "Subcontract Agreement",
+   "reqd": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "title",
+   "fieldtype": "Data",
+   "label": "งานที่จ้าง",
+   "fetch_from": "subcontract_agreement.title",
+   "read_only": 1
+  },
+  {
+   "fieldname": "supplier",
+   "fieldtype": "Link",
+   "label": "ผู้รับเหมาช่วง",
+   "options": "Supplier",
+   "fetch_from": "subcontract_agreement.supplier",
+   "in_standard_filter": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "supplier_name",
+   "fieldtype": "Data",
+   "label": "ชื่อผู้รับเหมา",
+   "fetch_from": "subcontract_agreement.supplier_name",
+   "in_list_view": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_head",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "project",
+   "fieldtype": "Link",
+   "label": "โครงการ",
+   "options": "Project",
+   "fetch_from": "subcontract_agreement.project",
+   "in_standard_filter": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "label": "บริษัท",
+   "options": "Company",
+   "fetch_from": "subcontract_agreement.company",
+   "read_only": 1
+  },
+  {
+   "fieldname": "billing_method",
+   "fieldtype": "Select",
+   "label": "วิธีเบิก",
+   "options": "Measured\nMilestone",
+   "fetch_from": "subcontract_agreement.billing_method",
+   "read_only": 1
+  },
+  {
+   "fieldname": "claim_no",
+   "fieldtype": "Int",
+   "label": "งวดที่",
+   "in_list_view": 1,
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "สถานะ",
+   "options": "Draft\nPending Review\nReturned\nApproved\nCancelled",
+   "default": "Draft",
+   "in_list_view": 1,
+   "read_only": 1,
+   "no_copy": 1,
+   "allow_on_submit": 1
+  },
+  {
+   "fieldname": "section_period",
+   "fieldtype": "Section Break",
+   "label": "ช่วงงาน"
+  },
+  {
+   "fieldname": "posting_date",
+   "fieldtype": "Date",
+   "label": "วันที่เบิก",
+   "reqd": 1,
+   "default": "Today",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "column_break_period1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "period_from",
+   "fieldtype": "Date",
+   "label": "งานตั้งแต่"
+  },
+  {
+   "fieldname": "column_break_period2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "period_to",
+   "fieldtype": "Date",
+   "label": "ถึง"
+  },
+  {
+   "fieldname": "milestone",
+   "fieldtype": "Data",
+   "label": "งวดงาน (แถว)",
+   "hidden": 1
+  },
+  {
+   "fieldname": "milestone_description",
+   "fieldtype": "Data",
+   "label": "งวดงาน",
+   "depends_on": "eval:doc.billing_method=='Milestone'",
+   "read_only": 1
+  },
+  {
+   "fieldname": "milestone_percent",
+   "fieldtype": "Percent",
+   "label": "% ของงวด",
+   "depends_on": "eval:doc.billing_method=='Milestone'",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_items",
+   "fieldtype": "Section Break",
+   "label": "รายการ"
+  },
+  {
+   "fieldname": "items",
+   "fieldtype": "Table",
+   "label": "รายการ",
+   "options": "Subcontract Claim Item",
+   "reqd": 1
+  },
+  {
+   "fieldname": "section_amounts",
+   "fieldtype": "Section Break",
+   "label": "ยอดเงิน (ก่อน VAT)"
+  },
+  {
+   "fieldname": "gross_amount",
+   "fieldtype": "Currency",
+   "label": "มูลค่างานงวดนี้",
+   "options": "Company:company:default_currency",
+   "in_list_view": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "penalty_days",
+   "fieldtype": "Int",
+   "label": "จำนวนวันที่ปรับ"
+  },
+  {
+   "fieldname": "penalty_amount",
+   "fieldtype": "Currency",
+   "label": "ค่าปรับ",
+   "options": "Company:company:default_currency",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_amounts",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "advance_recovery",
+   "fieldtype": "Currency",
+   "label": "หักคืนเงินล่วงหน้า",
+   "options": "Company:company:default_currency",
+   "read_only": 1
+  },
+  {
+   "fieldname": "retention_amount",
+   "fieldtype": "Currency",
+   "label": "หักเงินประกันผลงาน",
+   "options": "Company:company:default_currency",
+   "read_only": 1
+  },
+  {
+   "fieldname": "wht_amount",
+   "fieldtype": "Currency",
+   "label": "หัก ณ ที่จ่าย",
+   "options": "Company:company:default_currency",
+   "read_only": 1
+  },
+  {
+   "fieldname": "net_amount",
+   "fieldtype": "Currency",
+   "label": "ยอดจ่ายสุทธิ (ก่อน VAT)",
+   "options": "Company:company:default_currency",
+   "bold": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_contractor",
+   "fieldtype": "Section Break",
+   "label": "ผู้รับเหมาส่งเบิก (แอป /contractor)",
+   "collapsible": 1,
+   "depends_on": "from_contractor"
+  },
+  {
+   "fieldname": "from_contractor",
+   "fieldtype": "Check",
+   "label": "ผู้รับเหมาร่างเอง",
+   "read_only": 1,
+   "no_copy": 1,
+   "description": "ร่างในแอปผู้รับเหมา (/contractor) ผ่านบัญชีผู้ใช้หรือลิงก์ของสัญญา"
+  },
+  {
+   "fieldname": "prepared_by",
+   "fieldtype": "Link",
+   "label": "ผู้รับเหมาที่ร่าง",
+   "options": "User",
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "submitted_on",
+   "fieldtype": "Datetime",
+   "label": "ส่งให้ตรวจเมื่อ",
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "column_break_contractor",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "return_reason",
+   "fieldtype": "Small Text",
+   "label": "เหตุผลที่ส่งกลับแก้",
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "section_invoice",
+   "fieldtype": "Section Break",
+   "label": "ใบแจ้งหนี้"
+  },
+  {
+   "fieldname": "purchase_invoice",
+   "fieldtype": "Link",
+   "label": "ใบแจ้งหนี้ซื้อ (PI)",
+   "options": "Purchase Invoice",
+   "read_only": 1,
+   "no_copy": 1,
+   "allow_on_submit": 1
+  },
+  {
+   "fieldname": "remarks",
+   "fieldtype": "Small Text",
+   "label": "หมายเหตุ"
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "options": "Subcontract Claim",
+   "no_copy": 1,
+   "print_hide": 1,
+   "read_only": 1,
+   "search_index": 1
+  }
+ ],
+ "grid_page_length": 50,
+ "links": [],
+ "modified": "2026-11-15 20:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "ConsBiz",
+ "name": "Subcontract Claim",
+ "owner": "Administrator",
+ "row_format": "Dynamic",
+ "sort_field": "posting_date",
+ "sort_order": "DESC",
+ "states": [],
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "create": 1,
+   "write": 1,
+   "delete": 1,
+   "share": 1,
+   "email": 1,
+   "submit": 1,
+   "cancel": 1,
+   "amend": 1
+  },
+  {
+   "role": "Projects Manager",
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "create": 1,
+   "write": 1,
+   "delete": 1,
+   "share": 1,
+   "email": 1,
+   "submit": 1,
+   "cancel": 1,
+   "amend": 1
+  },
+  {
+   "role": "Purchase Manager",
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "create": 1,
+   "write": 1,
+   "delete": 1,
+   "share": 1,
+   "email": 1,
+   "submit": 1,
+   "cancel": 1,
+   "amend": 1
+  },
+  {
+   "role": "Projects User",
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "create": 1,
+   "write": 1
+  },
+  {
+   "role": "Purchase User",
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1
+  },
+  {
+   "role": "Accounts Manager",
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1
+  },
+  {
+   "role": "Accounts User",
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1
+  }
+ ],
+ "autoname": "naming_series:",
+ "naming_rule": "By \"Naming Series\" field",
+ "is_submittable": 1,
+ "track_changes": 1,
+ "title_field": "supplier_name"
+}

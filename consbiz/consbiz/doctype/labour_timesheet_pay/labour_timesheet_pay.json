@@ -1,0 +1,165 @@
+{
+ "actions": [],
+ "creation": "2026-11-13 12:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "worker",
+  "worker_name",
+  "payee_type",
+  "supplier",
+  "days_worked",
+  "holiday_days",
+  "ot_hours",
+  "column_break_pay",
+  "wage",
+  "ot_amount",
+  "gross",
+  "advance",
+  "sso",
+  "employer_sso",
+  "other_deduction",
+  "deduction_remark",
+  "net",
+  "purchase_invoice"
+ ],
+ "fields": [
+  {
+   "fieldname": "worker",
+   "fieldtype": "Link",
+   "label": "คนงาน",
+   "options": "Daily Worker",
+   "read_only": 1,
+   "in_list_view": 1,
+   "columns": 2
+  },
+  {
+   "fieldname": "worker_name",
+   "fieldtype": "Data",
+   "label": "ชื่อ",
+   "read_only": 1,
+   "in_list_view": 1,
+   "columns": 2
+  },
+  {
+   "fieldname": "payee_type",
+   "fieldtype": "Data",
+   "label": "จ่ายผ่าน",
+   "read_only": 1
+  },
+  {
+   "fieldname": "supplier",
+   "fieldtype": "Link",
+   "label": "ผู้รับเหมา/หัวหน้าชุด",
+   "options": "Supplier",
+   "read_only": 1
+  },
+  {
+   "fieldname": "days_worked",
+   "fieldtype": "Float",
+   "label": "วันทำงาน",
+   "read_only": 1,
+   "in_list_view": 1,
+   "columns": 1
+  },
+  {
+   "fieldname": "holiday_days",
+   "fieldtype": "Float",
+   "label": "ทำวันหยุด",
+   "read_only": 1
+  },
+  {
+   "fieldname": "ot_hours",
+   "fieldtype": "Float",
+   "label": "OT (ชม.)",
+   "read_only": 1,
+   "in_list_view": 1,
+   "columns": 1
+  },
+  {
+   "fieldname": "column_break_pay",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "wage",
+   "fieldtype": "Currency",
+   "label": "ค่าแรง",
+   "read_only": 1
+  },
+  {
+   "fieldname": "ot_amount",
+   "fieldtype": "Currency",
+   "label": "ค่า OT",
+   "read_only": 1
+  },
+  {
+   "fieldname": "gross",
+   "fieldtype": "Currency",
+   "label": "รวมค่าแรง",
+   "read_only": 1,
+   "in_list_view": 1,
+   "columns": 1
+  },
+  {
+   "fieldname": "advance",
+   "fieldtype": "Currency",
+   "label": "หักเบิกล่วงหน้า",
+   "read_only": 1
+  },
+  {
+   "fieldname": "sso",
+   "fieldtype": "Currency",
+   "label": "หักประกันสังคม",
+   "read_only": 1
+  },
+  {
+   "fieldname": "employer_sso",
+   "fieldtype": "Currency",
+   "label": "ประกันสังคมส่วนนายจ้าง",
+   "read_only": 1
+  },
+  {
+   "fieldname": "other_deduction",
+   "fieldtype": "Currency",
+   "label": "หักอื่นๆ",
+   "in_list_view": 1,
+   "columns": 1
+  },
+  {
+   "fieldname": "deduction_remark",
+   "fieldtype": "Data",
+   "label": "หมายเหตุการหัก"
+  },
+  {
+   "fieldname": "net",
+   "fieldtype": "Currency",
+   "label": "รับสุทธิ",
+   "read_only": 1,
+   "in_list_view": 1,
+   "columns": 1,
+   "bold": 1
+  },
+  {
+   "fieldname": "purchase_invoice",
+   "fieldtype": "Link",
+   "label": "Purchase Invoice",
+   "options": "Purchase Invoice",
+   "read_only": 1,
+   "no_copy": 1
+  }
+ ],
+ "grid_page_length": 50,
+ "links": [],
+ "modified": "2026-11-13 20:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "ConsBiz",
+ "name": "Labour Timesheet Pay",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "istable": 1,
+ "editable_grid": 1
+}

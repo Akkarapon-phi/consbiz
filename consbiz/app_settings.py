@@ -55,17 +55,21 @@ MODULES = (
 			("Variation Order", "งานลด-เพิ่ม", 0),
 			("Extension of Time", "ขยายเวลา (EOT)", 0),
 			("Construction Baseline", "Baseline", 0),
-		),
-	),
-	(
-		"site",
-		"resources",
-		(
 			("Construction Resource Plan", "แผนคนและเครื่องจักร", 0),
 			("Construction Material Plan", "แผนวัสดุ", 0),
 		),
 	),
 	("site", "buy", (("Material Request", "ใบขอซื้อ", 0),)),
+	("site", "rebar", (("Bar Cut Plan", "แผนตัดเหล็ก", 0),)),
+	(
+		"office",
+		"labour",
+		(
+			("Labour Timesheet", "ลงเวลา/ค่าแรงคนงาน", 0),
+			("Labour Advance", "เบิกล่วงหน้า", 0),
+			("Daily Worker", "ทะเบียนคนงาน", 0),
+		),
+	),
 	(
 		"office",
 		"purchase",
@@ -73,6 +77,8 @@ MODULES = (
 			("Material Request", "ใบขอซื้อ", 0),
 			("Purchase Order", "ใบสั่งซื้อ", 0),
 			("Purchase Invoice", "ใบแจ้งหนี้ซื้อ", 0),
+			("Retention Payable", "เงินประกันผลงานที่หัก ผรม.", 0),
+			("Retention Release", "ใบคืนเงินประกัน ผรม.", 0),
 		),
 	),
 	(
@@ -82,10 +88,67 @@ MODULES = (
 			("Quotation", "ใบเสนอราคา", 0),
 			("Sales Order", "ใบสั่งขาย", 0),
 			("Sales Invoice", "ใบแจ้งหนี้ขาย", 0),
+			("Retention Receivable", "เงินประกันผลงานที่ผู้ว่าจ้างหัก", 0),
+			("Retention Invoice", "ใบขอคืนเงินประกัน", 0),
 		),
 	),
 	("office", "boq", (("BOQ", "BOQ", 0),)),
-	("office", "hr", (("Attendance", "การเข้างาน (Attendance)", 0),)),
+	(
+		"office",
+		"hr",
+		(
+			("Attendance", "การเข้างาน (Attendance)", 0),
+			("Employment Contract", "สัญญาจ้างพนักงาน", 0),
+			("WHT Employee", "หนังสือรับรองหัก ณ ที่จ่าย พนักงาน (50 ทวิ)", 0),
+		),
+	),
+	(
+		"office",
+		"saraban",
+		(
+			("Letter In", "หนังสือเข้า", 0),
+			("Letter Out", "หนังสือออก", 0),
+			("Transmittal", "ใบนำส่งเอกสาร", 0),
+			("Envelope", "ใบปะหน้าซอง", 0),
+		),
+	),
+	(
+		"office",
+		"subcontract",
+		(
+			("Subcontract Agreement", "สัญญาจ้างเหมาช่วง", 0),
+			("Subcontract Claim", "ใบเบิกงวด ผรม.", 0),
+			("Subcontract Variation", "ใบงานเพิ่ม ผรม.", 0),
+		),
+	),
+	(
+		"office",
+		"accounting",
+		(
+			("Payment Entry", "รับชำระ / จ่ายชำระ (Payment Entry)", 0),
+			("Withholding Tax Cert", "หนังสือรับรองหัก ณ ที่จ่าย (ที่เราออก)", 0),
+			("Sales Tax Invoice", "ใบกำกับภาษีขาย (ภาษีขาย)", 0),
+			("Purchase Tax Invoice", "ใบกำกับภาษีซื้อ (ภาษีซื้อ)", 0),
+			("Journal Entry", "รายการรับ-จ่ายเงิน (Journal Entry)", 0),
+			("Retention Receivable", "เงินประกันผลงานที่ผู้ว่าจ้างหัก", 0),
+			("Retention Invoice", "ใบขอคืนเงินประกัน", 0),
+			("Retention Payable", "เงินประกันผลงานที่หัก ผรม.", 0),
+			("Retention Release", "ใบคืนเงินประกัน ผรม.", 0),
+		),
+	),
+	# ข้อมูลหลัก (consbiz/master_data.py) ที่อยู่ = ที่อยู่หลักของลูกค้า/ผู้ขาย (แก้ในหน้าลูกค้า/ผู้ขาย)
+	(
+		"office",
+		"master",
+		(
+			("Employee", "ทะเบียนพนักงาน", 0),
+			("Item", "สินค้า / วัสดุ", 0),
+			("Customer", "ลูกค้า", 0),
+			("Supplier", "ผู้ขาย / ผู้รับเหมา", 0),
+			("Address", "ที่อยู่ลูกค้า / ผู้ขาย", 0),
+			("Project", "โครงการ", 0),
+		),
+	),
 )
 TARGETS = {(row[0], row[2]) for _app, _section, rows in MODULES for row in rows}
 

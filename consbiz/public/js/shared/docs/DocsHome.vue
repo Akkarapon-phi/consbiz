@@ -199,6 +199,8 @@ function all_lists() {
 	const s = summary.value || {};
 	return family === "buy"
 		? [
+				// PO ที่แก้ตามใบงานเพิ่ม ผรม. รอส่งฉบับใหม่ให้ผู้รับเหมา (ใครในฝ่ายจัดซื้อก็ส่งได้)
+				{ title: "PO แก้ไขแล้ว รอส่งผู้รับเหมา", rows: s.po_resend, view: "po" },
 				{ title: "ถึงกำหนดรับของ (7 วัน)", rows: s.due_soon, view: "po" },
 				{ title: "ถึงกำหนดจ่าย (7 วัน)", rows: s.to_pay, view: "pi" },
 		  ]

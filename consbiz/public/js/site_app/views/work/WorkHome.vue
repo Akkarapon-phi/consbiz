@@ -1,5 +1,5 @@
 <template>
-	<div>
+	<div class="ss-work-pilot">
 		<Hero />
 
 		<div v-if="!state.project" class="ss-content">
@@ -10,132 +10,166 @@
 			</Empty>
 		</div>
 
-		<div v-else class="ss-content ss-dash-content">
-			<!-- มือถือเรียงตามลำดับนี้ แท็บเล็ต/จอใหญ่จัดตำแหน่งด้วยกริด .ss-dash ใน style.css (ดู Design.md "หน้าภาพรวม") -->
-			<div class="ss-dash" :class="{ 'has-curve': summary?.curve?.length > 1 }">
-				<!-- ความคืบหน้า ณ วันนี้ -->
-				<div v-if="loading" class="ss-plan ss-plan--loading ss-dash-progress">
-					<span class="ss-sk ss-sk-number"></span>
-					<span class="ss-sk ss-sk-line"></span>
+		<div v-else class="ss-content ss-work-content">
+			<header class="ss-work-greeting">
+				<div>
+					<h1>{{ greeting }}, {{ display_name }}</h1>
+					<p>ติดตามงาน ความก้าวหน้า และสถานะของโครงการได้จากที่นี่</p>
 				</div>
-				<Empty
-					v-else-if="!summary.construction_management"
-					class="ss-dash-full"
-					icon="layers"
-					title="โครงการนี้ยังไม่มีแผนงาน"
-					text="สร้างแผนงานก่อสร้าง (Construction Management) ของโครงการในระบบเต็มก่อน"
-				/>
-				<div v-else-if="progress" class="ss-plan ss-dash-progress">
-					<div class="ss-plan-head">
-						<div class="ss-plan-figure">
-							<span>ทำได้จริง</span>
-							<b>{{ pct(progress.actual) }}<small>%</small></b>
+				<button
+					v-if="actions[0]"
+					type="button"
+					class="ss-btn ss-btn--primary ss-work-create"
+					:disabled="actions[0].disabled"
+					@click="actions[0].run()"
+				>
+					<Icon name="plus" :size="17" />
+					{{ actions[0].label }}
+				</button>
+			</header>
+
+			<div v-if="loading" class="ss-work-loading">
+				<div v-for="i in 6" :key="i" class="ss-plan ss-plan--loading">
+					<span class="ss-sk ss-sk-number"></span><span class="ss-sk ss-sk-line"></span>
+				</div>
+			</div>
+
+			<Empty
+				v-else-if="!summary.construction_management"
+				icon="layers"
+				title="โครงการนี้ยังไม่มีแผนงาน"
+				text="สร้างแผนงานก่อสร้าง (Construction Management) ของโครงการในระบบเต็มก่อน"
+			/>
+
+			<div v-else class="ss-work-grid">
+				<section class="ss-work-card ss-work-progress">
+					<div class="ss-work-head">
+						<div>
+							<span>ความก้าวหน้าโครงการ</span>
+							<strong>{{ pct(progress?.actual) }}<small>%</small></strong>
 						</div>
-						<div class="ss-plan-figure is-plan">
-							<span>ตามแผน</span>
-							<b>{{ pct(progress.plan) }}<small>%</small></b>
-						</div>
-						<span class="ss-tag" :class="`tone-${variance_tone}`">
-							<Icon :name="variance >= 0 ? 'check' : 'alert'" :size="13" />
+						<span class="ss-work-variance" :class="`is-${variance_tone}`">
+							<Icon :name="variance >= 0 ? 'trending' : 'alert'" :size="13" />
 							{{ variance_text }}
 						</span>
 					</div>
 					<div
-						class="ss-plan-bar"
-						:aria-label="`จริง ${pct(progress.actual)}% แผน ${pct(progress.plan)}%`"
+						class="ss-work-track"
+						:aria-label="`จริง ${pct(progress?.actual)}% แผน ${pct(progress?.plan)}%`"
 					>
-						<span class="ss-plan-bar-plan" :style="{ width: `${clamp(progress.plan)}%` }"></span>
-						<span class="ss-plan-bar-actual" :style="{ width: `${clamp(progress.actual)}%` }"></span>
+						<span class="is-plan" :style="{ width: `${clamp(progress?.plan)}%` }"></span>
+						<span class="is-actual" :style="{ width: `${clamp(progress?.actual)}%` }"></span>
 					</div>
-					<div class="ss-plan-foot">
-						<span>{{ progress.basis === "Baseline" ? "เทียบแผนสัญญา" : "เทียบแผนปัจจุบัน" }}</span>
-						<span v-if="progress.finish_date"
-							>สิ้นสุดสัญญา {{ thai_date(progress.finish_date, { year: true }) }} ·
-							{{ days_left }}</span
+					<dl class="ss-work-facts">
+						<div><dt>ผลงานจริง</dt><dd>{{ pct(progress?.actual) }}%</dd></div>
+						<div><dt>ตามแผน</dt><dd>{{ pct(progress?.plan) }}%</dd></div>
+						<div>
+							<dt>สิ้นสุดสัญญา</dt>
+							<dd>{{ progress?.finish_date ? thai_date(progress.finish_date, { year: true }) : "–" }}</dd>
+						</div>
+						<div><dt>เวลาที่เหลือ</dt><dd>{{ days_left || "–" }}</dd></div>
+					</dl>
+					<div class="ss-work-progress-actions">
+						<button type="button" class="ss-btn ss-btn--primary" @click="go('plan')">
+							<Icon name="gantt" :size="16" /> ดูแผนงาน
+						</button>
+						<button
+							v-if="inspection_action"
+							type="button"
+							class="ss-btn ss-btn--soft"
+							:disabled="inspection_action.disabled"
+							@click="inspection_action.run()"
 						>
+							<Icon name="search-check" :size="16" /> ขอตรวจงาน
+						</button>
 					</div>
-				</div>
+				</section>
 
-				<div v-if="summary?.curve?.length > 1" class="ss-plan ss-plan--curve ss-dash-curve">
-					<h2 class="ss-section-title ss-section-title--first">S-Curve</h2>
-					<SCurve :points="summary.curve" :basis="progress?.basis" fill />
-				</div>
-
-				<div class="ss-stats">
+				<section class="ss-work-stats" aria-label="ตัวเลขสรุป">
 					<button
-						v-for="(s, i) in stats"
-						:key="s.key"
+						v-for="(stat, index) in stats"
+						:key="stat.key"
 						type="button"
-						class="ss-stat"
-						:class="`tone-${s.tone}`"
-						:style="{ '--i': i }"
-						@click="go(s.view, s.params || {})"
+						:class="{ 'is-featured': index === 0 }"
+						@click="go(stat.view, stat.params || {})"
 					>
-						<span class="ss-stat-icon"><Icon :name="s.icon" :size="20" /></span>
-						<span class="ss-stat-value">
-							<span v-if="loading" class="ss-sk ss-sk-number"></span>
-							<template v-else>{{ s.value }}</template>
-						</span>
-						<span class="ss-stat-label">{{ s.label }}</span>
-						<span v-if="s.alert" class="ss-stat-alert">{{ s.alert }}</span>
+						<span>{{ stat.label }} <i><Icon :name="stat.icon" :size="15" /></i></span>
+						<strong>{{ stat.value }}</strong>
+						<small>{{ stat.alert || "ดูรายละเอียด" }}</small>
 					</button>
-				</div>
+				</section>
 
-				<section class="ss-dash-wide">
-					<h2 class="ss-section-title">ทำรายการ</h2>
-					<div class="ss-actions">
+				<section v-if="summary?.curve?.length > 1" class="ss-work-card ss-work-curve">
+					<div class="ss-work-head">
+						<div><h2>ความก้าวหน้ารายเดือน</h2><p>ผลงานจริงเทียบแผนสะสม</p></div>
+					</div>
+					<SCurve :points="summary.curve" :basis="progress?.basis" fill />
+				</section>
+
+				<section v-if="quick_actions.length" class="ss-work-card ss-work-quick">
+					<div class="ss-work-head"><h2>ทำรายการด่วน</h2></div>
+					<div class="ss-work-quick-list">
 						<button
-							v-for="(a, i) in actions"
-							:key="a.label"
+							v-for="action in quick_actions"
+							:key="action.label"
 							type="button"
-							class="ss-action"
-							:class="`tone-${a.tone}`"
-							:style="{ '--i': i }"
-							:disabled="a.disabled"
-							@click="a.run ? a.run() : open(a.url)"
+							:disabled="action.disabled"
+							@click="action.run()"
 						>
-							<span class="ss-action-icon"><Icon :name="a.icon" :size="26" :stroke="2" /></span>
-							<span class="ss-action-label">{{ a.label }}</span>
-							<span class="ss-action-note">{{ a.note }}</span>
+							<i><Icon :name="action.icon" :size="17" /></i>
+							<span><b>{{ action.label }}</b><small>{{ action.note }}</small></span>
+							<Icon name="chevron-right" :size="15" />
 						</button>
 					</div>
 				</section>
 
-				<section v-if="summary?.requests_ready?.length" class="ss-dash-wide">
-					<h2 class="ss-section-title">
-						อนุมัติแล้ว รอทำรายงาน
-						<button type="button" class="ss-link" @click="go('reports', { tab: 'request' })">
-							ดูทั้งหมด
-						</button>
-					</h2>
-					<div class="ss-list">
-						<button
-							v-for="(r, i) in summary.requests_ready"
-							:key="r.name"
-							type="button"
-							class="ss-card ss-card--row"
-							:style="{ '--i': i }"
-							@click="go('report-view', { kind: 'drq', name: r.name })"
-						>
-							<span class="ss-avatar tone-blue"><Icon name="clipboard-check" :size="18" /></span>
-							<span class="ss-card-main">
-								<span class="ss-card-title">{{ r.requested_by || r.name }}</span>
-								<span class="ss-card-sub"
-									>{{ r.name }} · คาดว่าได้ {{ pct(r.expected_progress) }}%</span
+				<section v-if="categories.length" class="ss-work-card ss-work-categories">
+					<div class="ss-work-head">
+						<h2>หมวดงาน</h2>
+						<span>ทั้งหมด {{ summary.categories.length }} หมวด</span>
+					</div>
+					<div class="ss-work-cat-list">
+						<div v-for="category in categories" :key="category.wbs" class="ss-work-cat-row">
+							<span :title="category.item_name"><small>{{ category.wbs }}</small>{{ category.item_name }}</span>
+							<b>{{ pct(category.percent) }}%</b>
+							<div class="ss-work-track">
+								<span class="is-actual" :style="{ width: `${clamp(category.percent)}%` }"></span>
+							</div>
+						</div>
+					</div>
+				</section>
+
+				<section class="ss-work-card ss-work-followups">
+					<div class="ss-work-head">
+						<h2>งานที่ต้องติดตาม</h2>
+						<button type="button" class="ss-link" @click="go('reports')">ดูรายงานทั้งหมด</button>
+					</div>
+					<div v-if="followups.length" class="ss-work-table-wrap">
+						<table>
+							<thead><tr><th>เลขที่</th><th>รายการ</th><th>รายละเอียด</th><th>สถานะ</th><th>อัปเดต</th><th></th></tr></thead>
+							<tbody>
+								<tr
+									v-for="row in followups"
+									:key="row.key"
+									:class="{ 'is-clickable': row.run }"
+									@click="open_followup(row)"
 								>
-							</span>
-							<span class="ss-due" :class="{ 'is-late': r.date < today() }">{{
-								relative_date(r.date)
-							}}</span>
-						</button>
+									<td>{{ row.ref }}</td>
+									<td>
+										<span class="ss-work-row-title">
+											<span class="ss-work-row-icon" :class="`is-${row.tone}`"><Icon :name="row.icon" :size="13" /></span>{{ row.title }}
+										</span>
+									</td>
+									<td>{{ row.detail }}</td>
+									<td><span class="ss-work-row-status" :class="`is-${row.tone}`"><i></i>{{ row.status }}</span></td>
+									<td>{{ row.when }}</td>
+									<td><Icon v-if="row.run" name="chevron-right" :size="14" /></td>
+								</tr>
+							</tbody>
+						</table>
 					</div>
+					<div v-else class="ss-work-empty"><Icon name="check" :size="18" /> ไม่มีงานที่ต้องติดตาม</div>
 				</section>
-
-				<PlanPanels
-					v-if="summary?.categories?.length"
-					:tasks="summary.late_tasks"
-					:categories="summary.categories"
-				/>
 			</div>
 		</div>
 	</div>
@@ -146,7 +180,6 @@ import { computed, inject, onMounted } from "vue";
 import Icon from "../../../shared/components/Icon.vue";
 import Empty from "../../../shared/components/Empty.vue";
 import Hero from "../../../shared/components/Hero.vue";
-import PlanPanels from "../../../shared/components/PlanPanels.vue";
 import SCurve from "../../../shared/components/SCurve.vue";
 import { boot, go, relative_date, state, thai_date, today } from "../../../shared/api.js";
 
@@ -157,6 +190,13 @@ const summary = computed(() => state.summaries.work);
 const loading = computed(() => !summary.value);
 const progress = computed(() => summary.value?.progress);
 const cm = computed(() => summary.value?.construction_management);
+const display_name = computed(() => (boot.full_name || boot.user || "ผู้ใช้งาน").split(" ")[0]);
+const greeting = computed(() => {
+	const hour = new Date().getHours();
+	if (hour < 12) return "อรุณสวัสดิ์";
+	if (hour < 17) return "สวัสดีตอนบ่าย";
+	return "สวัสดีตอนเย็น";
+});
 
 const pct = (value) =>
 	(Number(value) || 0).toLocaleString("th-TH", { minimumFractionDigits: 0, maximumFractionDigits: 1 });
@@ -172,6 +212,7 @@ const variance_text = computed(() => {
 	return `${variance.value > 0 ? "เร็วกว่า" : "ช้ากว่า"}แผน ${pct(v)}%`;
 });
 const days_left = computed(() => {
+	if (!progress.value?.finish_date) return "";
 	const days = Math.round((new Date(progress.value.finish_date) - new Date(today())) / 86400000);
 	if (days === 0) return "วันนี้";
 	return days > 0 ? `อีก ${days} วัน` : `เลยมา ${-days} วัน`;
@@ -220,7 +261,7 @@ const stats = computed(() => {
 			view: "inspections",
 			params: { tab: "punch" },
 		},
-	];
+	].filter((stat) => stat.when);
 });
 
 const actions = computed(() => {
@@ -228,6 +269,7 @@ const actions = computed(() => {
 		{
 			when: boot.can.daily_report,
 			label: "เขียนรายงาน",
+			short_label: "วันนี้",
 			note: "Daily Report ของวันนี้",
 			icon: "clipboard",
 			tone: "orange",
@@ -237,6 +279,7 @@ const actions = computed(() => {
 		{
 			when: boot.can.daily_request,
 			label: "ขออนุมัติล่วงหน้า",
+			short_label: "REQ",
 			note: "Daily Request ล่วงหน้า",
 			icon: "send",
 			tone: "blue",
@@ -246,6 +289,7 @@ const actions = computed(() => {
 		{
 			when: boot.can.create_inspection,
 			label: "ขอตรวจงาน",
+			short_label: "IR",
 			note: "ส่งใบขอตรวจถึงผู้ตรวจ",
 			icon: "search-check",
 			tone: "teal",
@@ -255,6 +299,7 @@ const actions = computed(() => {
 		{
 			when: boot.can.concrete,
 			label: "เทคอนกรีต",
+			short_label: "คอนกรีต",
 			note: "บันทึกตั๋วรถทีละคัน",
 			icon: "truck",
 			tone: "violet",
@@ -264,8 +309,41 @@ const actions = computed(() => {
 	].filter((action) => action.when);
 });
 
-function open(url) {
-	if (url) window.location.href = url;
+const categories = computed(() => (summary.value?.categories || []).slice(0, 6));
+const inspection_action = computed(() => actions.value.find((action) => action.icon === "search-check"));
+// ปุ่มเขียนรายงานอยู่ที่หัวหน้า ขอตรวจงานอยู่ในการ์ดความก้าวหน้า ไม่ต้องซ้ำ
+const quick_actions = computed(() =>
+	actions.value.filter((action, index) => index > 0 && action !== inspection_action.value)
+);
+const followups = computed(() => {
+	const s = summary.value || {};
+	const requests = (s.requests_ready || []).map((row) => ({
+		key: `request-${row.name}`,
+		ref: row.name,
+		title: row.requested_by || "ขออนุมัติปฏิบัติงาน",
+		detail: `คาดว่าได้ ${pct(row.expected_progress)}%`,
+		status: "รอทำรายงาน",
+		tone: "ready",
+		icon: "clipboard-check",
+		when: row.date ? relative_date(row.date) : "–",
+		run: () => go("report-view", { kind: "drq", name: row.name }),
+	}));
+	const late_tasks = (s.late_tasks || []).map((row) => ({
+		key: `task-${row.wbs}`,
+		ref: row.wbs,
+		title: row.item_name,
+		detail: row.status_label || `จริง ${pct(row.actual_pct)}% · แผน ${pct(row.plan_pct)}%`,
+		status: row.delay_days > 0 ? `ช้า ${row.delay_days} วัน` : "ต้องติดตาม",
+		tone: row.critical ? "critical" : "late",
+		icon: row.critical ? "flag" : "alert",
+		when: `จริง ${pct(row.actual_pct)}%`,
+		run: null,
+	}));
+	return [...requests, ...late_tasks].slice(0, 5);
+});
+
+function open_followup(row) {
+	row.run?.();
 }
 
 onMounted(() => {
