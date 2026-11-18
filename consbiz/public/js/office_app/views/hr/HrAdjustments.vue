@@ -11,6 +11,25 @@
 		</TopBar>
 
 		<div class="ss-content">
+			<!-- ตัวเลขสรุปอยู่เหนือหัวรายการ (หัวรายการต้องติดกับการ์ดตาราง) -->
+			<div v-if="data" class="ss-stats ss-stats--3">
+				<div class="ss-stat" style="--i: 0">
+					<span class="ss-stat-icon"><Icon name="list" :size="20" /></span>
+					<span class="ss-stat-value">{{ data.rows.length }}</span>
+					<span class="ss-stat-label">รายการ</span>
+				</div>
+				<div class="ss-stat" style="--i: 1">
+					<span class="ss-stat-icon"><Icon name="plus" :size="20" /></span>
+					<span class="ss-stat-value ss-stat-value--money">{{ money(data.totals.earning) }}</span>
+					<span class="ss-stat-label">รายได้เพิ่ม</span>
+				</div>
+				<div class="ss-stat" style="--i: 2">
+					<span class="ss-stat-icon"><Icon name="minus" :size="20" /></span>
+					<span class="ss-stat-value ss-stat-value--money">{{ money(data.totals.deduction) }}</span>
+					<span class="ss-stat-label">รายการหัก</span>
+				</div>
+			</div>
+
 			<!-- จอเล็ก: เลือกเดือนอย่างเดียว (ลงรายการอยู่บนแถบบน) -->
 			<ListHead
 				v-model:search="txt"
@@ -29,26 +48,9 @@
 				</template>
 			</ListHead>
 
+			<ListCard :on="wide">
 			<Skeleton v-if="data === null" :rows="5" />
 			<template v-else>
-				<div class="ss-stats ss-stats--3">
-					<div class="ss-stat" style="--i: 0">
-						<span class="ss-stat-icon"><Icon name="list" :size="20" /></span>
-						<span class="ss-stat-value">{{ data.rows.length }}</span>
-						<span class="ss-stat-label">รายการ</span>
-					</div>
-					<div class="ss-stat" style="--i: 1">
-						<span class="ss-stat-icon"><Icon name="plus" :size="20" /></span>
-						<span class="ss-stat-value ss-stat-value--money">{{ money(data.totals.earning) }}</span>
-						<span class="ss-stat-label">รายได้เพิ่ม</span>
-					</div>
-					<div class="ss-stat" style="--i: 2">
-						<span class="ss-stat-icon"><Icon name="minus" :size="20" /></span>
-						<span class="ss-stat-value ss-stat-value--money">{{ money(data.totals.deduction) }}</span>
-						<span class="ss-stat-label">รายการหัก</span>
-					</div>
-				</div>
-
 				<Empty v-if="!shown.length" icon="list" title="ยังไม่มีรายการเดือนนี้" text="เช่น OT โบนัส หักเครดิตร้านค้า" />
 				<DataTable v-else-if="wide" :rows="shown" :columns="COLUMNS" @open="open_row">
 					<template #employee_name="{ row }">
@@ -74,6 +76,7 @@
 					</button>
 				</div>
 			</template>
+			</ListCard>
 		</div>
 
 		<Sheet :open="form_open" title="ลงรายการเพิ่ม/หัก" :subtitle="month_label" @close="form_open = false">
@@ -129,6 +132,7 @@ import MoneyInput from "../../../shared/components/MoneyInput.vue";
 import DataTable from "../../../shared/components/DataTable.vue";
 import DateInput from "../../../shared/components/DateInput.vue";
 import ListHead from "../../../shared/components/ListHead.vue";
+import ListCard from "../../../shared/components/ListCard.vue";
 import { matches, use_wide } from "../../../shared/table.js";
 import { call, money, post, replace_params, show_error, state, strip_html, thai_date, toast } from "../../../shared/api.js";
 

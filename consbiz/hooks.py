@@ -121,7 +121,7 @@ doc_events = {
     "Payment Entry": {
         "on_submit": [
             "consbiz.api.update_si_tax",
-            # จ่ายใบเบิกจากแอป Self Service: หักเงินเดือนล่วงหน้าเป็นงวด / ตั้งกำหนดเคลียร์เงินสำรองจ่าย
+            # จ่ายใบเบิกจากแอป Self Service: หักเงินเดือนล่วงหน้าเป็นงวด / ตั้งกำหนดเคลียร์เงินทดรองจ่าย
             "consbiz.self_advance.on_payment_entry_submit"
         ]
     },
@@ -203,7 +203,7 @@ scheduler_events = {
         "consbiz.retention.update_overdue",
         # ลบรูปเซลฟี่ของการลงเวลาเมื่อ Salary Slip ของงวดนั้นผ่านไป 90 วัน (ยกเว้นติ๊กเก็บหลักฐาน)
         "consbiz.self_service.purge_selfies",
-        # เงินสำรองจ่ายเลยกำหนดเคลียร์: แจ้งเตือนพนักงาน
+        # เงินทดรองจ่ายเลยกำหนดเคลียร์: แจ้งเตือนพนักงาน
         "consbiz.self_advance.remind_overdue_clearing"
     ]
 }
@@ -287,6 +287,7 @@ jinja = {
 		"consbiz.utils.name_with_title",
 		"consbiz.utils.thai_baht_text",
 		"consbiz.utils.image_data_uri",
+		"consbiz.contract_terms.render_contract",
 	]
 }
 # jinja = {

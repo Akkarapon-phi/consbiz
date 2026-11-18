@@ -29,10 +29,20 @@ KINDS = {
 			"prob_days",
 			"prob_end_date",
 			"probation",
+			# เนื้อหาสัญญา (ตกลง 2026-11-18, consbiz/contract_terms.py): แม่แบบ + เนื้อหาเฉพาะฉบับ
+			"contract_template",
+			"heading",
+			"designation",
+			"department",
+			"employer_signer",
+			"witnesses",
+			"terms",
+			"layout",
 		),
 		# ช่องที่แก้หลัง Submit ได้ (สถานะทดลองงาน ตัดสินเมื่อครบกำหนด)
 		"after": ("probation",),
-		"formats": ("Employment Contract", "Employee Evaluation Form"),
+		# Employment Contract TH = HTML จากเนื้อหาสัญญา / Employment Contract = แบบเดิม (Print Designer) ของสัญญาที่ไม่มีเนื้อหา
+		"formats": ("Employment Contract TH", "Employment Contract", "Employee Evaluation Form"),
 	},
 	"hr-wht": {
 		"doctype": "WHT Employee",
@@ -53,6 +63,28 @@ KINDS = {
 		),
 		"after": (),
 		"formats": ("WHT Employee",),
+	},
+	# ใบเตือน (Employee Warning, ตกลง 2026-11-17) หลังยืนยันแก้ได้เฉพาะการรับทราบ
+	"hr-warnings": {
+		"doctype": "Employee Warning",
+		"list": ("employee", "employee_name", "company", "date", "level", "category", "acknowledged", "refused"),
+		"date": "date",
+		"input": (
+			"employee",
+			"date",
+			"level",
+			"category",
+			"incident_date",
+			"description",
+			"regulation",
+			"corrective_action",
+			"witness",
+			"acknowledged",
+			"acknowledged_date",
+			"refused",
+		),
+		"after": ("acknowledged", "acknowledged_date", "refused"),
+		"formats": ("Employee Warning",),
 	},
 }
 WHT_ITEM = ("type_of_income", "description", "tax_base", "tax_rate")
@@ -87,6 +119,13 @@ def label_status(kind, row):
 			label, tone = _("ครบทดลองงาน รอประเมิน"), "amber"
 		elif row.get("prob_end_date"):
 			label, tone = _("ทดลองงาน"), "blue"
+	if kind == "hr-warnings" and cint(row.get("docstatus")) == 1:
+		if cint(row.get("acknowledged")):
+			label, tone = _("รับทราบแล้ว"), "green"
+		elif cint(row.get("refused")):
+			label, tone = _("ไม่ยอมลงชื่อ"), "rose"
+		else:
+			label, tone = _("รอรับทราบ"), "amber"
 	row["status_label"], row["status_tone"] = label, tone
 	return row
 
@@ -143,8 +182,12 @@ def pdfs(kind, doc):
 	for fmt in KINDS[kind]["formats"]:
 		if not frappe.db.exists("Print Format", {"name": fmt, "disabled": 0}):
 			continue
+		if kind == "hr-contracts" and fmt in ("Employment Contract TH", "Employment Contract"):
+			if bool(doc.get("terms")) != (fmt == "Employment Contract TH"):
+				continue
 		pf = frappe.db.get_value("Print Format", fmt, ["pdf_generator", "print_designer"], as_dict=True)
 		# แบบของ Print Designer ออกแบบมาให้ Chrome สร้าง PDF (wkhtmltopdf วาดข้อความซ้อน)
+		# สัญญาจ้าง HTML ฝังฟอนต์เป็น data URI: ต้องใช้ chrome (wkhtmltopdf อ่าน woff2 ไม่ได้ = ฟอนต์ระบบ) ตั้งใน JSON ของ Print Format แล้ว
 		generator = "chrome" if pf.print_designer else pf.pdf_generator or print_options(doc.doctype)[1]
 		params = {
 			"doctype": doc.doctype,
@@ -153,7 +196,7 @@ def pdfs(kind, doc):
 			"no_letterhead": 0,
 			"pdf_generator": generator,
 		}
-		label = _("แบบประเมินทดลองงาน") if fmt == "Employee Evaluation Form" else _("พิมพ์")
+		label = {"Employee Evaluation Form": _("แบบประเมินทดลองงาน"), "Employment Contract TH": _("สัญญาจ้าง")}.get(fmt, _("พิมพ์"))
 		out.append(
 			{"label": label, "url": "/api/method/frappe.utils.print_format.download_pdf?" + urlencode(params)}
 		)
@@ -173,6 +216,16 @@ def serialize(kind, doc):
 	)
 	if kind == "hr-contracts":
 		out.update(salutation=doc.salutation, full_name=doc.full_name)
+	elif kind == "hr-warnings":
+		out.update(
+			employee_name=doc.employee_name,
+			designation=doc.designation,
+			company=doc.company,
+			issued_by=doc.issued_by,
+			previous=[
+				{**r, "date": str(r.date)} for r in (doc.previous_warnings() if doc.employee else [])
+			],
+		)
 	else:
 		out.update(
 			company_tax_id=doc.company_tax_id,
@@ -208,6 +261,13 @@ def get_doc(kind, name=None, company=None):
 		if kind == "hr-wht":
 			doc.date = nowdate()
 			doc.tax_payer = "Withholding"
+		if kind == "hr-warnings":
+			doc.date = nowdate()
+			doc.level, doc.category = "Written 1", "Late"
+		if kind == "hr-contracts":
+			from consbiz.contract_terms import default_template
+
+			apply_template(doc, default_template(doc.company))
 	return serialize(kind, doc)
 
 
@@ -221,6 +281,10 @@ def employee_info(employee):
 		["employee_name", "salutation", "company", "custom_id_card", "permanent_address", "date_of_joining"],
 		as_dict=True,
 	)
+	from consbiz.contract_terms import strip_abbr
+
+	info.designation = frappe.db.get_value("Employee", employee, "designation")
+	info.department = strip_abbr(frappe.db.get_value("Employee", employee, "department"), info.company)
 	info.base = frappe.db.get_value(
 		"Salary Structure Assignment",
 		{"employee": employee, "docstatus": 1},
@@ -230,16 +294,41 @@ def employee_info(employee):
 	return info
 
 
+def apply_template(doc, name):
+	"""คัดลอกแม่แบบลงสัญญา (เนื้อหา ชื่อเอกสาร ผู้ลงนาม พยาน) แล้วแก้เฉพาะฉบับได้"""
+	if not name:
+		return
+	tpl = frappe.db.get_value(
+		"Employment Contract Template", name, ["heading", "employer_signer", "witnesses", "terms", "layout"], as_dict=True
+	)
+	if tpl:
+		doc.contract_template = name
+		doc.update(tpl)
+
+
 def fill_contract(doc, data):
+	from consbiz.contract_terms import strip_abbr
+
 	if doc.employee:
-		emp = frappe.db.get_value("Employee", doc.employee, ["salutation", "employee_name"], as_dict=True)
+		emp = frappe.db.get_value(
+			"Employee", doc.employee, ["salutation", "employee_name", "designation", "department"], as_dict=True
+		)
 		doc.salutation, doc.full_name = emp.salutation, emp.employee_name
+		doc.designation = doc.designation or emp.designation
+		doc.department = doc.department or strip_abbr(emp.department, doc.company)
+	if doc.contract_template and not doc.terms:
+		apply_template(doc, doc.contract_template)
 	if not doc.naming_series:
 		doc.naming_series = (
 			frappe.get_meta(doc.doctype).get_field("naming_series").default or "EC-.ABBR..YY..####"
 		)
 	if doc.prob_start_date and doc.prob_days and not data.get("prob_end_date"):
 		doc.prob_end_date = add_days(doc.prob_start_date, cint(doc.prob_days) - 1)
+
+
+def fill_warning(doc, data):
+	if not doc.naming_series:
+		doc.naming_series = frappe.get_meta(doc.doctype).get_field("naming_series").default
 
 
 def fill_wht(doc, data):
@@ -305,7 +394,7 @@ def save_doc(kind, data, submit=0):
 	for field in config["input"]:
 		if field in data:
 			doc.set(field, data[field])
-	(fill_contract if kind == "hr-contracts" else fill_wht)(doc, data)
+	{"hr-contracts": fill_contract, "hr-warnings": fill_warning}.get(kind, fill_wht)(doc, data)
 	doc.save()
 	if cint(submit):
 		doc.submit()

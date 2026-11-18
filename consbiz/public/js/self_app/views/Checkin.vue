@@ -1,11 +1,12 @@
-<!-- ลงเวลาเข้า-ออกงาน: กดปุ่ม = เปิดกล้องถ่ายสด (LiveCamera, เลือกไฟล์ไม่ได้) + ขอตำแหน่ง GPS พร้อมกัน แล้วยืนยันใน sheet
-     รูป 480px JPEG 0.6 ส่งพร้อมพิกัดในคำขอเดียว server ตรวจรัศมีจุดลงเวลาและใช้เวลาของ server
-     นอกรัศมี / GPS คลาดเกิน accuracy_limit = ลงได้แต่ต้องมีเหตุผล แล้วรอหัวหน้ายืนยัน (โมดูลอนุมัติ หน้า approve)
-     ลืมลงเวลาออก (ย้อนหลังไม่เกิน 7 วัน) = แถบเตือนบนหน้า แจ้งเวลาออก + เหตุผล รอหัวหน้ายืนยัน
-     ประวัติ 31 วัน จัดกลุ่มตามวัน กดรายการ = ดูรูปเซลฟี่ (ลบอัตโนมัติเมื่อสลิปงวดนั้นผ่านไป 90 วัน) -->
+<!-- ภาพรวม (หน้าแรกของ Self Service, ตกลง 2026-11-17, view ชื่อเดิม checkin) API consbiz.self_home.get_home / get_month
+     ทักทาย + ลงเวลา (กดปุ่ม = กล้องถ่ายสด LiveCamera + GPS พร้อมกัน ยืนยันใน sheet, server ตรวจรัศมีและใช้เวลาของ server
+     นอกรัศมี / GPS คลาดเกิน accuracy_limit = ลงได้แต่ต้องมีเหตุผล รอหัวหน้ายืนยัน)
+     ตัวเลขเดือน (มาทำงาน/ลา/ขาด/สาย + ของปี) สิ่งที่ควรทำ (ลืมลงเวลาออก, วันขาดที่แจ้งมาทำงานได้, จองกะ, เคลียร์เงิน, สิทธิ์ลาใกล้หมด)
+     ปฏิทินเดือน = สถานะชุดเดียวกับหน้าสรุปวันทำงานของ HR (hr_attendance) แตะวัน = เวลาเข้า-ออก รูปเซลฟี่ คำขอ + แจ้งมาทำงาน/แจ้งเวลาออก
+     แจ้งมาทำงาน = Attendance Request (ย้อนหลัง request_days วัน) รายการของฉันที่รออนุมัติ และทางลัดไปฟอร์มขอที่ใช้บ่อย -->
 <template>
 	<div>
-		<TopBar title="ลงเวลา" no_project>
+		<TopBar title="ภาพรวม" no_project>
 			<template #actions>
 				<button
 					type="button"
@@ -19,109 +20,331 @@
 			</template>
 		</TopBar>
 
-		<div class="ss-content">
-			<Skeleton v-if="data === null" :rows="3" />
-			<template v-else>
-				<section class="ss-card ss-clock" :class="{ 'is-out': data.next_log_type === 'OUT' }">
-					<div class="ss-clock-date">{{ long_date(clock) }}</div>
-					<div class="ss-clock-time">{{ clock_text }}</div>
-					<div class="ss-clock-place">
-						<Icon name="pin" :size="14" />
-						<span v-if="data.location">
-							{{ data.location.location_name || data.location.name }}
-							<small v-if="data.location.radius">· รัศมี {{ num(data.location.radius) }} ม.</small>
+		<div class="ss-content ss-work-content">
+			<header class="ss-work-greeting">
+				<div>
+					<h1>{{ greeting }}<template v-if="data?.first_name">, {{ data.first_name }}</template></h1>
+					<p>
+						{{ long_date(clock) }}
+						<template v-if="data?.project"> · {{ data.project.project_name || data.project.name }}</template>
+					</p>
+				</div>
+			</header>
+
+			<Skeleton v-if="data === null" :rows="4" />
+			<div v-else class="ss-work-grid ss-self-grid">
+				<!-- ลงเวลา -->
+				<section class="ss-work-card ss-self-clock" :class="{ 'is-out': data.next_log_type === 'OUT' }">
+					<div class="ss-work-head">
+						<div>
+							<span>{{ data.next_log_type === "OUT" ? "กำลังทำงาน" : "ยังไม่ได้เข้างาน" }}</span>
+							<strong class="ss-self-time">{{ clock_text }}</strong>
+						</div>
+						<span class="ss-self-place" :class="{ 'is-danger': !data.location }">
+							<Icon name="pin" :size="13" />
+							<template v-if="data.location">
+								{{ data.location.location_name || data.location.name }} · {{ num(data.location.radius) }} ม.
+							</template>
+							<template v-else>ยังลงเวลาไม่ได้</template>
 						</span>
-						<span v-else class="ss-text-danger">{{ data.location_issue }}</span>
 					</div>
-					<button
-						type="button"
-						class="ss-btn ss-btn--primary ss-btn--block ss-btn--lg ss-clock-btn"
-						:disabled="!data.location || busy"
-						@click="start"
-					>
-						<Icon name="camera" :size="20" />
-						<span>{{ data.next_log_type === "OUT" ? "ลงเวลาออกงาน" : "ลงเวลาเข้างาน" }}</span>
+					<dl class="ss-work-facts">
+						<div><dt>เข้างานวันนี้</dt><dd>{{ today_summary.first_in || "—" }}</dd></div>
+						<div><dt>ออกงานวันนี้</dt><dd>{{ today_summary.last_out || "—" }}</dd></div>
+						<div><dt>ชั่วโมงวันนี้</dt><dd>{{ today_summary.hours }}</dd></div>
+						<div><dt>สถานะ</dt><dd>{{ today_status }}</dd></div>
+					</dl>
+					<p v-if="!data.location" class="ss-note ss-note--warn ss-self-issue">{{ data.location_issue }}</p>
+					<div class="ss-work-progress-actions ss-self-clock-actions">
+						<button
+							type="button"
+							class="ss-btn ss-btn--primary"
+							:disabled="!data.location || busy"
+							@click="start"
+						>
+							<Icon name="camera" :size="18" />
+							{{ data.next_log_type === "OUT" ? "ลงเวลาออกงาน" : "ลงเวลาเข้างาน" }}
+						</button>
+						<button type="button" class="ss-btn ss-btn--soft" @click="open_request(data.today)">
+							<Icon name="clipboard-check" :size="16" /> แจ้งมาทำงาน
+						</button>
+					</div>
+				</section>
+
+				<!-- ตัวเลขของเดือน -->
+				<section class="ss-work-stats ss-self-stats" aria-label="สรุปการทำงาน">
+					<button type="button" class="is-featured" @click="scroll_to_calendar">
+						<span>มาทำงาน <i><Icon name="check" :size="15" /></i></span>
+						<strong>{{ days_text(totals.present + totals.half / 2) }}</strong>
+						<small>{{ month_label }} · ครึ่งวัน {{ totals.half }} · หยุด {{ totals.off }}</small>
+					</button>
+					<button type="button" @click="go('leave')">
+						<span>ลา <i><Icon name="calendar" :size="15" /></i></span>
+						<strong>{{ totals.leave }}</strong>
+						<small>ปีนี้ {{ data.year.leave_count }} ครั้ง · {{ days_text(data.year.leave_days) }} วัน</small>
+					</button>
+					<button type="button" @click="absent_action">
+						<span>ขาด <i><Icon name="ban" :size="15" /></i></span>
+						<strong>{{ totals.absent }}</strong>
+						<small>ปีนี้ {{ data.year.absent }} วัน</small>
+					</button>
+					<button type="button" @click="scroll_to_calendar">
+						<span>สาย <i><Icon name="clock" :size="15" /></i></span>
+						<strong>{{ totals.late_count }}</strong>
+						<small>{{ totals.late_min ? `${num(totals.late_min)} นาที · ` : "" }}ปีนี้ {{ data.year.late_count }} ครั้ง</small>
 					</button>
 				</section>
 
-				<button
-					v-for="m in data.missing_out"
-					:key="m.date"
-					type="button"
-					class="ss-card ss-card--row ss-missing-out"
-					@click="open_missing(m)"
-				>
-					<span class="ss-avatar tone-amber"><Icon name="alert" :size="18" /></span>
-					<span class="ss-card-main">
-						<span class="ss-card-title">ยังไม่ได้ลงเวลาออก {{ relative_date(m.date) }}</span>
-						<span class="ss-card-meta">เข้างาน {{ time_of(m.check_in) }} น. · แตะเพื่อแจ้งเวลาออก</span>
-					</span>
-					<Icon name="chevron-right" :size="18" />
-				</button>
-
-				<div class="ss-stats ss-stats--3">
-					<div class="ss-stat tone-green" style="--i: 0">
-						<span class="ss-stat-icon"><Icon name="log-out" :size="20" class="ss-flip" /></span>
-						<span class="ss-stat-value">{{ today_summary.first_in || "—" }}</span>
-						<span class="ss-stat-label">เข้างานวันนี้</span>
+				<!-- สิ่งที่ควรทำ -->
+				<section class="ss-work-card ss-self-todo">
+					<div class="ss-work-head">
+						<h2>สิ่งที่ควรทำ</h2>
+						<span v-if="todos.length">{{ todos.length }} รายการ</span>
 					</div>
-					<div class="ss-stat tone-green" style="--i: 1">
-						<span class="ss-stat-icon"><Icon name="log-out" :size="20" /></span>
-						<span class="ss-stat-value">{{ today_summary.last_out || "—" }}</span>
-						<span class="ss-stat-label">ออกงานวันนี้</span>
-					</div>
-					<div class="ss-stat tone-green" style="--i: 2">
-						<span class="ss-stat-icon"><Icon name="clock" :size="20" /></span>
-						<span class="ss-stat-value">{{ today_summary.hours }}</span>
-						<span class="ss-stat-label">ชั่วโมงวันนี้</span>
-					</div>
-				</div>
-
-				<h2 class="ss-section-title">ประวัติ 31 วัน</h2>
-				<Empty
-					v-if="!days.length"
-					icon="clock"
-					title="ยังไม่มีการลงเวลา"
-					text="กดปุ่มด้านบนเพื่อลงเวลาเข้างาน"
-				/>
-				<template v-for="day in days" :key="day.date">
-					<div class="ss-day">{{ relative_date(day.date) }}</div>
-					<div class="ss-list">
+					<div v-if="todos.length" class="ss-work-quick-list">
 						<button
-							v-for="(log, i) in day.logs"
-							:key="log.name"
+							v-for="t in todos"
+							:key="t.key"
 							type="button"
-							class="ss-card ss-card--row"
-							:style="{ '--i': i }"
-							@click="open_log(log)"
+							:class="`is-${t.tone}`"
+							:disabled="!t.run"
+							@click="t.run?.()"
 						>
-							<span class="ss-avatar" :class="log.log_type === 'IN' ? 'tone-green' : 'tone-gray'">
-								<Icon name="log-out" :size="18" :class="{ 'ss-flip': log.log_type === 'IN' }" />
-							</span>
-							<span class="ss-card-main">
-								<span class="ss-card-title">
-									{{ log.log_type === "IN" ? "เข้างาน" : "ออกงาน" }}
-									<span v-if="APPROVAL[log.approval]" class="ss-tag" :class="`tone-${APPROVAL[log.approval].tone}`">{{
-										APPROVAL[log.approval].label
-									}}</span>
-								</span>
-								<span class="ss-card-meta">
-									<template v-if="log.manual">แจ้งย้อนหลัง</template>
-									<template v-else-if="log.distance != null">ห่าง {{ num(log.distance) }} ม.</template>
-									<template v-if="log.shift"> · {{ log.shift }}</template>
-								</span>
-							</span>
-							<span class="ss-qty"><b>{{ time_of(log.time) }}</b><small>น.</small></span>
+							<i><Icon :name="t.icon" :size="17" /></i>
+							<span><b>{{ t.title }}</b><small>{{ t.note }}</small></span>
+							<Icon v-if="t.run" name="chevron-right" :size="15" />
 						</button>
 					</div>
-				</template>
-			</template>
+					<div v-else class="ss-work-empty"><Icon name="check" :size="18" /> เรียบร้อย ไม่มีงานค้าง</div>
+				</section>
+
+				<!-- ปฏิทิน -->
+				<section ref="calendar_el" class="ss-work-card ss-self-cal">
+					<div class="ss-work-head">
+						<h2>{{ month_label }}</h2>
+						<div class="ss-self-cal-nav">
+							<button type="button" class="ss-icon-btn" aria-label="เดือนก่อน" :disabled="month_loading" @click="move_month(-1)">
+								<Icon name="chevron-left" :size="18" />
+							</button>
+							<button
+								v-if="cal.month !== this_month"
+								type="button"
+								class="ss-btn ss-btn--soft ss-self-cal-today"
+								:disabled="month_loading"
+								@click="load_month(this_month)"
+							>
+								เดือนนี้
+							</button>
+							<button
+								type="button"
+								class="ss-icon-btn"
+								aria-label="เดือนถัดไป"
+								:disabled="month_loading || cal.month >= this_month"
+								@click="move_month(1)"
+							>
+								<Icon name="chevron-right" :size="18" />
+							</button>
+						</div>
+					</div>
+					<div class="ss-self-cal-grid" :class="{ 'is-loading': month_loading }">
+						<span v-for="d in DOW" :key="d" class="ss-self-cal-dow">{{ d }}</span>
+						<span v-for="n in lead_blanks" :key="`b${n}`"></span>
+						<button
+							v-for="d in cal_days"
+							:key="d.iso"
+							type="button"
+							class="ss-self-cal-day"
+							:class="[`is-${d.view.tone}`, { 'is-today': d.iso === data.today, 'has-request': d.cell?.request }]"
+							:disabled="d.view.tone === 'none' && d.iso !== data.today"
+							:aria-label="`${d.day} ${d.view.label}`"
+							:title="d.view.label"
+							@click="open_day(d.iso)"
+						>
+							<small>{{ d.day }}</small>
+							<span>{{ d.view.glyph }}</span>
+							<i v-if="d.cell?.late" class="ss-self-cal-late"></i>
+						</button>
+					</div>
+					<div class="ss-self-legend">
+						<span v-for="item in legend" :key="item.key" :class="`is-${item.tone}`">
+							<i>{{ item.glyph }}</i>{{ item.label }} <b>{{ item.count }}</b>
+						</span>
+					</div>
+				</section>
+
+				<!-- รออนุมัติ -->
+				<section class="ss-work-card ss-self-pending">
+					<div class="ss-work-head">
+						<h2>รออนุมัติ</h2>
+						<span v-if="pending.length">{{ pending.length }} รายการ</span>
+					</div>
+					<div v-if="pending.length" class="ss-work-quick-list">
+						<button v-for="p in pending" :key="`${p.kind}:${p.name}`" type="button" @click="p.run()">
+							<i><Icon :name="p.icon" :size="17" /></i>
+							<span><b>{{ p.title }}</b><small>{{ p.note }}</small></span>
+							<b v-if="p.amount != null" class="ss-self-amount">{{ money(p.amount) }}</b>
+							<Icon v-else name="chevron-right" :size="15" />
+						</button>
+					</div>
+					<div v-else class="ss-work-empty"><Icon name="inbox" :size="18" /> ไม่มีรายการรออนุมัติ</div>
+				</section>
+
+				<!-- ทางลัด -->
+				<section class="ss-work-card ss-work-quick">
+					<div class="ss-work-head"><h2>ทางลัด</h2></div>
+					<div class="ss-work-quick-list ss-self-shortcuts">
+						<button v-for="a in SHORTCUTS" :key="a.label" type="button" @click="a.run()">
+							<i><Icon :name="a.icon" :size="17" /></i>
+							<span><b>{{ a.label }}</b><small>{{ a.note }}</small></span>
+							<Icon name="chevron-right" :size="15" />
+						</button>
+					</div>
+				</section>
+			</div>
 		</div>
+
+		<!-- รายละเอียดวัน -->
+		<Sheet
+			:open="!!day"
+			:title="day ? thai_date(day.iso, { year: true }) : ''"
+			:subtitle="day?.view.label"
+			@close="day = null"
+		>
+			<template v-if="day">
+				<div class="ss-facts">
+					<div class="ss-fact">
+						<span>สถานะ</span>
+						<b><span class="ss-tag" :class="`tone-${TAG_TONE[day.view.tone] || 'gray'}`">{{ day.view.label }}</span></b>
+					</div>
+					<div v-if="day.cell?.note" class="ss-fact"><span>หมายเหตุ</span><b>{{ day.cell.note }}</b></div>
+					<div v-if="day.cell?.in || day.cell?.out" class="ss-fact">
+						<span>เข้า – ออก</span>
+						<b>{{ day.cell.in || "—" }} – {{ day.cell.out || "—" }}<template v-if="day.cell.hours != null"> ({{ day.cell.hours }} ชม.)</template></b>
+					</div>
+					<div v-if="day.cell?.late" class="ss-fact"><span>มาสาย</span><b>{{ day.cell.late }} นาที</b></div>
+					<div v-if="day.cell?.early" class="ss-fact"><span>กลับก่อน</span><b>{{ day.cell.early }} นาที</b></div>
+				</div>
+				<div v-if="day.logs.length" class="ss-list">
+					<button
+						v-for="(log, i) in day.logs"
+						:key="log.name"
+						type="button"
+						class="ss-card ss-card--row"
+						:style="{ '--i': i }"
+						@click="viewing = log"
+					>
+						<span class="ss-avatar" :class="log.log_type === 'IN' ? 'tone-green' : 'tone-gray'">
+							<Icon name="log-out" :size="18" :class="{ 'ss-flip': log.log_type === 'IN' }" />
+						</span>
+						<span class="ss-card-main">
+							<span class="ss-card-title">
+								{{ log.log_type === "IN" ? "เข้างาน" : "ออกงาน" }}
+								<span v-if="APPROVAL[log.approval]" class="ss-tag" :class="`tone-${APPROVAL[log.approval].tone}`">{{
+									APPROVAL[log.approval].label
+								}}</span>
+							</span>
+							<span class="ss-card-meta">
+								<template v-if="log.manual">แจ้งย้อนหลัง</template>
+								<template v-else-if="log.distance != null">ห่าง {{ num(log.distance) }} ม.</template>
+							</span>
+						</span>
+						<span class="ss-qty"><b>{{ time_of(log.time) }}</b><small>น.</small></span>
+					</button>
+				</div>
+				<div v-for="r in day.requests" :key="r.name" class="ss-card ss-card--row">
+					<span class="ss-avatar tone-blue"><Icon name="clipboard-check" :size="18" /></span>
+					<span class="ss-card-main">
+						<span class="ss-card-title">
+							แจ้งมาทำงาน
+							<span class="ss-tag" :class="`tone-${request_status(r).tone}`">{{ request_status(r).label }}</span>
+						</span>
+						<span class="ss-card-meta">{{ REQUEST_REASON[r.reason] }} · {{ leave_range(r) }}</span>
+						<span v-if="r.review_note" class="ss-card-meta">เหตุผล: {{ r.review_note }}</span>
+					</span>
+					<button v-if="r.can_delete" type="button" class="ss-link" :disabled="busy" @click="withdraw_request(r)">ถอน</button>
+				</div>
+			</template>
+			<template v-if="day && (day.cell?.can_request || day.missing)" #footer>
+				<button
+					v-if="day.missing"
+					type="button"
+					class="ss-btn ss-btn--soft ss-btn--block ss-btn--lg"
+					@click="open_missing(day.missing)"
+				>
+					แจ้งเวลาออก
+				</button>
+				<button
+					v-if="day.cell?.can_request"
+					type="button"
+					class="ss-btn ss-btn--primary ss-btn--block ss-btn--lg"
+					@click="open_request(day.iso)"
+				>
+					แจ้งมาทำงานวันนี้
+				</button>
+			</template>
+		</Sheet>
+
+		<!-- แจ้งมาทำงาน (Attendance Request) -->
+		<Sheet
+			:open="!!request"
+			title="แจ้งมาทำงาน"
+			form
+			:subtitle="`กรณีไม่ได้ลงเวลา ส่งให้${data?.approver_name ? ` ${data.approver_name} ` : 'หัวหน้า'}อนุมัติ`"
+			@close="request = null"
+		>
+			<template v-if="request">
+				<div class="ss-field">
+					<span class="ss-field-label">ประเภท<em>*</em></span>
+					<Segmented v-model="request.reason" :options="REASON_OPTIONS" />
+				</div>
+				<div class="ss-leave-dates">
+					<div class="ss-field">
+						<span class="ss-field-label">ตั้งแต่วันที่<em>*</em></span>
+						<DateInput v-model="request.from_date" :min="request_min" :max="data.today" @change="on_request_from" />
+					</div>
+					<div class="ss-field">
+						<span class="ss-field-label">ถึงวันที่<em>*</em></span>
+						<DateInput v-model="request.to_date" :min="request.from_date" :max="data.today" />
+					</div>
+				</div>
+				<label class="ss-toggle" :class="{ 'is-on': request.half_day }">
+					<input v-model="request.half_day" type="checkbox" />
+					<span class="ss-toggle-track"><span></span></span>
+					<span>ทำงานครึ่งวัน</span>
+				</label>
+				<div v-if="request.half_day && request.from_date !== request.to_date" class="ss-field">
+					<span class="ss-field-label">วันที่ทำงานครึ่งวัน</span>
+					<DateInput v-model="request.half_day_date" :min="request.from_date" :max="request.to_date" />
+				</div>
+				<label class="ss-field">
+					<span class="ss-field-label">รายละเอียด<em>*</em></span>
+					<textarea
+						v-model="request.explanation"
+						class="ss-input"
+						rows="3"
+						placeholder="เช่น ไปตรวจงานที่ไซต์ลูกค้า มือถือแบตหมดจึงไม่ได้ลงเวลา"
+					></textarea>
+				</label>
+				<p class="ss-note">แจ้งย้อนหลังได้ไม่เกิน {{ data.request_days }} วัน อนุมัติแล้วนับเป็นวันทำงาน</p>
+			</template>
+			<template #footer>
+				<button
+					type="button"
+					class="ss-btn ss-btn--primary ss-btn--block ss-btn--lg"
+					:disabled="busy || !can_send_request"
+					@click="send_request"
+				>
+					<span v-if="busy" class="ss-spinner"></span>
+					<span>ส่งให้หัวหน้าอนุมัติ</span>
+				</button>
+			</template>
+		</Sheet>
 
 		<Sheet
 			:open="!!draft"
 			:title="draft?.log_type === 'OUT' ? 'ลงเวลาออกงาน' : 'ลงเวลาเข้างาน'"
 			:subtitle="data?.location?.location_name || data?.location?.name"
+			form
 			@close="cancel"
 		>
 			<div v-if="draft" class="ss-selfie">
@@ -194,6 +417,7 @@
 		<Sheet
 			:open="!!missing"
 			title="แจ้งเวลาออกงาน"
+			form
 			:subtitle="missing && `${thai_date(missing.date, { year: true })} · เข้างาน ${time_of(missing.check_in)} น.`"
 			@close="missing = null"
 		>
@@ -262,12 +486,15 @@ import { computed, inject, onBeforeUnmount, ref } from "vue";
 import Icon from "../../shared/components/Icon.vue";
 import TopBar from "../../shared/components/TopBar.vue";
 import Skeleton from "../../shared/components/Skeleton.vue";
-import Empty from "../../shared/components/Empty.vue";
 import Sheet from "../../shared/components/Sheet.vue";
+import Segmented from "../../shared/components/Segmented.vue";
+import DateInput from "../../shared/components/DateInput.vue";
 import LiveCamera from "../../shared/components/LiveCamera.vue";
 import {
 	call,
 	celebrate,
+	go,
+	money,
 	num,
 	post,
 	relative_date,
@@ -276,8 +503,11 @@ import {
 	toast,
 	vibrate,
 } from "../../shared/api.js";
+import { TYPE } from "../../shared/approvals/status.js";
+import { leave_range, REQUEST_REASON } from "../../shared/approvals/kinds.js";
 
 const API = "consbiz.self_service.";
+const HOME = "consbiz.self_home.";
 // เซลฟี่: ด้านยาว 480px คุณภาพ 0.6 (~30-50 KB) ตกลงกับผู้ใช้ 2026-11-11
 const SELFIE_MAX = 480;
 const SELFIE_QUALITY = 0.6;
@@ -287,6 +517,20 @@ const APPROVAL = {
 	Rejected: { label: "ไม่ยืนยัน", tone: "rose" },
 };
 const THAI_DAYS = ["อาทิตย์", "จันทร์", "อังคาร", "พุธ", "พฤหัสบดี", "ศุกร์", "เสาร์"];
+const MONTHS = ["มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"];
+const DOW = ["อา", "จ", "อ", "พ", "พฤ", "ศ", "ส"];
+// โทนของช่องปฏิทิน → สีป้าย (ss-tag)
+const TAG_TONE = { green: "green", orange: "amber", blue: "blue", red: "rose", amber: "amber", gray: "gray" };
+const REASON_OPTIONS = Object.entries(REQUEST_REASON).map(([value, label]) => ({ value, label }));
+const SHORTCUTS = [
+	{ label: "ขอลา", note: "ลาป่วย ลากิจ พักร้อน", icon: "calendar", run: () => go("leave", { action: "new" }) },
+	{ label: "แจ้งมาทำงาน", note: "กรณีไม่ได้ลงเวลา", icon: "clipboard-check", run: () => open_request() },
+	{ label: "จองกะ", note: "เลือกวันเสาร์/อาทิตย์ที่มาทำงาน", icon: "sun", run: () => go("dayoff") },
+	{ label: "เบิกเงินเดือนล่วงหน้า", note: "หักคืนจากเงินเดือน", icon: "wallet", run: () => go("advances", { action: "Salary Advance" }) },
+	{ label: "เบิกทดรองจ่าย", note: "รับเงินก่อน แล้วเคลียร์ด้วยบิล", icon: "calculator", run: () => go("advances", { action: "Expense Advance" }) },
+	{ label: "เบิกสำรองจ่าย", note: "จ่ายเองไปก่อน ส่งบิลเบิกคืน", icon: "receive", run: () => go("advances", { action: "reimburse" }) },
+	{ label: "เงินเดือน / สลิป", note: "ยอดสะสม ประกันสังคม", icon: "file", run: () => go("pay") },
+];
 
 const reload_summary = inject("reload_summary");
 const data = ref(null);
@@ -302,31 +546,25 @@ const clock = ref(new Date());
 const timer = setInterval(() => (clock.value = new Date(Date.now() + offset.value)), 1000);
 onBeforeUnmount(() => clearInterval(timer));
 const pad = (n) => String(n).padStart(2, "0");
-const clock_text = computed(
-	() => `${pad(clock.value.getHours())}:${pad(clock.value.getMinutes())}:${pad(clock.value.getSeconds())}`
-);
+const clock_text = computed(() => `${pad(clock.value.getHours())}:${pad(clock.value.getMinutes())}`);
 const long_date = (d) =>
-	`วัน${THAI_DAYS[d.getDay()]}ที่ ${thai_date(
-		`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`,
-		{ year: true }
-	)}`;
+	`วัน${THAI_DAYS[d.getDay()]}ที่ ${thai_date(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`, { year: true })}`;
+const greeting = computed(() => {
+	const h = clock.value.getHours();
+	return h < 12 ? "สวัสดีตอนเช้า" : h < 17 ? "สวัสดีตอนบ่าย" : "สวัสดีตอนเย็น";
+});
 const time_of = (value) => String(value || "").slice(11, 16);
 const selfie_url = (name) => `/api/method/${API}selfie?name=${encodeURIComponent(name)}`;
-
-const days = computed(() => {
-	const out = [];
-	for (const log of data.value?.logs || []) {
-		const date = String(log.time).slice(0, 10);
-		let day = out.find((d) => d.date === date);
-		if (!day) out.push((day = { date, logs: [] }));
-		day.logs.push(log);
-	}
-	return out;
-});
+const days_text = (value) => {
+	const n = Number(value) || 0;
+	return Number.isInteger(n) ? String(n) : n.toFixed(1);
+};
 
 const today_summary = computed(() => {
-	const today = data.value && String(data.value.now).slice(0, 10);
-	const logs = (days.value.find((d) => d.date === today)?.logs || []).slice().reverse();
+	const today = data.value?.today;
+	const logs = (data.value?.logs || [])
+		.filter((l) => String(l.time).slice(0, 10) === today && l.approval !== "Rejected")
+		.reverse();
 	const ins = logs.filter((l) => l.log_type === "IN");
 	const outs = logs.filter((l) => l.log_type === "OUT");
 	// ชั่วโมง = ผลรวมช่วงเข้า → ออกถัดไป (ช่วงที่ยังไม่ออกนับถึงตอนนี้)
@@ -346,23 +584,261 @@ const today_summary = computed(() => {
 		first_in: ins.length ? time_of(ins[0].time) : "",
 		last_out: outs.length ? time_of(outs[outs.length - 1].time) : "",
 		hours: minutes ? `${Math.floor(minutes / 60)}:${pad(minutes % 60)}` : "—",
+		pending: logs.some((l) => l.approval === "Pending"),
 	};
+});
+const today_status = computed(() => {
+	const cell = data.value?.calendar?.days?.[data.value.today];
+	if (cell?.s === "day_off" || cell?.s === "holiday") return "วันหยุด";
+	if (today_summary.value.pending) return "รอหัวหน้ายืนยัน";
+	if (!today_summary.value.first_in) return "ยังไม่ลงเวลา";
+	return data.value.next_log_type === "OUT" ? "อยู่ระหว่างทำงาน" : "ออกงานแล้ว";
 });
 
 async function load() {
 	loading.value = true;
 	try {
-		data.value = await call(`${API}get_checkin_data`);
+		data.value = await call(`${HOME}get_home`, { month: cal.value?.month });
+		cal.value = data.value.calendar;
 		offset.value = new Date(String(data.value.now).replace(" ", "T")).getTime() - Date.now();
 		reload_summary?.("self");
 	} catch (error) {
 		show_error(error);
-		data.value ??= { logs: [], location: null, next_log_type: "IN" };
+		data.value ??= {
+			logs: [],
+			location: null,
+			next_log_type: "IN",
+			missing_out: [],
+			calendar: { month: this_month, days: {}, totals: {}, logs: [], requests: [] },
+			year: {},
+			pending: [],
+			suggestions: [],
+			today: this_month + "-01",
+			request_days: 7,
+		};
+		cal.value ??= data.value.calendar;
 	} finally {
 		loading.value = false;
 	}
 }
-load();
+
+// ---------------------------------------------------------------- ปฏิทินเดือน
+
+const now = new Date();
+const this_month = `${now.getFullYear()}-${pad(now.getMonth() + 1)}`;
+const cal = ref(null);
+const month_loading = ref(false);
+const calendar_el = ref(null);
+const totals = computed(() => ({ present: 0, half: 0, off: 0, leave: 0, absent: 0, flag: 0, late_count: 0, late_min: 0, ...(cal.value?.totals || {}) }));
+const month_label = computed(() => {
+	const [y, m] = (cal.value?.month || this_month).split("-").map(Number);
+	return `${MONTHS[m - 1]} ${y + 543}`;
+});
+const cal_days = computed(() => {
+	const [y, m] = (cal.value?.month || this_month).split("-").map(Number);
+	const count = new Date(y, m, 0).getDate();
+	return Array.from({ length: count }, (_, i) => {
+		const iso = `${y}-${pad(m)}-${pad(i + 1)}`;
+		const cell = cal.value?.days?.[iso];
+		return { iso, day: i + 1, cell, view: cell_view(cell) };
+	});
+});
+const lead_blanks = computed(() => {
+	const [y, m] = (cal.value?.month || this_month).split("-").map(Number);
+	return new Date(y, m - 1, 1).getDay();
+});
+
+// สถานะของช่อง (ตรงกับ cell_of ใน HrAttendance.vue แต่ข้อความสำหรับพนักงาน)
+function cell_view(c) {
+	const v = (tone, glyph, label) => ({ tone, glyph, label });
+	if (!c) return v("none", "", "");
+	switch (c.s) {
+		case "marked": {
+			const waived = c.waived ? " (ไม่หักเงิน)" : "";
+			if (c.status === "Half Day")
+				return c.leave_type ? v("blue", "½", `ลาครึ่งวัน (${c.leave_type})`) : v("orange", "½", `ครึ่งวัน${waived}`);
+			if (c.status === "Absent") return v("red", "ข", `ขาดงาน${waived}`);
+			if (c.status === "On Leave") return v("blue", "ล", `ลา${c.leave_type ? ` (${c.leave_type})` : ""}`);
+			if (c.status === "Work From Home") return v("green", "✓", "ทำงานที่บ้าน");
+			return v("green", "✓", "มาทำงาน");
+		}
+		case "present":
+			return v("green", "✓", "มาทำงาน");
+		case "absent":
+			return v("red", "ข", "ขาดงาน (ไม่มีการลงเวลา)");
+		case "flag":
+			return v("amber", "!", "รอตรวจสอบ");
+		case "holiday":
+			return v("gray", "ห", c.worked ? "วันหยุด (มาทำงาน)" : "วันหยุด");
+		case "day_off":
+			return v("gray", "ย", c.worked ? "วันหยุดประจำสัปดาห์ (มาทำงาน)" : "วันหยุดประจำสัปดาห์");
+		default:
+			return v("none", "", c.s === "future" ? "ยังไม่ถึงวัน" : "");
+	}
+}
+const legend = computed(() => [
+	{ key: "present", tone: "green", glyph: "✓", label: "มาทำงาน", count: totals.value.present },
+	{ key: "half", tone: "orange", glyph: "½", label: "ครึ่งวัน", count: totals.value.half },
+	{ key: "off", tone: "gray", glyph: "ย", label: "หยุด", count: totals.value.off },
+	{ key: "leave", tone: "blue", glyph: "ล", label: "ลา", count: totals.value.leave },
+	{ key: "absent", tone: "red", glyph: "ข", label: "ขาด", count: totals.value.absent },
+	{ key: "flag", tone: "amber", glyph: "!", label: "รอตรวจสอบ", count: totals.value.flag },
+]);
+
+async function load_month(month) {
+	month_loading.value = true;
+	try {
+		cal.value = await call(`${HOME}get_month`, { month });
+	} catch (error) {
+		show_error(error);
+	} finally {
+		month_loading.value = false;
+	}
+}
+function move_month(step) {
+	const [y, m] = cal.value.month.split("-").map(Number);
+	const d = new Date(y, m - 1 + step, 1);
+	load_month(`${d.getFullYear()}-${pad(d.getMonth() + 1)}`);
+}
+function scroll_to_calendar() {
+	calendar_el.value?.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+// ---------------------------------------------------------------- รายละเอียดวัน
+
+const day = ref(null);
+async function open_day(iso) {
+	if (cal.value?.month !== iso.slice(0, 7)) await load_month(iso.slice(0, 7));
+	const cell = cal.value?.days?.[iso];
+	day.value = {
+		iso,
+		cell,
+		view: cell_view(cell),
+		logs: (cal.value?.logs || []).filter((l) => String(l.time).slice(0, 10) === iso).reverse(),
+		requests: (cal.value?.requests || []).filter((r) => r.from_date <= iso && iso <= r.to_date),
+		missing: (data.value?.missing_out || []).find((m) => m.date === iso),
+	};
+}
+function request_status(r) {
+	if (r.docstatus === 1) return { label: "อนุมัติแล้ว", tone: "green" };
+	if (r.approval === "Rejected") return { label: "ไม่อนุมัติ", tone: "rose" };
+	return { label: "รออนุมัติ", tone: "amber" };
+}
+
+// ---------------------------------------------------------------- สิ่งที่ควรทำ / รออนุมัติ
+
+const todos = computed(() =>
+	(data.value?.suggestions || []).map((s, i) => {
+		const key = `${s.kind}:${i}`;
+		switch (s.kind) {
+			case "missing_out":
+				return { key, tone: "amber", icon: "alert", title: `ยังไม่ได้ลงเวลาออก ${relative_date(s.date)}`, note: `เข้างาน ${time_of(s.check_in)} น. · แตะเพื่อแจ้งเวลาออก`, run: () => open_missing(s) };
+			case "absent":
+				return {
+					key,
+					tone: "rose",
+					icon: "clipboard-check",
+					title: `ขาดงาน ${s.dates.length} วัน ที่ยังแจ้งมาทำงานได้`,
+					note: `${s.dates.map((d) => thai_date(d)).join(", ")} · มาทำงานแต่ไม่ได้ลงเวลา แจ้งได้ภายใน ${data.value.request_days} วัน`,
+					run: () => open_request(s.dates[0]),
+				};
+			case "overdue_clearing":
+				return { key, tone: "rose", icon: "calculator", title: `เงินทดรองจ่ายเลยกำหนดเคลียร์ ${s.count} ใบ`, note: `กำหนด ${thai_date(s.due_date, { year: true })} · ส่งบิลเคลียร์`, run: () => go("advances") };
+			case "book_shift":
+				return { key, tone: "blue", icon: "sun", title: "ยังไม่ได้จองกะสัปดาห์หน้า", note: `สัปดาห์ ${thai_date(s.week_start)} · เลือกวันเสาร์หรืออาทิตย์ที่มาทำงาน`, run: () => go("dayoff") };
+			case "leave_expiring":
+				return { key, tone: "blue", icon: "calendar", title: `${s.leave_type} เหลือ ${days_text(s.remaining)} วัน`, note: `ใช้ได้ถึง ${thai_date(s.to_date, { year: true })}`, run: () => go("leave", { action: "new" }) };
+			default:
+				return { key, tone: "rose", icon: "pin", title: "ยังลงเวลาไม่ได้", note: s.text };
+		}
+	})
+);
+const pending = computed(() =>
+	(data.value?.pending || []).map((p) => {
+		const base = { kind: p.kind, name: p.name, amount: null };
+		const range = p.to_date && p.to_date !== String(p.date).slice(0, 10) ? `${thai_date(p.date)} – ${thai_date(p.to_date, { year: true })}` : thai_date(p.date, { year: true });
+		switch (p.kind) {
+			case "leave":
+				return { ...base, icon: "calendar", title: `ลา${p.title}`, note: `${range} · ${days_text(p.days)} วัน`, run: () => go("leave") };
+			case "checkin":
+				return {
+					...base,
+					icon: "clock",
+					title: p.manual ? "แจ้งลืมลงเวลาออก" : "ลงเวลานอกพื้นที่",
+					note: `${p.log_type === "IN" ? "เข้า" : "ออก"} ${thai_date(p.date)} ${time_of(p.date)} น.`,
+					run: () => open_day(String(p.date).slice(0, 10)),
+				};
+			case "attendance":
+				return { ...base, icon: "clipboard-check", title: `แจ้งมาทำงาน · ${REQUEST_REASON[p.reason] || ""}`, note: range, run: () => open_day(String(p.date).slice(0, 10)) };
+			case "advance":
+				return { ...base, icon: "wallet", title: TYPE[p.advance_type] || "ใบเบิก", note: thai_date(p.date, { year: true }), amount: p.amount, run: () => go("advances") };
+			default:
+				return { ...base, icon: "receive", title: p.clearing ? "เคลียร์เงินทดรองจ่าย" : "เบิกสำรองจ่าย", note: thai_date(p.date, { year: true }), amount: p.amount, run: () => go("advances", {}) };
+		}
+	})
+);
+function absent_action() {
+	const s = (data.value?.suggestions || []).find((x) => x.kind === "absent");
+	if (s) open_request(s.dates[0]);
+	else scroll_to_calendar();
+}
+
+// ---------------------------------------------------------------- แจ้งมาทำงาน
+
+const request = ref(null);
+const request_min = computed(() => {
+	const d = new Date(`${data.value?.today}T00:00:00`);
+	d.setDate(d.getDate() - (data.value?.request_days || 7));
+	return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+});
+const can_send_request = computed(() => {
+	const r = request.value;
+	return r && r.reason && r.from_date && r.to_date && r.to_date >= r.from_date && r.explanation?.trim();
+});
+function open_request(date) {
+	const iso = date || data.value?.today;
+	day.value = null;
+	request.value = { reason: "On Duty", from_date: iso, to_date: iso, half_day: false, half_day_date: iso, explanation: "" };
+}
+function on_request_from(value) {
+	if (!request.value.to_date || request.value.to_date < value) request.value.to_date = value;
+	request.value.half_day_date = value;
+}
+async function send_request() {
+	const r = request.value;
+	busy.value = true;
+	try {
+		await post(`${HOME}request_attendance`, {
+			from_date: r.from_date,
+			to_date: r.to_date,
+			reason: r.reason,
+			explanation: r.explanation,
+			half_day: r.half_day ? 1 : 0,
+			half_day_date: r.from_date === r.to_date ? r.from_date : r.half_day_date,
+		});
+		request.value = null;
+		celebrate("ส่งแจ้งมาทำงานแล้ว", "รอหัวหน้าอนุมัติ");
+		await load();
+	} catch (error) {
+		show_error(error);
+	} finally {
+		busy.value = false;
+	}
+}
+async function withdraw_request(r) {
+	busy.value = true;
+	try {
+		await post(`${HOME}delete_attendance_request`, { name: r.name });
+		day.value = null;
+		toast("ถอนคำขอแล้ว", "success");
+		await load();
+	} catch (error) {
+		show_error(error);
+	} finally {
+		busy.value = false;
+	}
+}
+
 
 // ---------------------------------------------------------------- ลงเวลา
 
@@ -462,14 +938,11 @@ async function submit() {
 	}
 }
 
-function open_log(log) {
-	viewing.value = log;
-}
-
 // ---------------------------------------------------------------- ลืมลงเวลาออก
 
 const missing = ref(null);
 function open_missing(m) {
+	day.value = null;
 	missing.value = { ...m, time: "17:00", reason: "" };
 }
 async function send_missing() {
@@ -489,4 +962,5 @@ async function send_missing() {
 		busy.value = false;
 	}
 }
+load();
 </script>

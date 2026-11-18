@@ -54,6 +54,18 @@
 			</div>
 		</template>
 
+		<!-- แจ้งมาทำงาน (Attendance Request) -->
+		<template v-else-if="item.kind === 'attendance'">
+			<div class="ss-facts">
+				<div class="ss-fact"><span>ประเภท</span><b>{{ REQUEST_REASON[item.row.reason] || item.row.reason }}</b></div>
+				<div class="ss-fact"><span>วันที่</span><b>{{ leave_range(item.row) }}</b></div>
+				<div class="ss-fact"><span>รายละเอียด</span><b>{{ item.row.explanation }}</b></div>
+				<div class="ss-fact"><span>ส่งเมื่อ</span><b>{{ thai_date(item.row.creation, { year: true }) }}</b></div>
+				<div v-if="item.row.review_note" class="ss-fact"><span>เหตุผลของผู้พิจารณา</span><b>{{ item.row.review_note }}</b></div>
+			</div>
+			<p v-if="!history" class="ss-note">อนุมัติแล้วระบบบันทึกการเข้างาน (Attendance) ของวันที่แจ้งทันที</p>
+		</template>
+
 		<!-- ใบเบิก -->
 		<template v-else-if="item.kind === 'advance'">
 			<div class="ss-facts">
@@ -65,13 +77,19 @@
 				<template v-if="item.row.advance_type === 'Salary Advance'">
 					<div v-if="item.row.base_salary != null" class="ss-fact"><span>เงินเดือน</span><b>{{ money(item.row.base_salary) }}</b></div>
 					<div v-if="item.row.limit_amount != null" class="ss-fact"><span>วงเงิน</span><b>{{ money(item.row.limit_amount) }}</b></div>
-					<div class="ss-fact"><span>หักคืน</span><b>{{ item.row.installments || 1 }} งวด</b></div>
+					<div v-if="history || !can_review" class="ss-fact"><span>หักคืน</span><b>{{ item.row.installments || 1 }} งวด</b></div>
 				</template>
 				<div v-if="item.row.approved_by" class="ss-fact"><span>ผู้อนุมัติ</span><b>{{ item.row.approved_by }}</b></div>
 				<div v-if="item.row.executive_approved_by" class="ss-fact">
 					<span>ผู้บริหารอนุมัติ</span><b>{{ item.row.executive_approved_by }}</b>
 				</div>
 				<div v-if="item.row.reject_reason" class="ss-fact"><span>เหตุผลที่ไม่อนุมัติ</span><b>{{ item.row.reject_reason }}</b></div>
+			</div>
+			<!-- จำนวนงวดหักคืน: ผู้อนุมัติกำหนด (ผู้ขอไม่เลือกเอง ตกลง 2026-11-17) -->
+			<div v-if="!history && can_review && item.row.advance_type === 'Salary Advance'" class="ss-field ss-review-installments">
+				<span class="ss-field-label">หักคืนจากเงินเดือน<em>*</em></span>
+				<SelectBox v-model="installments" :options="INSTALLMENT_OPTIONS" />
+				<small>หักงวดละ {{ money(item.row.advance_amount / installments) }} บาท</small>
 			</div>
 			<p v-if="!history && item.row.needs_executive" class="ss-note ss-note--warn">
 				เกินวงเงิน: อนุมัติแล้วส่งต่อให้ผู้บริหารอนุมัติอีกขั้น
@@ -96,7 +114,7 @@
 				<div class="ss-facts">
 					<div class="ss-fact"><span>รวม</span><b>{{ money(detail.total_claimed_amount) }} บาท</b></div>
 					<div v-for="a in detail.advances" :key="a.employee_advance" class="ss-fact">
-						<span>ตัดเงินสำรองจ่าย {{ a.employee_advance }}</span><b>{{ money(a.allocated_amount) }}</b>
+						<span>ตัดเงินทดรองจ่าย {{ a.employee_advance }}</span><b>{{ money(a.allocated_amount) }}</b>
 					</div>
 					<div v-if="detail.remark" class="ss-fact"><span>หมายเหตุ</span><b>{{ detail.remark }}</b></div>
 					<div v-if="detail.reject_reason" class="ss-fact">
@@ -143,9 +161,10 @@ import { computed, ref, watch } from "vue";
 import Icon from "../components/Icon.vue";
 import Skeleton from "../components/Skeleton.vue";
 import Sheet from "../components/Sheet.vue";
+import SelectBox from "../components/SelectBox.vue";
 import EmployeeContext from "../components/EmployeeContext.vue";
 import { call, money, num, post, show_error, thai_date, toast } from "../api.js";
-import { context_dates, days, KINDS, leave_range, time_of } from "./kinds.js";
+import { context_dates, days, KINDS, leave_range, REQUEST_REASON, time_of } from "./kinds.js";
 
 const props = defineProps({
 	item: { type: Object, default: null },
@@ -155,8 +174,16 @@ const props = defineProps({
 });
 const emit = defineEmits(["close", "done"]);
 
+// หักคืนเงินเดือนล่วงหน้าได้สูงสุด (ตรงกับ MAX_INSTALLMENTS ใน consbiz/self_advance.py)
+const MAX_INSTALLMENTS = 6;
+const INSTALLMENT_OPTIONS = Array.from({ length: MAX_INSTALLMENTS }, (_, i) => ({
+	value: i + 1,
+	label: i ? `ผ่อน ${i + 1} งวด (เดือน)` : "หักครั้งเดียวงวดถัดไป",
+}));
+
 const busy = ref(false);
 const reason = ref("");
+const installments = ref(1);
 const detail = ref(null);
 const can_review = computed(() => props.review_allowed);
 const selfie_url = (name) => `/api/method/consbiz.self_service.selfie?name=${encodeURIComponent(name)}`;
@@ -166,6 +193,7 @@ watch(
 	async () => {
 		reason.value = "";
 		detail.value = null;
+		installments.value = Number(props.item?.row?.installments) || 1;
 		if (props.item?.kind !== "claim") return;
 		const key = props.item.key;
 		try {
@@ -187,7 +215,9 @@ async function review(approve) {
 	const config = KINDS[kind];
 	busy.value = true;
 	try {
-		const result = await post(config.method, { name: row.name, approve: approve ? 1 : 0, [config.reason]: reason.value });
+		const args = { name: row.name, approve: approve ? 1 : 0, [config.reason]: reason.value };
+		if (kind === "advance" && row.advance_type === "Salary Advance") args.installments = installments.value;
+		const result = await post(config.method, args);
 		toast(
 			result === "Pending Executive" ? "อนุมัติแล้ว ส่งต่อผู้บริหาร" : approve ? "อนุมัติแล้ว" : "บันทึกไม่อนุมัติแล้ว",
 			"success"

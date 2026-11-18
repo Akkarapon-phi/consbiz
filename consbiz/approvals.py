@@ -6,9 +6,10 @@
 ตอนนี้เฉพาะงาน HR แต่ละชนิดใช้กติกาผู้อนุมัติเดิมของตัวเอง:
 - leave   ใบลา (Leave Application Open) Role Leave Approver หรือ HR
 - checkin ลงเวลานอกพื้นที่ / แจ้งลืมลงเวลาออก Role Leave Approver หรือ HR
+- attendance แจ้งมาทำงาน (Attendance Request, self_home) Role Leave Approver หรือ HR
   (ผู้อนุมัติที่ประจำโครงการเห็นเฉพาะพนักงานโครงการเดียวกัน: self_service.scope_employees)
-- advance ใบเบิกเงินเดือนล่วงหน้า / เงินสำรองจ่าย (self_advance: Role Expense Approver, เกินวงเงิน Executive Approver)
-- claim   ใบเคลียร์ / เบิกค่าใช้จ่ายคืน (self_advance: Role Expense Approver)
+- advance ใบเบิกเงินเดือนล่วงหน้า / เงินทดรองจ่าย (self_advance: Role Expense Approver, เกินวงเงิน Executive Approver)
+- claim   ใบเคลียร์ / เบิกสำรองจ่าย (self_advance: Role Expense Approver)
 ชนิดใหม่: เพิ่มใน KINDS (ฟังก์ชันรายการ + ฟังก์ชันอนุมัติ) และหน้า ApproveInbox.vue
 """
 
@@ -16,13 +17,13 @@ import frappe
 from frappe import _
 from frappe.utils import add_days, cint, nowdate
 
-from consbiz import self_advance, self_service
+from consbiz import self_advance, self_home, self_service
 
 HR_ROLES = self_service.HR_ROLES
 HISTORY_DAYS = 31
 # โมดูลเจ้าของเอกสาร (ตรงกับ MODULES / KINDS[].module ใน public/js/shared/approvals/kinds.js)
 # โมดูลอนุมัติเป็นแค่ที่รวม แต่ละโมดูลอนุมัติในหน้าของตัวเองได้ (API อนุมัติชุดเดียวกัน)
-MODULES = {"hr": ("leave", "checkin", "advance", "claim")}
+MODULES = {"hr": ("leave", "checkin", "attendance", "advance", "claim")}
 
 
 def kinds_of(module=None):
@@ -154,6 +155,7 @@ def can_approve_any():
 	return {
 		"leave": can_approve_leave(),
 		"checkin": self_service.can_review(),
+		"attendance": self_service.is_approver(),
 		"advance": self_advance.can_approve(),
 		"claim": self_advance.APPROVER_ROLE in self_advance.roles(),
 	}
@@ -178,6 +180,7 @@ def get_inbox(module=None, quiet=0):
 		"can": can,
 		"leave": leave_rows() if can.get("leave") else [],
 		"checkin": self_service.get_reviews() if can.get("checkin") else [],
+		"attendance": self_home.approval_rows() if can.get("attendance") else [],
 		"advance": money["advances"],
 		"claim": money["claims"] if can.get("claim") else [],
 	}
@@ -193,6 +196,7 @@ def get_history(module=None):
 	user = frappe.session.user
 	out = {"leave": leave_rows(pending=False) if can["leave"] else []}
 	out["checkin"] = self_service.get_reviews(status="Done") if can["checkin"] else []
+	out["attendance"] = self_home.approval_rows(pending=False) if can["attendance"] else []
 	advances = []
 	if can["advance"]:
 		filters = {
@@ -238,6 +242,7 @@ def get_summary(project=None):
 	counts = {
 		"leave": len(leave_rows()) if can["leave"] else 0,
 		"checkin": frappe.db.count("Employee Checkin", self_service.review_filters()) if can["checkin"] else 0,
+		"attendance": frappe.db.count("Attendance Request", self_home.request_filters()) if can["attendance"] else 0,
 		"advance": 0,
 		"claim": 0,
 	}
@@ -375,7 +380,7 @@ def get_context(employee, kind, from_date=None, to_date=None):
 	if not info:
 		frappe.throw(_("ไม่พบพนักงาน"), frappe.DoesNotExistError)
 	out = {"employee": info}
-	if kind in ("leave", "checkin"):
+	if kind in ("leave", "checkin", "attendance"):
 		if not self_service.can_approve_employee(employee):
 			frappe.throw(_("ไม่มีสิทธิ์ดูข้อมูลพนักงานคนนี้"), frappe.PermissionError)
 		out["leave"] = leave_context(employee, from_date, to_date)

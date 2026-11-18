@@ -95,51 +95,85 @@ export const SECTIONS = {
 		key: "hr",
 		...MODULE_META.office.hr,
 		home: "hr-attendance",
+		// กลุ่มเมนู (ตกลง 2026-11-18): แถบบน/แถบล่าง = 4 กลุ่ม เมนูในกลุ่ม = dropdown (แถบบน) / bottom sheet (มือถือ)
+		// settings = หัวข้อแรกของตั้งค่าของหมวด (เมนู ⋯ ในหัวรายการ, shared/settings_pages.js, hr_setup.MODULES)
+		groups: {
+			time: { label: "เวลาทำงาน", icon: "clock", settings: "hr-time" },
+			pay: { label: "เงินเดือน", icon: "wallet", settings: "hr-pay" },
+			expense: { label: "ค่าใช้จ่าย", icon: "receive", settings: "hr-expense" },
+			people: { label: "พนักงาน", icon: "users", settings: "hr-people" },
+		},
 		tabs: [
 			{
 				view: "hr-attendance",
-				label: "สรุปวันทำงาน",
+				group: "time",
+				label: "เวลาทำงาน",
 				icon: "calendar",
 				badge: (s) => s?.flag,
 				alert: (s) => s?.flag,
 			},
+			{ view: "hr-shifts", group: "time", label: "กะ", icon: "sun", badge: (s) => s?.shift_requests },
+			{
+				view: "hr-salary-advances",
+				group: "pay",
+				label: "เบิกล่วงหน้า",
+				icon: "swap",
+			},
+			{
+				view: "hr-payroll",
+				group: "pay",
+				label: "ใบจ่ายเงินเดือน",
+				icon: "receive",
+				when: (b) => b.can?.payroll,
+			},
 			{
 				view: "hr-adjustments",
+				group: "pay",
 				label: "เพิ่ม/หัก",
 				icon: "list",
 				when: (b) => b.can?.payroll,
 			},
 			{
-				view: "hr-payroll",
-				label: "เงินเดือน",
-				icon: "receive",
-				when: (b) => b.can?.payroll,
-			},
-			{
 				view: "hr-salaries",
-				label: "ค่าจ้างพนักงาน",
+				group: "pay",
+				label: "ค่าจ้าง",
 				icon: "users",
 				when: (b) => b.can?.payroll,
 			},
-			{ view: "hr-advances", label: "เบิกเงิน", icon: "swap" },
-			// สัญญาจ้าง / 50 ทวิ พนักงาน (views/hr/kinds.js + HrDocPage.vue, API consbiz/hr_docs.py)
+			{
+				view: "hr-wht",
+				group: "pay",
+				label: "50 ทวิ",
+				icon: "file",
+				when: (b) => b.hr_docs?.["hr-wht"],
+			},
+			{ view: "hr-expense-advances", group: "expense", label: "ทดรองจ่าย", icon: "calculator" },
+			{ view: "hr-claims", group: "expense", label: "สำรองจ่าย", icon: "receive" },
+			{ view: "hr-employees", group: "people", label: "พนักงาน", icon: "users" },
+			// สัญญาจ้าง / ใบเตือน / 50 ทวิ (views/hr/kinds.js + HrDocPage.vue, API consbiz/hr_docs.py)
 			{
 				view: "hr-contracts",
+				group: "people",
 				label: "สัญญาจ้าง",
 				icon: "file",
 				when: (b) => b.hr_docs?.["hr-contracts"],
 				badge: (s) => s?.probation_due?.count,
 			},
 			{
-				view: "hr-wht",
-				label: "50 ทวิ",
-				icon: "receive",
-				when: (b) => b.hr_docs?.["hr-wht"],
+				view: "hr-warnings",
+				group: "people",
+				label: "ใบเตือน",
+				icon: "alert",
+				when: (b) => b.hr_docs?.["hr-warnings"],
 			},
-			{ view: "hr-setup", label: "ตั้งค่า HR", icon: "sliders" },
+			// URL เดิมของตั้งค่า HR: เปิดตั้งค่าของหมวดที่หัวข้อของกลุ่ม (HrSetup.vue)
+			{ view: "hr-setup", sub: true, label: "ตั้งค่า HR", icon: "sliders" },
+			// URL เดิม: เบิกเงินรวมทุกชนิด
+			{ view: "hr-advances", sub: true, label: "เบิกเงิน", icon: "swap" },
 		],
 		badge: (s) => s?.flag,
 	},
+
 	// สารบรรณ: 1 ชนิดเอกสาร = 1 เมนู (views/saraban/kinds.js, API consbiz/saraban.py)
 	saraban: {
 		key: "saraban",
@@ -289,6 +323,8 @@ export const SECTIONS = {
 	labour: {
 		key: "labour",
 		...MODULE_META.office.labour,
+		// ตั้งค่าของหมวด (เมนู ⋯ ในหัวรายการ) = บัญชีค่าแรง (settings_pages.js)
+		settings: "labour",
 		get home() {
 			return (this.tabs.find((t) => t.when(boot)) || this.tabs[0]).view;
 		},
@@ -361,7 +397,14 @@ export const ROUTES = {
 	// month = YYYY-MM (ว่าง = เดือนนี้)
 	"hr-attendance": { section: "hr", params: ["month"] },
 	"hr-payroll": { section: "hr", params: ["month"] },
-	"hr-setup": { section: "hr", params: [] },
+	"hr-setup": { section: "hr", params: ["module"] },
+	"hr-shifts": { section: "hr", params: ["tab"] },
+	"hr-employees": { section: "hr", params: ["filter"] },
+	"hr-employee": { section: "hr", params: ["name"] },
+	"hr-warnings": { section: "hr", params: ["tab"] },
+	"hr-salary-advances": { section: "hr", params: ["filter"] },
+	"hr-expense-advances": { section: "hr", params: ["filter"] },
+	"hr-claims": { section: "hr", params: ["filter"] },
 	"hr-adjustments": { section: "hr", params: ["month"] },
 	"hr-salaries": { section: "hr", params: ["filter"] },
 	"hr-advances": { section: "hr", params: ["filter"] },
@@ -422,6 +465,8 @@ export const ROUTES = {
 // ค่าของหมวดออฟฟิศที่ bundle ConsERP (site_app.bundle.js) รวมเข้า configure() (เดิมอยู่ office_app.bundle.js)
 export const PARENT_TAB = {
 	"boq-form": "boq",
+	// หน้าเต็มของพนักงาน (HrEmployee.vue) อยู่ใต้เมนูพนักงาน
+	"hr-employee": "hr-employees",
 	agreement: "agreements",
 	claim: "claims",
 	variation: "variations",

@@ -19,6 +19,16 @@
 		</TopBar>
 
 		<div class="ss-content">
+			<div v-if="data && data.payroll_based_on !== 'Attendance'" class="ss-banner tone-amber hr-banner">
+				<Icon name="alert" :size="20" />
+				<div>
+					<div class="ss-banner-title">Payroll ยังคิดเงินเดือนตาม{{ data.payroll_based_on === "Leave" ? "ใบลา" : data.payroll_based_on }}</div>
+					<div class="ss-banner-text">
+						ตั้ง Payroll Settings → Payroll Based On = Attendance แล้ววันขาดงาน/ครึ่งวันที่บันทึกจากหน้านี้จึงหักเงินเดือน
+					</div>
+				</div>
+			</div>
+
 			<ListHead
 				v-if="wide"
 				v-model="filter"
@@ -67,16 +77,8 @@
 				<Segmented v-model="filter" :options="tabs" />
 			</template>
 
-			<div v-if="data && data.payroll_based_on !== 'Attendance'" class="ss-banner tone-amber hr-banner">
-				<Icon name="alert" :size="20" />
-				<div>
-					<div class="ss-banner-title">Payroll ยังคิดเงินเดือนตาม{{ data.payroll_based_on === "Leave" ? "ใบลา" : data.payroll_based_on }}</div>
-					<div class="ss-banner-text">
-						ตั้ง Payroll Settings → Payroll Based On = Attendance แล้ววันขาดงาน/ครึ่งวันที่บันทึกจากหน้านี้จึงหักเงินเดือน
-					</div>
-				</div>
-			</div>
-
+			<!-- จอ ≥768: หัวรายการ + การ์ดตาราง (ListCard) พอดีจอ คำอธิบายสีอยู่ท้ายการ์ด -->
+			<ListCard :on="wide">
 			<Skeleton v-if="data === null" :rows="6" />
 			<Empty
 				v-else-if="!shown.length"
@@ -86,7 +88,7 @@
 			/>
 
 			<!-- จอ ≥ 768: ตารางคน x วัน -->
-			<div v-else-if="wide" class="hr-grid-wrap">
+			<div v-else-if="wide" class="hr-grid-wrap ss-list-scroll">
 				<table class="hr-grid">
 					<thead>
 						<tr>
@@ -109,8 +111,19 @@
 							<th class="hr-total hr-total--min" title="กลับก่อน 17:00 (นาที)">กลับก่อน</th>
 						</tr>
 					</thead>
-					<tbody>
-						<tr v-for="row in shown" :key="row.employee">
+					<!-- ทุกโครงการ = จัดกลุ่มตามโครงการที่ประจำ (หัวกลุ่ม = ชื่อโครงการ + จำนวนคน) เลือกโครงการ = ไม่มีหัวกลุ่ม -->
+					<tbody v-for="g in groups" :key="g.key">
+						<tr v-if="g.label" class="hr-group">
+							<th class="hr-name hr-group-name">
+								<span class="hr-group-label">
+									<Icon :name="g.key ? 'briefcase' : 'users'" :size="13" />
+									<span>{{ g.label }}</span>
+									<em>{{ g.rows.length }} คน</em>
+								</span>
+							</th>
+							<td :colspan="days.length + 7" class="hr-group-fill"></td>
+						</tr>
+						<tr v-for="row in g.rows" :key="row.employee">
 							<th class="hr-name" title="ดูทั้งเดือน / เวลาที่ไม่ได้ทำงาน" @click="open_person(row)">
 								<span class="ss-cell-main">{{ row.employee_name }}</span>
 								<small>{{ row_sub(row) }}</small>
@@ -151,7 +164,9 @@
 
 			<!-- มือถือ: การ์ดต่อคน (ตัวเลขสรุป) แตะ = ปฏิทินของคนนั้น + รายการวันที่รอตัดสิน -->
 			<div v-else class="ss-list">
-				<button v-for="row in shown" :key="row.employee" type="button" class="ss-card" @click="open_person(row)">
+				<template v-for="g in groups" :key="g.key">
+				<div v-if="g.label" class="ss-section-title hr-group-title">{{ g.label }} · {{ g.rows.length }} คน</div>
+				<button v-for="row in g.rows" :key="row.employee" type="button" class="ss-card" @click="open_person(row)">
 					<div class="ss-card-head">
 						<span class="ss-card-main">
 							<span class="ss-card-title">{{ row.employee_name }}</span>
@@ -172,9 +187,10 @@
 						สาย {{ row.totals.late_count }} ครั้ง ({{ row.totals.late_min }} นาที) · กลับก่อน {{ row.totals.early_count }} ครั้ง ({{ row.totals.early_min }} นาที)
 					</div>
 				</button>
+				</template>
 			</div>
 
-			<div v-if="wide && data?.rows?.length" class="hr-legend">
+			<div v-if="wide && data?.rows?.length" class="hr-legend ss-list-foot">
 				<span v-for="item in LEGEND" :key="item.label" class="hr-legend-item">
 					<span class="hr-cell hr-cell--legend" :class="[`is-${item.tone}`, { 'is-auto': item.auto }]"><span>{{ item.glyph }}</span></span>
 					{{ item.label }}
@@ -182,6 +198,7 @@
 				<span class="hr-legend-item"><span class="hr-cell hr-cell--legend"><i class="hr-worked"></i></span>ลงเวลาในวันหยุด</span>
 				<span class="hr-legend-item"><span class="hr-cell hr-cell--legend"><i class="hr-late"></i></span>สาย / กลับก่อน</span>
 			</div>
+			</ListCard>
 		</div>
 
 		<Teleport to="#ss-layer">
@@ -413,6 +430,7 @@ import ApprovalSheet from "../../../shared/approvals/ApprovalSheet.vue";
 import { find_pending } from "../../../shared/approvals/kinds.js";
 import ProjectFilter from "../../../shared/docs/ProjectFilter.vue";
 import ListHead from "../../../shared/components/ListHead.vue";
+import ListCard from "../../../shared/components/ListCard.vue";
 import { matches, use_wide } from "../../../shared/table.js";
 import {
 	call,
@@ -516,6 +534,16 @@ const close_hint = computed(() =>
 	flagged_total.value ? `ยังมี ${flagged_total.value} วันที่รอตัดสิน ตัดสินให้ครบก่อน` : "บันทึกวันมาทำงาน/ครึ่งวัน/ขาดงานถึงเมื่อวาน"
 );
 
+// ทุกโครงการ (ไม่ได้กรองโครงการ) + มีมากกว่า 1 โครงการ = กลุ่มตามโครงการ เรียงชื่อโครงการ ไม่ประจำโครงการไว้ท้าย
+const groups = computed(() => {
+	const rows = shown.value;
+	const keys = [...new Set(rows.map((r) => r.project || ""))];
+	if (state.project || keys.length < 2) return [{ key: "all", label: "", rows }];
+	const label = (k) => (k ? data.value.projects[k] || k : "ไม่ประจำโครงการ");
+	return keys
+		.sort((a, b) => (!a ? 1 : !b ? -1 : label(a).localeCompare(label(b), "th")))
+		.map((k) => ({ key: k, label: label(k), rows: rows.filter((r) => (r.project || "") === k) }));
+});
 const row_sub = (row) =>
 	[row.designation, row.project && (data.value.projects[row.project] || row.project)].filter(Boolean).join(" · ");
 const flagged_days = (row) => Object.keys(row.days).filter((iso) => row.days[iso].s === "flag");
@@ -962,10 +990,24 @@ load();
 	display: flex;
 	flex-wrap: wrap;
 	gap: 6px 16px;
-	margin-top: 10px;
+	flex: none;
 	color: var(--ss-muted);
 	font-size: var(--ss-fs-sm);
 }
+/* หัวกลุ่มโครงการ (ทุกโครงการ) */
+.hr-grid .hr-group th,
+.hr-grid .hr-group td {
+	background: var(--ss-surface-2);
+	border-top: 1px solid var(--ss-border);
+}
+.hr-grid .hr-group-name {
+	font-weight: 650;
+	white-space: nowrap;
+}
+.hr-group-label { display: inline-flex; align-items: center; gap: 6px; }
+.hr-group-label svg { flex: none; color: var(--ss-muted); }
+.hr-group-label em { font-style: normal; font-weight: 400; color: var(--ss-muted); }
+.hr-group-title { margin: 6px 2px 0; }
 .hr-legend-item {
 	display: inline-flex;
 	align-items: center;
@@ -1033,14 +1075,14 @@ load();
 	color: var(--ss-brand);
 	font-weight: 700;
 }
-@media (prefers-color-scheme: dark) {
-	.hr-counts .is-red b { color: #fb7185; }
-	.hr-cell.is-green { --c: #4ade80; --c-bg: rgba(74, 222, 128, 0.16); }
-	.hr-cell.is-orange { --c: #fb923c; --c-bg: rgba(251, 146, 60, 0.16); }
-	.hr-cell.is-red { --c: #fb7185; --c-bg: rgba(251, 113, 133, 0.16); }
-	.hr-cell.is-blue { --c: #60a5fa; --c-bg: rgba(96, 165, 250, 0.16); }
-	.hr-cell.is-amber { --c: #fbbf24; --c-bg: rgba(251, 191, 36, 0.18); }
-	.hr-total.is-red { color: #fb7185; }
-	.hr-total.is-amber { color: #fbbf24; }
-}
+/* โหมดมืด = html[data-theme="dark"] (theme.js) :where ไม่เพิ่ม specificity */
+:where([data-theme="dark"]) .hr-counts .is-red b { color: #fb7185; }
+:where([data-theme="dark"]) .hr-cell.is-green { --c: #4ade80; --c-bg: rgba(74, 222, 128, 0.16); }
+:where([data-theme="dark"]) .hr-cell.is-orange { --c: #fb923c; --c-bg: rgba(251, 146, 60, 0.16); }
+:where([data-theme="dark"]) .hr-cell.is-red { --c: #fb7185; --c-bg: rgba(251, 113, 133, 0.16); }
+:where([data-theme="dark"]) .hr-cell.is-blue { --c: #60a5fa; --c-bg: rgba(96, 165, 250, 0.16); }
+:where([data-theme="dark"]) .hr-cell.is-amber { --c: #fbbf24; --c-bg: rgba(251, 191, 36, 0.18); }
+:where([data-theme="dark"]) .hr-total.is-red { color: #fb7185; }
+:where([data-theme="dark"]) .hr-total.is-amber { color: #fbbf24; }
+
 </style>

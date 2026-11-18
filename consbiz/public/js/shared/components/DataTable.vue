@@ -1,4 +1,5 @@
-<!-- ตารางแบบรายการเอกสารจัดซื้อ สำหรับข้อมูลที่โหลดมาครบแล้ว (เรียง/แบ่งหน้าในเครื่อง)
+<!-- active = แถวที่เปิดแผงตัวอย่างอยู่ (ไฮไลต์)
+     ตารางแบบรายการเอกสารจัดซื้อ สำหรับข้อมูลที่โหลดมาครบแล้ว (เรียง/แบ่งหน้าในเครื่อง)
      columns: [{key, label, class?, sort?}] sort = true (เรียงตาม row[key]) หรือฟังก์ชันคืนค่าที่ใช้เรียง
      ช่องที่ต้องจัดรูปแบบใช้ slot ชื่อเดียวกับ key (ได้ { row }) class ใช้ชุดเดียวกับ DocTable (col-wide = ซ่อนเมื่อจอ < 1180)
      selectable + v-model:selected (Set ของ row_key) = มีช่องติ๊ก ติ๊กหัวตาราง = ทุกแถวของ rows (รวมหน้าอื่น) -->
@@ -56,6 +57,7 @@
 							'is-late': late?.(row),
 							'is-static': !clickable,
 							'is-selected': selectable && selected.has(row[row_key]),
+							'is-active': active != null && row[row_key] === active,
 						}"
 						:style="{ '--i': Math.min(i, 20) }"
 						:tabindex="clickable ? 0 : undefined"
@@ -127,6 +129,8 @@ const props = defineProps({
 	page_size: { type: Number, default: 30 },
 	selectable: Boolean,
 	selected: { type: Set, default: () => new Set() },
+	// แถวที่เปิดตัวอย่างอยู่ (แผงขวาของ ListCard) ไฮไลต์แบบ DocTable
+	active: { type: String, default: null },
 });
 const emit = defineEmits(["open", "update:selected"]);
 

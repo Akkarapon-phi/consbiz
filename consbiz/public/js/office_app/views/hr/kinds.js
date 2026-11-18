@@ -46,6 +46,35 @@ export const HR_DOC_KINDS = {
 		open: (r) => ["hr-doc", { kind: "hr-contracts", name: r.name }],
 		create: () => ["hr-doc", { kind: "hr-contracts", name: "new" }],
 	},
+	// ใบเตือน (Employee Warning, ตกลง 2026-11-17)
+	"hr-warnings": {
+		api: API,
+		boot: "hr_docs",
+		label: "ใบเตือน",
+		create_label: "ออกใบเตือน",
+		icon: "alert",
+		title: (r) => r.employee_name || r.employee,
+		title_label: "พนักงาน",
+		party: (r) =>
+			[
+				{ Verbal: "ด้วยวาจา", "Written 1": "ครั้งที่ 1", "Written 2": "ครั้งที่ 2", Final: "ครั้งสุดท้าย" }[r.level] || r.level,
+				{ Late: "มาสาย", Absence: "ขาดงาน", Misconduct: "ผิดวินัย", Safety: "ความปลอดภัย", Performance: "ผลงาน", Other: "อื่นๆ" }[r.category] || r.category,
+			]
+				.filter(Boolean)
+				.join(" · "),
+		party_label: "ระดับ / เรื่อง",
+		date: "date",
+		date_label: "วันที่",
+		search: ["name", "employee_name", "employee"],
+		filters: [
+			{ value: "waiting", label: "รอรับทราบ", test: (r) => done(r) && !r.acknowledged && !r.refused },
+			{ value: "draft", label: "ร่าง", test: draft },
+			{ value: "done", label: "ยืนยันแล้ว", test: done },
+			{ value: "all", label: "ทั้งหมด", test: () => true },
+		],
+		open: (r) => ["hr-doc", { kind: "hr-warnings", name: r.name }],
+		create: () => ["hr-doc", { kind: "hr-warnings", name: "new" }],
+	},
 	"hr-wht": {
 		api: API,
 		boot: "hr_docs",

@@ -11,7 +11,8 @@ Payroll คิดตาม Attendance ของ HRMS (Payroll Settings payroll_b
 - holiday  วันหยุดใน Holiday List ของพนักงาน (หรือของบริษัท) ไม่สร้าง Attendance
 - day_off  วันหยุดประจำสัปดาห์ ไม่สร้าง Attendance
            สัปดาห์ที่ไม่ได้ลง Weekly Day Off: เสาร์/อาทิตย์ที่ไม่ได้ลงเวลา = วันหยุด (อาทิตย์ก่อน) อีกวันคิดตามปกติ
-ชั่วโมงทำงาน (work_hours) = ช่วงเข้าครั้งแรก-ออกครั้งสุดท้าย ที่อยู่ในเวลางาน WORK_START-WORK_END หักพักเที่ยง LUNCH
+ชั่วโมงทำงาน (work_hours) = ช่วงเข้าครั้งแรก-ออกครั้งสุดท้าย ที่อยู่ในเวลากะของวันนั้น หักเวลาพัก (ตกลง 2026-11-17: กะจริง shift_of)
+ไม่ได้กำหนดกะ = DEFAULT_SHIFT (WORK_START-WORK_END พัก LUNCH ผ่อนผันสาย 5 นาที) ตัวเลขเวลา 08:00/17:00 ด้านล่าง = ของกะนี้
 ตกลง 2026-11-11 (พ.ร.บ.คุ้มครองแรงงาน ม.76 ห้ามตัดครึ่งวันเพราะสาย: ไม่จ่ายได้เฉพาะเวลาที่ไม่ได้ทำงานจริง):
 - สาย (late) = นาทีทำงานตั้งแต่ 08:00 ถึงเวลาเข้า เข้าไม่เกิน LATE_GRACE (08:05) = ไม่สาย เกินแล้วนับจาก 08:00 (08:10 = 10 นาที)
 - กลับก่อน (early) = นาทีทำงานจากเวลาออกถึง 17:00 ไม่มีผ่อนผัน อยู่เกิน 17:00 ไม่นับ OT (ยังไม่มีนโยบาย)
@@ -99,6 +100,7 @@ def employees_of(company, start, end, project=None):
 			"relieving_date",
 			"holiday_list",
 			"user_id",
+			"default_shift",
 		],
 		order_by="employee_name asc",
 		limit_page_length=0,
@@ -141,6 +143,28 @@ def load_period(employees, start, end):
 		fields=["name", "employee", "from_date", "to_date", "leave_type"],
 		limit_page_length=0,
 	)
+	# แจ้งมาทำงาน (Attendance Request) ที่รออนุมัติ: วันนั้นรอตัดสินเหมือนใบลา Open (self_home)
+	open_requests = frappe.get_all(
+		"Attendance Request",
+		filters={
+			"employee": ("in", names),
+			"docstatus": 0,
+			"custom_approval_status": ("!=", "Rejected"),
+			"from_date": ("<=", end),
+			"to_date": (">=", start),
+		},
+		fields=["name", "employee", "from_date", "to_date"],
+		limit_page_length=0,
+	)
+	# กะ: Shift Assignment ที่ครอบช่วง (Submit + Active)
+	assignments = frappe.get_all(
+		"Shift Assignment",
+		filters={"employee": ("in", names), "docstatus": 1, "status": "Active", "start_date": ("<=", end)},
+		or_filters=[["end_date", "is", "not set"], ["end_date", ">=", start]],
+		fields=["employee", "shift_type", "start_date", "end_date"],
+		order_by="start_date desc",
+		limit_page_length=0,
+	)
 	# วันหยุดประจำสัปดาห์: รวมสัปดาห์ที่คร่อมต้น/ท้ายเดือน
 	day_offs = frappe.get_all(
 		"Weekly Day Off",
@@ -152,6 +176,8 @@ def load_period(employees, start, end):
 		"checkins": group_by_employee(checkins),
 		"attendance": {(a.employee, getdate(a.attendance_date)): a for a in attendance},
 		"open_leaves": group_by_employee(open_leaves),
+		"open_requests": group_by_employee(open_requests),
+		"assignments": group_by_employee(assignments),
 		"day_offs": {(d.employee, getdate(d.week_start)): getdate(d.off_date) for d in day_offs},
 		"holidays": {},
 	}
@@ -186,36 +212,130 @@ def week_start_of(day):
 	return day - timedelta(days=day.weekday())
 
 
-def work_hours(first_in, last_out):
-	"""ชั่วโมงทำงานที่นับ: เฉพาะช่วงในเวลางาน หักพักเที่ยงที่ทับช่วงนั้น (มาก่อน 8 โมง/อยู่เกิน 5 โมงเย็นไม่นับเพิ่ม)"""
+# ---------------------------------------------------------------- กะ (ตกลง 2026-11-17: คิดสาย/ชั่วโมงตามกะของแต่ละคน)
+# กะของวัน (shift_of) = Shift Assignment ที่ครอบวันนั้น > Employee.default_shift > Company.custom_default_shift > DEFAULT_SHIFT
+# Shift Type: start_time / end_time, พัก = custom_break_start / custom_break_end (ไม่ตั้ง = ไม่มีพัก)
+# สายเมื่อเข้าเกิน start + late_entry_grace_period นาที (ไม่ตั้ง = LATE_GRACE_MINUTES) กะข้ามเที่ยงคืนยังไม่รองรับ (ใช้ DEFAULT_SHIFT)
+LATE_GRACE_MINUTES = 5
+
+
+def to_time(value):
+	"""เวลาจาก DB (timedelta / str / time) → time"""
+	if value in (None, ""):
+		return None
+	if isinstance(value, time):
+		return value
+	if isinstance(value, timedelta):
+		seconds = int(value.total_seconds()) % 86400
+		return time(seconds // 3600, seconds % 3600 // 60)
+	parts = [int(x) for x in str(value).split(":")[:2]]
+	return time(parts[0], parts[1] if len(parts) > 1 else 0)
+
+
+def make_shift(name, start, end, break_start=None, break_end=None, grace=None):
+	start, end = to_time(start), to_time(end)
+	break_start, break_end = to_time(break_start), to_time(break_end)
+	if not break_start or not break_end or not (start <= break_start < break_end <= end):
+		break_start = break_end = None
+	grace = LATE_GRACE_MINUTES if grace in (None, "") else cint(grace)
+	day = datetime(2000, 1, 1)
+	span = datetime.combine(day, end) - datetime.combine(day, start)
+	if break_start:
+		span -= datetime.combine(day, break_end) - datetime.combine(day, break_start)
+	hours = round(span.total_seconds() / 3600, 2)
+	return frappe._dict(
+		name=name,
+		start=start,
+		end=end,
+		break_start=break_start,
+		break_end=break_end,
+		grace=grace,
+		late_after=(datetime.combine(day, start) + timedelta(minutes=grace)).time(),
+		hours=hours,
+		half=hours / 2,
+	)
+
+
+DEFAULT_SHIFT = make_shift(None, WORK_START, WORK_END, *LUNCH, LATE_GRACE_MINUTES)
+
+
+def shift_type(name, cache=None):
+	"""Shift Type → กะ (cache = dict ของรอบนั้น) กะข้ามเที่ยงคืน/ไม่มีเวลา = None (ใช้กะถัดไปในลำดับ)"""
+	if not name:
+		return None
+	cache = cache if cache is not None else {}
+	if name not in cache:
+		row = frappe.db.get_value(
+			"Shift Type",
+			name,
+			["name", "start_time", "end_time", "custom_break_start", "custom_break_end", "late_entry_grace_period"],
+			as_dict=True,
+		)
+		shift = None
+		if row and row.start_time is not None and row.end_time is not None and to_time(row.end_time) > to_time(row.start_time):
+			shift = make_shift(
+				row.name, row.start_time, row.end_time, row.custom_break_start, row.custom_break_end, row.late_entry_grace_period
+			)
+		cache[name] = shift
+	return cache[name]
+
+
+def company_shift(company):
+	"""กะเริ่มต้นของบริษัท (Company.custom_default_shift, ตั้งในหน้าตั้งค่าเวลาทำงาน)"""
+	if not frappe.get_meta("Company").has_field("custom_default_shift"):
+		return None
+	return frappe.db.get_value("Company", company, "custom_default_shift")
+
+
+def shift_of(data, employee, day):
+	cache = data.setdefault("shift_types", {})
+	for row in data.get("assignments", {}).get(employee.name, []):
+		if getdate(row.start_date) <= day and (not row.end_date or getdate(row.end_date) >= day):
+			shift = shift_type(row.shift_type, cache)
+			if shift:
+				return shift
+	return (
+		shift_type(employee.get("default_shift"), cache)
+		or shift_type(data.get("company_shift"), cache)
+		or DEFAULT_SHIFT
+	)
+
+
+def work_hours(first_in, last_out, shift=None):
+	"""ชั่วโมงทำงานที่นับ: เฉพาะช่วงในเวลากะ หักเวลาพักที่ทับช่วงนั้น (มาก่อน/อยู่เกินเวลากะไม่นับเพิ่ม)"""
+	shift = shift or DEFAULT_SHIFT
 	day = first_in.date()
 	at = lambda t: datetime.combine(day, t)  # noqa: E731
-	start, end = max(first_in, at(WORK_START)), min(last_out, at(WORK_END))
+	start, end = max(first_in, at(shift.start)), min(last_out, at(shift.end))
 	if end <= start:
 		return 0
-	lunch = max(timedelta(0), min(end, at(LUNCH[1])) - max(start, at(LUNCH[0])))
-	return round((end - start - lunch).total_seconds() / 3600, 2)
+	rest = timedelta(0)
+	if shift.break_start:
+		rest = max(timedelta(0), min(end, at(shift.break_end)) - max(start, at(shift.break_start)))
+	return round((end - start - rest).total_seconds() / 3600, 2)
 
 
-def work_minutes(start, end):
-	"""นาทีทำงานตามเวลางานระหว่างสองเวลา (หักพักเที่ยง) ปัดวินาทีทิ้ง"""
+def work_minutes(start, end, shift=None):
+	"""นาทีทำงานตามเวลากะระหว่างสองเวลา (หักพัก) ปัดวินาทีทิ้ง"""
 	start, end = start.replace(second=0, microsecond=0), end.replace(second=0, microsecond=0)
-	return round(work_hours(start, end) * 60) if end > start else 0
+	return round(work_hours(start, end, shift) * 60) if end > start else 0
 
 
-def late_minutes(first_in):
-	if not first_in or first_in.replace(second=0, microsecond=0).time() <= LATE_GRACE:
+def late_minutes(first_in, shift=None):
+	shift = shift or DEFAULT_SHIFT
+	if not first_in or first_in.replace(second=0, microsecond=0).time() <= shift.late_after:
 		return 0
-	return work_minutes(datetime.combine(first_in.date(), WORK_START), first_in)
+	return work_minutes(datetime.combine(first_in.date(), shift.start), first_in, shift)
 
 
-def early_minutes(last_out):
+def early_minutes(last_out, shift=None):
+	shift = shift or DEFAULT_SHIFT
 	if not last_out:
 		return 0
-	return work_minutes(last_out, datetime.combine(last_out.date(), WORK_END))
+	return work_minutes(last_out, datetime.combine(last_out.date(), shift.end), shift)
 
 
-def summarize_logs(logs):
+def summarize_logs(logs, shift=None):
 	"""รายการลงเวลาของวัน → (เข้าครั้งแรก, ออกครั้งสุดท้าย, ชั่วโมง, มีรอยืนยัน) ไม่นับที่ไม่ได้รับยืนยัน"""
 	counted = [l for l in logs if l.approval != "Rejected"]
 	pending = any(l.approval == "Pending" for l in counted)
@@ -225,7 +345,7 @@ def summarize_logs(logs):
 	last_out = max(outs) if outs else None
 	hours = None
 	if first_in and last_out and last_out > first_in:
-		hours = work_hours(first_in, last_out)
+		hours = work_hours(first_in, last_out, shift)
 	return first_in, last_out, hours, pending, bool(counted)
 
 
@@ -254,6 +374,7 @@ def employee_days(employee, data, start, end, today):
 	holidays = holidays_of(data, employee, start, end)
 	day_offs = day_offs_of(data, employee.name, logged, start, end)
 	open_leaves = data["open_leaves"].get(employee.name, [])
+	open_requests = data.get("open_requests", {}).get(employee.name, [])
 	# ทั้งช่วง (ถึงเมื่อวาน) ไม่มีการลงเวลาเลย: อาจไม่ได้ใช้แอป ให้ HR ตัดสินแทนการตัดขาดทั้งเดือน
 	never = not any(day < today for day in logged)
 	joined = getdate(employee.date_of_joining)
@@ -263,17 +384,23 @@ def employee_days(employee, data, start, end, today):
 	day = start
 	while day <= end:
 		logs = logs_by_day.get(day, [])
-		first_in, last_out, hours, pending, has_logs = summarize_logs(logs)
+		shift = shift_of(data, employee, day)
+		first_in, last_out, hours, pending, has_logs = summarize_logs(logs, shift)
 		cell = {"in": first_in and first_in.strftime("%H:%M"), "out": last_out and last_out.strftime("%H:%M")}
 		if hours is not None:
 			cell["hours"] = hours
-		if late_minutes(first_in):
-			cell["late"] = late_minutes(first_in)
-		if early_minutes(last_out) and first_in and last_out > first_in:
-			cell["early"] = early_minutes(last_out)
+		if shift.name:
+			cell["shift"] = shift.name
+		if late_minutes(first_in, shift):
+			cell["late"] = late_minutes(first_in, shift)
+		if early_minutes(last_out, shift) and first_in and last_out > first_in:
+			cell["early"] = early_minutes(last_out, shift)
 		attendance = data["attendance"].get((employee.name, day))
 		leave = next(
 			(l for l in open_leaves if getdate(l.from_date) <= day <= getdate(l.to_date)), None
+		)
+		request = next(
+			(r for r in open_requests if getdate(r.from_date) <= day <= getdate(r.to_date)), None
 		)
 		if day < joined or (relieved and day > relieved):
 			cell["s"] = "inactive"
@@ -296,6 +423,8 @@ def employee_days(employee, data, start, end, today):
 			cell["s"] = "future"
 		elif leave:
 			cell.update(s="flag", suggest=None, note=_("มีใบลารออนุมัติ ({0})").format(leave.leave_type))
+		elif request:
+			cell.update(s="flag", suggest=None, note=_("มีคำขอแจ้งมาทำงานรออนุมัติ ({0})").format(request.name))
 		elif pending:
 			cell.update(s="flag", suggest=None, note=_("มีการลงเวลารอยืนยัน"))
 		elif not has_logs:
@@ -307,13 +436,13 @@ def employee_days(employee, data, start, end, today):
 			cell.update(s="flag", suggest=None, note=_("ลงเวลาเข้าอย่างเดียว ไม่มีเวลาออก"))
 		elif not first_in:
 			cell.update(s="flag", suggest=None, note=_("ลงเวลาออกอย่างเดียว ไม่มีเวลาเข้า"))
-		elif (hours or 0) >= HALF_DAY_HOURS:
+		elif (hours or 0) >= shift.half:
 			cell["s"] = "present"
 		else:
 			cell.update(
 				s="flag",
 				suggest=None,
-				note=_("ทำงาน {0} ชม. น้อยกว่าครึ่งวัน ({1} ชม.)").format(hours or 0, HALF_DAY_HOURS),
+				note=_("ทำงาน {0} ชม. น้อยกว่าครึ่งวัน ({1} ชม.)").format(hours or 0, shift.half),
 			)
 		if has_logs and cell["s"] in ("holiday", "day_off"):
 			cell["worked"] = 1
@@ -370,6 +499,7 @@ def build(company, month, project=None, employee=None):
 	if employee:
 		employees = [e for e in employees if e.name == employee]
 	data = load_period(employees, start, end)
+	data["company_shift"] = company_shift(company)
 	today = getdate()
 	rows = []
 	for emp in employees:

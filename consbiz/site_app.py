@@ -195,6 +195,24 @@ def get_my_profile():
 	return profile
 
 
+@frappe.whitelist(methods=["POST"])
+def update_my_profile(first_name, middle_name=None, last_name=None):
+	"""แก้ชื่อของผู้ใช้ที่ล็อกอิน (avatar > ตั้งค่า > ข้อมูลส่วนตัว) แก้ได้เฉพาะของตัวเองและเฉพาะช่องชื่อ
+	รหัสผ่านเปลี่ยนผ่าน frappe.core.doctype.user.user.update_password (ตรวจรหัสเดิม + ความยาก) ไม่ผ่านที่นี่"""
+	if frappe.session.user == "Guest":
+		frappe.throw(_("กรุณาเข้าสู่ระบบ"), frappe.PermissionError)
+	first_name = (first_name or "").strip()
+	if not first_name:
+		frappe.throw(_("กรุณากรอกชื่อ"))
+	user = frappe.get_doc("User", frappe.session.user)
+	user.first_name = first_name
+	user.middle_name = (middle_name or "").strip()
+	user.last_name = (last_name or "").strip()
+	# User เขียนได้เฉพาะ System Manager ตามสิทธิ์ปกติ ผู้ใช้แก้ชื่อตัวเองได้ (เหมือนหน้า Settings ของ Frappe)
+	user.save(ignore_permissions=True)
+	return {"full_name": user.full_name}
+
+
 def office_boot_data():
 	"""เดิมเป็น boot ของ bundle ออฟฟิศ รวมเข้า ConsERP แล้ว (2026-11-17) คงชื่อไว้ให้ที่เรียกเดิม"""
 	return boot_data()

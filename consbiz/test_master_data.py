@@ -91,3 +91,20 @@ class IntegrationTestMasterData(IntegrationTestCase):
 		self.assertIsInstance(master_data.search("md-employees", "Department", ""), list)
 		with self.assertRaises(frappe.PermissionError):
 			master_data.search("md-employees", "Item", "")
+
+	def test_checkin_location(self):
+		# จุดลงเวลาจากฟอร์มในแอป (ตกลง 2026-11-17): สร้าง / แก้ในที่ / ใช้ร่วมกัน = สร้างจุดใหม่ / ค่าผิด = ไม่ผ่าน
+		kind = "md-projects"
+		first = master_data.save_checkin_location(kind, "_Test จุดลงเวลา", 13.7563, 100.5018, 200)
+		self.assertTrue(first["created"])
+		edited = master_data.save_checkin_location(kind, "x", 13.75, 100.5, 300, location=first["name"])
+		self.assertEqual(edited["name"], first["name"])
+		self.assertEqual(frappe.db.get_value("Shift Location", first["name"], "checkin_radius"), 300)
+		project = frappe.get_all("Project", limit=1, pluck="name")
+		if project:
+			frappe.db.set_value("Project", project[0], "custom_checkin_location", first["name"])
+			copy = master_data.save_checkin_location(kind, "_Test จุดลงเวลา", 13.7, 100.4, 150, location=first["name"])
+			self.assertNotEqual(copy["name"], first["name"])
+		for bad in ((0, 0, 200), (13, 100, 5), (95, 100, 200)):
+			with self.assertRaises(frappe.ValidationError):
+				master_data.save_checkin_location(kind, "_Test bad", *bad)

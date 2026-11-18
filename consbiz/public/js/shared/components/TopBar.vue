@@ -96,6 +96,17 @@
 		<!-- ผู้ที่เปิดจากลิงก์โดยไม่ login (boot.guest, แอปผู้รับเหมา) ไม่มีการแจ้งเตือน -->
 		<NotificationBell v-if="!boot.guest" />
 		<slot name="actions" />
+		<!-- ตั้งค่าของหมวด: ปกติอยู่เมนู ⋯ ของหัวรายการ หน้าที่ไม่มีหัวรายการ (มือถือบางหน้า) ใช้ปุ่มนี้แทน -->
+		<button
+			v-if="settings_here"
+			type="button"
+			class="ss-icon-btn ss-topbar-settings"
+			title="ตั้งค่า"
+			aria-label="ตั้งค่า"
+			@click="module_settings.open()"
+		>
+			<Icon name="sliders" :size="19" />
+		</button>
 		<button
 			v-if="show_header_user"
 			ref="header_user_button"
@@ -163,6 +174,10 @@ const open_company = inject("open_company_picker", null);
 const open_launcher = inject("open_launcher", null);
 const open_user_menu = inject("open_user_menu", null);
 const open_global_search = inject("open_global_search", null);
+const module_settings = inject("module_settings", null);
+const settings_here = computed(
+	() => !props.back_to && !!module_settings?.key.value && module_settings.heads.value === 0
+);
 // ป้ายคีย์ลัดเป็น ⌘G ทุกเครื่อง (ตกลง 2026-11-16) Windows/Linux ไม่มีปุ่ม ⌘ กด Ctrl+G ได้เหมือนกัน (AppShell)
 const search_key = "⌘G";
 const header_user_button = ref(null);

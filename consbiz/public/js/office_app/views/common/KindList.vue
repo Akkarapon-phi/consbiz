@@ -46,6 +46,8 @@
 				<Segmented v-model="filter" :options="tabs" />
 			</template>
 
+			<!-- จอ ≥768: การ์ดเดียวต่อจากหัวรายการ (ListCard) ไม่มีข้อมูล = Empty กลางการ์ด -->
+			<ListCard :on="wide">
 			<Skeleton v-if="rows === null" />
 			<Empty v-else-if="!shown.length" :icon="kind.icon" :title="`ไม่มี${kind.label}`" />
 			<DataTable v-else-if="wide" :rows="shown" :columns="COLUMNS" @open="open">
@@ -108,6 +110,7 @@
 					</div>
 				</button>
 			</div>
+			</ListCard>
 		</div>
 	</div>
 </template>
@@ -121,6 +124,7 @@ import Skeleton from "../../../shared/components/Skeleton.vue";
 import Empty from "../../../shared/components/Empty.vue";
 import DataTable from "../../../shared/components/DataTable.vue";
 import ListHead from "../../../shared/components/ListHead.vue";
+import ListCard from "../../../shared/components/ListCard.vue";
 import { matches, use_wide } from "../../../shared/table.js";
 import {
 	boot,

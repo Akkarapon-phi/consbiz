@@ -1,6 +1,7 @@
 // ข้อมูลงานพิมพ์ของแผนงานในแอป (รูปแบบเดียวกับ print_model ใน construction_management/App.vue)
 // คอลัมน์ แถวที่ย่อ/กรอง และการแสดงผล ตามที่ตั้งไว้ในหน้าแผนงาน
 import { cell_text, text_width } from "../../../../construction_management/columns.js";
+import { PRINT_FONT } from "../../../../construction_management/print.js";
 import { from_day, to_day, today } from "../../../../construction_management/schedule.js";
 import { thai_date } from "../../../../shared/api.js";
 import { COLUMNS, SUMMARY_ROWS } from "./planner.js";
@@ -74,7 +75,6 @@ function print_row(task, metrics) {
 }
 
 // ความกว้างที่พอดีข้อความของแต่ละคอลัมน์ (px ของงานพิมพ์ ตัวอักษรหัว 7px เนื้อหา 8px ตรงกับ cell ใน print.js)
-const PRINT_FONT = `"Noto Sans Thai", system-ui, -apple-system, sans-serif`;
 const CELL_PADDING = 10;
 const MAX_FIT = { item_name: 320 };
 export const MIN_COLUMN_WIDTH = 20;

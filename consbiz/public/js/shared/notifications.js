@@ -67,6 +67,11 @@ const APP_PAGES = {
 		{ section: "approve", view: "approve", args: {} },
 		{ section: "self", view: "leave", args: {}, no_name: true },
 	],
+	// แจ้งมาทำงาน (self_home): เจ้าของเปิดภาพรวม (ปฏิทิน)
+	"Attendance Request": [
+		{ section: "approve", view: "approve", args: {} },
+		{ section: "self", view: "checkin", args: {}, no_name: true },
+	],
 	"Employee Advance": [
 		{ section: "approve", view: "approve", args: {} },
 		{ section: "self", view: "advances", args: {}, no_name: true },

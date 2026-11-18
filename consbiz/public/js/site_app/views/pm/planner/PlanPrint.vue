@@ -1,5 +1,6 @@
 <!-- tab "พิมพ์" ของหน้าแผนงาน: ซ้าย = Preview, ขวา = Properties
      Preview คือ iframe เอกสารเดียวกับที่สั่งพิมพ์ (build_print ใน construction_management/print.js) งานพิมพ์จึงตรงกับที่เห็น
+     ปุ่ม "พิมพ์" (ตกลง 2026-11-18 แทนปุ่มพิมพ์เดิม + ดู PDF) = HtmlViewer: เอกสารเดียวกันเต็มจอ + พิมพ์/แชร์/ดาวน์โหลด PDF (get_plan_pdf)
      ย่อ/ขยายเพื่อดูทำที่ตัว iframe จากภายนอก ไม่กระทบเอกสาร ขอบกระดาษและเงาในเอกสารเป็น @media screen ไม่ออกตอนพิมพ์
      tab คอลัมน์: เลือก/เรียง/กำหนดความกว้าง (ว่าง = พอดีข้อความ) ไม่กระทบตาราง
      การย่อ-หุบ WBS เป็นของงานพิมพ์ แยกจากตาราง (ครั้งแรกตั้งต้นจากตาราง) ค่าทั้งหมดจำในเครื่องแยกตามแผนงาน -->
@@ -59,6 +60,10 @@
 						<span>{{ item.label }}</span>
 					</label>
 				</div>
+				<label class="ss-field">
+					<span class="ss-field-label pl-print-label">ขนาดเส้น S-Curve<b>{{ options.curve_scale }}%</b></span>
+					<input v-model.number="options.curve_scale" class="pl-print-range" type="range" min="50" max="400" step="10" />
+				</label>
 				<div class="ss-field">
 					<span class="ss-field-label">ตารางสรุป</span>
 					<label v-for="row in summary_items" :key="row.key" class="ss-toggle" :class="{ 'is-on': options.summary[row.key] }">
@@ -141,15 +146,23 @@
 			</div>
 			<div class="pl-print-foot">
 				<span>{{ result.error ? "–" : `${rows.length} แถว · ${result.pages} หน้า · ${options.paper}` }}</span>
-				<button type="button" class="ss-btn ss-btn--soft" :disabled="!!result.error" @click="pdf_open = true">
-					<Icon name="file" :size="16" /> <span>ดู PDF</span>
-				</button>
-				<button type="button" class="ss-btn ss-btn--primary" :disabled="!!result.error || printing" @click="print">
+				<button type="button" class="ss-btn ss-btn--primary" :disabled="!!result.error" title="พิมพ์ แชร์ ดาวน์โหลด PDF" @click="html_open = true">
 					<Icon name="printer" :size="16" /> <span>พิมพ์</span>
 				</button>
 			</div>
 		</aside>
-		<PdfViewer :open="pdf_open" :fetch_file="fetch_pdf" :name="file_name" :file_name="file_name" title="แผนงาน" :max_zoom="8" @close="pdf_open = false" />
+		<HtmlViewer
+			:open="html_open"
+			:html="result.html"
+			:width="sheet_w"
+			:height="sheet_h"
+			:pages="result.pages"
+			:fetch_file="fetch_pdf"
+			:name="file_name"
+			:file_name="file_name"
+			title="แผนงาน"
+			@close="html_open = false"
+		/>
 	</div>
 </template>
 
@@ -157,11 +170,11 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 import Empty from "../../../../shared/components/Empty.vue";
 import Icon from "../../../../shared/components/Icon.vue";
-import PdfViewer from "../../../../shared/components/PdfViewer.vue";
+import HtmlViewer from "../../../../shared/components/HtmlViewer.vue";
 import Segmented from "../../../../shared/components/Segmented.vue";
 import SelectBox from "../../../../shared/components/SelectBox.vue";
 import StatusTabs from "../../../../shared/components/StatusTabs.vue";
-import { build_print } from "../../../../construction_management/print.js";
+import { build_print, print_font_ready } from "../../../../construction_management/print.js";
 import { COLUMNS, CURVE_ITEMS, SUMMARY_ROWS, default_curves, default_summary } from "./planner.js";
 import { MIN_COLUMN_WIDTH, PRINT_SCALES, build_print_model, fit_column_widths, print_file_name } from "./print_model.js";
 
@@ -253,6 +266,7 @@ const options = reactive({
 	...PAGE_DEFAULTS,
 	...end_defaults(),
 	period_scale: 100,
+	curve_scale: 100,
 	scale: props.settings.scale,
 	...remembered,
 	columns: merged_columns(remembered.columns),
@@ -261,8 +275,11 @@ const options = reactive({
 });
 if (!TEMPLATES.some((t) => t.value === options.template)) options.template = PAGE_DEFAULTS.template;
 const same = (a, b) => Object.keys(b).every((key) => a[key] === b[key]);
-const curve_is_default = computed(() => same(options.curves, curve_defaults()) && same(options.summary, summary_defaults()));
+const curve_is_default = computed(
+	() => options.curve_scale === 100 && same(options.curves, curve_defaults()) && same(options.summary, summary_defaults())
+);
 function reset_curve() {
+	options.curve_scale = 100;
 	options.curves = curve_defaults();
 	options.summary = summary_defaults();
 }
@@ -354,7 +371,10 @@ function collapse_done() {
 }
 
 const visible_keys = computed(() => options.columns.filter((c) => c.visible).map((c) => c.key));
-const fit_widths = computed(() => fit_column_widths(props.p, rows.value, visible_keys.value));
+// ฟอนต์งานพิมพ์โหลดเสร็จ = สร้างใหม่ (ความกว้างข้อความวัดด้วยฟอนต์ที่พิมพ์จริง)
+const font_tick = ref(0);
+print_font_ready().then(() => font_tick.value++);
+const fit_widths = computed(() => font_tick.value >= 0 && fit_column_widths(props.p, rows.value, visible_keys.value));
 const columns_is_default = computed(
 	() => JSON.stringify(options.columns) === JSON.stringify(default_columns())
 );
@@ -363,6 +383,7 @@ function reset_columns() {
 }
 
 const result = computed(() =>
+	font_tick.value >= 0 &&
 	build_print(build_print_model(props.p, props.settings, rows.value, options, fit_widths.value), options)
 );
 
@@ -445,7 +466,6 @@ const frame = ref(null);
 const stage = ref(null);
 const stage_w = ref(0);
 const manual_zoom = ref(null);
-const printing = ref(false);
 
 const sheet_w = computed(() => {
 	const [short, long] = result.value.size || [297, 420];
@@ -492,7 +512,7 @@ watch(
 	}
 );
 
-const pdf_open = ref(false);
+const html_open = ref(false);
 const file_name = computed(() => print_file_name(props.p));
 // สร้าง PDF จากเอกสารเดียวกับ Preview ส่งเป็น JSON เพราะ HTML ใหญ่เกินขีดจำกัดของฟอร์ม
 function fetch_pdf() {
@@ -514,26 +534,6 @@ function fetch_pdf() {
 			margin: options.margin,
 		}),
 	});
-}
-
-function print() {
-	const win = frame.value?.contentWindow;
-	if (!win || result.value.error) return;
-	clearTimeout(timer);
-	write(result.value.html);
-	printing.value = true;
-	// รอฟอนต์ไทยโหลดก่อนสั่งพิมพ์ ไม่งั้นอาจใช้ฟอนต์สำรอง
-	win.document.fonts
-		.load('10px "Noto Sans Thai"', "ก")
-		.finally(() => {
-			printing.value = false;
-			// เบราว์เซอร์ตั้งชื่อไฟล์ "บันทึกเป็น PDF" จากชื่อหน้า
-			const page_title = document.title;
-			document.title = file_name.value;
-			win.focus();
-			win.print();
-			setTimeout(() => (document.title = page_title), 3000);
-		});
 }
 
 let observer = null;

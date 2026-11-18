@@ -1,8 +1,8 @@
 // ของกลางสำหรับหน้าที่แสดงเป็นตารางบนแท็บเล็ต/จอใหญ่ และการ์ดบนมือถือ
 import { nextTick, onBeforeUnmount, ref, watch } from "vue";
 
-export function use_wide() {
-	const mq = window.matchMedia("(min-width: 768px)");
+export function use_wide(min = 768) {
+	const mq = window.matchMedia(`(min-width: ${min}px)`);
 	const wide = ref(mq.matches);
 	const update = () => (wide.value = mq.matches);
 	mq.addEventListener("change", update);

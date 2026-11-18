@@ -74,14 +74,21 @@
 			}
 		</style>
 		<script>
-			// โหมดมืดของหน้าตาใหม่อ่าน html[data-theme] (ธีมเดิมอ่าน prefers-color-scheme ตรง ๆ)
-			// ตั้งตามระบบก่อนวาดหน้า และเปลี่ยนตามเมื่อผู้ใช้สลับโหมดระหว่างเปิดแอป
+			// โหมดมืด/สว่าง: CSS อ่าน html[data-theme] เลือกได้ที่ avatar > ตั้งค่า > การแสดงผล (shared/theme.js คีย์เดียวกัน)
+			// "auto" (ค่าเริ่มต้น) = ตามเครื่อง และเปลี่ยนตามเมื่อผู้ใช้สลับโหมดระหว่างเปิดแอป ตั้งก่อนวาดหน้า
 			(function () {
 				var mq = window.matchMedia("(prefers-color-scheme: dark)");
 				function apply() {
-					document.documentElement.setAttribute("data-theme", mq.matches ? "dark" : "light");
+					var pick = "auto";
+					try {
+						pick = localStorage.getItem("consbiz.theme") || "auto";
+					} catch (e) {}
+					var dark = pick === "dark" || (pick !== "light" && mq.matches);
+					document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
+					document.documentElement.style.colorScheme = dark ? "dark" : "light";
 				}
 				apply();
+				window.__consbiz_theme = apply;
 				if (mq.addEventListener) mq.addEventListener("change", apply);
 				else if (mq.addListener) mq.addListener(apply);
 			})();

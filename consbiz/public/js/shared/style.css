@@ -51,40 +51,40 @@
 	color-scheme: light;
 }
 
-@media (prefers-color-scheme: dark) {
-	:root {
-		--ss-brand: #4b8dff;
-		--ss-brand-2: #8b74ff;
-		--ss-brand-soft: rgba(75, 141, 255, 0.16);
-		--ss-bg: #0b1020;
-		--ss-surface: #141a2c;
-		--ss-surface-2: #1b2236;
-		--ss-border: rgba(255, 255, 255, 0.08);
-		--ss-border-strong: rgba(255, 255, 255, 0.16);
-		--ss-text: #e8ecf5;
-		--ss-text-2: #b2bccd;
-		--ss-muted: #7d889c;
-		--ss-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 10px 30px -14px rgba(0, 0, 0, 0.6);
-		--ss-shadow-lg: 0 24px 60px -20px rgba(0, 0, 0, 0.8);
-		--tone-blue: #6ea2ff;
-		--tone-blue-bg: rgba(75, 141, 255, 0.16);
-		--tone-violet: #a592ff;
-		--tone-violet-bg: rgba(139, 116, 255, 0.18);
-		--tone-teal: #34d3c0;
-		--tone-teal-bg: rgba(45, 212, 191, 0.14);
-		--tone-amber: #fbbf24;
-		--tone-amber-bg: rgba(251, 191, 36, 0.14);
-		--tone-rose: #fb7185;
-		--tone-rose-bg: rgba(251, 113, 133, 0.15);
-		--tone-green: #34d399;
-		--tone-green-bg: rgba(52, 211, 153, 0.14);
-		--tone-indigo: #a5b4fc;
-		--tone-indigo-bg: rgba(129, 140, 248, 0.16);
-		--tone-orange: #fb923c;
-		--tone-orange-bg: rgba(251, 146, 60, 0.15);
-		color-scheme: dark;
-	}
+/* โหมดมืด = html[data-theme="dark"] (theme.js) :where ไม่เพิ่ม specificity */
+:root:where([data-theme="dark"]) {
+	--ss-brand: #4b8dff;
+	--ss-brand-2: #8b74ff;
+	--ss-brand-soft: rgba(75, 141, 255, 0.16);
+	--ss-bg: #0b1020;
+	--ss-surface: #141a2c;
+	--ss-surface-2: #1b2236;
+	--ss-border: rgba(255, 255, 255, 0.08);
+	--ss-border-strong: rgba(255, 255, 255, 0.16);
+	--ss-text: #e8ecf5;
+	--ss-text-2: #b2bccd;
+	--ss-muted: #7d889c;
+	--ss-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 10px 30px -14px rgba(0, 0, 0, 0.6);
+	--ss-shadow-lg: 0 24px 60px -20px rgba(0, 0, 0, 0.8);
+	--tone-blue: #6ea2ff;
+	--tone-blue-bg: rgba(75, 141, 255, 0.16);
+	--tone-violet: #a592ff;
+	--tone-violet-bg: rgba(139, 116, 255, 0.18);
+	--tone-teal: #34d3c0;
+	--tone-teal-bg: rgba(45, 212, 191, 0.14);
+	--tone-amber: #fbbf24;
+	--tone-amber-bg: rgba(251, 191, 36, 0.14);
+	--tone-rose: #fb7185;
+	--tone-rose-bg: rgba(251, 113, 133, 0.15);
+	--tone-green: #34d399;
+	--tone-green-bg: rgba(52, 211, 153, 0.14);
+	--tone-indigo: #a5b4fc;
+	--tone-indigo-bg: rgba(129, 140, 248, 0.16);
+	--tone-orange: #fb923c;
+	--tone-orange-bg: rgba(251, 146, 60, 0.15);
+	color-scheme: dark;
 }
+
 
 *,
 *::before,
@@ -299,17 +299,17 @@ a {
 		linear-gradient(120deg, var(--ss-brand) 0%, var(--ss-brand-2) 100%);
 	transition: box-shadow 0.25s ease;
 }
-@media (prefers-color-scheme: dark) {
-	/* สีหลักของธีมมืดสว่างเกินสำหรับตัวอักษรขาว */
-	.ss-topbar {
-		background: radial-gradient(90% 220% at 100% 0%, rgba(255, 255, 255, 0.1), transparent 55%),
-			linear-gradient(
-				120deg,
-				color-mix(in srgb, var(--ss-brand) 58%, #000) 0%,
-				color-mix(in srgb, var(--ss-brand-2) 58%, #000) 100%
-			);
-	}
+/* โหมดมืด = html[data-theme="dark"] (theme.js) :where ไม่เพิ่ม specificity */
+/* สีหลักของธีมมืดสว่างเกินสำหรับตัวอักษรขาว */
+:where([data-theme="dark"]) .ss-topbar {
+	background: radial-gradient(90% 220% at 100% 0%, rgba(255, 255, 255, 0.1), transparent 55%),
+		linear-gradient(
+			120deg,
+			color-mix(in srgb, var(--ss-brand) 58%, #000) 0%,
+			color-mix(in srgb, var(--ss-brand-2) 58%, #000) 100%
+		);
 }
+
 .ss-topbar.is-scrolled {
 	box-shadow: 0 8px 18px -12px rgba(15, 23, 42, 0.55);
 }
@@ -412,14 +412,14 @@ a {
 	--viz-2: #1f9e6b;
 	--viz-3: #c9650a;
 }
-@media (prefers-color-scheme: dark) {
-	.ss-fin,
-	.ss-money-chart {
-		--viz-1: #3987e5;
-		--viz-2: #199e70;
-		--viz-3: #d95926;
-	}
+/* โหมดมืด = html[data-theme="dark"] (theme.js) :where ไม่เพิ่ม specificity */
+:where([data-theme="dark"]) .ss-fin,
+:where([data-theme="dark"]) .ss-money-chart {
+	--viz-1: #3987e5;
+	--viz-2: #199e70;
+	--viz-3: #d95926;
 }
+
 .ss-fin {
 	display: flex;
 	flex-direction: column;
@@ -2026,6 +2026,7 @@ button.ss-card:active {
 	transform: translateX(-50%);
 	width: 100%;
 	max-height: calc(92vh - var(--ss-top));
+	max-height: calc(92dvh - var(--ss-top));
 	display: flex;
 	flex-direction: column;
 	border-radius: 28px 28px 0 0;
@@ -2035,9 +2036,11 @@ button.ss-card:active {
 }
 .ss-sheet--full {
 	height: calc(92vh - var(--ss-top));
+	height: calc(92dvh - var(--ss-top));
 }
 .ss-sheet--half {
 	height: 60vh;
+	height: 60dvh;
 }
 .ss-sheet-grip {
 	display: grid;
@@ -2078,6 +2081,34 @@ button.ss-card:active {
 	overflow-y: auto;
 	overscroll-behavior: contain;
 	padding: 4px 16px 16px;
+}
+/* Sheet แบบฟอร์ม (prop form ของ Sheet.vue): ช่อง/กล่องในตัวห่างเท่ากัน */
+.ss-sheet-body.is-form {
+	display: flex;
+	flex-direction: column;
+	gap: 14px;
+	padding-top: 8px;
+}
+.ss-sheet-body.is-form > .ss-note {
+	margin: 0;
+}
+/* ประเภทการเบิก (Advances.vue ขั้นเลือก) */
+.ss-advance-types .ss-option {
+	border: 1px solid var(--ss-border);
+	background: var(--ss-surface);
+}
+.ss-advance-types .ss-option-desc { white-space: normal; }
+.ss-advance-types .ss-option > .ss-icon:last-child { color: var(--ss-muted); }
+.ss-advance-change {
+	display: inline-flex;
+	align-items: center;
+	gap: 2px;
+	align-self: flex-start;
+}
+.ss-review-installments { margin-top: 12px; }
+.ss-review-installments small {
+	color: var(--ss-muted);
+	font-size: var(--ss-fs-sm);
 }
 .ss-sheet-foot {
 	padding: 12px 16px calc(12px + var(--ss-bottom));
@@ -2547,7 +2578,8 @@ button.ss-card:active {
 	animation: ss-spin 0.7s linear infinite;
 }
 .ss-options-note .ss-spinner,
-.ss-btn--ghost .ss-spinner {
+.ss-btn--ghost .ss-spinner,
+.ss-pdf-bar .ss-spinner {
 	border-color: var(--ss-border);
 	border-top-color: var(--ss-brand);
 }
@@ -3091,38 +3123,38 @@ svg.ss-check {
 	--ss-brand-2: #d6336c;
 	--ss-brand-soft: #fff0e6;
 }
-@media (prefers-color-scheme: dark) {
-	[data-section="work"] {
-		--ss-brand: #ff8a4c;
-		--ss-brand-2: #f06595;
-		--ss-brand-soft: rgba(255, 138, 76, 0.16);
-	}
+/* โหมดมืด = html[data-theme="dark"] (theme.js) :where ไม่เพิ่ม specificity */
+:where([data-theme="dark"]) [data-section="work"], [data-section="work"]:where([data-theme="dark"]) {
+	--ss-brand: #ff8a4c;
+	--ss-brand-2: #f06595;
+	--ss-brand-soft: rgba(255, 138, 76, 0.16);
 }
+
 
 [data-section="pm"] {
 	--ss-brand: #1e3a8a;
 	--ss-brand-2: #0369a1;
 	--ss-brand-soft: #e3eaf8;
 }
-@media (prefers-color-scheme: dark) {
-	[data-section="pm"] {
-		--ss-brand: #8fb0f5;
-		--ss-brand-2: #5fb6e0;
-		--ss-brand-soft: rgba(143, 176, 245, 0.18);
-	}
+/* โหมดมืด = html[data-theme="dark"] (theme.js) :where ไม่เพิ่ม specificity */
+:where([data-theme="dark"]) [data-section="pm"], [data-section="pm"]:where([data-theme="dark"]) {
+	--ss-brand: #8fb0f5;
+	--ss-brand-2: #5fb6e0;
+	--ss-brand-soft: rgba(143, 176, 245, 0.18);
 }
+
 [data-section="resources"] {
 	--ss-brand: #6d28d9;
 	--ss-brand-2: #4f46e5;
 	--ss-brand-soft: #efe8fb;
 }
-@media (prefers-color-scheme: dark) {
-	[data-section="resources"] {
-		--ss-brand: #b79af5;
-		--ss-brand-2: #9aa0f7;
-		--ss-brand-soft: rgba(183, 154, 245, 0.18);
-	}
+/* โหมดมืด = html[data-theme="dark"] (theme.js) :where ไม่เพิ่ม specificity */
+:where([data-theme="dark"]) [data-section="resources"], [data-section="resources"]:where([data-theme="dark"]) {
+	--ss-brand: #b79af5;
+	--ss-brand-2: #9aa0f7;
+	--ss-brand-soft: rgba(183, 154, 245, 0.18);
 }
+
 [data-section="buy"],
 [data-section="purchase"] {
 	--ss-brand: #0d9488;
@@ -3181,66 +3213,66 @@ svg.ss-check {
 	--ss-brand-2: #7c3aed;
 	--ss-brand-soft: #e0e7ff;
 }
-@media (prefers-color-scheme: dark) {
-	[data-section="buy"],
-	[data-section="purchase"] {
-		--ss-brand: #2dd4bf;
-		--ss-brand-2: #38bdf8;
-		--ss-brand-soft: rgba(45, 212, 191, 0.15);
-	}
-	[data-section="sell"],
-	[data-section="sales"] {
-		--ss-brand: #e879f9;
-		--ss-brand-2: #a78bfa;
-		--ss-brand-soft: rgba(232, 121, 249, 0.15);
-	}
-	[data-section="boq"] {
-		--ss-brand: #f0a94b;
-		--ss-brand-2: #e0b84a;
-		--ss-brand-soft: rgba(240, 169, 75, 0.16);
-	}
-	[data-section="labour"] {
-		--ss-brand: #94a3b8;
-		--ss-brand-2: #2dd4bf;
-		--ss-brand-soft: rgba(148, 163, 184, 0.16);
-	}
-	[data-section="hr"] {
-		--ss-brand: #fb7185;
-		--ss-brand-2: #fb923c;
-		--ss-brand-soft: rgba(251, 113, 133, 0.15);
-	}
-	[data-section="saraban"] {
-		--ss-brand: #22d3ee;
-		--ss-brand-2: #818cf8;
-		--ss-brand-soft: rgba(34, 211, 238, 0.15);
-	}
-	[data-section="subcontract"],
-	[data-section="contractor"] {
-		--ss-brand: #fb923c;
-		--ss-brand-2: #fbbf24;
-		--ss-brand-soft: rgba(251, 146, 60, 0.15);
-	}
-	[data-section="accounting"] {
-		--ss-brand: #60a5fa;
-		--ss-brand-2: #2dd4bf;
-		--ss-brand-soft: rgba(96, 165, 250, 0.15);
-	}
-	[data-section="master"] {
-		--ss-brand: #a3e635;
-		--ss-brand-2: #2dd4bf;
-		--ss-brand-soft: rgba(163, 230, 53, 0.15);
-	}
-	[data-section="self"] {
-		--ss-brand: #4ade80;
-		--ss-brand-2: #2dd4bf;
-		--ss-brand-soft: rgba(74, 222, 128, 0.15);
-	}
-	[data-section="approve"] {
-		--ss-brand: #818cf8;
-		--ss-brand-2: #a78bfa;
-		--ss-brand-soft: rgba(129, 140, 248, 0.16);
-	}
+/* โหมดมืด = html[data-theme="dark"] (theme.js) :where ไม่เพิ่ม specificity */
+:where([data-theme="dark"]) [data-section="buy"], [data-section="buy"]:where([data-theme="dark"]),
+:where([data-theme="dark"]) [data-section="purchase"], [data-section="purchase"]:where([data-theme="dark"]) {
+	--ss-brand: #2dd4bf;
+	--ss-brand-2: #38bdf8;
+	--ss-brand-soft: rgba(45, 212, 191, 0.15);
 }
+:where([data-theme="dark"]) [data-section="sell"], [data-section="sell"]:where([data-theme="dark"]),
+:where([data-theme="dark"]) [data-section="sales"], [data-section="sales"]:where([data-theme="dark"]) {
+	--ss-brand: #e879f9;
+	--ss-brand-2: #a78bfa;
+	--ss-brand-soft: rgba(232, 121, 249, 0.15);
+}
+:where([data-theme="dark"]) [data-section="boq"], [data-section="boq"]:where([data-theme="dark"]) {
+	--ss-brand: #f0a94b;
+	--ss-brand-2: #e0b84a;
+	--ss-brand-soft: rgba(240, 169, 75, 0.16);
+}
+:where([data-theme="dark"]) [data-section="labour"], [data-section="labour"]:where([data-theme="dark"]) {
+	--ss-brand: #94a3b8;
+	--ss-brand-2: #2dd4bf;
+	--ss-brand-soft: rgba(148, 163, 184, 0.16);
+}
+:where([data-theme="dark"]) [data-section="hr"], [data-section="hr"]:where([data-theme="dark"]) {
+	--ss-brand: #fb7185;
+	--ss-brand-2: #fb923c;
+	--ss-brand-soft: rgba(251, 113, 133, 0.15);
+}
+:where([data-theme="dark"]) [data-section="saraban"], [data-section="saraban"]:where([data-theme="dark"]) {
+	--ss-brand: #22d3ee;
+	--ss-brand-2: #818cf8;
+	--ss-brand-soft: rgba(34, 211, 238, 0.15);
+}
+:where([data-theme="dark"]) [data-section="subcontract"], [data-section="subcontract"]:where([data-theme="dark"]),
+:where([data-theme="dark"]) [data-section="contractor"], [data-section="contractor"]:where([data-theme="dark"]) {
+	--ss-brand: #fb923c;
+	--ss-brand-2: #fbbf24;
+	--ss-brand-soft: rgba(251, 146, 60, 0.15);
+}
+:where([data-theme="dark"]) [data-section="accounting"], [data-section="accounting"]:where([data-theme="dark"]) {
+	--ss-brand: #60a5fa;
+	--ss-brand-2: #2dd4bf;
+	--ss-brand-soft: rgba(96, 165, 250, 0.15);
+}
+:where([data-theme="dark"]) [data-section="master"], [data-section="master"]:where([data-theme="dark"]) {
+	--ss-brand: #a3e635;
+	--ss-brand-2: #2dd4bf;
+	--ss-brand-soft: rgba(163, 230, 53, 0.15);
+}
+:where([data-theme="dark"]) [data-section="self"], [data-section="self"]:where([data-theme="dark"]) {
+	--ss-brand: #4ade80;
+	--ss-brand-2: #2dd4bf;
+	--ss-brand-soft: rgba(74, 222, 128, 0.15);
+}
+:where([data-theme="dark"]) [data-section="approve"], [data-section="approve"]:where([data-theme="dark"]) {
+	--ss-brand: #818cf8;
+	--ss-brand-2: #a78bfa;
+	--ss-brand-soft: rgba(129, 140, 248, 0.16);
+}
+
 a.ss-option {
 	color: inherit;
 	text-decoration: none;
@@ -7435,6 +7467,22 @@ a.ss-btn--soft {
 	background: #fff;
 	box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35);
 }
+/* HtmlViewer.vue: iframe ขนาดเอกสารจริงย่อ/ขยายด้วย transform กรอบนอกกว้าง/สูงตามขนาดหลังย่อ
+   iframe ไม่รับการแตะ ให้ซูมสองนิ้ว/เลื่อน/แตะสองครั้งที่กรอบนอก */
+.ss-html-sheet {
+	position: relative;
+	overflow: hidden;
+	flex: none;
+}
+.ss-html-frame {
+	position: absolute;
+	top: 0;
+	left: 0;
+	border: 0;
+	transform-origin: 0 0;
+	pointer-events: none;
+	background: transparent;
+}
 .ss-pdf-note {
 	display: flex;
 	flex-direction: column;
@@ -7771,6 +7819,70 @@ a.ss-btn--soft {
 .ss-menu-item:hover,
 .ss-menu-item:focus-visible {
 	background: color-mix(in srgb, var(--ss-text) 5%, transparent);
+}
+/* เมนูใน bottom sheet ของมือถือ (กลุ่มเมนู / อื่นๆ ใน AppShell): ช่องไอคอน+ชื่อ 3 คอลัมน์ จอแคบ 2 (ตกลง 2026-11-18) */
+.ss-menu-grid {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	gap: 10px;
+}
+@media (max-width: 359px) {
+	.ss-menu-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+.ss-menu-tile {
+	position: relative;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: 8px;
+	min-height: 88px;
+	padding: 12px 8px;
+	border: 1px solid var(--ss-border);
+	border-radius: 16px;
+	background: var(--ss-surface);
+	color: var(--ss-text);
+	font-size: var(--ss-fs);
+	font-weight: 500;
+	text-align: center;
+	cursor: pointer;
+}
+.ss-menu-tile-icon {
+	display: grid;
+	place-items: center;
+	width: 40px;
+	height: 40px;
+	border-radius: 50%;
+	color: var(--ss-text-2);
+	background: var(--ss-surface-2);
+}
+.ss-menu-tile-label { line-height: 1.3; overflow-wrap: anywhere; }
+.ss-menu-tile.is-active { border-color: var(--ss-brand); font-weight: 600; }
+.ss-menu-tile.is-active .ss-menu-tile-icon { color: #fff; background: var(--ss-brand); }
+.ss-menu-tile-badge {
+	position: absolute;
+	top: 8px;
+	right: 8px;
+	min-width: 20px;
+	padding: 0 6px;
+	border-radius: 999px;
+	color: var(--ss-brand);
+	background: var(--ss-brand-soft);
+	font-size: var(--ss-fs-sm);
+	font-weight: 700;
+	line-height: 20px;
+}
+.ss-menu-tile-badge.is-danger { color: #fff; background: #e11d48; }
+/* ช่องของกลุ่มเมนูบนแถบบน (SectionTabs): ลูกศรบอกว่าเป็น dropdown */
+.ss-sectab-caret {
+	flex: none;
+	margin-left: -2px;
+	opacity: 0.7;
+}
+/* ⋯ ของหัวรายการ (ListHead: ตั้งค่าของหมวด + คำสั่งของหน้า) */
+.ss-list-more.is-open {
+	color: var(--ss-text);
+	background: var(--ss-surface-2);
 }
 .ss-menu-item.is-selected {
 	background: color-mix(in srgb, var(--ss-text) 9%, transparent);
@@ -12747,6 +12859,9 @@ html.ss-boq-grabbing * {
 	min-height: 0;
 	border-top: 1px solid var(--ss-border);
 }
+.ss-settings.is-single {
+	grid-template-columns: minmax(0, 1fr);
+}
 .ss-settings-menu {
 	display: flex;
 	flex-direction: column;
@@ -12801,6 +12916,32 @@ html.ss-boq-grabbing * {
 	display: flex;
 	min-width: 0;
 	min-height: 0;
+}
+/* มือถือ: เมนูหัวข้อเป็นแถวเลื่อนแนวนอนบนสุด (ไม่มีหัวข้อหลัก) */
+@media (max-width: 767px) {
+	.ss-settings {
+		grid-template-columns: minmax(0, 1fr);
+		grid-template-rows: auto minmax(0, 1fr);
+	}
+	.ss-settings-menu {
+		flex-direction: row;
+		gap: 6px;
+		padding: 8px 12px;
+		overflow-x: auto;
+		border-right: 0;
+		border-bottom: 1px solid var(--ss-border);
+		scrollbar-width: none;
+	}
+	.ss-settings-group {
+		display: none;
+	}
+	.ss-settings-link {
+		flex: none;
+		white-space: nowrap;
+	}
+	.ss-settings-form-inner {
+		padding: 12px 16px 24px;
+	}
 }
 .ss-perm {
 	display: flex;
@@ -13117,11 +13258,11 @@ html.ss-boq-grabbing * {
 	font-size: var(--ss-fs-sm);
 }
 /* เบิกเงิน / อนุมัติ */
-.ss-claim-row {
+/* รายการค่าใช้จ่ายในใบเคลียร์/สำรองจ่าย (Self Service) ห้ามใช้ชื่อ .ss-claim-row (เป็นแถวของแอปผู้รับเหมา) */
+.ss-expense-row {
 	display: grid;
-	gap: 10px;
-	padding: 12px;
-	margin-bottom: 10px;
+	gap: 12px;
+	padding: 14px;
 }
 .ss-money {
 	font-variant-numeric: tabular-nums;
@@ -13857,6 +13998,205 @@ html[data-theme="dark"] .ss-work-variance.is-rose { color: #f0a0a6; background: 
 	.ss-work-stats { gap: 10px; }
 	.ss-work-grid { gap: 10px; }
 }
+
+/* ---------------------------------------------------------------- ภาพรวม Self Service (self_app/views/Checkin.vue, ตกลง 2026-11-17)
+   การ์ดชุดเดียวกับภาพรวมควบคุมงาน (.ss-work-*) วางด้วย grid-area ของตัวเอง ลำดับมือถือ = ลำดับใน template */
+.ss-self-grid > .ss-self-clock { grid-area: clock; }
+.ss-self-grid > .ss-self-stats { grid-area: stats; }
+.ss-self-grid > .ss-self-todo { grid-area: todo; }
+.ss-self-grid > .ss-self-cal { grid-area: cal; }
+.ss-self-grid > .ss-self-pending { grid-area: pending; }
+.ss-self-grid > .ss-work-quick { grid-area: quick; }
+.ss-work-grid.ss-self-grid { grid-template-areas: "clock" "stats" "todo" "cal" "pending" "quick"; }
+@container work-dash (min-width: 640px) {
+	.ss-work-grid.ss-self-grid {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		grid-template-areas: "clock stats" "todo todo" "cal pending" "cal quick";
+	}
+}
+@container work-dash (min-width: 1080px) {
+	.ss-work-grid.ss-self-grid {
+		grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.15fr);
+		grid-template-rows: auto auto 1fr;
+		grid-template-areas: "clock stats todo" "cal cal pending" "cal cal quick";
+	}
+}
+.ss-self-stats > button { min-height: 112px; }
+.ss-self-time {
+	display: block;
+	margin-top: 4px;
+	font-size: 38px;
+	font-weight: 700;
+	line-height: 1;
+	font-variant-numeric: tabular-nums;
+}
+.ss-self-clock .ss-work-head > div > span {
+	color: var(--ss-work-muted);
+	font-size: var(--ss-fs-sm);
+}
+.ss-self-place {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	max-width: 55%;
+	padding: 3px 8px;
+	border-radius: 999px;
+	color: var(--ss-brand);
+	background: var(--ss-brand-soft);
+	font-size: var(--ss-fs-sm);
+	font-weight: 600;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.ss-self-place.is-danger { color: #b4323b; background: #fbe6e7; }
+html[data-theme="dark"] .ss-self-place.is-danger { color: #f0a0a6; background: #41252b; }
+.ss-self-issue { margin: 10px 0 0; }
+.ss-self-clock-actions .ss-btn { gap: 6px; }
+/* ลงเวลาออก = ปุ่มสีทอง (สีเดียวกับตัวเลขเด่น) */
+.ss-self-clock.is-out .ss-self-clock-actions .ss-btn--primary {
+	color: var(--ss-accent-ink);
+	background: var(--ss-accent);
+}
+.ss-self-todo .ss-work-quick-list button.is-rose > i { color: #b4323b; background: #fbe6e7; }
+.ss-self-todo .ss-work-quick-list button.is-amber > i { color: #8a6116; background: #fbefd2; }
+.ss-self-todo .ss-work-quick-list button.is-blue > i { color: var(--ss-brand); background: var(--ss-brand-soft); }
+html[data-theme="dark"] .ss-self-todo .ss-work-quick-list button.is-rose > i { color: #f0a0a6; background: #41252b; }
+html[data-theme="dark"] .ss-self-todo .ss-work-quick-list button.is-amber > i { color: #f0cd7a; background: #3b3120; }
+.ss-self-todo .ss-work-quick-list button:disabled { opacity: 1; }
+.ss-self-pending .ss-work-quick-list button > .ss-self-amount {
+	font-size: var(--ss-fs);
+	font-variant-numeric: tabular-nums;
+}
+.ss-self-shortcuts { grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); }
+
+/* ปฏิทินเดือน: สีช่องชุดเดียวกับหน้าสรุปวันทำงานของ HR (hr-cell) */
+.ss-self-cal-nav {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+}
+.ss-self-cal-today { height: 30px; padding: 0 12px; border-radius: 999px; }
+.ss-self-cal-grid {
+	display: grid;
+	grid-template-columns: repeat(7, minmax(0, 1fr));
+	gap: 4px;
+	transition: opacity 0.15s ease;
+}
+.ss-self-cal-grid.is-loading { opacity: 0.5; pointer-events: none; }
+.ss-self-cal-dow {
+	padding-bottom: 2px;
+	color: var(--ss-work-muted);
+	font-size: var(--ss-fs-sm);
+	text-align: center;
+}
+.ss-self-cal-dow:first-child { color: #b4323b; }
+.ss-self-cal-day {
+	--c: var(--ss-work-muted);
+	--c-bg: transparent;
+	position: relative;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 2px;
+	min-height: 54px;
+	padding: 5px 0;
+	border: 1px solid transparent;
+	border-radius: 10px;
+	background: none;
+	color: var(--ss-work-ink);
+	cursor: pointer;
+}
+.ss-self-cal-day:hover:not(:disabled) { border-color: var(--ss-work-line); }
+.ss-self-cal-day:disabled { cursor: default; }
+.ss-self-cal-day small {
+	color: var(--ss-work-muted);
+	font-size: var(--ss-fs-sm);
+	font-variant-numeric: tabular-nums;
+}
+.ss-self-cal-day > span {
+	display: grid;
+	place-items: center;
+	width: 28px;
+	height: 28px;
+	border-radius: 50%;
+	color: var(--c);
+	background: var(--c-bg);
+	font-size: var(--ss-fs-sm);
+	font-weight: 700;
+}
+.ss-self-cal-day.is-today { border-color: var(--ss-brand); }
+.ss-self-cal-day.is-today small { color: var(--ss-brand); font-weight: 700; }
+.ss-self-cal-day.has-request > span { box-shadow: inset 0 0 0 1.5px #1d4ed8; }
+.ss-self-cal-late {
+	position: absolute;
+	top: 6px;
+	right: 6px;
+	width: 6px;
+	height: 6px;
+	border-radius: 50%;
+	background: #d39a2d;
+}
+.ss-self-cal-day.is-green, .ss-self-legend .is-green { --c: #15803d; --c-bg: #dcfce7; }
+.ss-self-cal-day.is-orange, .ss-self-legend .is-orange { --c: #c2410c; --c-bg: #ffedd5; }
+.ss-self-cal-day.is-red, .ss-self-legend .is-red { --c: #be123c; --c-bg: #ffe4e6; }
+.ss-self-cal-day.is-blue, .ss-self-legend .is-blue { --c: #1d4ed8; --c-bg: #dbeafe; }
+.ss-self-cal-day.is-amber, .ss-self-legend .is-amber { --c: #92400e; --c-bg: #fde68a; }
+.ss-self-cal-day.is-gray, .ss-self-legend .is-gray { --c: var(--ss-work-muted); --c-bg: color-mix(in srgb, var(--ss-work-ink) 6%, transparent); }
+html[data-theme="dark"] .ss-self-cal-day.is-green, html[data-theme="dark"] .ss-self-legend .is-green { --c: #4ade80; --c-bg: rgba(74, 222, 128, 0.16); }
+html[data-theme="dark"] .ss-self-cal-day.is-orange, html[data-theme="dark"] .ss-self-legend .is-orange { --c: #fb923c; --c-bg: rgba(251, 146, 60, 0.16); }
+html[data-theme="dark"] .ss-self-cal-day.is-red, html[data-theme="dark"] .ss-self-legend .is-red { --c: #fb7185; --c-bg: rgba(251, 113, 133, 0.16); }
+html[data-theme="dark"] .ss-self-cal-day.is-blue, html[data-theme="dark"] .ss-self-legend .is-blue { --c: #60a5fa; --c-bg: rgba(96, 165, 250, 0.16); }
+html[data-theme="dark"] .ss-self-cal-day.is-amber, html[data-theme="dark"] .ss-self-legend .is-amber { --c: #fbbf24; --c-bg: rgba(251, 191, 36, 0.18); }
+.ss-self-legend {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px 14px;
+	margin-top: 12px;
+	padding-top: 12px;
+	border-top: 1px solid var(--ss-work-line);
+	color: var(--ss-work-muted);
+	font-size: var(--ss-fs-sm);
+}
+.ss-self-legend span { display: inline-flex; align-items: center; gap: 5px; }
+.ss-self-legend i {
+	display: grid;
+	place-items: center;
+	width: 18px;
+	height: 18px;
+	border-radius: 50%;
+	color: var(--c);
+	background: var(--c-bg);
+	font-style: normal;
+	font-weight: 700;
+}
+.ss-self-legend b { color: var(--ss-work-ink); font-variant-numeric: tabular-nums; }
+
+/* เงินเดือน (self_app/views/Pay.vue) */
+.ss-pay-hero {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	padding: 18px 16px;
+}
+.ss-pay-label,
+.ss-pay-meta {
+	color: var(--ss-muted);
+	font-size: var(--ss-fs-sm);
+}
+.ss-pay-amount {
+	font-size: 32px;
+	font-weight: 700;
+	line-height: 1.15;
+	font-variant-numeric: tabular-nums;
+}
+.ss-pay-amount small {
+	margin-left: 4px;
+	color: var(--ss-muted);
+	font-size: var(--ss-fs);
+	font-weight: 500;
+}
+.ss-pay-upcoming { margin-top: 8px; }
 
 @media (min-width: 768px) {
 	.ss-app[data-look="new"] .ss-rail {
@@ -15171,7 +15511,7 @@ html[data-look="new"] .ss-avatar.has-logo {
 	padding-bottom: var(--ss-bottom);
 }
 /* หน้า (.ss-view = root ของ DocList) → เนื้อหา → การ์ด ยืดเต็มความสูงที่เหลือ */
-.ss-content.ss-list-page:has(> .ss-list-card) {
+.ss-content:has(> .ss-list-card) {
 	flex: 1;
 }
 .ss-content .ss-list-head:not(.ss-form-head):has(+ .ss-list-card) {
@@ -15224,6 +15564,31 @@ html[data-look="new"] .ss-avatar.has-logo {
 .ss-list-card > .ss-list-main > .ss-empty {
 	margin: auto;
 }
+/* ListCard (ตกลง 2026-11-18): ตาราง/รายการในการ์ดไม่มีกรอบของตัวเอง (การ์ดเป็นกรอบ) */
+.ss-content .ss-list-card .ss-list-main > .ss-data-table > .ss-table-wrap,
+.ss-content .ss-list-card .ss-list-main > .ss-list-scroll {
+	border: 0;
+	border-radius: 0;
+	box-shadow: none;
+	max-height: none;
+}
+.ss-list-card > .ss-list-main > .ss-data-table > .ss-list-foot,
+.ss-list-card > .ss-list-main > .ss-list-foot {
+	margin-top: auto;
+	border: 0;
+	border-top: 1px solid var(--ss-border);
+	border-radius: 0;
+	box-shadow: none;
+	background: transparent;
+}
+.ss-app[data-look="new"] .ss-list-card > .ss-list-main > .ss-data-table > .ss-list-foot,
+.ss-app[data-look="new"] .ss-list-card > .ss-list-main > .ss-list-foot {
+	border-top-color: var(--ss-work-line);
+}
+.ss-list-card > .ss-list-main > .ss-skeleton,
+.ss-list-card > .ss-list-main > .ss-card-grid {
+	padding: 14px;
+}
 .ss-list-card > .ss-list-main > .ss-list {
 	padding: 14px;
 }
@@ -15252,8 +15617,21 @@ html[data-look="new"] .ss-avatar.has-logo {
 	.ss-app[data-look] .ss-stage > .ss-view:has(.ss-list-card) {
 		height: calc(100dvh - var(--ss-head-h));
 	}
-	.ss-content.ss-list-page:has(> .ss-list-card) {
+	.ss-content:has(> .ss-list-card) {
 		min-height: 0;
+	}
+	/* ListCard: DataTable / ตารางของหน้า (.ss-list-scroll) เลื่อนในการ์ด */
+	.ss-list-card > .ss-list-main > .ss-data-table {
+		flex: 1 1 auto;
+		min-height: 0;
+		display: flex;
+		flex-direction: column;
+	}
+	.ss-list-card > .ss-list-main > .ss-data-table > .ss-table-wrap,
+	.ss-list-card > .ss-list-main > .ss-list-scroll {
+		flex: 1 1 auto;
+		min-height: 0;
+		overflow: auto;
 	}
 	.ss-list-card > .ss-list-main {
 		min-height: 0;
@@ -15458,4 +15836,110 @@ html[data-look="new"] .ss-avatar.has-logo {
 	.ss-app[data-look="new"] .ss-planner > .pl-statusbar {
 		margin: 0 12px 12px 4px;
 	}
+}
+
+/* ---------------------------------------------------------------- 2026-11-18 สัญญาจ้าง: เนื้อหา + ตัวอย่าง real-time (shared/components/contract/)
+   HrDocPage จอ ≥1180 = ฟอร์มซ้าย + ตัวอย่างขวา (sticky สูงเท่าจอ) จอเล็ก = เมนู ⋯ > ดูตัวอย่างสัญญา (Sheet เต็มจอ) */
+.ec-split {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) minmax(420px, 46%);
+	gap: 14px;
+	align-items: start;
+}
+.ec-split-main {
+	display: flex;
+	flex-direction: column;
+	gap: 14px;
+	min-width: 0;
+}
+.ec-split-side {
+	position: sticky;
+	top: calc(var(--ss-head-h, 64px) + 8px);
+	height: calc(100dvh - var(--ss-head-h, 64px) - 24px);
+	min-height: 420px;
+}
+.ec-preview {
+	position: relative;
+	height: 100%;
+	min-height: 360px;
+	overflow: hidden;
+	border: 1px solid var(--ss-work-line, var(--ss-border));
+	border-radius: 16px;
+	background: #e9ebef;
+}
+.ec-preview iframe {
+	display: block;
+	width: 100%;
+	height: 100%;
+	border: 0;
+	background: #e9ebef;
+	color-scheme: light;
+}
+.ec-preview-busy {
+	position: absolute;
+	top: 10px;
+	right: 12px;
+}
+.ec-preview-error {
+	position: absolute;
+	inset: auto 12px 12px;
+	margin: 0;
+	padding: 8px 12px;
+	border-radius: 10px;
+	color: #9f1239;
+	background: #ffe4e6;
+	font-size: var(--ss-fs-sm);
+}
+.ss-sheet-body > .ec-preview--sheet {
+	flex: 1;
+	min-height: 70dvh;
+}
+.ec-terms-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 10px;
+}
+.ec-terms-note {
+	margin: 0;
+	font-size: var(--ss-fs-sm);
+}
+.ec-insert {
+	display: inline-flex !important;
+	align-items: center;
+	width: auto !important;
+	gap: 4px;
+	padding: 0 10px !important;
+	margin-left: auto;
+	font-size: var(--ss-fs-sm);
+	font-weight: 600;
+}
+.ec-editor .ss-rich-area {
+	min-height: 360px;
+	max-height: 70dvh;
+	overflow-y: auto;
+}
+/* เยื้องแบบ Quill (ข้อย่อยของสัญญา) ในช่องแก้: ค่าเริ่มต้น = ย่อหน้าบรรทัดแรก (หลักเอกสารไทย) ตรงกับ indent_css ใน contract_terms.py
+   ช่องแก้สัญญาแสดงตามรูปแบบที่เลือก (.ec-editor--block / --hanging) ระดับละ 2em ในช่อง (ไม่ใช่ ซม. จริง) */
+.ss-rich .ql-indent-1 { text-indent: 2em; }
+.ss-rich .ql-indent-2 { text-indent: 4em; }
+.ss-rich .ql-indent-3 { text-indent: 6em; }
+.ec-editor--block .ss-rich [class*="ql-indent-"] { text-indent: 0; }
+.ec-editor--block .ss-rich .ql-indent-1 { padding-left: 2em; }
+.ec-editor--block .ss-rich .ql-indent-2 { padding-left: 4em; }
+.ec-editor--block .ss-rich .ql-indent-3 { padding-left: 6em; }
+.ec-editor--hanging .ss-rich [class*="ql-indent-"] { text-indent: -2.2em; }
+.ec-editor--hanging .ss-rich .ql-indent-1 { padding-left: 4.2em; }
+.ec-editor--hanging .ss-rich .ql-indent-2 { padding-left: 6.2em; }
+.ec-editor--hanging .ss-rich .ql-indent-3 { padding-left: 8.2em; }
+.ss-rich .ql-align-center { text-align: center; }
+.ss-rich .ql-align-right { text-align: right; }
+@media (max-width: 1179px) {
+	.ec-split { display: block; }
+}
+.ec-terms-head .ss-link {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	white-space: nowrap;
 }

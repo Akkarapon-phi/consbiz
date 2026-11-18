@@ -60,7 +60,7 @@ const props = defineProps({
 	anchor: { type: Object, default: null },
 	groups: { type: Array, required: true },
 	// "side" = ข้าง Dock ชิดล่างของปุ่ม (ค่าเดิม), "below" = ใต้ปุ่มบนแถบบน ชิดขวาของปุ่ม
-	// "above" = เหนือปุ่ม ชิดขวา (ปุ่มในแถบล่างของมือถือ)
+	// "above" = เหนือปุ่ม ชิดขวา (ปุ่มในแถบล่างของมือถือ), "below-start" = ใต้ปุ่ม ชิดซ้ายของปุ่ม (dropdown ของแท็บ)
 	placement: { type: String, default: "side" },
 });
 const emit = defineEmits(["close"]);
@@ -130,6 +130,13 @@ watch(
 									transformOrigin: "bottom right",
 							  }),
 						maxHeight: `${rect.top - 16}px`,
+				  }
+				: props.placement === "below-start"
+				? {
+						top: `${rect.bottom + 8}px`,
+						left: `${Math.max(8, Math.min(rect.left, window.innerWidth - 248))}px`,
+						maxHeight: `${window.innerHeight - rect.bottom - 16}px`,
+						transformOrigin: "top left",
 				  }
 				: props.placement === "below"
 				? {

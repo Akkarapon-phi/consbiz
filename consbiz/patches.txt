@@ -25,3 +25,4 @@ consbiz.patches.add_consoffice_to_desktop_layouts
 consbiz.patches.create_concrete_item_group
 consbiz.patches.set_payroll_based_on_attendance
 consbiz.patches.seed_social_security_rates
+consbiz.patches.seed_employment_contract_template

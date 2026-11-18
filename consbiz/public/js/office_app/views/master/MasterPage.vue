@@ -64,6 +64,15 @@
 										@select="(o) => pick(f, o)"
 									/>
 									<small v-if="f.note" class="ss-muted">{{ f.note }}</small>
+									<!-- จุดลงเวลา: ตั้ง/แก้ด้วย GPS (Shift Location) -->
+									<CheckinLocation
+										v-if="f.widget === 'checkin_location' && editable(f)"
+										v-model="doc[f.fieldname]"
+										:kind="params.kind"
+										:docname="doc.name"
+										:label="doc.project_name || doc.title || doc.first_name || ''"
+										@saved="(r) => (titles[f.fieldname] = r.location_name)"
+									/>
 								</template>
 
 								<!-- ตาราง (หน่วยแปลงของสินค้า) -->
@@ -235,6 +244,7 @@
 import { computed, ref } from "vue";
 import DateInput from "../../../shared/components/DateInput.vue";
 import DeleteSheet from "../../../shared/components/DeleteSheet.vue";
+import CheckinLocation from "./CheckinLocation.vue";
 import Icon from "../../../shared/components/Icon.vue";
 import MoneyInput from "../../../shared/components/MoneyInput.vue";
 import Picker from "../../../shared/components/Picker.vue";

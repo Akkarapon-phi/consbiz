@@ -112,9 +112,14 @@
 		</Transition>
 
 		<AppTooltip />
-		<ProfileSheet :open="profile_open" @close="profile_open = false" />
 		<GlobalSearch v-if="!boot.guest" :open="search_open" @close="search_open = false" />
-		<SettingsDialog v-if="boot.can?.settings || boot.can?.labour_settings" :open="settings_open" @close="settings_open = false" />
+		<SettingsDialog
+			:open="settings.open"
+			:pages="settings.pages"
+			:title="settings.title"
+			:initial="settings.initial"
+			@close="settings.open = false"
+		/>
 
 		<DockMenu
 			:open="dock_menu === 'user'"
@@ -141,7 +146,7 @@
 					:class="{ 'is-active': tab.view === MORE ? more_active : tab.view === active_view }"
 					:title="tab.label"
 					:style="{ '--i': i }"
-					@click="tab.view === MORE ? (more_open = true) : open_tab(tab.view)"
+					@click="tap_nav(tab)"
 				>
 					<span class="ss-nav-icon">
 						<Icon
@@ -164,20 +169,38 @@
 			</nav>
 		</Transition>
 
+		<!-- มือถือ: เมนูในกลุ่ม (แตะช่องของกลุ่มในแถบล่าง) = bottom sheet แบบเดียวกับเมนูที่เกินแถบล่าง: ช่องสี่เหลี่ยม 3 คอลัมน์ (จอแคบ 2) -->
+		<Sheet :open="!!group_sheet" :title="group_sheet?.label" @close="group_sheet = null">
+			<div class="ss-menu-grid">
+				<button
+					v-for="tab in group_sheet?.tabs || []"
+					:key="tab.view"
+					type="button"
+					class="ss-menu-tile"
+					:class="{ 'is-active': tab.view === active_view }"
+					@click="(group_sheet = null), open_tab(tab.view)"
+				>
+					<span class="ss-menu-tile-icon"><Icon :name="tab.icon" :size="22" /></span>
+					<span class="ss-menu-tile-label">{{ tab.label }}</span>
+					<span v-if="tab.badge" class="ss-menu-tile-badge" :class="tab.badge_tone">{{ tab.badge }}</span>
+				</button>
+			</div>
+		</Sheet>
+
 		<!-- มือถือ: เมนูที่เกินแถบล่าง (เกิน NAV_MAX) -->
 		<Sheet :open="more_open" title="เมนูอื่นๆ" @close="more_open = false">
-			<div class="ss-list">
+			<div class="ss-menu-grid">
 				<button
 					v-for="tab in more_tabs"
 					:key="tab.view"
 					type="button"
-					class="ss-card ss-card--row"
+					class="ss-menu-tile"
 					:class="{ 'is-active': tab.view === active_view }"
 					@click="(more_open = false), open_tab(tab.view)"
 				>
-					<span class="ss-nav-icon"><Icon :name="tab.icon" :size="22" /></span>
-					<span class="ss-card-main"><span class="ss-card-title">{{ tab.label }}</span></span>
-					<span v-if="tab.badge" class="ss-badge" :class="tab.badge_tone">{{ tab.badge }}</span>
+					<span class="ss-menu-tile-icon"><Icon :name="tab.icon" :size="22" /></span>
+					<span class="ss-menu-tile-label">{{ tab.label }}</span>
+					<span v-if="tab.badge" class="ss-menu-tile-badge" :class="tab.badge_tone">{{ tab.badge }}</span>
 				</button>
 			</div>
 		</Sheet>
@@ -336,9 +359,9 @@ import Icon from "./components/Icon.vue";
 import Sheet from "./components/Sheet.vue";
 import DockMenu from "./components/DockMenu.vue";
 import AppTooltip from "./components/AppTooltip.vue";
-import ProfileSheet from "./components/ProfileSheet.vue";
 import GlobalSearch from "./components/GlobalSearch.vue";
 import SettingsDialog from "./components/SettingsDialog.vue";
+import { module_pages, personal_pages } from "./settings_pages.js";
 import SectionLauncher from "./components/SectionLauncher.vue";
 import Desktop from "./components/Desktop.vue";
 import { app, app_of, is_desktop, is_filter_section, is_tab } from "./app.js";
@@ -397,13 +420,70 @@ const show_nav = computed(
 // tab.sub = หน้าระดับเมนูแต่ไม่แสดงเป็นเมนู (tab ในหน้าของเมนู PARENT_TAB เช่น ยอดวัสดุ ในทรัพยากร)
 const visible_tabs = (s) => s.tabs.filter((tab) => !tab.sub && (!tab.when || tab.when(boot)));
 
-const tabs = computed(() => {
+// เมนูทั้งหมดของหมวด (รวมเมนูย่อยในกลุ่ม) พร้อมตัวเลข
+const all_tabs = computed(() => {
 	const summary = state.summaries[state.section];
 	return visible_tabs(section.value).map((tab) => ({
 		...tab,
 		badge: tab.badge?.(summary) || 0,
 		badge_tone: tab.alert?.(summary) ? "is-danger" : "",
 	}));
+});
+// กลุ่มเมนู (section.groups + tab.group, ตกลง 2026-11-18 หมวดบุคคล): แถบบน/แถบล่างแสดง 1 ช่องต่อกลุ่ม
+// เมนูในกลุ่ม = dropdown ของช่องนั้นบนแถบบน (SectionTabs) / bottom sheet บนมือถือ (group_sheet) ไม่มีแถวเมนูย่อย
+const last_in_group = ref({});
+const group_of_view = (view) => {
+	const s = section.value;
+	if (!s?.groups) return null;
+	return s.tabs.find((t) => t.view === view)?.group || null;
+};
+const active_group = computed(() => group_of_view(active_view.value));
+const tabs = computed(() => {
+	const groups = section.value?.groups;
+	if (!groups) return all_tabs.value;
+	const out = [];
+	for (const tab of all_tabs.value) {
+		if (!tab.group) {
+			out.push(tab);
+			continue;
+		}
+		if (out.some((t) => t.group === tab.group)) continue;
+		const members = all_tabs.value.filter((t) => t.group === tab.group);
+		const meta = groups[tab.group] || {};
+		// ช่องของกลุ่ม: กลุ่มที่เปิดอยู่ = view ปัจจุบัน (ไฮไลต์) / กลุ่มอื่น = หน้าล่าสุดที่เปิดในกลุ่ม หรือหน้าแรกของกลุ่ม
+		const remembered = last_in_group.value[`${state.section}:${tab.group}`];
+		const view =
+			active_group.value === tab.group
+				? active_view.value
+				: members.find((t) => t.view === remembered)?.view || members[0].view;
+		out.push({
+			view,
+			group: tab.group,
+			label: meta.label || tab.label,
+			icon: meta.icon || tab.icon,
+			badge: members.reduce((sum, t) => sum + (Number(t.badge) || 0), 0),
+			badge_tone: members.some((t) => t.badge_tone) ? "is-danger" : "",
+		});
+	}
+	return out;
+});
+// เมนูในกลุ่ม (dropdown ของแถบบน / sheet ของแถบล่าง)
+const group_members = (group) => all_tabs.value.filter((t) => t.group === group);
+const group_label = (group) => section.value?.groups?.[group]?.label || "";
+const group_sheet = ref(null);
+function tap_nav(tab) {
+	if (tab.view === MORE) more_open.value = true;
+	else if (tab.group && group_members(tab.group).length > 1)
+		group_sheet.value = { label: group_label(tab.group), tabs: group_members(tab.group) };
+	else open_tab(tab.view);
+}
+// ตั้งค่าของหมวด (ตกลง 2026-11-18): เมนู ⋯ ในหัวรายการ (ListHead) ของหน้าเมนูหลัก
+// key = groups[กลุ่มที่เปิด].settings หรือ section.settings (หัวข้อใน settings_pages.js MODULE) ไม่มีสิทธิ์ = ไม่มีเมนู
+const module_settings = computed(() => {
+	const s = section.value;
+	if (!s || !is_tab(state.route.view)) return null;
+	const key = s.groups?.[active_group.value]?.settings || s.settings;
+	return key && module_pages(key).length ? key : null;
 });
 const mobile_tabs = computed(() => tabs.value.filter((t) => !t.wide_only));
 // แถบล่างมีได้ NAV_MAX ช่อง เกินแล้วช่องสุดท้ายเป็น "อื่นๆ" (เปิด sheet เลือกเมนูที่เหลือ)
@@ -453,6 +533,12 @@ const active_view = computed(
 		app.parent_tab[state.route.view] ||
 		(app.kind_pages.includes(state.route.view) && state.route.params.kind) ||
 		state.route.view
+);
+watch(
+	() => [active_view.value, active_group.value],
+	([view, group]) => {
+		if (group) last_in_group.value[`${state.section}:${group}`] = view;
+	}
 );
 // ตำแหน่งแถบไฮไลต์ของแถบล่าง (มือถือไม่มีเมนู wide_only)
 const tab_index = computed(() =>
@@ -648,8 +734,17 @@ function toggle_header_user_menu(anchor) {
 	header_user_anchor.value = anchor;
 	dock_menu.value = dock_menu.value === "user" ? "" : "user";
 }
-const profile_open = ref(false);
-const settings_open = ref(false);
+// หน้าต่างตั้งค่าเดียว 2 ชุดหัวข้อ: ส่วนตัว (avatar) / ของหมวด (⋯ ในหัวรายการ)
+const settings = ref({ open: false, pages: [], title: "ตั้งค่า", initial: null });
+const PERSONAL = personal_pages();
+function open_settings(initial = null) {
+	settings.value = { open: true, pages: PERSONAL, title: "ตั้งค่า", initial };
+}
+function open_module_settings(key = module_settings.value) {
+	const pages = module_pages(key);
+	if (!pages.length) return;
+	settings.value = { open: true, pages, title: `ตั้งค่า${section.value?.label || ""}`, initial: key };
+}
 const user_groups = [
 	{
 		items: [
@@ -662,12 +757,12 @@ const user_groups = [
 					text: initials(boot.full_name || boot.user || ""),
 					tone: tone(boot.user || ""),
 				},
-				onclick: () => (profile_open.value = true),
+				onclick: () => open_settings("profile"),
 			},
 		],
 	},
-	...(boot.can?.settings || boot.can?.labour_settings
-		? [{ items: [{ key: "settings", label: "ตั้งค่า", icon: "sliders", onclick: () => (settings_open.value = true) }] }]
+	...(PERSONAL.length
+		? [{ items: [{ key: "settings", label: "ตั้งค่า", icon: "sliders", onclick: () => open_settings() }] }]
 		: []),
 	...(boot.desk
 		? [{ items: [{ key: "desk", label: "ระบบเต็ม", icon: "monitor", href: "/app" }] }]
@@ -700,7 +795,10 @@ if (!boot.guest) {
 }
 provide("open_user_menu", toggle_header_user_menu);
 // เมนูของหมวดบนแถบบน (SectionTabs.vue ใน TopBar จอ ≥768)
-provide("section_nav", { tabs, active_view, open_tab });
+provide("section_nav", { tabs, active_view, open_tab, group_members, group_label });
+// heads = จำนวน ListHead ที่แสดงอยู่ (หน้าที่ไม่มีหัวรายการ เช่น มือถือของหน้าเวลาทำงาน TopBar แสดงปุ่มตั้งค่าแทน)
+const list_heads = ref(0);
+provide("module_settings", { key: module_settings, open: open_module_settings, heads: list_heads });
 
 onMounted(async () => {
 	shell_mounted.value = true;

@@ -100,6 +100,7 @@ MODULES = (
 			("Attendance", "การเข้างาน (Attendance)", 0),
 			("Employment Contract", "สัญญาจ้างพนักงาน", 0),
 			("WHT Employee", "หนังสือรับรองหัก ณ ที่จ่าย พนักงาน (50 ทวิ)", 0),
+			("Employee Warning", "ใบเตือนพนักงาน", 0),
 		),
 	),
 	(

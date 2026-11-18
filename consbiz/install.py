@@ -4,6 +4,7 @@
 from consbiz.patches import (
 	create_concrete_item_group,
 	seed_cost_categories,
+	seed_employment_contract_template,
 	seed_bar_cut_masters,
 	seed_more_bar_shapes,
 	seed_more_rebar_types,
@@ -17,5 +18,6 @@ def after_install():
 	seed_more_rebar_types.execute()
 	seed_cost_categories.execute()
 	seed_social_security_rates.execute()
+	seed_employment_contract_template.execute()
 	# ไซต์ที่ยังไม่ผ่าน setup wizard ไม่มีกลุ่มราก ข้ามไปได้ (สร้างกลุ่มเองทีหลัง)
 	create_concrete_item_group.execute()

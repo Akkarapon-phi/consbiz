@@ -1,5 +1,7 @@
 <!-- หัวรายการกลางของทุกหน้า (.ss-list-head) แก้ที่นี่ที่เดียวมีผลทุกหน้า (ตกลง 2026-11-17)
-     แถว 1: แท็บสถานะ (tabs + v-model) หรือ slot lead (เช่น เลือกเดือน) → slot tools (ปุ่มของหน้า) → โหลดใหม่ → ปุ่มสร้าง (ขวาสุด)
+     แถว 1: แท็บสถานะ (tabs + v-model) หรือ slot lead (เช่น เลือกเดือน) → slot tools (ปุ่มของหน้า) → โหลดใหม่ → ⋯ → ปุ่มสร้าง (ขวาสุด)
+       ⋯ (ตกลง 2026-11-18) = ตั้งค่าของหมวด (AppShell provide "module_settings", หัวข้อใน settings_pages.js) + menu (คำสั่งของหน้า รูปแบบ DockMenu items)
+       ไม่มีทั้งสองอย่าง = ไม่มีปุ่ม ตั้งค่าส่วนตัวอยู่เมนู avatar ไม่อยู่ที่นี่
      แถว 2 (แถวตัวกรอง): ค้นหา (v-model:search, มีปุ่ม X) → slot filters (ตัวกรองแบบเลือก) → ปุ่มตัวกรองรวม (ขวาสุด)
        มีปุ่มตัวกรองรวม (@filters) = ตัวกรองเรียงแถวเดียว ที่ไม่พอซ่อน (ไปตั้งในหน้าตัวกรองรวมของหน้านั้น)
        ไม่มี = ตัวกรองตกบรรทัดได้
@@ -27,6 +29,20 @@
 				@click="onRefresh"
 			>
 				<Icon name="refresh" :size="17" />
+			</button>
+			<button
+				v-if="more_items.length"
+				ref="more_btn"
+				type="button"
+				class="ss-icon-btn ss-list-more"
+				:class="{ 'is-open': more_open }"
+				aria-label="เพิ่มเติม"
+				title="เพิ่มเติม"
+				aria-haspopup="menu"
+				:aria-expanded="more_open"
+				@click="more_open = !more_open"
+			>
+				<Icon name="more" :size="18" :stroke="2.6" />
 			</button>
 			<button
 				v-if="create && onCreate"
@@ -70,12 +86,20 @@
 			</button>
 		</div>
 		<slot />
+		<DockMenu
+			:open="more_open"
+			:anchor="more_btn"
+			:groups="more_groups"
+			placement="below"
+			@close="more_open = false"
+		/>
 	</div>
 </template>
 
 <script setup>
-import { computed, onUpdated, ref, useSlots } from "vue";
+import { computed, inject, onBeforeUnmount, onMounted, onUpdated, ref, useSlots } from "vue";
 import Icon from "./Icon.vue";
+import DockMenu from "./DockMenu.vue";
 import StatusTabs from "./StatusTabs.vue";
 import ListSearch from "./ListSearch.vue";
 import { use_overflow_row } from "../table.js";
@@ -97,11 +121,31 @@ const props = defineProps({
 	onRefresh: Function,
 	onCreate: Function,
 	onFilters: Function,
+	// คำสั่งเพิ่มของหน้าในเมนู ⋯ (DockMenu items: key, label, icon, onclick)
+	menu: { type: Array, default: () => [] },
 });
 defineEmits(["update:modelValue", "update:search"]);
 
 const slots = useSlots();
-const show_tools = computed(() => !!(slots.tools || props.onRefresh || (props.create && props.onCreate)));
+const settings = inject("module_settings", null);
+if (settings) {
+	onMounted(() => settings.heads.value++);
+	onBeforeUnmount(() => settings.heads.value--);
+}
+const more_btn = ref(null);
+const more_open = ref(false);
+const more_groups = computed(() =>
+	[
+		props.menu.length ? { items: props.menu } : null,
+		settings?.key.value
+			? { items: [{ key: "module-settings", label: "ตั้งค่า", icon: "sliders", onclick: () => settings.open() }] }
+			: null,
+	].filter(Boolean)
+);
+const more_items = computed(() => more_groups.value.flatMap((g) => g.items));
+const show_tools = computed(
+	() => !!(slots.tools || props.onRefresh || more_items.value.length || (props.create && props.onCreate))
+);
 const show_filterbar = computed(
 	() => props.search !== undefined || !!slots.filters || !!props.onFilters
 );

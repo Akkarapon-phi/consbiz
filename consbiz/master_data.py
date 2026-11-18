@@ -89,8 +89,9 @@ KINDS = {
 					("designation", {"label": "ตำแหน่ง"}),
 					("employment_type", {"label": "ประเภทการจ้าง"}),
 					("branch", {"label": "สาขา"}),
-					("custom_project", {"label": "โครงการที่ประจำ", "filters": {"company": "company"}}),
-					("custom_checkin_location", {"label": "จุดลงเวลา (เฉพาะคน)"}),
+					# ไม่กรองตามบริษัท (ตกลง 2026-11-17): พนักงานบริษัทหนึ่งไปประจำโครงการของอีกบริษัทในเครือได้
+					("custom_project", {"label": "โครงการที่ประจำ"}),
+					("custom_checkin_location", {"label": "จุดลงเวลา (เฉพาะคน)", "widget": "checkin_location", "note": "ว่าง = ใช้จุดของโครงการที่ประจำ"}),
 					(
 						"reports_to",
 						{"label": "หัวหน้างาน", "filters": {"company": "company", "status": "Active"}},
@@ -289,7 +290,7 @@ KINDS = {
 							"labels": {"Employer First": "ของผู้ว่าจ้างก่อน", "Company First": "ของบริษัทก่อน"},
 						},
 					),
-					("custom_checkin_location", {"label": "จุดลงเวลา"}),
+					("custom_checkin_location", {"label": "จุดลงเวลา", "widget": "checkin_location"}),
 					("custom_day_off_saturday_percent", {"label": "สัดส่วนหยุดวันเสาร์ (%)"}),
 					("holiday_list", {"label": "ปฏิทินวันหยุด"}),
 				],
@@ -388,6 +389,7 @@ def field_schema(meta, field, opts):
 		"digits": opts.get("digits"),
 		"read_only": bool(df.read_only),
 		"permlevel": df.permlevel,
+		"widget": opts.get("widget"),
 	}
 	if kind == "select":
 		out["options"] = option_list(df, opts)
@@ -753,3 +755,84 @@ def search(kind, doctype, txt="", filters=None):
 			doctype, txt or "", filters=filters, page_length=30, reference_doctype=config["doctype"]
 		)
 	]
+
+
+# ---------------------------------------------------------------- จุดลงเวลา (Shift Location) ตกลง 2026-11-17
+# ตั้งจากฟอร์มโครงการ/พนักงานในแอป: ใช้ GPS ของมือถือที่หน้างาน + รัศมี ผู้ใช้ไม่ต้องรู้จัก Shift Location
+# API คืนชื่อจุด แล้วฟอร์มใส่ลงช่อง custom_checkin_location บันทึกพร้อมฟอร์ม (เอกสารใหม่ก็ใช้ได้)
+# สิทธิ์: เขียนชนิดเอกสารนั้นได้ (Project / Employee) หรือ HR จุดที่ใช้ร่วมกับเอกสารอื่น แก้แล้วสร้างจุดใหม่ (ไม่กระทบคนอื่น)
+
+LOCATION_KINDS = ("md-projects", "md-employees")
+MAX_RADIUS = 5000
+
+
+def location_users(location, kind=None, name=None):
+	"""เอกสารที่ใช้จุดนี้ (ไม่รวมเอกสารที่กำลังแก้)"""
+	out = []
+	for doctype in ("Project", "Employee"):
+		rows = frappe.get_all(doctype, filters={"custom_checkin_location": location}, pluck="name")
+		current = name if kind and KINDS[kind]["doctype"] == doctype else None
+		out += [(doctype, r) for r in rows if r != current]
+	return out
+
+
+def check_location_rights(kind):
+	from consbiz.self_service import is_hr
+
+	if kind not in LOCATION_KINDS:
+		frappe.throw(_("ไม่รองรับข้อมูลชนิดนี้"), frappe.PermissionError)
+	if not (is_hr() or frappe.has_permission(KINDS[kind]["doctype"], "write")):
+		frappe.throw(_("ไม่มีสิทธิ์ตั้งจุดลงเวลา"), frappe.PermissionError)
+
+
+@frappe.whitelist()
+def get_checkin_location(kind, location, name=None):
+	check_location_rights(kind)
+	row = frappe.db.get_value(
+		"Shift Location", location, ["name", "location_name", "latitude", "longitude", "checkin_radius as radius"], as_dict=True
+	)
+	if not row:
+		frappe.throw(_("ไม่พบจุดลงเวลา {0}").format(location))
+	row.shared = len(location_users(location, kind, name))
+	return row
+
+
+def unique_location_name(label):
+	label = (label or "").strip()[:120] or _("จุดลงเวลา")
+	name, n = label, 2
+	while frappe.db.exists("Shift Location", name):
+		name, n = f"{label} ({n})", n + 1
+	return name
+
+
+@frappe.whitelist(methods=["POST"])
+def save_checkin_location(kind, label, latitude, longitude, radius, location=None, name=None, in_place=0):
+	"""สร้าง/แก้จุดลงเวลา คืน {name, location_name} location = จุดเดิมในช่อง name = เอกสารที่กำลังแก้ (ว่าง = เอกสารใหม่)
+	in_place = แก้จุดเดิมแม้ใช้ร่วมกัน (หน้ากะของ HR จัดการจุดทั้งหมด) เฉพาะ HR"""
+	from consbiz.self_service import is_hr
+
+	check_location_rights(kind)
+	latitude, longitude, radius = flt(latitude), flt(longitude), cint(radius)
+	if not (-90 <= latitude <= 90 and -180 <= longitude <= 180) or (not latitude and not longitude):
+		frappe.throw(_("พิกัดไม่ถูกต้อง"))
+	if not 10 <= radius <= MAX_RADIUS:
+		frappe.throw(_("รัศมีต้องอยู่ระหว่าง 10 ถึง {0} เมตร").format(MAX_RADIUS))
+	label = (label or "").strip()
+	if not label:
+		frappe.throw(_("ระบุชื่อจุดลงเวลา"))
+	shared = location and not (cint(in_place) and is_hr()) and location_users(location, kind, name)
+	if location and frappe.db.exists("Shift Location", location) and not shared:
+		doc = frappe.get_doc("Shift Location", location)
+	else:
+		doc = frappe.new_doc("Shift Location")
+		doc.location_name = unique_location_name(label)
+	doc.latitude, doc.longitude, doc.checkin_radius = latitude, longitude, radius
+	# แผนที่ในฟอร์มระบบเต็ม (GeoJSON ลำดับ ลองจิจูด, ละติจูด)
+	doc.geolocation = json.dumps(
+		{
+			"type": "FeatureCollection",
+			"features": [{"type": "Feature", "properties": {}, "geometry": {"type": "Point", "coordinates": [longitude, latitude]}}],
+		}
+	)
+	doc.save(ignore_permissions=True)
+	return {"name": doc.name, "location_name": doc.location_name, "created": doc.name != location}

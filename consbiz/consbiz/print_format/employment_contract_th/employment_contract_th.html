@@ -1,0 +1,8 @@
+{#-
+	สัญญาจ้างพนักงาน (HTML, ตกลง 2026-11-18) แทนแบบ Print Designer ที่วางข้อมูลทับรูปแบบฟอร์ม
+	เนื้อหา = Employment Contract.terms (คัดลอกจากแม่แบบ Employment Contract Template แล้วแก้เฉพาะคนได้)
+	หน้าเอกสารสร้างที่ consbiz/contract_terms.py render_contract ชุดเดียวกับตัวอย่างในแอป แก้หน้าตาที่นั่น
+-#}
+{#- ไม่ include print_style.html: @page margin ของไฟล์นั้นทำให้เนื้อหาเว้นขอบซ้ำในพื้นที่ระหว่างหัว/ท้ายกระดาษ
+    ฟอนต์ฝังใน render_contract แล้ว ขอบกระดาษ = .print-format { margin-* } -#}
+{{ render_contract(doc) }}

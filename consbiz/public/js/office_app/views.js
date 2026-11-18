@@ -16,6 +16,9 @@ import HrSetup from "./views/hr/HrSetup.vue";
 import HrAdjustments from "./views/hr/HrAdjustments.vue";
 import HrSalaries from "./views/hr/HrSalaries.vue";
 import HrAdvances from "./views/hr/HrAdvances.vue";
+import HrShifts from "./views/hr/HrShifts.vue";
+import HrEmployees from "./views/hr/HrEmployees.vue";
+import HrEmployee from "./views/hr/HrEmployee.vue";
 import KindList from "./views/common/KindList.vue";
 import SarabanView from "./views/saraban/SarabanView.vue";
 import SarabanForm from "./views/saraban/SarabanForm.vue";
@@ -51,6 +54,13 @@ export default {
 	"hr-adjustments": HrAdjustments,
 	"hr-salaries": HrSalaries,
 	"hr-advances": HrAdvances,
+	// เบิกเงินแยกตามกลุ่มเมนู (HrAdvances.vue เลือกชนิดจากชื่อหน้า)
+	"hr-salary-advances": HrAdvances,
+	"hr-expense-advances": HrAdvances,
+	"hr-claims": HrAdvances,
+	"hr-shifts": HrShifts,
+	"hr-employees": HrEmployees,
+	"hr-employee": HrEmployee,
 	"letters-in": KindList,
 	"letters-out": KindList,
 	transmittals: KindList,
@@ -82,6 +92,7 @@ export default {
 	"buy-retention-doc": RetentionPage,
 	"hr-contracts": KindList,
 	"hr-wht": KindList,
+	"hr-warnings": KindList,
 	"hr-doc": HrDocPage,
 	"md-employees": KindList,
 	"md-items": KindList,

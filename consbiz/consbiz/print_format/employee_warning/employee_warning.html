@@ -1,0 +1,81 @@
+{#-
+	หนังสือเตือน (Employee Warning) A4 หน้าเดียว ตกลง 2026-11-17
+	หัว = โลโก้ + บริษัท / ชื่อเอกสารตามระดับ, เนื้อหา = ถึงพนักงาน เรื่อง รายละเอียด ข้อบังคับ สิ่งที่ต้องปรับปรุง
+	ใบเตือนที่ผ่านมา (ยืนยันแล้ว) + ช่องลงชื่อ ผู้ออกหนังสือ / พนักงานรับทราบ / พยาน
+-#}
+{%- set company = frappe.db.get_value("Company", doc.company, ["company_name", "company_logo"], as_dict=True) or {} -%}
+{%- set levels = {"Verbal": "บันทึกการตักเตือนด้วยวาจา", "Written 1": "หนังสือเตือนครั้งที่ 1", "Written 2": "หนังสือเตือนครั้งที่ 2", "Final": "หนังสือเตือนครั้งสุดท้าย"} -%}
+{%- set categories = {"Late": "มาทำงานสาย", "Absence": "ขาดงาน", "Misconduct": "ประพฤติผิดวินัย", "Safety": "ฝ่าฝืนกฎความปลอดภัย", "Performance": "ผลการปฏิบัติงาน", "Other": "อื่นๆ"} -%}
+{%- set issuer = frappe.db.get_value("User", doc.issued_by, "full_name") if doc.issued_by else "" -%}
+{%- set previous = frappe.get_all("Employee Warning", filters={"employee": doc.employee, "docstatus": 1, "name": ["!=", doc.name]}, fields=["name", "date", "level", "category"], order_by="date asc") -%}
+
+{% include "consbiz/templates/print/print_style.html" %}
+
+<style>
+	.pf-warn { font-size: 10pt; line-height: 1.7; color: var(--pf-text); }
+	.pf-warn-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-bottom: 10px; border-bottom: 2px solid var(--pf-ink); }
+	.pf-warn-head img { max-height: 52px; max-width: 90px; object-fit: contain; }
+	.pf-warn-head b { font-size: 11pt; color: var(--pf-ink); }
+	.pf-warn-doc { text-align: right; }
+	.pf-warn-doc h1 { margin: 0; font-size: 16pt; font-weight: 700; color: var(--pf-ink); }
+	.pf-warn-meta { margin: 14px 0; display: grid; grid-template-columns: 110px 1fr; gap: 2px 12px; }
+	.pf-warn-meta dt { color: var(--pf-muted); }
+	.pf-warn-meta dd { margin: 0; color: var(--pf-ink); }
+	.pf-warn h2 { margin: 16px 0 4px; font-size: 10.5pt; color: var(--pf-ink); }
+	.pf-warn p { margin: 0; white-space: pre-line; }
+	.pf-warn table { width: 100%; border-collapse: collapse; margin-top: 4px; }
+	.pf-warn th, .pf-warn td { padding: 4px 8px; border: 1px solid var(--pf-line); text-align: left; }
+	.pf-warn th { background: var(--pf-head); font-weight: 600; }
+	.pf-warn-sign { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; margin-top: 48px; text-align: center; }
+	.pf-warn-sign div { padding-top: 36px; border-top: 0; }
+	.pf-warn-sign span { display: block; border-top: 1px dotted var(--pf-ink); padding-top: 4px; }
+	.pf-warn-note { margin-top: 18px; font-size: 9pt; color: var(--pf-muted); }
+</style>
+
+<div class="pf-warn">
+	<div class="pf-warn-head">
+		<div>
+			{%- set logo = image_data_uri(company.company_logo) if company.company_logo else "" %}
+			{%- if logo %}<img src="{{ logo }}" alt="" /><br />{% endif %}
+			<b>{{ company.company_name or doc.company }}</b>
+		</div>
+		<div class="pf-warn-doc">
+			<h1>{{ levels.get(doc.level, doc.level) }}</h1>
+			<div>เลขที่ {{ doc.name }} · วันที่ {{ thai_date(doc.date) }}</div>
+		</div>
+	</div>
+
+	<dl class="pf-warn-meta">
+		<dt>ถึง</dt><dd>{{ doc.employee_name }} (รหัส {{ doc.employee }}){% if doc.designation %} ตำแหน่ง {{ doc.designation }}{% endif %}</dd>
+		<dt>เรื่อง</dt><dd>{{ categories.get(doc.category, doc.category) }}</dd>
+		{%- if doc.incident_date %}<dt>วันที่เกิดเหตุ</dt><dd>{{ thai_date(doc.incident_date) }}</dd>{% endif %}
+		{%- if doc.regulation %}<dt>ข้อบังคับที่ฝ่าฝืน</dt><dd>{{ doc.regulation }}</dd>{% endif %}
+	</dl>
+
+	<h2>รายละเอียด</h2>
+	<p>{{ doc.description or "" }}</p>
+
+	{%- if doc.corrective_action %}
+	<h2>สิ่งที่ต้องปรับปรุง / ผลหากกระทำผิดซ้ำ</h2>
+	<p>{{ doc.corrective_action }}</p>
+	{%- endif %}
+
+	{%- if previous %}
+	<h2>การตักเตือนที่ผ่านมา</h2>
+	<table>
+		<tr><th>วันที่</th><th>เลขที่</th><th>ระดับ</th><th>เรื่อง</th></tr>
+		{%- for p in previous %}
+		<tr><td>{{ thai_date(p.date) }}</td><td>{{ p.name }}</td><td>{{ levels.get(p.level, p.level) }}</td><td>{{ categories.get(p.category, p.category) }}</td></tr>
+		{%- endfor %}
+	</table>
+	{%- endif %}
+
+	<div class="pf-warn-sign">
+		<div><span>ผู้ออกหนังสือ<br />({{ issuer or "........................................" }})</span></div>
+		<div><span>พนักงานผู้รับทราบ<br />({{ doc.employee_name }})</span></div>
+		<div><span>พยาน<br />({{ doc.witness or "........................................" }})</span></div>
+	</div>
+	<p class="pf-warn-note">
+		{%- if doc.refused %}พนักงานไม่ยอมลงชื่อรับทราบ บันทึกต่อหน้าพยาน{% elif doc.acknowledged %}พนักงานรับทราบแล้ว{% if doc.acknowledged_date %} เมื่อ {{ thai_date(doc.acknowledged_date) }}{% endif %}{% endif -%}
+	</p>
+</div>

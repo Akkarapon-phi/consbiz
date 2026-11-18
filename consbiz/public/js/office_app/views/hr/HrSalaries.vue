@@ -17,6 +17,7 @@
 			/>
 			<Segmented v-else v-model="filter" :options="tabs" />
 
+			<ListCard :on="wide">
 			<Skeleton v-if="data === null" :rows="6" />
 			<template v-else>
 				<Empty v-if="!shown.length" icon="users" :title="filter === 'missing' ? 'ทุกคนมีเงินเดือนแล้ว' : 'ไม่มีพนักงาน'" />
@@ -46,6 +47,7 @@
 					</button>
 				</div>
 			</template>
+			</ListCard>
 		</div>
 
 		<Sheet :open="!!person" :title="person?.employee_name" :subtitle="person?.designation || person?.name" @close="person = null">
@@ -100,6 +102,7 @@ import MoneyInput from "../../../shared/components/MoneyInput.vue";
 import DateInput from "../../../shared/components/DateInput.vue";
 import DataTable from "../../../shared/components/DataTable.vue";
 import ListHead from "../../../shared/components/ListHead.vue";
+import ListCard from "../../../shared/components/ListCard.vue";
 import { matches, use_wide } from "../../../shared/table.js";
 import { call, money, post, show_error, state, strip_html, thai_date, toast } from "../../../shared/api.js";
 
