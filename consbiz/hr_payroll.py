@@ -19,7 +19,7 @@ import frappe
 from frappe import _
 from frappe.utils import flt, getdate
 
-from consbiz import hr_attendance
+from consbiz import hr_attendance, row_social
 
 PAYROLL_FREQUENCY = "Monthly"
 SLIP_FIELDS = [
@@ -121,10 +121,11 @@ def get_payroll(month, company=None):
 		slips = frappe.get_all(
 			"Salary Slip",
 			filters={"payroll_entry": name, "docstatus": ("<", 2)},
-			fields=SLIP_FIELDS,
+			fields=[*SLIP_FIELDS, "modified"],
 			order_by="employee_name asc",
 			limit_page_length=0,
 		)
+		row_social.attach(slips, "Salary Slip")
 		employees = set(frappe.get_all("Payroll Employee Detail", filters={"parent": name}, pluck="employee"))
 	else:
 		employees = salaried_employees(company, start, end)

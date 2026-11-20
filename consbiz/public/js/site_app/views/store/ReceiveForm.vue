@@ -1,8 +1,19 @@
 <template>
-	<div class="ss-has-bar">
+	<div>
 		<TopBar :title="source?.party || 'ตรวจรับของ'" :subtitle="params.name" back_to="receive" />
 
 		<div class="ss-content">
+			<FormHead
+				v-if="source"
+				model-value="main"
+				:tabs="[{ value: 'main', label: 'ตรวจรับของ' }]"
+				:actions="actions"
+			>
+				<template #summary>
+					<b>รับ {{ accepted_count }}</b> รายการ
+					<span v-if="rejected_count" class="ss-text-danger"> · ตีกลับ {{ rejected_count }}</span>
+				</template>
+			</FormHead>
 			<Skeleton v-if="!source" :rows="3" />
 			<template v-else>
 				<div class="ss-split">
@@ -154,26 +165,6 @@
 			</template>
 		</div>
 
-		<Teleport to="#ss-layer">
-			<Transition name="ss-bar">
-				<div v-if="source" class="ss-bottom-bar">
-					<div class="ss-bar-summary">
-						<b>รับ {{ accepted_count }}</b> รายการ
-						<span v-if="rejected_count" class="ss-text-danger">
-							· ตีกลับ {{ rejected_count }}</span
-						>
-					</div>
-					<button
-						type="button"
-						class="ss-btn ss-btn--primary ss-btn--lg"
-						:disabled="!accepted_count && !rejected_count"
-						@click="confirm = true"
-					>
-						ยืนยันรับของ
-					</button>
-				</div>
-			</Transition>
-		</Teleport>
 
 		<Sheet :open="confirm" title="ยืนยันรับของ" :subtitle="source?.party" @close="confirm = false">
 			<div class="ss-summary-list">
@@ -211,6 +202,8 @@
 </template>
 
 <script setup>
+import FormHead from "../../../shared/components/FormHead.vue";
+import { step_actions } from "../../../shared/form_actions.js";
 import { computed, inject, reactive, ref } from "vue";
 import Icon from "../../../shared/components/Icon.vue";
 import TopBar from "../../../shared/components/TopBar.vue";
@@ -245,6 +238,17 @@ const form = reactive({ delivery_note: "", delivered_by: "", vehicle_no: "", rem
 const touched = computed(() => rows.value.filter((r) => r.qty > 0 || r.rejected_qty > 0));
 const accepted_count = computed(() => rows.value.filter((r) => r.qty > 0).length);
 const rejected_count = computed(() => rows.value.filter((r) => r.rejected_qty > 0).length);
+// หัวฟอร์ม: รับของเป็นขั้นเดียว (ไม่มีร่าง) ยืนยันแล้วสร้างใบรับ
+const actions = computed(() =>
+	step_actions({
+		stage: "draft",
+		submit: {
+			label: "ยืนยันรับของ",
+			disabled: !accepted_count.value && !rejected_count.value,
+			run: () => (confirm.value = true),
+		},
+	})
+);
 const uploading = computed(() => photos.value.some((p) => p.uploading));
 
 function row_state(row) {

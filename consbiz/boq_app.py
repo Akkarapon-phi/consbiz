@@ -8,6 +8,8 @@
 import frappe
 from frappe import _
 
+from consbiz import row_social
+
 HEADER_FIELDS = ("customer", "project", "location", "date", "company", "combined_rate", "round_down_total")
 ROW_FIELDS = (
 	"wbs",
@@ -33,7 +35,7 @@ def active_plan(boq):
 @frappe.whitelist()
 def get_boqs(company=None):
 	frappe.has_permission("BOQ", "read", throw=True)
-	return frappe.get_list(
+	return row_social.get_list(
 		"BOQ",
 		filters={"company": company} if company else None,
 		fields=["name", "customer", "project", "location", "date", "company", "grand_total", "docstatus", "modified"],

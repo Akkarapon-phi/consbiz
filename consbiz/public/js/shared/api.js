@@ -3,7 +3,7 @@
 // ค่าของแต่ละแอป (หมวด/หน้า/base) อยู่ใน app.js (configure ใน bundle ของแอป)
 import { reactive } from "vue";
 import { app, is_desktop, is_filter_section, is_tab, route_in, section_for, section_of } from "./app.js";
-import { NEW_LOOK } from "./modules.js";
+import { NEW_LOOK, is_company_section } from "./modules.js";
 
 const API = "consbiz.store_app.";
 const section_key = () => `${app.storage}.section`;
@@ -16,15 +16,6 @@ function remembered(key, fallback) {
 		return localStorage.getItem(key) || fallback;
 	} catch {
 		return fallback;
-	}
-}
-
-export function set_doc_scope(scope) {
-	state.doc_scope = scope;
-	try {
-		localStorage.setItem("consbiz.site.doc_scope", scope);
-	} catch {
-		// private mode
 	}
 }
 
@@ -43,14 +34,16 @@ export const state = reactive({
 	project: null, // {name, project_name, company}
 	// ออฟฟิศ: บริษัทที่เลือก ("" = ทุกบริษัท) กรองรายการ/ตัวเลข และเป็นบริษัทของเอกสารใหม่
 	company: "",
+	// จำนวน ProjectFilter ที่แสดงอยู่ (กลุ่มออฟฟิศใช้ตัวกรองโครงการเฉพาะหน้าที่มีตัวกรองนี้)
+	project_filter_shown: 0,
 	section: null, // ตั้งใน init_app()
 	// summary ของแต่ละหมวด (สโตร์ = store_app.get_summary, ควบคุมงาน = site_app.get_work_summary)
 	summaries: {},
 	// หน้าหลักล่าสุดของแต่ละหมวด: สลับหมวดกลับมาแล้วอยู่เมนูเดิม
 	last_tab: {},
 	// จัดซื้อ/ขาย: project = เฉพาะโครงการที่เลือก, all = ทุกโครงการ
-	doc_scope: remembered("consbiz.site.doc_scope", "project"),
 	route: { view: "home", params: {} },
+	route_revision: 0,
 	direction: "fade", // forward | back | fade (สลับแท็บ)
 	toasts: [],
 	success: null,
@@ -340,17 +333,23 @@ export function set_company(company) {
 }
 
 // ขอบเขตของรายการ/ตัวเลขเอกสารซื้อ-ขาย (site_docs.get_docs / get_summary)
-// หน้างาน: โครงการที่เลือก หรือทุกโครงการ (state.doc_scope) / ออฟฟิศ: ตัวกรองโครงการ + บริษัท
+// หน้างาน: โครงการที่เลือกเท่านั้น (เลือกที่แถบบน) / ออฟฟิศ: ตัวกรองโครงการ + บริษัท
 // section = หมวดที่ขอ (ตัวเลขของหมวดอื่นโหลดพร้อมกัน) ไม่ระบุ = หมวดที่เปิดอยู่
 export function scope_args(section = state.section) {
 	if (is_filter_section(section)) {
+		// กลุ่มออฟฟิศ: ทุกโครงการ เว้นหน้าที่เปิดอยู่มีตัวกรองโครงการในหัวรายการ (ตัวเลขบนเมนู = ทุกโครงการ)
+		const project =
+			!is_company_section(section) || (section === state.section && state.project_filter_shown)
+				? state.project?.name
+				: undefined;
 		return {
-			project: state.project?.name,
-			scope: state.project ? "project" : "all",
-			company: state.company || undefined,
+			project,
+			scope: project ? "project" : "all",
+			// บริษัทเลือกได้เฉพาะกลุ่มออฟฟิศ (ปุ่มบนแถบบน) ธุรการโครงการ: บริษัทตามโครงการที่เลือก
+			company: (is_company_section(section) && state.company) || undefined,
 		};
 	}
-	return { project: state.project?.name, scope: state.doc_scope };
+	return { project: state.project?.name, scope: "project" };
 }
 // เปลี่ยนเมื่อขอบเขตเปลี่ยน (ใช้ใน watch)
 export const scope_key = () => JSON.stringify(scope_args());
@@ -360,10 +359,12 @@ export const scope_key = () => JSON.stringify(scope_args());
 // route.section = หมวดของหน้าที่อยู่หลายหมวด (section_for ตอน go / หมวดใน URL) ไม่มี = หมวดตาม routes
 function to_path({ view, params, section: target }) {
 	const section = target || section_of(view);
+	const query_keys = app.routes[view]?.query_params || [];
 	const parts = (app.routes[view]?.params || [])
+		.filter((key) => !query_keys.includes(key))
 		.map((key) => params[key])
 		.filter((v) => v !== undefined && v !== null && v !== "");
-	return [
+	const path = [
 		app.base,
 		section,
 		view === app.sections[section].home ? "" : view,
@@ -371,6 +372,9 @@ function to_path({ view, params, section: target }) {
 	]
 		.filter((p, i) => i < 2 || p)
 		.join("/");
+	const query = new URLSearchParams();
+	for (const key of query_keys) if (params[key]) query.set(key, params[key]);
+	return query.size ? `${path}?${query}` : path;
 }
 
 export function parse_path(pathname = location.pathname) {
@@ -399,6 +403,12 @@ export function parse_path(pathname = location.pathname) {
 	app.routes[view].params.forEach((key, i) => {
 		if (parts[i + offset] !== undefined) params[key] = parts[i + offset];
 	});
+	const query = new URLSearchParams(location.search);
+	for (const key of app.routes[view].query_params || []) {
+		if (query.has(key)) params[key] = query.get(key);
+	}
+	if (app.routes[view].when && !app.routes[view].when(boot, params))
+		return { view: app.sections[section].home, params: {}, section };
 	// หมวดที่เปิดได้เฉพาะบางชนิดเอกสาร (ขอซื้อ = ใบขอซื้อ) ชนิดอื่นใน URL = เปิดในหมวดหลักของหน้านั้น (จัดซื้อ)
 	const kinds = app.sections[section].kinds;
 	if (kinds && params.kind && !kinds.includes(params.kind) && allowed(app.routes[view].section))
@@ -413,6 +423,7 @@ function apply_route(route, direction) {
 	if (is_tab(route.view))
 		state.last_tab[section] = { view: route.view, params: { ...route.params } };
 	state.route = route;
+	state.route_revision++;
 }
 
 // ด่านก่อนออกจากหน้า (เช่น หน้าแก้แผนงาน: บันทึกงานค้างก่อน) fn() คืน Promise<boolean> (true = ออกได้)
@@ -466,8 +477,10 @@ export function remember_tab(view, tab, default_tab) {
 
 // เปลี่ยน params ของหน้าเดิมใน URL โดยไม่สร้างประวัติ (เช่น วันที่เลือกในปฏิทิน)
 export function replace_params(view, params) {
-	const route = { view, params: { ...params }, section: section_of(view) };
+	if (state.route.view !== view) return;
+	const route = { view, params: { ...params }, section: state.route.section || section_of(view) };
 	if (is_tab(view)) state.last_tab[section_of(view)] = route;
+	if (app.routes[view].query_params) state.route = route;
 	history.replaceState({ ...(history.state || {}), route }, "", to_path(route));
 }
 
@@ -593,6 +606,51 @@ export function time_ago(value) {
 	if (minutes < 60 * 24) return `${Math.round(minutes / 60)} ชม.`;
 	if (minutes < 60 * 24 * 30) return `${Math.round(minutes / 1440)} วัน`;
 	return thai_date(value, { year: then.getFullYear() !== new Date().getFullYear() });
+}
+
+const site_offset = boot.time_zone && new Intl.DateTimeFormat("en", {
+	timeZone: boot.time_zone,
+	timeZoneName: "longOffset",
+});
+const thai_date_time = new Intl.DateTimeFormat("th-TH", {
+	dateStyle: "long",
+	timeStyle: "medium",
+	...(site_offset ? { timeZone: boot.time_zone } : {}),
+});
+
+function site_offset_ms(time) {
+	const zone = site_offset.formatToParts(time).find((part) => part.type === "timeZoneName").value;
+	const [, sign, hours, minutes] = zone.match(/GMT([+-])(\d\d):(\d\d)/) || [];
+	return hours ? (sign === "-" ? -1 : 1) * (Number(hours) * 60 + Number(minutes)) * 60_000 : 0;
+}
+
+function modified_time(value) {
+	if (!value) return NaN;
+	if (value instanceof Date) return value.getTime();
+	const iso = String(value).replace(" ", "T");
+	if (!site_offset || /(?:Z|[+-]\d{2}:?\d{2})$/i.test(iso)) return Date.parse(iso);
+	// Frappe sends database datetimes in the site time zone without an offset.
+	const wall = Date.parse(`${iso}Z`);
+	if (!Number.isFinite(wall)) return NaN;
+	return wall - site_offset_ms(wall - site_offset_ms(wall));
+}
+
+export function short_ago(value) {
+	const minutes = Math.floor((Date.now() - modified_time(value)) / 60_000);
+	if (!Number.isFinite(minutes)) return "";
+	if (minutes < 1) return "now";
+	if (minutes < 60) return `${minutes}m`;
+	if (minutes < 1440) return `${Math.floor(minutes / 60)}h`;
+	const days = Math.floor(minutes / 1440);
+	if (days < 7) return `${days}d`;
+	if (days < 30) return `${Math.floor(days / 7)}w`;
+	if (days < 365) return `${Math.min(11, Math.floor(days / 30))}M`;
+	return `${Math.floor(days / 365)}y`;
+}
+
+export function modified_title(value) {
+	const time = modified_time(value);
+	return Number.isFinite(time) ? thai_date_time.format(time) : undefined;
 }
 
 // ---------------------------------------------------------------- ข้อความแบบ Text Editor ของระบบเต็ม (Quill 2)

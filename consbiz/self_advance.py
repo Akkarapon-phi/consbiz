@@ -6,15 +6,17 @@
 ประเภท (Employee Advance.custom_advance_type):
 - Salary Advance เบิกเงินเดือนล่วงหน้า: วงเงิน = Company.custom_salary_advance_limit_percent (50%) ของ base ใน Salary Structure Assignment
   รวมใบที่ยังหักคืนไม่ครบ เกินวงเงิน = ผู้บริหาร (Role Executive Approver) ต้องอนุมัติด้วย
-  หักคืน 1..MAX_INSTALLMENTS งวด: จ่ายเงินแล้ว (Payment Entry submit) ระบบสร้าง Additional Salary (Company.custom_salary_advance_component) งวดละเดือน
+  หักคืน 1..MAX_INSTALLMENTS งวด (ผู้อนุมัติกำหนด): จ่ายเงินแล้ว (Payment Entry submit) ระบบสร้าง Additional Salary (Company.custom_salary_advance_component) งวดละเดือน
   งวดแรก = เดือนที่จ่าย (ถ้าสลิปเดือนนั้นออกแล้ว = เดือนถัดไป) งวดสุดท้ายรับเศษ
-- Expense Advance เงินสำรองจ่าย: จ่ายแล้วกำหนดเคลียร์ = วันจ่าย + Company.custom_expense_clear_days (15) วัน
+- Expense Advance เงินทดรองจ่าย: จ่ายแล้วกำหนดเคลียร์ = วันจ่าย + Company.custom_expense_clear_days (15) วัน
   เคลียร์ด้วย Expense Claim ที่ตัดยอด Advance เลยกำหนดแล้วแจ้งเตือนพนักงาน (remind_overdue_clearing) ไม่หักเงินเอง เงินเหลือฝ่ายบัญชีรับคืนในระบบเต็ม
-เบิกค่าใช้จ่ายคืน (สำรองจ่ายเอง) = Expense Claim ไม่มี Advance ทุกรายการต้องแนบรูปบิล (Expense Claim Detail.custom_receipt)
+เบิกสำรองจ่าย (สำรองจ่ายเอง) = Expense Claim ไม่มี Advance ทุกรายการต้องแนบรูปบิล (Expense Claim Detail.custom_receipt)
 
 อนุมัติ: ผู้มี Role Expense Approver (ไม่ใช้ Reports To เพราะตั้งได้คนเดียว) อนุมัติในแอป = Submit (Employee Advance / Expense Claim Approved)
 ไม่อนุมัติ = คงเป็นร่าง + เหตุผล อนุมัติของตัวเองไม่ได้ จ่ายเงิน/รับคืนเงินเหลือ ฝ่ายบัญชีทำ Payment Entry ในระบบเต็ม
 before_submit ของ Employee Advance (doc_events) บังคับกติกาเดียวกันเมื่อ Submit จากระบบเต็ม
+HR บันทึกแทนพนักงาน (ตกลง 2026-11-18 สำหรับคนที่ไม่มีมือถือ): API ชุดเดียวกันส่ง employee (ต้องเป็น HR: hr_attendance.can_manage)
+กติกา/วงเงิน/ผู้อนุมัติเหมือนพนักงานขอเอง บันทึก Comment ว่าใครบันทึกแทน แจ้งเตือนพนักงานด้วย (ถ้ามีบัญชีผู้ใช้)
 """
 
 import calendar
@@ -131,10 +133,35 @@ def salary_limit(employee, company, exclude=None):
 # ---------------------------------------------------------------- ข้อมูลของพนักงาน
 
 
+EMPLOYEE_FIELDS = ["name", "employee_name", "company", "custom_project", "user_id", "status"]
+
+
+def employee_for(employee=None):
+	"""พนักงานของคำขอ: ไม่ส่ง = ตัวเอง (Self Service) / ส่งรหัส = HR บันทึกแทน (เฉพาะ HR, พนักงาน Active)"""
+	if not employee:
+		return my_employee()
+	from consbiz import hr_attendance
+
+	hr_attendance.require_hr()
+	row = frappe.db.get_value("Employee", employee, EMPLOYEE_FIELDS, as_dict=True)
+	if not row or row.status != "Active":
+		frappe.throw(_("ไม่พบพนักงาน {0} (หรือพ้นสภาพแล้ว)").format(employee))
+	if not frappe.has_permission("Employee", "read", doc=row.name):
+		frappe.throw(_("ไม่มีสิทธิ์ดูพนักงาน {0}").format(employee), frappe.PermissionError)
+	return row
+
+
+def on_behalf(employee, doc, what):
+	"""HR บันทึกแทน: Comment ที่เอกสาร + แจ้งพนักงาน (ถ้ามีบัญชีและไม่ใช่คนบันทึก)"""
+	if not employee.get("user_id") or employee.user_id != frappe.session.user:
+		doc.add_comment("Info", _("{0} บันทึกแทนพนักงาน").format(frappe.utils.get_fullname()))
+		notify_users([employee.get("user_id")], doc, _("ฝ่ายบุคคลบันทึก{0}แทนคุณ").format(what))
+
+
 @frappe.whitelist()
-def get_advance_data():
-	"""หน้าเบิกเงิน: ใบเบิก (ล่วงหน้า/สำรองจ่าย) + ใบเคลียร์/เบิกคืน ของตัวเอง + วงเงิน + ประเภทค่าใช้จ่าย"""
-	employee = my_employee()
+def get_advance_data(employee=None):
+	"""หน้าเบิกเงิน: ใบเบิก (ล่วงหน้า/ทดรองจ่าย) + ใบเคลียร์/สำรองจ่าย ของตัวเอง (หรือของพนักงานที่ HR เลือก) + วงเงิน + ประเภทค่าใช้จ่าย"""
+	employee = employee_for(employee)
 	advances = frappe.get_all(
 		"Employee Advance",
 		filters={"employee": employee.name, "custom_advance_type": ("in", TYPES)},
@@ -159,6 +186,7 @@ def get_advance_data():
 		"claims": claims,
 		"salary": salary_limit(employee.name, employee.company),
 		"max_installments": MAX_INSTALLMENTS,
+		"clear_days": cint(company_setting(employee.company, "custom_expense_clear_days", DEFAULT_CLEAR_DAYS)),
 		"expense_types": frappe.get_all("Expense Claim Type", pluck="name", order_by="name asc"),
 	}
 
@@ -175,9 +203,10 @@ def decorate_advance(row, today=None):
 
 
 @frappe.whitelist(methods=["POST"])
-def request_advance(advance_type, amount, purpose, installments=1, required_date=None):
-	"""ขอเบิกเงินเดือนล่วงหน้า / เงินสำรองจ่าย = Employee Advance ร่าง รอผู้อนุมัติ (Expense Approver)"""
-	employee = my_employee()
+def request_advance(advance_type, amount, purpose, installments=1, required_date=None, employee=None):
+	"""ขอเบิกเงินเดือนล่วงหน้า / เงินทดรองจ่าย = Employee Advance ร่าง รอผู้อนุมัติ (Expense Approver)
+	แอปไม่ส่ง installments แล้ว (ผู้อนุมัติกำหนดใน review_advance) ค่าเริ่มต้น 1 งวด  employee = HR บันทึกแทน"""
+	employee = employee_for(employee)
 	if advance_type not in TYPES:
 		frappe.throw(_("ประเภทการเบิกไม่ถูกต้อง"))
 	amount = flt(amount, 2)
@@ -213,6 +242,7 @@ def request_advance(advance_type, amount, purpose, installments=1, required_date
 		)
 	doc = frappe.get_doc(values)
 	doc.insert(ignore_permissions=True)
+	on_behalf(employee, doc, type_label(advance_type))
 	notify_users(
 		approver_users(),
 		doc,
@@ -222,7 +252,7 @@ def request_advance(advance_type, amount, purpose, installments=1, required_date
 
 
 def type_label(advance_type):
-	return {"Salary Advance": _("เบิกเงินเดือนล่วงหน้า"), "Expense Advance": _("เบิกเงินสำรองจ่าย")}.get(
+	return {"Salary Advance": _("เบิกเงินเดือนล่วงหน้า"), "Expense Advance": _("เบิกเงินทดรองจ่าย")}.get(
 		advance_type, advance_type
 	)
 
@@ -241,7 +271,7 @@ def delete_advance(name):
 	frappe.delete_doc("Employee Advance", name, ignore_permissions=True)
 
 
-# ---------------------------------------------------------------- เคลียร์ / เบิกค่าใช้จ่ายคืน (Expense Claim)
+# ---------------------------------------------------------------- เคลียร์ / เบิกสำรองจ่าย (Expense Claim)
 
 
 def clean_rows(rows):
@@ -273,12 +303,12 @@ def own_receipt(file_name):
 
 
 @frappe.whitelist(methods=["POST"])
-def submit_claim(rows, remark=None, advance=None):
-	"""ส่งใบเคลียร์ (advance = Employee Advance เงินสำรองจ่าย) หรือเบิกค่าใช้จ่ายคืน (ไม่มี advance)
+def submit_claim(rows, remark=None, advance=None, employee=None):
+	"""ส่งใบเคลียร์ (advance = Employee Advance เงินทดรองจ่าย) หรือเบิกสำรองจ่าย (ไม่มี advance)
 	= Expense Claim ร่าง approval_status Draft รอผู้อนุมัติ"""
 	from hrms.hr.doctype.expense_claim.expense_claim import get_expense_claim_advances
 
-	employee = my_employee()
+	employee = employee_for(employee)
 	rows = clean_rows(rows)
 	company = employee.company
 	payable = frappe.db.get_value("Company", company, "default_expense_claim_payable_account")
@@ -324,7 +354,7 @@ def submit_claim(rows, remark=None, advance=None):
 			as_dict=True,
 		)
 		if not info or info.employee != employee.name or info.docstatus != 1:
-			frappe.throw(_("ไม่พบใบเบิกเงินสำรองจ่าย"), frappe.PermissionError)
+			frappe.throw(_("ไม่พบใบเบิกเงินทดรองจ่าย"), frappe.PermissionError)
 		unclaimed = flt(info.paid_amount) - flt(info.claimed_amount) - flt(info.return_amount)
 		if unclaimed <= 0:
 			frappe.throw(_("ใบเบิก {0} เคลียร์ครบแล้ว").format(advance))
@@ -343,12 +373,13 @@ def submit_claim(rows, remark=None, advance=None):
 	doc.flags.ignore_permissions = True
 	doc.insert(ignore_permissions=True)
 	store_app.attach_files(files, "Expense Claim", doc.name)
+	on_behalf(employee, doc, _("ใบเคลียร์เงินทดรองจ่าย") if advance else _("เบิกสำรองจ่าย"))
 	notify_users(
 		approver_users(),
 		doc,
 		_("{0} ส่ง{1} {2} บาท").format(
 			employee.employee_name,
-			_("ใบเคลียร์เงินสำรองจ่าย") if advance else _("เบิกค่าใช้จ่ายคืน"),
+			_("ใบเคลียร์เงินทดรองจ่าย") if advance else _("เบิกสำรองจ่าย"),
 			frappe.format(doc.total_claimed_amount, "Currency"),
 		),
 	)
@@ -370,10 +401,9 @@ def delete_claim(name):
 
 @frappe.whitelist()
 def get_claim(name):
-	"""รายละเอียดใบเคลียร์/เบิกคืน: เจ้าของหรือผู้อนุมัติ"""
+	"""รายละเอียดใบเคลียร์/สำรองจ่าย: เจ้าของ ผู้อนุมัติ หรือ HR"""
 	doc = frappe.get_doc("Expense Claim", name)
-	mine = frappe.db.get_value("Employee", {"user_id": frappe.session.user}, "name")
-	if doc.employee != mine and not can_approve():
+	if not can_view_claim(doc):
 		frappe.throw(_("ไม่มีสิทธิ์ดูใบนี้"), frappe.PermissionError)
 	data = {field.split(" as ")[-1]: doc.get(field.split(" as ")[0]) for field in CLAIM_FIELDS}
 	data["expenses"] = [
@@ -390,6 +420,13 @@ def get_claim(name):
 	return data
 
 
+def can_view_claim(doc):
+	from consbiz import hr_attendance
+
+	mine = frappe.db.get_value("Employee", {"user_id": frappe.session.user}, "name")
+	return doc.employee == mine or can_approve() or hr_attendance.can_manage()
+
+
 def receipt_url(name, idx):
 	from urllib.parse import urlencode
 
@@ -398,10 +435,9 @@ def receipt_url(name, idx):
 
 @frappe.whitelist()
 def receipt(name, idx):
-	"""รูปบิลของใบเคลียร์ (ไฟล์ private): เจ้าของและผู้อนุมัติ"""
+	"""รูปบิลของใบเคลียร์ (ไฟล์ private): เจ้าของ ผู้อนุมัติ หรือ HR"""
 	doc = frappe.get_doc("Expense Claim", name)
-	mine = frappe.db.get_value("Employee", {"user_id": frappe.session.user}, "name")
-	if doc.employee != mine and not can_approve():
+	if not can_view_claim(doc):
 		frappe.throw(_("ไม่มีสิทธิ์ดูรูปนี้"), frappe.PermissionError)
 	row = next((r for r in doc.expenses if r.idx == cint(idx)), None)
 	file_name = row and row.custom_receipt and frappe.db.get_value("File", {"file_url": row.custom_receipt})
@@ -468,7 +504,7 @@ def pending_advance_states():
 
 @frappe.whitelist()
 def get_approvals():
-	"""ใบเบิกและใบเคลียร์/เบิกคืนที่รออนุมัติ"""
+	"""ใบเบิกและใบเคลียร์/สำรองจ่ายที่รออนุมัติ"""
 	check_approver()
 	me = frappe.db.get_value("Employee", {"user_id": frappe.session.user}, "name")
 	advances = frappe.get_all(
@@ -506,9 +542,11 @@ def get_approvals():
 
 
 @frappe.whitelist(methods=["POST"])
-def review_advance(name, approve, reason=None):
+def review_advance(name, approve, reason=None, installments=None):
 	"""อนุมัติ: ไม่เกินวงเงิน หรือผู้บริหารอนุมัติ = Submit / เกินวงเงินโดยผู้อนุมัติทั่วไป = ส่งต่อผู้บริหาร (Pending Executive)
-	ไม่อนุมัติ = คงร่าง + เหตุผล"""
+	ไม่อนุมัติ = คงร่าง + เหตุผล
+	installments = จำนวนงวดหักคืนเงินเดือนล่วงหน้า ผู้อนุมัติเป็นคนกำหนด (ตกลง 2026-11-17: ผู้ขอไม่เลือกเอง กันติดเป็นนิสัย)
+	ผู้บริหารที่อนุมัติขั้นถัดไปแก้ได้อีกครั้ง ไม่ส่ง = คงค่าเดิมของใบ"""
 	check_approver()
 	doc = frappe.get_doc("Employee Advance", name)
 	check_not_self(doc.employee)
@@ -524,6 +562,11 @@ def review_advance(name, approve, reason=None):
 		notify_users([employee_user], doc, _("ใบเบิก {0} ไม่ได้รับอนุมัติ: {1}").format(doc.name, reason))
 		return "Rejected"
 
+	if doc.custom_advance_type == "Salary Advance" and installments not in (None, ""):
+		installments = cint(installments)
+		if not 1 <= installments <= MAX_INSTALLMENTS:
+			frappe.throw(_("หักคืนได้ 1 ถึง {0} งวด").format(MAX_INSTALLMENTS))
+		doc.custom_installments = installments
 	if doc.custom_advance_type == "Salary Advance":
 		# วงเงินอาจเปลี่ยนระหว่างรอ (ใบอื่นถูกอนุมัติ/หักคืน)
 		limit = salary_limit(doc.employee, doc.company, exclude=doc.name)
@@ -571,7 +614,7 @@ def guard_advance_submit(doc, method=None):
 
 @frappe.whitelist(methods=["POST"])
 def review_claim(name, approve, reason=None):
-	"""อนุมัติใบเคลียร์/เบิกคืน = approval_status Approved + Submit / ไม่อนุมัติ = คงร่าง + เหตุผล"""
+	"""อนุมัติใบเคลียร์/สำรองจ่าย = approval_status Approved + Submit / ไม่อนุมัติ = คงร่าง + เหตุผล"""
 	check_approver()
 	if APPROVER_ROLE not in roles():
 		frappe.throw(_("ไม่มีสิทธิ์อนุมัติใบเคลียร์ (ต้องมี Role {0})").format(APPROVER_ROLE), frappe.PermissionError)
@@ -659,7 +702,7 @@ def create_salary_deductions(advance, paid_date):
 
 def on_payment_entry_submit(doc, method=None):
 	"""doc_events Payment Entry.on_submit: จ่าย Employee Advance ของแอปครบแล้ว
-	เงินเดือนล่วงหน้า = สร้างรายการหักเงินเดือน / เงินสำรองจ่าย = ตั้งกำหนดเคลียร์"""
+	เงินเดือนล่วงหน้า = สร้างรายการหักเงินเดือน / เงินทดรองจ่าย = ตั้งกำหนดเคลียร์"""
 	names = {r.reference_name for r in doc.references if r.reference_doctype == "Employee Advance"}
 	for name in names:
 		advance = frappe.get_doc("Employee Advance", name)
@@ -683,7 +726,7 @@ def on_payment_entry_submit(doc, method=None):
 
 
 def remind_overdue_clearing():
-	"""scheduler รายวัน: เงินสำรองจ่ายเลยกำหนดเคลียร์ แจ้งเตือนพนักงานทุก REMIND_EVERY_DAYS วัน (ไม่หักเงินเอง)"""
+	"""scheduler รายวัน: เงินทดรองจ่ายเลยกำหนดเคลียร์ แจ้งเตือนพนักงานทุก REMIND_EVERY_DAYS วัน (ไม่หักเงินเอง)"""
 	today = getdate()
 	for row in frappe.get_all(
 		"Employee Advance",
@@ -709,7 +752,7 @@ def remind_overdue_clearing():
 					"type": "Alert",
 					"document_type": "Employee Advance",
 					"document_name": row.name,
-					"subject": _("เงินสำรองจ่าย {0} เลยกำหนดเคลียร์แล้ว ส่งใบเคลียร์ในแอป Self Service").format(row.name),
+					"subject": _("เงินทดรองจ่าย {0} เลยกำหนดเคลียร์แล้ว ส่งใบเคลียร์ในแอป Self Service").format(row.name),
 				},
 			)
 		frappe.db.set_value("Employee Advance", row.name, "custom_last_reminder", today, update_modified=False)

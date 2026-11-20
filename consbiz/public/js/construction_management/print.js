@@ -59,6 +59,30 @@ const PRINT_WIDTH = {
 // โหมดหลายหน้า: ความกว้างของ 1 ช่องเวลา (px) และจำนวนวันเฉลี่ยต่อช่อง
 const PERIOD_PX = { day: 18, week: 42, mweek: 42, month: 56, quarter: 64 };
 const PERIOD_DAYS = { day: 1, week: 7, mweek: 7.6, month: 30.4, quarter: 91.3 };
+// ช่องที่กว้างเท่ากันทุกช่อง (เหมือนตารางบนจอ planner/time_axis.js, ตกลง 2026-11-18): สัปดาห์แบ่งในเดือน (สัปดาห์ท้ายเดือน 7-10 วัน)
+// และรายเดือน ในช่องแบ่งตามจำนวนวันของช่องนั้น ตำแหน่งคิดเป็น "วันเสมือน" (vday) ห้ามคูณ ppd กับจำนวนวันจริงตรงๆ
+const EQUAL_CELL_DAYS = { mweek: 7.6, month: 30.4 };
+
+// วันจริง -> วันเสมือนของแกนเวลา (ช่องละ EQUAL_CELL_DAYS วัน) หน่วยอื่น = วันจริง
+function virtual_days(range, unit) {
+	const size = EQUAL_CELL_DAYS[unit];
+	if (!size) return (day) => day;
+	const cells = periods(range.start, range.end, unit);
+	return (day) => {
+		if (day <= range.start || !cells.length) return day;
+		let low = 0;
+		let high = cells.length - 1;
+		while (low < high) {
+			const mid = Math.ceil((low + high) / 2);
+			if (cells[mid].start <= day) low = mid;
+			else high = mid - 1;
+		}
+		const cell = cells[low];
+		const inside = Math.min(day - cell.start, cell.end - cell.start);
+		const over = Math.max(day - cell.end, 0);
+		return range.start + (low + inside / (cell.end - cell.start)) * size + over;
+	};
+}
 const CURVE_MARGIN = 8;
 
 // สีของงานพิมพ์ใช้ค่าคงที่ (ไม่ตามธีมมืด) เส้นตาราง #BFBFBF ตามมาตรฐานเอกสารพิมพ์ของแอป
@@ -91,7 +115,37 @@ const STATUS_PILL = {
 };
 // สีแถบตามสถานะ = --green-500 / --orange-500 / --red-500 ของ Frappe
 const STATUS_COLOR = { green: "#43ac79", orange: "#e86c13", red: "#e03434" };
-const PRINT_FONT = `"Noto Sans Thai", system-ui, -apple-system, sans-serif`;
+// ฟอนต์ของงานพิมพ์ = Noto Sans Thai ทั้งตัวไทยและตัวเลข/อังกฤษ (ตกลง 2026-11-18)
+// เดิมฝังเฉพาะช่วงตัวไทย ตัวเลขใช้ฟอนต์ระบบของเครื่อง: PDF ฝั่ง server ได้ DejaVu (กว้างกว่า) ตัวเลขในช่องเวลาชิดกัน
+// ไม่เหมือน Preview ชื่อ family แยก ("ConsBiz Print") เพื่อไม่เปลี่ยนฟอนต์อังกฤษของหน้าแอป (Inter)
+// หน้าแอปลงทะเบียน family เดียวกัน (print_font_ready) ให้ text_width วัดด้วยฟอนต์ที่พิมพ์จริง
+export const PRINT_FAMILY = "ConsBiz Print";
+export const PRINT_FONT = `"${PRINT_FAMILY}", "Noto Sans Thai", system-ui, -apple-system, sans-serif`;
+const FONT_DIR = "/assets/consbiz/fonts/noto-sans-thai/";
+const PRINT_FACES = [
+	["NotoSansThai-Variable-thai.woff2", "U+02D7, U+0303, U+0331, U+0E01-0E5B, U+200C-200D, U+25CC"],
+	[
+		"NotoSansThai-Variable-latin.woff2",
+		"U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, " +
+			"U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD",
+	],
+];
+let font_promise = null;
+// โหลดฟอนต์งานพิมพ์ในหน้าแอป (ครั้งเดียว) คืน Promise ที่เสร็จเมื่อโหลดครบ (ล้มเหลว = ใช้ฟอนต์สำรอง)
+export function print_font_ready() {
+	if (font_promise) return font_promise;
+	if (typeof FontFace === "undefined" || !document.fonts) return (font_promise = Promise.resolve());
+	const faces = PRINT_FACES.map(
+		([file, range]) =>
+			new FontFace(PRINT_FAMILY, `url("${FONT_DIR}${file}") format("woff2")`, {
+				weight: "100 900",
+				unicodeRange: range,
+			})
+	);
+	faces.forEach((face) => document.fonts.add(face));
+	font_promise = Promise.all(faces.map((face) => face.load())).catch(() => null);
+	return font_promise;
+}
 
 // แบบเอกสาร (options.template) ไม่ระบุ = แบบเดิมของ desk
 // color = สีของแบบ, bar = ทรงแถบงาน (ไม่มี = แบบเดิม), head = ส่วนหัวกระดาษ (page_head), foot_mm = ช่องลงนามท้ายหน้า
@@ -196,6 +250,8 @@ const THEMES = {
 // ค่าของแบบที่กำลังสร้าง ตั้งที่ต้น build_print (สร้างแบบ sync ทีละครั้ง)
 let T = CLASSIC;
 let C = COLOR;
+// ขนาดเส้น S-Curve (options.curve_scale %, ตกลง 2026-11-18) คูณความหนาเส้นของแบบเอกสาร + ขนาดจุด
+let curve_k = 1;
 const SIDE_GAP_MM = 3;
 // แบบ 1 หน้า: แถบ S-Curve กินสัดส่วนตามจำนวนแถว ไม่ถูกย่อจนแบนเมื่อแผนยาว
 const PANEL_SHARE = 0.4;
@@ -273,9 +329,11 @@ export function print_gantt(model, options) {
 
 // สร้างเอกสารพิมพ์ คืน { html, pages, size } หรือ { error } ใช้ทั้งหน้าต่างพิมพ์ของ desk และ Preview ของแอป (PlanPrint.vue)
 // content_scale (%) = ย่อ/ขยายเนื้อหาทั้งหน้า, period_scale (%) = ความกว้างช่องเวลาของแบบต่อเนื่อง, margin = ระยะขอบ (มม.)
+// curve_scale (%) = ขนาดเส้น S-Curve
 export function build_print(model, options) {
 	T = THEMES[options.template] || CLASSIC;
 	clip_seq = 0;
+	curve_k = (options.curve_scale || 100) / 100;
 	C = T.color;
 	const size = PAPER[options.paper];
 	const [short, long] = size;
@@ -348,7 +406,7 @@ function fit_model(model, content_w, content_h) {
 	const summary_h = model.summary_rows.length * SUMMARY_ROW;
 	const height = HEADER + Math.max(model.rows.length, 1) * ROW + summary_h + panel_of(model);
 	const scale = Math.min(content_h / height, 1);
-	const days = model.range.end - model.range.start;
+	const days = model.vday(model.range.end) - model.vday(model.range.start);
 	const tail = model.tail || 0;
 	const ppd = Math.max((content_w / scale - grid_width - tail) / days, 0.3);
 	return {
@@ -360,14 +418,11 @@ function fit_model(model, content_w, content_h) {
 
 function with_range(model, units) {
 	const { first, last } = model.extent;
-	return {
-		...model,
-		units,
-		range: {
-			start: floor_to(first - 1, units.bottom),
-			end: next_of(floor_to(last + 1, units.bottom), units.bottom),
-		},
+	const range = {
+		start: floor_to(first - 1, units.bottom),
+		end: next_of(floor_to(last + 1, units.bottom), units.bottom),
 	};
+	return { ...model, units, range, vday: virtual_days(range, units.bottom) };
 }
 
 class Layout {
@@ -406,7 +461,8 @@ class Layout {
 			const slice_w = content_w - width_of(columns);
 			// ช่องสุดท้ายต้องเหลือที่ว่างท้าย Timeline
 			const tail = period === this.bottom_periods.at(-1) ? this.model.tail || 0 : 0;
-			if ((period.end - from) * this.model.ppd + tail > slice_w && period.start > from) {
+			const { vday, ppd } = this.model;
+			if ((vday(period.end) - vday(from)) * ppd + tail > slice_w && period.start > from) {
 				close(period.start);
 			}
 		}
@@ -427,7 +483,7 @@ class Layout {
 		const [row_from, row_to] = page.rows;
 		const [day_from, day_to] = page.days;
 		const columns = page.columns || m.columns;
-		const slice_w = page.slice_w || (day_to - day_from) * m.ppd;
+		const slice_w = page.slice_w || (m.vday(day_to) - m.vday(day_from)) * m.ppd;
 		const gx = columns.reduce((sum, c) => sum + c.width, 0);
 		const clip = `tl${index}`;
 		const rows_h = (row_to - row_from) * ROW;
@@ -437,7 +493,9 @@ class Layout {
 		const summary_y = body_y + band_h;
 		const width = gx + slice_w;
 		const height = summary_y + this.summary_height;
-		const x = (day) => gx + (day - day_from) * m.ppd;
+		const v_from = m.vday(day_from);
+		const x = (day) => gx + (m.vday(day) - v_from) * m.ppd;
+		const first_w = this.bottom_periods[0] ? x(this.bottom_periods[0].end) - x(this.bottom_periods[0].start) : 0;
 		const rows = m.rows.slice(row_from, row_to);
 		const out = [];
 		// มุมมนคงที่บนกระดาษ ไม่ย่อตามเนื้อหา
@@ -488,7 +546,7 @@ class Layout {
 			const px = Math.max(x(period.start), gx);
 			out.push(
 				`<rect x="${x(period.start)}" y="0" width="${
-					(period.end - period.start) * m.ppd
+					x(period.end) - x(period.start)
 				}" height="${HEADER / 2}" fill="none" stroke="${C.line}" stroke-width="0.5"/>`,
 				text(px + 4, HEADER / 2 - 6, fitted_top_label(period, m, Math.min(x(period.end), gx + slice_w) - px - 6), {
 					size: 9,
@@ -496,10 +554,10 @@ class Layout {
 				})
 			);
 		}
-		const narrow = (this.bottom_periods[0]?.end - this.bottom_periods[0]?.start) * m.ppd < 18;
+		const narrow = first_w < 18;
 		for (const period of this.bottom_periods) {
 			if (period.end <= day_from || period.start >= day_to) continue;
-			const w = (period.end - period.start) * m.ppd;
+			const w = x(period.end) - x(period.start);
 			out.push(
 				`<rect x="${x(period.start)}" y="${HEADER / 2}" width="${w}" height="${
 					HEADER / 2
@@ -520,11 +578,9 @@ class Layout {
 			}
 			out.push(line(x(period.start), body_y, x(period.start), summary_y, C.line, "2 3"));
 		}
-		if (m.ppd >= 3) {
-			for (const day of m.holidays) {
-				if (day >= day_from && day < day_to) {
-					out.push(rect(x(day), body_y, m.ppd, band_h, C.holiday));
-				}
+		for (const day of m.holidays) {
+			if (day >= day_from && day < day_to && x(day + 1) - x(day) >= 3) {
+				out.push(rect(x(day), body_y, x(day + 1) - x(day), band_h, C.holiday));
 			}
 		}
 
@@ -540,14 +596,14 @@ class Layout {
 					rect(
 						x(base_start),
 						y + ROW - 6,
-						(base_end - base_start + 1) * m.ppd,
+						x(base_end + 1) - x(base_start),
 						3,
 						m.colors.baseline
 					)
 				);
 			}
 			if (start === null || end === null) return;
-			const w = Math.max((end - start + 1) * m.ppd, 1.5);
+			const w = Math.max(x(end + 1) - x(start), 1.5);
 			const top = m.show_baseline_bars ? 4 : 5;
 			const h = m.show_baseline_bars ? 9 : ROW - 10;
 			if (T.bar) {
@@ -631,18 +687,17 @@ class Layout {
 					out.push(`<path d="${area}" fill="${color}" fill-opacity="${T.curve_area}"/>`);
 				}
 				out.push(
-					`<path d="${d}" fill="none" stroke="${color}" stroke-width="${T.curve_width || 1.6}"${
+					`<path d="${d}" fill="none" stroke="${color}" stroke-width="${+((T.curve_width || 1.6) * curve_k).toFixed(2)}"${
 						dash ? ` stroke-dasharray="${dash}"` : ""
 					}/>`
 				);
 				// ช่องเวลาแคบ (พิมพ์แผนยาวใน 1 หน้า) จุดจะถี่จนทึบ แสดงแต่เส้น
-				const period_w = (this.bottom_periods[0].end - this.bottom_periods[0].start) * m.ppd;
-				if (T.curve_points === false || (T.bar && period_w < 14)) continue;
+				if (T.curve_points === false || (T.bar && first_w < 14)) continue;
 				for (const p of points) {
 					out.push(
 						`<circle cx="${x(p.day + 1)}" cy="${cy(
 							p.value
-						)}" r="2" fill="#fff" stroke="${color}" stroke-width="1.2"/>`
+						)}" r="${+(2 * Math.sqrt(curve_k)).toFixed(2)}" fill="#fff" stroke="${color}" stroke-width="${+(1.2 * curve_k).toFixed(2)}"/>`
 					);
 				}
 			}
@@ -666,7 +721,7 @@ class Layout {
 			});
 			for (const period of this.bottom_periods) {
 				if (period.end <= day_from || period.start >= day_to) continue;
-				const w = (period.end - period.start) * m.ppd;
+				const w = x(period.end) - x(period.start);
 				const values = summary_values(period, m.all_curves, m.total_amount);
 				m.summary_rows.forEach((row, i) => {
 					const y = summary_y + i * SUMMARY_ROW;
@@ -834,7 +889,7 @@ function split_texts(task, start, end, x, y, m) {
 	const distribution = m.show_split ? parse_distribution(task.plan_distribution) : null;
 	if (!distribution || !distribution_fits(start, end, distribution)) return [];
 	return period_shares(start, end, distribution, m.counting_holidays, m.units.bottom)
-		.filter((part) => (part.end - part.start + 1) * m.ppd >= 22)
+		.filter((part) => x(part.end + 1) - x(part.start) >= 22)
 		.map((part) =>
 			text((x(part.start) + x(part.end + 1)) / 2, y, format_share(part.percent), {
 				size: 7,
@@ -1111,28 +1166,33 @@ function themed_head(model, page, index, total) {
 }
 
 function page_html(model, pages, paper_w, paper_h, margin) {
-	const font = `${window.location.origin}/assets/consbiz/fonts/noto-sans-thai/NotoSansThai-Variable-thai.woff2`;
+	const faces = PRINT_FACES.map(
+		([file, range]) => `@font-face {
+	font-family: "${PRINT_FAMILY}";
+	font-weight: 100 900;
+	src: url("${window.location.origin}${FONT_DIR}${file}") format("woff2");
+	unicode-range: ${range};
+}`
+	).join("\n");
 	const body = pages
 		.map((page) => `<section class="page${T.side_mm ? " page-side" : ""}">${page.head}${page.svg}${page.foot || ""}</section>`)
 		.join("");
 	return `<!doctype html>
 <html><head><meta charset="utf-8"><title>${escape(model.title)}</title>
 <style>
-@font-face {
-	font-family: "Noto Sans Thai";
-	font-weight: 100 900;
-	src: url("${font}") format("woff2");
-	unicode-range: U+02D7, U+0303, U+0331, U+0E01-0E5B, U+200C-200D, U+25CC;
-}
+${faces}
 @page { size: ${paper_w}mm ${paper_h}mm; margin: ${margin}mm; }
 html, body { margin: 0; padding: 0; }
+/* geometricPrecision: Chrome PDF (ปุ่มดู PDF/ดาวน์โหลด) ใช้ font hinting ปัดความกว้างตัวอักษร
+   ตัวไทยใน PDF ห่างไม่เท่ากัน สระ/วรรณยุกต์เลื่อน ("งานเจาะสํารวจ") ปิด hinting แล้วตรงกับที่เห็นบนจอ */
 body {
-	font-family: "Noto Sans Thai", system-ui, -apple-system, sans-serif;
+	font-family: ${PRINT_FONT};
+	text-rendering: geometricPrecision;
 	color: ${C.text};
 	-webkit-print-color-adjust: exact;
 	print-color-adjust: exact;
 }
-svg text { font-family: "Noto Sans Thai", system-ui, -apple-system, sans-serif; }
+svg text { font-family: ${PRINT_FONT}; }
 .page {
 	width: ${paper_w - 2 * margin}mm;
 	height: ${paper_h - 2 * margin}mm;
@@ -1224,7 +1284,10 @@ function print_html(html) {
 	const cleanup = () => setTimeout(() => iframe.remove(), 1000);
 	win.addEventListener("afterprint", cleanup, { once: true });
 	// รอฟอนต์ไทยโหลดก่อนสั่งพิมพ์ ไม่งั้นหน้าแรกอาจใช้ฟอนต์สำรอง
-	win.document.fonts.load('10px "Noto Sans Thai"', "ก").finally(() => {
+	Promise.all([
+		win.document.fonts.load(`10px "${PRINT_FAMILY}"`, "ก"),
+		win.document.fonts.load(`10px "${PRINT_FAMILY}"`, "0"),
+	]).finally(() => {
 		win.focus();
 		win.print();
 	});

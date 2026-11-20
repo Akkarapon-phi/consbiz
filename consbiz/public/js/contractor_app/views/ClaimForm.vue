@@ -6,6 +6,16 @@
 		<TopBar :title="title" :subtitle="agreement?.title" back_to="contractor-claims" no_project />
 
 		<div class="ss-content">
+			<FormHead
+				v-if="doc"
+				model-value="main"
+				:tabs="[{ value: 'main', label: 'ใบเบิกงวด' }]"
+				:actions="actions"
+				:menu="menu"
+				:busy="busy"
+			>
+				<template #summary><b>{{ money(doc.gross_amount) }}</b> บาท</template>
+			</FormHead>
 			<Skeleton v-if="!doc" :rows="6" />
 			<template v-else>
 				<div v-if="doc.status === 'Returned'" class="ss-banner tone-rose">
@@ -20,7 +30,7 @@
 					<div>
 						<div class="ss-banner-title">ส่งให้ตรวจแล้ว รอเจ้าหน้าที่ตรวจ</div>
 						<div class="ss-banner-text">
-							เจ้าหน้าที่อาจปรับปริมาณตามที่ตรวจจริง ต้องการแก้เองให้กด "ถอนกลับมาแก้"
+							เจ้าหน้าที่อาจปรับปริมาณตามที่ตรวจจริง ต้องการแก้เองให้กด "ดึงกลับ"
 						</div>
 					</div>
 				</div>
@@ -165,54 +175,9 @@
 					</div>
 				</section>
 
-				<button
-					v-if="view.can_delete"
-					type="button"
-					class="ss-btn ss-btn--ghost-danger ss-btn--block"
-					:disabled="busy"
-					@click="deleting = true"
-				>
-					<Icon name="trash" :size="18" /> <span>ลบใบเบิกนี้</span>
-				</button>
 			</template>
 		</div>
 
-		<Teleport to="#ss-layer">
-			<Transition name="ss-bar">
-				<div v-if="doc && (editable || view.can_withdraw)" class="ss-bottom-bar">
-					<div class="ss-bar-summary">
-						<b>{{ money(doc.gross_amount) }}</b> บาท
-					</div>
-					<template v-if="editable">
-						<button
-							type="button"
-							class="ss-btn ss-btn--soft ss-btn--lg"
-							:disabled="busy || (!dirty && !!doc.name)"
-							@click="save(false)"
-						>
-							บันทึก
-						</button>
-						<button
-							type="button"
-							class="ss-btn ss-btn--primary ss-btn--lg"
-							:disabled="busy || !!error || uploading.length > 0"
-							@click="confirm_send = true"
-						>
-							<Icon name="send" :size="18" /> <span>ส่งให้ตรวจ</span>
-						</button>
-					</template>
-					<button
-						v-else
-						type="button"
-						class="ss-btn ss-btn--soft ss-btn--lg"
-						:disabled="busy"
-						@click="withdraw"
-					>
-						<Icon name="undo" :size="18" /> <span>ถอนกลับมาแก้</span>
-					</button>
-				</div>
-			</Transition>
-		</Teleport>
 
 		<Sheet
 			:open="confirm_send"
@@ -221,7 +186,7 @@
 			@close="confirm_send = false"
 		>
 			<p class="ss-note-line">
-				ส่งแล้วแก้ไม่ได้ จนกว่าเจ้าหน้าที่ส่งกลับ หรือคุณถอนกลับมาแก้ก่อนเจ้าหน้าที่ตรวจ
+				ส่งแล้วแก้ไม่ได้ จนกว่าเจ้าหน้าที่ส่งกลับ หรือคุณดึงกลับมาแก้ก่อนเจ้าหน้าที่ตรวจ
 			</p>
 			<div v-if="doc" class="ss-facts">
 				<div class="ss-fact"><span>มูลค่างวดนี้</span><b>{{ money(doc.gross_amount) }}</b></div>
@@ -261,6 +226,8 @@
 import { computed, inject, ref } from "vue";
 import DateInput from "../../shared/components/DateInput.vue";
 import Icon from "../../shared/components/Icon.vue";
+import FormHead from "../../shared/components/FormHead.vue";
+import { LABELS, doc_menu, step_actions } from "../../shared/form_actions.js";
 import SelectBox from "../../shared/components/SelectBox.vue";
 import Sheet from "../../shared/components/Sheet.vue";
 import Skeleton from "../../shared/components/Skeleton.vue";
@@ -329,6 +296,30 @@ const payload = () =>
 const dirty = computed(() => !!doc.value && payload() !== saved.value);
 const file_url = (f) => claim_file_url(doc.value.name, f.name);
 
+// หัวฟอร์ม: ร่าง/ส่งกลับแก้ → บันทึก → ส่งอนุมัติ (ส่งให้ตรวจ) → รอตรวจ: ดึงกลับ
+const actions = computed(() => {
+	const d = doc.value;
+	return step_actions({
+		stage: editable.value ? "draft" : view.value.can_withdraw ? "pending" : "done",
+		is_new: !d.name,
+		dirty: dirty.value,
+		save: editable.value && (() => save(false)),
+		submit: editable.value && {
+			label: LABELS.send,
+			icon: "send",
+			disabled: !!error.value || uploading.value.length > 0,
+			run: () => (confirm_send.value = true),
+		},
+		withdraw: view.value.can_withdraw && { icon: "undo", run: withdraw },
+	});
+});
+const menu = computed(() =>
+	doc_menu({
+		refresh: doc.value.name && load,
+		remove: view.value.can_delete && (() => (deleting.value = true)),
+	})
+);
+
 function apply(result, keep_saved = false) {
 	view.value = result;
 	doc.value = result.doc;
@@ -386,7 +377,7 @@ async function save(send) {
 }
 
 async function withdraw() {
-	const result = await run(() => cpost("withdraw_claim", { name: doc.value.name }), "ถอนกลับมาแก้แล้ว");
+	const result = await run(() => cpost("withdraw_claim", { name: doc.value.name }), "ดึงกลับมาแก้แล้ว");
 	if (result) apply(result);
 }
 

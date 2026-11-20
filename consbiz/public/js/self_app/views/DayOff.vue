@@ -1,9 +1,10 @@
-<!-- วันหยุดประจำสัปดาห์ (Weekly Day Off): หยุด 1 วันต่อสัปดาห์ เลือกเสาร์หรืออาทิตย์ ใครลงก่อนได้ก่อนตามโควตาของโครงการ มีผลทันที
+<!-- จองกะ (ตกลง 2026-11-17, เดิม "วันหยุด"): ข้อมูลเดิม Weekly Day Off หยุด 1 วันต่อสัปดาห์ หน้าจอให้เลือกวันเสาร์หรืออาทิตย์ที่ "มาทำงาน"
+     อีกวันจึงเป็นวันหยุด (เลือกทำงานเสาร์ = book_day_off Sunday) ที่ว่างของวันทำงาน = โควตาวันหยุดของอีกวัน ใครจองก่อนได้ก่อน มีผลทันที
      tab ของฉัน = 8 สัปดาห์ (สัปดาห์นี้ก่อน) แตะวันเพื่อเลือก/เปลี่ยน ได้ถึงวันหยุดนั้น
      tab ทีม = ใครหยุดวันไหนในสัปดาห์ที่เลือก (พนักงานในโครงการเดียวกัน) API self_service.get_day_off / book_day_off / get_team_day_off -->
 <template>
 	<div>
-		<TopBar title="วันหยุด" no_project>
+		<TopBar title="จองกะ" no_project>
 			<template #actions>
 				<button
 					v-if="!wide"
@@ -19,20 +20,13 @@
 		</TopBar>
 
 		<div class="ss-content">
-			<div v-if="wide" class="ss-list-head">
-				<StatusTabs v-model="tab" :options="TABS" />
-				<div class="ss-list-tools">
-					<button
-						type="button"
-						class="ss-icon-btn"
-						:class="{ 'is-spinning': loading }"
-						aria-label="โหลดใหม่"
-						@click="reload"
-					>
-						<Icon name="refresh" :size="17" />
-					</button>
-				</div>
-			</div>
+			<ListHead
+				v-if="wide"
+				v-model="tab"
+				:tabs="TABS"
+				:loading="loading"
+				@refresh="reload"
+			/>
 			<div v-else class="ss-tabs">
 				<button
 					v-for="t in TABS"
@@ -51,10 +45,11 @@
 				<Skeleton v-if="mine === null" :rows="3" />
 				<template v-else>
 					<p class="ss-note">
-						หยุดสัปดาห์ละ 1 วัน เลือกเสาร์หรืออาทิตย์ ใครลงก่อนได้ก่อน เปลี่ยนได้จนถึงวันหยุดนั้น
+						จันทร์–ศุกร์ทำงานปกติ เลือกว่าจะมาทำงานวันเสาร์หรืออาทิตย์ อีกวันเป็นวันหยุด ใครจองก่อนได้ก่อน
+						เปลี่ยนได้จนถึงวันหยุดนั้น
 						<template v-if="mine.project">
-							· {{ mine.project.project_name || mine.project.name }} ทีม {{ mine.team_size }} คน (เสาร์
-							{{ mine.capacity.Saturday }} / อาทิตย์ {{ mine.capacity.Sunday }})
+							· {{ mine.project.project_name || mine.project.name }} ทีม {{ mine.team_size }} คน (ทำงานเสาร์
+							{{ mine.capacity.Sunday }} / ทำงานอาทิตย์ {{ mine.capacity.Saturday }} คน)
 						</template>
 					</p>
 					<div class="ss-dayoff-weeks">
@@ -67,7 +62,7 @@
 							<div class="ss-dayoff-head">
 								<b>{{ week_label(w.week_start) }}</b>
 								<span v-if="i === 0" class="ss-tag tone-green">สัปดาห์นี้</span>
-								<span v-if="!w.mine && !w.locked && any_open(w)" class="ss-tag tone-amber">ยังไม่ได้เลือก</span>
+								<span v-if="!w.mine && !w.locked && any_open(w)" class="ss-tag tone-amber">ยังไม่ได้จอง</span>
 							</div>
 							<div class="ss-dayoff-days">
 								<button
@@ -76,20 +71,20 @@
 									type="button"
 									class="ss-dayoff-day"
 									:class="{
-										'is-mine': w.mine === day,
-										'is-full': w.days[day].full && w.mine !== day,
+										'is-mine': w.mine === OFF[day],
+										'is-full': w.days[OFF[day]].full && w.mine !== OFF[day],
 									}"
 									:disabled="
 										busy === w.week_start ||
 										w.locked ||
-										!w.days[day].open ||
-										(w.days[day].full && w.mine !== day)
+										!w.days[OFF[day]].open ||
+										(w.days[OFF[day]].full && w.mine !== OFF[day])
 									"
-									@click="pick(w, day)"
+									@click="pick(w, OFF[day])"
 								>
 									<span class="ss-dayoff-name">
-										<Icon v-if="w.mine === day" name="check" :size="16" :stroke="2.6" />
-										{{ LABEL[day] }} {{ thai_date(w.days[day].date) }}
+										<Icon v-if="w.mine === OFF[day]" name="check" :size="16" :stroke="2.6" />
+										ทำงาน{{ LABEL[day] }} {{ thai_date(w.days[day].date) }}
 									</span>
 									<small>{{ slot_text(w, day) }}</small>
 								</button>
@@ -101,7 +96,7 @@
 								:disabled="busy === w.week_start"
 								@click="pick(w, null)"
 							>
-								ยกเลิกการเลือก
+								ยกเลิกการจอง
 							</button>
 						</section>
 					</div>
@@ -156,13 +151,15 @@ import Icon from "../../shared/components/Icon.vue";
 import TopBar from "../../shared/components/TopBar.vue";
 import Skeleton from "../../shared/components/Skeleton.vue";
 import Empty from "../../shared/components/Empty.vue";
-import StatusTabs from "../../shared/components/StatusTabs.vue";
+import ListHead from "../../shared/components/ListHead.vue";
 import { use_wide } from "../../shared/table.js";
 import { call, initials, post, show_error, thai_date, toast, tone, today } from "../../shared/api.js";
 
 const API = "consbiz.self_service.";
 const DAYS = ["Saturday", "Sunday"];
 const LABEL = { Saturday: "เสาร์", Sunday: "อาทิตย์" };
+// วันที่มาทำงาน → วันหยุดที่บันทึก (Weekly Day Off.day_off)
+const OFF = { Saturday: "Sunday", Sunday: "Saturday" };
 const TABS = [
 	{ value: "mine", label: "ของฉัน" },
 	{ value: "team", label: "ทีม" },
@@ -189,13 +186,16 @@ function monday_of(value) {
 const week_label = (start) => `${thai_date(start)} – ${thai_date(add_days(start, 6), { year: true })}`;
 const any_open = (w) => DAYS.some((d) => w.days[d].open);
 
+// ที่ว่างของวันทำงาน = โควตาวันหยุดของอีกวัน (ทำงานเสาร์ = หยุดอาทิตย์)
 function slot_text(w, day) {
-	const info = w.days[day];
+	const off = OFF[day];
+	const info = w.days[off];
+	const rest = `หยุด${LABEL[off]} ${thai_date(info.date)}`;
 	if (!info.open) return "ผ่านไปแล้ว";
-	if (info.limit == null) return w.mine === day ? "วันหยุดของฉัน" : "เลือกได้";
-	const used = info.taken + (w.mine === day ? 1 : 0);
-	if (w.mine === day) return `วันหยุดของฉัน · ${used}/${info.limit}`;
-	return info.full ? `เต็ม ${info.limit}/${info.limit}` : `ว่าง ${info.limit - info.taken} จาก ${info.limit}`;
+	if (info.limit == null) return w.mine === off ? `กะของฉัน · ${rest}` : rest;
+	const used = info.taken + (w.mine === off ? 1 : 0);
+	if (w.mine === off) return `กะของฉัน · ${used}/${info.limit} · ${rest}`;
+	return info.full ? `เต็ม ${info.limit}/${info.limit}` : `ว่าง ${info.limit - info.taken} จาก ${info.limit} · ${rest}`;
 }
 
 async function load_mine() {
@@ -217,7 +217,10 @@ async function pick(w, day) {
 		const result = await post(`${API}book_day_off`, { week_start: w.week_start, day_off: day || "" });
 		const at = mine.value.weeks.findIndex((x) => x.week_start === w.week_start);
 		if (at >= 0) mine.value.weeks[at] = result;
-		toast(day ? `หยุดวัน${LABEL[day]} ${thai_date(result.days[day].date)}` : "ยกเลิกวันหยุดแล้ว", "success");
+		toast(
+			day ? `จองกะทำงาน${LABEL[OFF[day]]} ${thai_date(result.days[OFF[day]].date)} หยุด${LABEL[day]}` : "ยกเลิกการจองแล้ว",
+			"success"
+		);
 	} catch (error) {
 		show_error(error);
 		// อาจมีคนลงไปก่อน: โหลดที่ว่างล่าสุด
@@ -249,9 +252,10 @@ const team_groups = computed(() => {
 	const t = team.value || {};
 	const cap = t.capacity || {};
 	return [
-		{ key: "Saturday", label: `หยุดเสาร์ ${thai_date(add_days(team_week.value, 5))}`, tone: "green", people: t.Saturday || [], count: `${(t.Saturday || []).length}/${cap.Saturday ?? "-"}` },
-		{ key: "Sunday", label: `หยุดอาทิตย์ ${thai_date(add_days(team_week.value, 6))}`, tone: "teal", people: t.Sunday || [], count: `${(t.Sunday || []).length}/${cap.Sunday ?? "-"}` },
-		{ key: "none", label: "ยังไม่ได้เลือก", tone: "amber", people: t.none || [], count: (t.none || []).length },
+		// ทำงานเสาร์ = คนที่หยุดอาทิตย์ (และกลับกัน)
+		{ key: "Saturday", label: `ทำงานเสาร์ ${thai_date(add_days(team_week.value, 5))}`, tone: "green", people: t.Sunday || [], count: `${(t.Sunday || []).length}/${cap.Sunday ?? "-"}` },
+		{ key: "Sunday", label: `ทำงานอาทิตย์ ${thai_date(add_days(team_week.value, 6))}`, tone: "teal", people: t.Saturday || [], count: `${(t.Saturday || []).length}/${cap.Saturday ?? "-"}` },
+		{ key: "none", label: "ยังไม่ได้จอง", tone: "amber", people: t.none || [], count: (t.none || []).length },
 	];
 });
 

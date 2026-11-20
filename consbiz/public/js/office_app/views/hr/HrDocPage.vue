@@ -1,4 +1,4 @@
-<!-- เอกสารพนักงาน 1 หน้า (หมวดบุคคล): สัญญาจ้าง (hr-contracts) / 50 ทวิ พนักงาน (hr-wht) params.kind = หน้ารายการ
+<!-- เอกสารพนักงาน 1 หน้า (หมวดบุคคล): สัญญาจ้าง (hr-contracts) / 50 ทวิ พนักงาน (hr-wht) / ใบเตือน (hr-warnings) params.kind = หน้ารายการ
      ร่าง = แก้ในหน้าเดียวกัน, ยืนยัน (Submit) แล้ว = ดู + PDF (สัญญาจ้างแก้สถานะทดลองงานได้)
      ลอกหน้าตาจากใบงานเพิ่ม ผรม. (VariationPage.vue) API consbiz/hr_docs.py -->
 <template>
@@ -6,73 +6,21 @@
 		<TopBar :title="title" :subtitle="doc?.name || 'ใหม่'" :back_to="params.kind" />
 
 		<div class="ss-content">
-			<div v-if="doc" class="ss-list-head">
-				<StatusTabs v-model="tab" :options="[{ value: 'main', label: kind.label }]" />
-				<div class="ss-list-tools">
-					<a
-						v-if="doc.name"
-						class="ss-icon-btn"
-						:href="desk_url(DOCTYPE, doc.name)"
-						title="เปิดในระบบเต็ม"
-						aria-label="เปิดในระบบเต็ม"
-						><Icon name="external" :size="17"
-					/></a>
-					<button
-						v-for="p in view.pdfs"
-						:key="p.url"
-						type="button"
-						class="ss-btn ss-btn--soft ss-list-create"
-						:disabled="dirty"
-						:title="dirty ? 'บันทึกก่อน' : ''"
-						@click="pdf = p"
-					>
-						<Icon name="printer" :size="17" /> <span>{{ p.label }}</span>
-					</button>
-					<template v-if="view.can_edit">
-						<button
-							v-if="view.can_delete"
-							type="button"
-							class="ss-btn ss-btn--ghost-danger ss-list-create"
-							:disabled="busy"
-							@click="deleting = true"
-						>
-							ลบ
-						</button>
-						<button
-							v-if="view.can_submit"
-							type="button"
-							class="ss-btn ss-btn--soft ss-list-create"
-							:disabled="busy || dirty"
-							:title="dirty ? 'บันทึกก่อนยืนยัน' : ''"
-							@click="confirm_submit = true"
-						>
-							ยืนยัน
-						</button>
-					</template>
-					<button
-						v-else-if="view.can_cancel"
-						type="button"
-						class="ss-btn ss-btn--ghost-danger ss-list-create"
-						:disabled="busy"
-						@click="confirm_cancel = true"
-					>
-						ยกเลิก
-					</button>
-					<button
-						v-if="view.can_edit || view.can_edit_after"
-						type="button"
-						class="ss-btn ss-btn--primary ss-list-create"
-						:disabled="busy || !dirty || !ready"
-						@click="save"
-					>
-						<Icon name="save" :size="18" /> <span>บันทึก</span>
-					</button>
-				</div>
-			</div>
+			<FormHead
+				v-if="doc"
+				v-model="tab"
+				:tabs="is_contract ? CONTRACT_TABS : [{ value: 'main', label: kind.label }]"
+				:actions="actions"
+				:menu="menu"
+				:busy="busy"
+				:on-print="print_one"
+			/>
 
 			<Skeleton v-if="!doc" :rows="6" />
-			<template v-else>
-				<section class="ss-card ss-form">
+			<!-- สัญญาจ้าง จอ ≥1180: ฟอร์มซ้าย + ตัวอย่างเอกสาร real-time ขวา (ContractPreview, หน้าเดียวกับ PDF) -->
+			<div v-else :class="{ 'ec-split': split }">
+			<div class="ec-split-main">
+				<section v-show="tab === 'main'" class="ss-card ss-form">
 					<div v-if="doc.name" class="ss-doc-head-top">
 						<span class="ss-tag" :class="`tone-${doc.status_tone}`">{{
 							doc.status_label
@@ -166,6 +114,67 @@
 						<p v-if="view.can_edit_after" class="ss-muted">
 							สัญญายืนยันแล้ว แก้ได้เฉพาะผลทดลองงาน (พิมพ์แบบประเมินได้จากปุ่มด้านบน)
 						</p>
+					</template>
+
+					<!-- ---------- ใบเตือน ---------- -->
+					<template v-else-if="is_warning">
+						<div class="ss-form-row">
+							<label class="ss-field">
+								<span class="ss-field-label">วันที่ออกหนังสือ<em>*</em></span>
+								<DateInput v-model="doc.date" label="วันที่" :disabled="!editable" />
+							</label>
+							<label class="ss-field">
+								<span class="ss-field-label">ระดับ<em>*</em></span>
+								<SelectBox v-model="doc.level" :options="WARNING_LEVELS" label="ระดับ" :disabled="!editable" />
+							</label>
+							<label class="ss-field">
+								<span class="ss-field-label">เรื่อง<em>*</em></span>
+								<SelectBox v-model="doc.category" :options="WARNING_CATEGORIES" label="เรื่อง" :disabled="!editable" />
+							</label>
+							<label class="ss-field">
+								<span class="ss-field-label">วันที่เกิดเหตุ</span>
+								<DateInput v-model="doc.incident_date" label="วันที่เกิดเหตุ" :disabled="!editable" clearable />
+							</label>
+						</div>
+						<label class="ss-field">
+							<span class="ss-field-label">รายละเอียดการกระทำผิด<em>*</em></span>
+							<textarea v-model="doc.description" class="ss-input" rows="3" :disabled="!editable" placeholder="เช่น มาทำงานสาย 4 ครั้งในเดือนตุลาคม รวม 95 นาที"></textarea>
+						</label>
+						<div class="ss-form-row">
+							<label class="ss-field">
+								<span class="ss-field-label">ข้อบังคับ/ระเบียบที่ฝ่าฝืน</span>
+								<input v-model="doc.regulation" class="ss-input" :disabled="!editable" placeholder="เช่น ข้อบังคับเกี่ยวกับการทำงาน หมวด 5 ข้อ 3" />
+							</label>
+							<label class="ss-field">
+								<span class="ss-field-label">พยาน</span>
+								<input v-model="doc.witness" class="ss-input" :disabled="!editable" />
+							</label>
+						</div>
+						<label class="ss-field">
+							<span class="ss-field-label">สิ่งที่ต้องปรับปรุง / ผลหากทำผิดซ้ำ</span>
+							<textarea v-model="doc.corrective_action" class="ss-input" rows="2" :disabled="!editable"></textarea>
+						</label>
+						<div v-if="doc.previous?.length" class="ss-facts">
+							<div v-for="p in doc.previous" :key="p.name" class="ss-fact">
+								<span>เตือนแล้ว {{ thai_date(p.date, { year: true }) }} · {{ p.name }}</span>
+								<b>{{ LEVEL_LABEL[p.level] || p.level }} · {{ CATEGORY_LABEL[p.category] || p.category }}</b>
+							</div>
+						</div>
+						<template v-if="doc.name && doc.docstatus === 1">
+							<h2 class="ss-section-title">การรับทราบ</h2>
+							<div class="ss-form-row">
+								<label class="ss-toggle" :class="{ 'is-on': doc.acknowledged, 'is-readonly': !view.can_edit_after }">
+									<input v-model="doc.acknowledged" type="checkbox" :true-value="1" :false-value="0" :disabled="!view.can_edit_after" @change="doc.acknowledged && (doc.refused = 0)" />
+									<span class="ss-toggle-track"><span></span></span>
+									<span><b>พนักงานรับทราบแล้ว</b></span>
+								</label>
+								<label class="ss-toggle" :class="{ 'is-on': doc.refused, 'is-readonly': !view.can_edit_after }">
+									<input v-model="doc.refused" type="checkbox" :true-value="1" :false-value="0" :disabled="!view.can_edit_after" @change="doc.refused && (doc.acknowledged = 0)" />
+									<span class="ss-toggle-track"><span></span></span>
+									<span><b>ไม่ยอมลงชื่อรับทราบ</b><small>บันทึกต่อหน้าพยาน</small></span>
+								</label>
+							</div>
+						</template>
 					</template>
 
 					<!-- ---------- 50 ทวิ ---------- -->
@@ -267,7 +276,7 @@
 				</section>
 
 				<!-- รายการเงินได้ของ 50 ทวิ -->
-				<section v-if="!is_contract" class="ss-card">
+				<section v-if="is_wht" class="ss-card">
 					<div class="ss-table-wrap">
 						<table class="ss-table ss-table--list">
 							<thead>
@@ -358,8 +367,76 @@
 						</div>
 					</div>
 				</section>
-			</template>
+
+				<!-- ---------- เนื้อหาสัญญา (แม่แบบ + แก้เฉพาะฉบับ) ---------- -->
+				<section v-if="is_contract" v-show="tab === 'terms'" class="ss-card ss-form">
+					<div class="ss-form-row">
+						<label class="ss-field">
+							<span class="ss-field-label">แม่แบบสัญญา</span>
+							<SelectBox
+								:model-value="doc.contract_template || ''"
+								:options="template_options"
+								label="แม่แบบสัญญา"
+								placeholder="ไม่ใช้แม่แบบ"
+								:disabled="!editable"
+								@update:model-value="use_template"
+							/>
+						</label>
+						<label class="ss-field">
+							<span class="ss-field-label">ชื่อเอกสาร</span>
+							<input v-model="doc.heading" class="ss-input" :disabled="!editable" placeholder="สัญญาจ้างพนักงาน" />
+						</label>
+					</div>
+					<div class="ss-form-row">
+						<label class="ss-field">
+							<span class="ss-field-label">ตำแหน่ง</span>
+							<input v-model="doc.designation" class="ss-input" :disabled="!editable" />
+						</label>
+						<label class="ss-field">
+							<span class="ss-field-label">แผนก/ฝ่าย</span>
+							<input v-model="doc.department" class="ss-input" :disabled="!editable" />
+						</label>
+						<label class="ss-field">
+							<span class="ss-field-label">ผู้ลงนามฝ่ายนายจ้าง</span>
+							<input v-model="doc.employer_signer" class="ss-input" :disabled="!editable" placeholder="ว่าง = เว้นให้เขียน" />
+						</label>
+					</div>
+					<label class="ss-toggle" :class="{ 'is-on': doc.witnesses, 'is-readonly': !editable }">
+						<input v-model="doc.witnesses" type="checkbox" :true-value="1" :false-value="0" :disabled="!editable" />
+						<span class="ss-toggle-track"><span></span></span>
+						<span><b>มีช่องพยาน 2 คน</b><small>ท้ายสัญญาต่อจากช่องลงชื่อลูกจ้าง/นายจ้าง</small></span>
+					</label>
+					<div class="ec-terms-head">
+						<span class="ss-field-label">เนื้อหาสัญญา (แก้เฉพาะฉบับนี้ แม่แบบไม่เปลี่ยน)</span>
+						<button
+							v-if="editable && doc.contract_template && terms_changed"
+							type="button"
+							class="ss-link"
+							@click="use_template(doc.contract_template, true)"
+						>
+							<Icon name="undo" :size="14" /> คืนเป็นเนื้อหาแม่แบบ
+						</button>
+					</div>
+					<TermsEditor
+						v-model="doc.terms"
+						:variables="variables"
+						:disabled="!editable"
+						:indent_style="layout_obj.indent_style || 'first_line'"
+					/>
+					<p class="ss-muted ec-terms-note">
+						ข้อความ {{ "{" + "{ ... }" + "}" }} แทนด้วยข้อมูลของสัญญาตอนพิมพ์ ข้อมูลที่ว่าง = เส้นจุดให้เขียนด้วยมือ ข้อย่อยใช้ปุ่มเยื้อง
+					</p>
+				</section>
+			</div>
+			<aside v-if="split" class="ec-split-side">
+				<ContractPreview :data="preview_data" />
+			</aside>
+			</div>
 		</div>
+
+		<Sheet :open="preview_open" title="ตัวอย่างสัญญา" :subtitle="doc?.name || 'ยังไม่บันทึก'" full @close="preview_open = false">
+			<ContractPreview v-if="preview_open" :data="preview_data" class="ec-preview--sheet" />
+		</Sheet>
 
 		<Sheet
 			:open="confirm_submit"
@@ -368,7 +445,7 @@
 			@close="confirm_submit = false"
 		>
 			<p class="ss-note-line">
-				หลังยืนยันแก้ไขไม่ได้<template v-if="is_contract"> (ยกเว้นผลทดลองงาน)</template>
+				หลังยืนยันแก้ไขไม่ได้<template v-if="is_contract"> (ยกเว้นผลทดลองงาน)</template><template v-if="is_warning"> (ยกเว้นการรับทราบ)</template>
 				ถ้าผิดให้ยกเลิกแล้วทำใบใหม่
 			</p>
 			<template #footer>
@@ -430,11 +507,16 @@ import Picker from "../../../shared/components/Picker.vue";
 import SelectBox from "../../../shared/components/SelectBox.vue";
 import Sheet from "../../../shared/components/Sheet.vue";
 import Skeleton from "../../../shared/components/Skeleton.vue";
-import StatusTabs from "../../../shared/components/StatusTabs.vue";
 import TopBar from "../../../shared/components/TopBar.vue";
+import TermsEditor from "../../../shared/components/contract/TermsEditor.vue";
+import ContractPreview from "../../../shared/components/contract/ContractPreview.vue";
+import { use_wide } from "../../../shared/table.js";
+import FormHead from "../../../shared/components/FormHead.vue";
+import { LABELS, can_duplicate, doc_menu, duplicate_doc, step_actions } from "../../../shared/form_actions.js";
 import {
 	back,
 	boot,
+	thai_date,
 	call,
 	celebrate,
 	desk_url,
@@ -481,6 +563,18 @@ const CONTRACT_INPUT = [
 	"prob_days",
 	"prob_end_date",
 	"probation",
+	"contract_template",
+	"heading",
+	"designation",
+	"department",
+	"employer_signer",
+	"witnesses",
+	"terms",
+	"layout",
+];
+const CONTRACT_TABS = [
+	{ value: "main", label: "สัญญาจ้าง" },
+	{ value: "terms", label: "เนื้อหาสัญญา" },
 ];
 const WHT_INPUT = [
 	"company",
@@ -496,12 +590,34 @@ const WHT_INPUT = [
 	"date",
 ];
 
+// ใบเตือน (Employee Warning) ค่า Select ของ DocType → ข้อความ (ตรงกับ LEVEL_LABEL / CATEGORY_LABEL ใน employee_warning.py)
+const LEVEL_LABEL = { Verbal: "ตักเตือนด้วยวาจา", "Written 1": "หนังสือเตือนครั้งที่ 1", "Written 2": "หนังสือเตือนครั้งที่ 2", Final: "หนังสือเตือนครั้งสุดท้าย" };
+const CATEGORY_LABEL = { Late: "มาสาย", Absence: "ขาดงาน", Misconduct: "ประพฤติผิดวินัย", Safety: "ความปลอดภัย", Performance: "ผลงาน", Other: "อื่นๆ" };
+const WARNING_LEVELS = Object.entries(LEVEL_LABEL).map(([value, label]) => ({ value, label }));
+const WARNING_CATEGORIES = Object.entries(CATEGORY_LABEL).map(([value, label]) => ({ value, label }));
+const WARNING_INPUT = [
+	"employee",
+	"date",
+	"level",
+	"category",
+	"incident_date",
+	"description",
+	"regulation",
+	"corrective_action",
+	"witness",
+	"acknowledged",
+	"acknowledged_date",
+	"refused",
+];
+
 const reload_summary = inject("reload_summary");
 const params = state.route.params;
 const kind = HR_DOC_KINDS[params.kind] || HR_DOC_KINDS["hr-contracts"];
 const is_contract = params.kind === "hr-contracts";
-const DOCTYPE = is_contract ? "Employment Contract" : "WHT Employee";
-const INPUT = is_contract ? CONTRACT_INPUT : WHT_INPUT;
+const is_warning = params.kind === "hr-warnings";
+const is_wht = !is_contract && !is_warning;
+const DOCTYPE = is_contract ? "Employment Contract" : is_warning ? "Employee Warning" : "WHT Employee";
+const INPUT = is_contract ? CONTRACT_INPUT : is_warning ? WARNING_INPUT : WHT_INPUT;
 const companies = (boot.companies || []).map((c) => ({ value: c.name, label: c.name }));
 
 let key = 0;
@@ -533,6 +649,7 @@ const ready = computed(() => {
 	const d = doc.value;
 	if (!d?.company || !d.employee) return false;
 	if (is_contract) return !!d.date;
+	if (is_warning) return !!(d.date && d.level && d.category && d.description?.trim());
 	return !!(d.date && d.income_tax_form && d.tax_payer && d.address && d.items.length);
 });
 
@@ -541,7 +658,7 @@ const payload = () =>
 		name: doc.value.name,
 		modified: doc.value.modified,
 		...Object.fromEntries(INPUT.map((f) => [f, doc.value[f] ?? null])),
-		...(is_contract
+		...(!is_wht
 			? {}
 			: {
 					items: doc.value.items.map((r) => ({
@@ -560,6 +677,7 @@ function apply(result) {
 	view.value = result;
 	doc.value = {
 		...result.doc,
+		full_name: result.doc.full_name || result.doc.employee_name,
 		probation: result.doc.probation || "",
 		items: (result.doc.items || []).map((r) => ({ ...r, _key: ++key })),
 	};
@@ -575,11 +693,13 @@ async function pick_employee(option) {
 		if (info.company) d.company = info.company;
 		if (is_contract) {
 			if (!d.base && info.base) d.base = info.base;
+			d.designation ||= info.designation || "";
+			d.department ||= info.department || "";
 			if (!d.prob_start_date && info.date_of_joining) {
 				d.prob_start_date = info.date_of_joining;
 				set_prob_end();
 			}
-		} else {
+		} else if (is_wht) {
 			d.tax_id = info.custom_id_card || d.tax_id;
 			d.address = info.permanent_address || d.address;
 		}
@@ -658,18 +778,121 @@ async function load() {
 		const name = params.name && params.name !== "new" ? params.name : undefined;
 		const [result, types] = await Promise.all([
 			call(`${API}.get_doc`, { kind: params.kind, name, company: scope_args().company }),
-			is_contract ? [] : call(`${API}.income_types`),
+			is_wht ? call(`${API}.income_types`) : [],
 		]);
 		incomes.value = types;
 		apply(result);
 		if (!name) {
 			doc.value.date ??= today();
-			if (!is_contract && !doc.value.items.length) add_item();
+			if (is_wht && !doc.value.items.length) add_item();
 		}
 	} catch (e) {
 		show_error(e);
 		back(params.kind);
 	}
 }
-load();
+// หัวฟอร์ม: ร่าง → บันทึก → ยืนยัน → ยกเลิก (ยืนยันแล้วแก้ได้เฉพาะบางช่อง เช่น ผลทดลองงาน = บันทึก)
+const actions = computed(() => {
+	const v = view.value;
+	return step_actions({
+		stage: editable.value ? "draft" : "done",
+		is_new: !doc.value.name,
+		dirty: dirty.value,
+		save: editable.value && { run: save, disabled: !ready.value },
+		save_after: v.can_edit_after && { run: save, disabled: !ready.value },
+		submit: v.can_submit && { label: LABELS.confirm, run: () => (confirm_submit.value = true) },
+		cancel: v.can_cancel && (() => (confirm_cancel.value = true)),
+	});
+});
+// PDF ใบเดียว = ปุ่มพิมพ์ หลายแบบ = เลือกในเมนู ⋯ (ต้องบันทึกก่อนพิมพ์)
+const print_one = computed(() =>
+	(view.value.pdfs || []).length === 1 && !dirty.value ? () => (pdf.value = view.value.pdfs[0]) : null
+);
+const menu = computed(() => {
+	const pdfs = view.value.pdfs || [];
+	return doc_menu({
+		items: [
+			...(pdfs.length > 1 && !dirty.value
+				? pdfs.map((p) => ({ key: p.url, label: `พิมพ์${p.label}`, icon: "printer", run: () => (pdf.value = p) }))
+				: []),
+			// จอเล็ก (ไม่มีช่องตัวอย่างขวา) = ดูตัวอย่างในหน้าต่างเต็มจอ
+			...(is_contract && !split.value
+				? [{ key: "preview", label: "ดูตัวอย่างสัญญา", icon: "eye", run: () => (preview_open.value = true) }]
+				: []),
+		],
+		duplicate:
+			doc.value.name &&
+			can_duplicate(DOCTYPE) &&
+			(() => duplicate_doc(DOCTYPE, doc.value.name, "hr-doc", { kind: params.kind })),
+		refresh: doc.value.name && load,
+		desk: [DOCTYPE, doc.value.name],
+		remove: editable.value && view.value.can_delete && (() => (deleting.value = true)),
+	});
+});
+
+// ---------------------------------------------------------------- เนื้อหาสัญญา (consbiz/contract_terms.py)
+
+const split = use_wide(1180);
+const preview_open = ref(false);
+const templates = ref([]);
+const variables = ref([]);
+const template_terms = ref("");
+const template_options = computed(() => [
+	{ value: "", label: "ไม่ใช้แม่แบบ" },
+	...templates.value
+		.filter((t) => !t.disabled || t.name === doc.value?.contract_template)
+		.map((t) => ({ value: t.name, label: t.title + (t.company ? ` (${t.company})` : "") })),
+]);
+const layout_obj = computed(() => {
+	const v = doc.value?.layout;
+	try {
+		return typeof v === "string" ? JSON.parse(v || "{}") : v || {};
+	} catch {
+		return {};
+	}
+});
+const terms_changed = computed(() => (doc.value?.terms || "") !== template_terms.value);
+const preview_data = computed(() =>
+	Object.fromEntries(["name", "full_name", ...CONTRACT_INPUT].map((f) => [f, doc.value?.[f] ?? null]))
+);
+
+async function load_templates() {
+	if (!is_contract) return;
+	try {
+		const res = await call("consbiz.contract_terms.get_templates", { company: doc.value?.company });
+		templates.value = res.templates;
+		variables.value = res.variables;
+		if (doc.value?.contract_template) {
+			const t = await call("consbiz.contract_terms.get_template", { name: doc.value.contract_template });
+			template_terms.value = t.terms || "";
+		}
+	} catch (e) {
+		show_error(e);
+	}
+}
+// เลือกแม่แบบ = คัดลอกเนื้อหา/ชื่อเอกสาร/ผู้ลงนาม/พยาน ทับของฉบับนี้ (แก้ไปแล้วต้องยืนยันก่อน)
+async function use_template(name, reset = false) {
+	const d = doc.value;
+	if (!name) {
+		d.contract_template = null;
+		return;
+	}
+	if ((reset || d.terms) && terms_changed.value && !window.confirm("แทนเนื้อหาที่แก้ไว้ด้วยเนื้อหาแม่แบบ?")) return;
+	try {
+		const t = await call("consbiz.contract_terms.get_template", { name });
+		Object.assign(d, {
+			contract_template: name,
+			heading: t.heading,
+			employer_signer: t.employer_signer,
+			witnesses: t.witnesses,
+			terms: t.terms,
+			layout: t.layout,
+		});
+		template_terms.value = t.terms || "";
+	} catch (e) {
+		show_error(e);
+	}
+}
+
+load().then(load_templates);
 </script>

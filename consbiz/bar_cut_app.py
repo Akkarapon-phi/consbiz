@@ -12,7 +12,7 @@ from frappe import _
 from frappe.query_builder.functions import Sum
 from frappe.utils import cint, flt
 
-from consbiz import store_app
+from consbiz import row_social, store_app
 from consbiz.consbiz.doctype.bar_cut_plan.bar_cut_plan import SETTINGS, get_unit_weight, preview_cut_length
 
 DOCTYPE = "Bar Cut Plan"
@@ -41,7 +41,7 @@ def get_plans(project):
 	"""แผนตัดเหล็กของโครงการ (ใหม่สุดก่อน)"""
 	store_app.check_project(project)
 	frappe.has_permission(DOCTYPE, "read", throw=True)
-	rows = frappe.get_list(
+	rows = row_social.get_list(
 		DOCTYPE,
 		filters={"project": project},
 		fields=["name", "title", "date", "modified", "owner", *TOTALS],

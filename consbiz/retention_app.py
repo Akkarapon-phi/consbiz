@@ -15,7 +15,7 @@ import frappe
 from frappe import _
 from frappe.utils import cint, flt, getdate, nowdate
 
-from consbiz import retention, store_app
+from consbiz import retention, row_social, store_app
 
 LIST_LIMIT = 500
 SIDES = {
@@ -139,6 +139,19 @@ def party_names(side, parties):
 	)
 
 
+def set_project_names(rows):
+	projects = {r.project for r in rows if r.project}
+	names = {}
+	if projects:
+		names = dict(
+			frappe.get_all(
+				"Project", filters={"name": ("in", list(projects))}, fields=["name", "project_name"], as_list=True
+			)
+		)
+	for row in rows:
+		row.project_name = names.get(row.project)
+
+
 def label(side, role, row):
 	statuses = (SOURCE_STATUS if role == "source" else CLAIM_STATUS)[side]
 	text, tone = statuses.get(row.get("status"), statuses["Draft"])
@@ -204,7 +217,7 @@ def side_rows(side, role, filters):
 		fields += ["billed_amount", "paid_amount", "outstanding_amount"]
 	else:
 		fields += ["journal_entry"]
-	rows = frappe.get_list(
+	rows = row_social.get_list(
 		doctype,
 		filters=filters,
 		fields=fields,
@@ -248,6 +261,8 @@ def get_list(kind, company=None, project=None):
 	names = party_names(side, [r.party for r in rows])
 	for row in rows:
 		row.party_name = names.get(row.party) or row.party
+	if kind.startswith("acc-"):
+		set_project_names(rows)
 	rows.sort(key=lambda r: r.modified, reverse=True)
 	return rows
 
@@ -348,6 +363,7 @@ def source_view(doc, side):
 				claim.status,
 				claim.posting_date,
 				claim.journal_entry,
+				claim.modified,
 				item.amount,
 			)
 			.where(item.parenttype == s.claim)
@@ -355,6 +371,7 @@ def source_view(doc, side):
 			.orderby(claim.posting_date)
 			.run(as_dict=True)
 		)
+		row_social.attach(rows, s.claim)
 		jes = je_statuses([r.journal_entry for r in rows])
 		for row in rows:
 			row.je_status = jes.get(row.journal_entry)

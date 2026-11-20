@@ -6,38 +6,7 @@
 		<TopBar :title="title" :subtitle="doc?.name || 'ใหม่'" :back_to="params.kind" no_project />
 
 		<div class="ss-content">
-			<div v-if="doc" class="ss-list-head ss-list-head--many">
-				<StatusTabs v-model="tab" :options="tabs" />
-				<div class="ss-list-tools">
-					<a
-						v-if="doc.name"
-						class="ss-icon-btn"
-						:href="desk_url(view.doctype, doc.name)"
-						title="เปิดในระบบเต็ม"
-						aria-label="เปิดในระบบเต็ม"
-						><Icon name="external" :size="17"
-					/></a>
-					<button
-						v-if="view.can_delete"
-						type="button"
-						class="ss-btn ss-btn--ghost-danger ss-list-create"
-						:disabled="busy"
-						@click="deleting = true"
-					>
-						ลบ
-					</button>
-					<button
-						v-if="view.can_edit"
-						type="button"
-						class="ss-btn ss-btn--primary ss-list-create"
-						:disabled="busy || !dirty || !!missing.length"
-						:title="missing.length ? `ยังไม่ได้กรอก: ${missing.join(', ')}` : ''"
-						@click="save"
-					>
-						<Icon name="save" :size="18" /> <span>บันทึก</span>
-					</button>
-				</div>
-			</div>
+			<FormHead v-if="doc" many v-model="tab" :tabs="tabs" :actions="actions" :menu="menu" :busy="busy" />
 
 			<Skeleton v-if="!doc" :rows="6" />
 			<template v-else>
@@ -95,6 +64,15 @@
 										@select="(o) => pick(f, o)"
 									/>
 									<small v-if="f.note" class="ss-muted">{{ f.note }}</small>
+									<!-- จุดลงเวลา: ตั้ง/แก้ด้วย GPS (Shift Location) -->
+									<CheckinLocation
+										v-if="f.widget === 'checkin_location' && editable(f)"
+										v-model="doc[f.fieldname]"
+										:kind="params.kind"
+										:docname="doc.name"
+										:label="doc.project_name || doc.title || doc.first_name || ''"
+										@saved="(r) => (titles[f.fieldname] = r.location_name)"
+									/>
 								</template>
 
 								<!-- ตาราง (หน่วยแปลงของสินค้า) -->
@@ -266,13 +244,15 @@
 import { computed, ref } from "vue";
 import DateInput from "../../../shared/components/DateInput.vue";
 import DeleteSheet from "../../../shared/components/DeleteSheet.vue";
+import CheckinLocation from "./CheckinLocation.vue";
 import Icon from "../../../shared/components/Icon.vue";
 import MoneyInput from "../../../shared/components/MoneyInput.vue";
 import Picker from "../../../shared/components/Picker.vue";
 import SelectBox from "../../../shared/components/SelectBox.vue";
 import Skeleton from "../../../shared/components/Skeleton.vue";
-import StatusTabs from "../../../shared/components/StatusTabs.vue";
 import TopBar from "../../../shared/components/TopBar.vue";
+import FormHead from "../../../shared/components/FormHead.vue";
+import { LABELS, doc_menu, step_actions } from "../../../shared/form_actions.js";
 import {
 	back,
 	call,
@@ -445,5 +425,26 @@ async function load() {
 		back(params.kind);
 	}
 }
+// หัวฟอร์ม: ข้อมูลหลักไม่มีขั้นอนุมัติ มีแค่บันทึก
+const actions = computed(() =>
+	step_actions({
+		stage: "draft",
+		is_new: !doc.value.name,
+		dirty: dirty.value,
+		save: view.value.can_edit && {
+			run: save,
+			disabled: !!missing.value.length,
+			title: missing.value.length ? `ยังไม่ได้กรอก: ${missing.value.join(", ")}` : "",
+		},
+	})
+);
+const menu = computed(() =>
+	doc_menu({
+		refresh: doc.value.name && load,
+		desk: [view.value.doctype, doc.value.name],
+		remove: view.value.can_delete && (() => (deleting.value = true)),
+	})
+);
+
 load();
 </script>

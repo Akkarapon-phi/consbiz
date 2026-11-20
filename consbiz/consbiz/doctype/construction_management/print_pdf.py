@@ -14,8 +14,9 @@ from frappe import _
 from frappe.utils import flt
 
 MAX_HTML = 30 * 1024 * 1024
-FONT_FILE = "NotoSansThai-Variable-thai.woff2"
-FONT_URL = re.compile(r'url\("[^"()]*/' + re.escape(FONT_FILE) + r'"\)')
+# ไฟล์ฟอนต์ที่ print.js อ้าง (PRINT_FACES: ตัวไทย + ตัวเลข/อังกฤษ) แทนด้วย base64
+FONT_FILES = ("NotoSansThai-Variable-thai.woff2", "NotoSansThai-Variable-latin.woff2")
+FONT_URL = re.compile(r'url\("[^"()]*/(' + "|".join(map(re.escape, FONT_FILES)) + r')"\)')
 PAGE_ROUNDING_MM = 0.5
 LOCAL_CLIP = re.compile(r"^url\(#[\w-]+\)$")
 BLOCKED_CSS = ("url(", "@import", "expression(", "javascript:")
@@ -64,10 +65,17 @@ def check_css(text):
 
 
 def embed_font(html):
-	path = frappe.get_app_path("consbiz", "public", "fonts", "noto-sans-thai", FONT_FILE)
-	with open(path, "rb") as file:
-		data = base64.b64encode(file.read()).decode()
-	return FONT_URL.sub(f'url("data:font/woff2;base64,{data}")', html)
+	cache = {}
+
+	def data_uri(match):
+		name = match.group(1)
+		if name not in cache:
+			path = frappe.get_app_path("consbiz", "public", "fonts", "noto-sans-thai", name)
+			with open(path, "rb") as file:
+				cache[name] = base64.b64encode(file.read()).decode()
+		return f'url("data:font/woff2;base64,{cache[name]}")'
+
+	return FONT_URL.sub(data_uri, html)
 
 
 @frappe.whitelist(methods=["POST"])

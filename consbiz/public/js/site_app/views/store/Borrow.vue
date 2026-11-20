@@ -16,36 +16,19 @@
 		</TopBar>
 
 		<div class="ss-content">
-			<div v-if="wide" class="ss-list-head">
-				<StatusTabs v-model="tab" :options="tabs" />
-				<div class="ss-list-tools">
+			<ListHead
+				v-if="wide"
+				v-model="tab"
+				:tabs="tabs"
+				v-model:search="txt"
+				search_placeholder="ค้นหาเลขที่ ผู้ยืม หรืออุปกรณ์"
+				:loading="loading"
+				:create="boot.can.borrow ? 'ยืมอุปกรณ์' : ''"
+				@refresh="load"
+				@create="go('borrow-new')"
+			>
+				<template v-if="tab === 'out'" #filters>
 					<button
-						v-if="boot.can.borrow"
-						type="button"
-						class="ss-btn ss-btn--primary ss-list-create"
-						@click="go('borrow-new')"
-					>
-						<Icon name="plus" :size="18" :stroke="2.6" />
-						<span>ยืมอุปกรณ์</span>
-					</button>
-					<button
-						type="button"
-						class="ss-icon-btn"
-						:class="{ 'is-spinning': loading }"
-						aria-label="โหลดใหม่"
-						@click="load"
-					>
-						<Icon name="refresh" :size="17" />
-					</button>
-				</div>
-				<!-- แถวตัวกรอง: ค้นหา + ตัวกรองของหน้า -->
-				<div class="ss-list-filterbar">
-					<ListSearch
-						v-model="txt"
-						:placeholder="'ค้นหาเลขที่ ผู้ยืม หรืออุปกรณ์'"
-					/>
-					<button
-						v-if="tab === 'out'"
 						type="button"
 						class="ss-tool ss-tool--toggle"
 						:class="{ 'is-active': only_overdue }"
@@ -54,8 +37,8 @@
 					>
 						<Icon name="alert" :size="15" /> เกินกำหนด
 					</button>
-				</div>
-			</div>
+				</template>
+			</ListHead>
 			<Segmented v-else v-model="tab" :options="tabs" />
 
 			<Skeleton v-if="data === null" />
@@ -227,8 +210,7 @@ import Segmented from "../../../shared/components/Segmented.vue";
 import Skeleton from "../../../shared/components/Skeleton.vue";
 import Empty from "../../../shared/components/Empty.vue";
 import DataTable from "../../../shared/components/DataTable.vue";
-import StatusTabs from "../../../shared/components/StatusTabs.vue";
-import ListSearch from "../../../shared/components/ListSearch.vue";
+import ListHead from "../../../shared/components/ListHead.vue";
 import { matches, use_wide } from "../../../shared/table.js";
 import {
 	boot,

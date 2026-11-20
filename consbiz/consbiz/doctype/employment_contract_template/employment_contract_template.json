@@ -1,0 +1,148 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "field:title",
+ "creation": "2026-11-18 12:00:00.000000",
+ "description": "แม่แบบเนื้อหาสัญญาจ้างพนักงาน (หมวดบุคคล > ตั้งค่า) สัญญาแต่ละฉบับคัดลอกเนื้อหาไปแก้เฉพาะคนได้ ตัวแปร {{ ... }} แทนค่าตอนพิมพ์ (consbiz/contract_terms.py)",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "title",
+  "company",
+  "is_default",
+  "disabled",
+  "column_break_main",
+  "heading",
+  "employer_signer",
+  "witnesses",
+  "description",
+  "layout",
+  "section_break_terms",
+  "terms"
+ ],
+ "fields": [
+  {
+   "fieldname": "title",
+   "fieldtype": "Data",
+   "label": "ชื่อแม่แบบ",
+   "reqd": 1,
+   "unique": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "label": "บริษัท",
+   "options": "Company",
+   "in_list_view": 1,
+   "description": "ว่าง = ใช้ได้ทุกบริษัท"
+  },
+  {
+   "fieldname": "is_default",
+   "fieldtype": "Check",
+   "label": "แม่แบบเริ่มต้น",
+   "default": "0",
+   "in_list_view": 1,
+   "description": "สัญญาใหม่ใช้แม่แบบนี้ก่อน (ของบริษัทนั้น > ของทุกบริษัท)"
+  },
+  {
+   "fieldname": "disabled",
+   "fieldtype": "Check",
+   "label": "ปิดใช้งาน",
+   "default": "0"
+  },
+  {
+   "fieldname": "column_break_main",
+   "fieldtype": "Column Break",
+   "label": ""
+  },
+  {
+   "fieldname": "heading",
+   "fieldtype": "Data",
+   "label": "ชื่อเอกสาร",
+   "default": "สัญญาจ้างพนักงาน"
+  },
+  {
+   "fieldname": "employer_signer",
+   "fieldtype": "Data",
+   "label": "ผู้ลงนามฝ่ายนายจ้าง",
+   "description": "ชื่อในวงเล็บใต้ช่องลงชื่อนายจ้าง ว่าง = เว้นให้เขียน"
+  },
+  {
+   "fieldname": "witnesses",
+   "fieldtype": "Check",
+   "label": "มีช่องพยาน 2 คน",
+   "default": "0"
+  },
+  {
+   "fieldname": "description",
+   "fieldtype": "Small Text",
+   "label": "หมายเหตุ (HR เห็นคนเดียว)"
+  },
+  {
+   "fieldname": "section_break_terms",
+   "fieldtype": "Section Break",
+   "label": "เนื้อหาสัญญา"
+  },
+  {
+   "fieldname": "terms",
+   "fieldtype": "Text Editor",
+   "label": "เนื้อหาสัญญา",
+   "reqd": 1,
+   "description": "ใส่ข้อมูลของแต่ละสัญญาด้วยตัวแปร เช่น {{ employee_name }} {{ designation }} {{ base }} (รายการตัวแปรอยู่ในหน้าแก้แม่แบบของแอป)"
+  },
+  {
+   "fieldname": "layout",
+   "fieldtype": "JSON",
+   "label": "รูปแบบหน้ากระดาษ",
+   "description": "ฟอนต์ ขนาด ระยะบรรทัด ขอบกระดาษ (มม.) การย่อหน้า: consbiz/contract_terms.py LAYOUT"
+  }
+ ],
+ "links": [],
+ "modified": "2026-11-18 15:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "ConsBiz",
+ "name": "Employment Contract Template",
+ "naming_rule": "By fieldname",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "create": 1,
+   "write": 1,
+   "delete": 1
+  },
+  {
+   "role": "HR Manager",
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "create": 1,
+   "write": 1,
+   "delete": 1
+  },
+  {
+   "role": "HR User",
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "title"
+}

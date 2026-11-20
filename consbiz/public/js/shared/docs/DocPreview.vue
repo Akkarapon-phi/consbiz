@@ -1,5 +1,5 @@
 <!-- ตัวอย่างเอกสารข้างตารางรายการ (จอ ≥1480, DocList.vue) ดูได้โดยไม่เปลี่ยนหน้า
-     ข้อมูลเดียวกับหน้าดู (site_docs.get_doc) แบบย่อ + ปุ่ม PDF / แก้ไข / ส่ง / สร้างเอกสารถัดไป / เปิดเต็มหน้า -->
+     ข้อมูลเดียวกับหน้าดู (site_docs.get_doc) แบบย่อ + ปุ่ม PDF / แก้ไข / ยืนยัน / สร้างเอกสารถัดไป / เปิดเต็มหน้า -->
 <template>
 	<aside class="ss-preview" :aria-label="`ตัวอย่าง ${name}`">
 		<header class="ss-preview-head">
@@ -97,7 +97,9 @@
 
 		<footer v-if="doc" class="ss-preview-foot">
 			<template v-if="confirm">
-				<span class="ss-preview-confirm">ส่งแล้วแก้ไขไม่ได้ ยืนยัน?</span>
+				<span class="ss-preview-confirm"
+					>{{ doc.approval?.words.do || "ยืนยัน" }}แล้วแก้ไขไม่ได้ {{ doc.approval?.words.do || "ยืนยัน" }}?</span
+				>
 				<button type="button" class="ss-btn ss-btn--ghost ss-btn--sm" @click="confirm = false">
 					ยกเลิก
 				</button>
@@ -108,7 +110,7 @@
 					@click="submit"
 				>
 					<span v-if="busy" class="ss-spinner"></span>
-					<template v-else>ยืนยันส่ง</template>
+					<template v-else>{{ doc.approval?.words.do || "ยืนยัน" }}</template>
 				</button>
 			</template>
 			<template v-else>
@@ -151,7 +153,7 @@
 					v-if="doc.can_edit"
 					type="button"
 					class="ss-btn ss-btn--ghost ss-btn--sm"
-					@click="go(`${config.section}-form`, { kind, name })"
+					@click="go_doc(kind, 'form', { name })"
 				>
 					<Icon name="pen" :size="15" /> แก้ไข
 				</button>
@@ -161,13 +163,13 @@
 					class="ss-btn ss-btn--primary ss-btn--sm"
 					@click="confirm = true"
 				>
-					ส่ง{{ config.label }}
+					{{ doc.approval?.words.do || "ยืนยัน" }}{{ config.label }}
 				</button>
 				<button
 					v-else-if="doc.next_kind && in_app(doc.next_kind)"
 					type="button"
 					class="ss-btn ss-btn--primary ss-btn--sm"
-					@click="go(`${config.section}-form`, { kind: doc.next_kind, name: 'new', source: name })"
+					@click="go_doc(doc.next_kind, 'form', { name: 'new', source: name })"
 				>
 					<Icon name="plus" :size="15" :stroke="2.6" /> สร้าง{{ DOC_KINDS[doc.next_kind].label }}
 				</button>
@@ -193,8 +195,8 @@ import Icon from "../components/Icon.vue";
 import Skeleton from "../components/Skeleton.vue";
 import PdfViewer from "../components/PdfViewer.vue";
 import DeleteSheet from "../components/DeleteSheet.vue";
-import { DOC_KINDS, in_app } from "./kinds.js";
-import { call, celebrate, desk_url, go, money, num, post, show_error, thai_date } from "../api.js";
+import { DOC_KINDS, go_doc, in_app } from "./kinds.js";
+import { call, celebrate, desk_url, money, num, post, show_error, thai_date } from "../api.js";
 
 const props = defineProps({ kind: String, name: String });
 // แสดงรายการแค่ 3 แถวแรก (แผงต้องพอดีจอโน้ตบุ๊กโดยไม่ต้องเลื่อน) ที่เหลือดูในหน้าเต็ม
@@ -226,13 +228,15 @@ async function load() {
 	}
 }
 
-const open_full = () => go(`${config.value.section}-doc`, { kind: props.kind, name: props.name });
+const open_full = () => go_doc(props.kind, "doc", { name: props.name });
 
 async function submit() {
 	busy.value = true;
 	try {
-		await post("consbiz.site_docs.submit_doc", { kind: props.kind, name: props.name });
-		await celebrate(`ส่ง${config.value.label}แล้ว`, props.name);
+		// ขั้นอนุมัติ/ลงนาม (consbiz/doc_approval.py) แจ้งผู้ส่งด้วย
+		if (doc.value?.approval) await post("consbiz.doc_approval.approve", { kind: props.kind, name: props.name });
+		else await post("consbiz.site_docs.submit_doc", { kind: props.kind, name: props.name });
+		await celebrate(`${doc.value?.approval?.words.do || "ยืนยัน"}${config.value.label}แล้ว`, props.name);
 		emit("changed");
 		await load();
 	} catch (error) {

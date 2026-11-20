@@ -1,5 +1,5 @@
 <template>
-	<div class="ss-has-bar">
+	<div>
 		<TopBar
 			:title="doc.name ? doc.task_name || doc.wbs || doc.name : 'เทคอนกรีต'"
 			:subtitle="doc.name || 'บันทึกใหม่'"
@@ -12,6 +12,16 @@
 		</TopBar>
 
 		<div class="ss-content">
+			<FormHead
+				v-if="setup"
+				model-value="main"
+				:tabs="[{ value: 'main', label: 'เทคอนกรีต' }]"
+				:actions="actions"
+				:menu="menu"
+				:busy="saving"
+			>
+				<template #summary><b>{{ num(total) }}</b> คิว</template>
+			</FormHead>
 			<Skeleton v-if="!setup" :rows="3" />
 			<template v-else>
 				<div class="ss-split">
@@ -157,39 +167,6 @@
 			</template>
 		</div>
 
-		<Teleport to="#ss-layer">
-			<Transition name="ss-bar">
-				<div v-if="setup && (!readonly || doc.can_delete)" class="ss-bottom-bar">
-					<button
-						v-if="doc.can_delete"
-						type="button"
-						class="ss-btn ss-btn--ghost-danger ss-btn--lg"
-						@click="deleting = true"
-					>
-						<Icon name="trash" :size="17" /> ลบ
-					</button>
-					<button
-						v-if="!readonly"
-						type="button"
-						class="ss-btn ss-btn--ghost ss-btn--lg"
-						:disabled="saving"
-						@click="save(0)"
-					>
-						บันทึกร่าง
-					</button>
-					<button
-						v-if="!readonly && boot.can.concrete_submit"
-						type="button"
-						class="ss-btn ss-btn--primary ss-btn--lg ss-grow"
-						:disabled="saving || !doc.tickets.length"
-						@click="save(1)"
-					>
-						<span v-if="saving" class="ss-spinner"></span>
-						<template v-else>ยืนยัน {{ num(total) }} คิว</template>
-					</button>
-				</div>
-			</Transition>
-		</Teleport>
 
 		<DeleteSheet
 			:open="deleting"
@@ -323,6 +300,8 @@
 </template>
 
 <script setup>
+import FormHead from "../../../shared/components/FormHead.vue";
+import { LABELS, can_duplicate, doc_menu, duplicate_doc, step_actions } from "../../../shared/form_actions.js";
 import { computed, inject, nextTick, reactive, ref } from "vue";
 import DateInput from "../../../shared/components/DateInput.vue";
 import Icon from "../../../shared/components/Icon.vue";
@@ -377,6 +356,37 @@ const doc = reactive({
 const readonly = computed(() => doc.docstatus !== 0 || doc.can_write === false);
 const deleting = ref(false);
 const total = computed(() => doc.tickets.reduce((s, t) => s + (Number(t.qty) || 0), 0));
+// ค่าที่บันทึกล่าสุด: ต่างจากนี้ = ยังไม่บันทึก (หัวฟอร์มแสดงปุ่มบันทึกก่อนยืนยัน)
+const saved = ref("");
+const snapshot = () => JSON.stringify({ ...doc, tickets: doc.tickets.map(({ _key, ...t }) => t) });
+const dirty = computed(() => snapshot() !== saved.value);
+
+// หัวฟอร์ม: ร่าง → บันทึก → ยืนยัน (ตามจำนวนคิว)
+const actions = computed(() =>
+	step_actions({
+		stage: readonly.value ? "done" : "draft",
+		is_new: !doc.name,
+		dirty: dirty.value,
+		save: !readonly.value && (() => save(0)),
+		submit: !readonly.value &&
+			boot.can.concrete_submit && {
+				label: `${LABELS.confirm} ${num(total.value)} คิว`,
+				disabled: !doc.tickets.length,
+				run: () => save(1),
+			},
+	})
+);
+const menu = computed(() =>
+	doc_menu({
+		duplicate:
+			doc.name &&
+			can_duplicate("Concrete Usage") &&
+			(() => duplicate_doc("Concrete Usage", doc.name, "concrete-form")),
+		refresh: doc.name && load,
+		desk: boot.desk ? ["Concrete Usage", doc.name] : null,
+		remove: doc.can_delete && (() => (deleting.value = true)),
+	})
+);
 
 function new_ticket() {
 	const last = doc.tickets[doc.tickets.length - 1];
@@ -444,6 +454,7 @@ async function save(submit) {
 			back("concrete");
 		} else {
 			doc.name = result.name;
+			saved.value = snapshot();
 			show_saved();
 			if (!params.name) go("concrete-form", { name: result.name }, { replace: true });
 		}
@@ -484,6 +495,7 @@ async function load() {
 			}
 		}
 		setup.value = s;
+		saved.value = existing ? snapshot() : "";
 	} catch (error) {
 		show_error(error);
 		back("concrete");

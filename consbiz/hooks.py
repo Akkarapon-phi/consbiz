@@ -121,7 +121,7 @@ doc_events = {
     "Payment Entry": {
         "on_submit": [
             "consbiz.api.update_si_tax",
-            # จ่ายใบเบิกจากแอป Self Service: หักเงินเดือนล่วงหน้าเป็นงวด / ตั้งกำหนดเคลียร์เงินสำรองจ่าย
+            # จ่ายใบเบิกจากแอป Self Service: หักเงินเดือนล่วงหน้าเป็นงวด / ตั้งกำหนดเคลียร์เงินทดรองจ่าย
             "consbiz.self_advance.on_payment_entry_submit"
         ]
     },
@@ -141,8 +141,17 @@ doc_events = {
 
     "Purchase Invoice": {
         # ตัดสต็อกในใบเดียว (update_stock): คลังวัสดุผู้ว่าจ้างรับของบริษัทไม่ได้ (consbiz/site_stock.py)
-        "validate": "consbiz.site_stock.validate_warehouses",
-        "on_submit": "consbiz.retention.create_from_invoice",
+        "validate": [
+            "consbiz.site_stock.validate_warehouses",
+            "consbiz.doc_approval.guard_pending"
+        ],
+        # ส่งลงนาม/ลงนาม (consbiz/doc_approval.py): Submit ต้องมี Role ผู้ลงนามที่ตั้งในแอป
+        "before_submit": "consbiz.doc_approval.guard_submit",
+        "on_submit": [
+            "consbiz.retention.create_from_invoice",
+            # แจ้งผู้ส่งว่าลงนามแล้ว (ทุกทาง รวมยืนยันหลายใบ)
+            "consbiz.doc_approval.after_submit"
+        ],
         "before_cancel": "consbiz.retention.cancel_from_invoice"
     },
 
@@ -155,8 +164,21 @@ doc_events = {
             "consbiz.consbiz.doctype.construction_material_plan.construction_material_plan.set_item_project",
             "consbiz.site_stock.validate_wbs",
             # ยอดเงิน/ภาษีของ MR สูตรเดียวกับ material_request.js (แอปหน้างานใช้ค่าจากที่นี่)
-            "consbiz.request_totals.calculate"
-        ]
+            "consbiz.request_totals.calculate",
+            "consbiz.doc_approval.guard_pending"
+        ],
+        # ส่งอนุมัติ/อนุมัติ (consbiz/doc_approval.py): Submit ต้องมี Role ผู้อนุมัติที่ตั้งในแอป
+        "before_submit": "consbiz.doc_approval.guard_submit",
+        "on_submit": "consbiz.doc_approval.after_submit",
+        # ใบที่ไม่อนุมัติแล้วเก็บเป็นประวัติ
+        "on_trash": "consbiz.doc_approval.guard_trash"
+    },
+
+    # ส่งลงนาม/ลงนาม (consbiz/doc_approval.py)
+    "Purchase Order": {
+        "validate": "consbiz.doc_approval.guard_pending",
+        "before_submit": "consbiz.doc_approval.guard_submit",
+        "on_submit": "consbiz.doc_approval.after_submit"
     },
 
     # สต็อกหน้างาน (consbiz/site_stock.py): คลังวัสดุผู้ว่าจ้างแยกจากคลังบริษัท, เบิกตัดคลังผู้ว่าจ้างก่อน, WBS ของรายการ
@@ -203,7 +225,7 @@ scheduler_events = {
         "consbiz.retention.update_overdue",
         # ลบรูปเซลฟี่ของการลงเวลาเมื่อ Salary Slip ของงวดนั้นผ่านไป 90 วัน (ยกเว้นติ๊กเก็บหลักฐาน)
         "consbiz.self_service.purge_selfies",
-        # เงินสำรองจ่ายเลยกำหนดเคลียร์: แจ้งเตือนพนักงาน
+        # เงินทดรองจ่ายเลยกำหนดเคลียร์: แจ้งเตือนพนักงาน
         "consbiz.self_advance.remind_overdue_clearing"
     ]
 }
@@ -287,6 +309,8 @@ jinja = {
 		"consbiz.utils.name_with_title",
 		"consbiz.utils.thai_baht_text",
 		"consbiz.utils.image_data_uri",
+		"consbiz.contract_terms.render_contract",
+		"consbiz.purchase_order_print.render_purchase_order",
 	]
 }
 # jinja = {

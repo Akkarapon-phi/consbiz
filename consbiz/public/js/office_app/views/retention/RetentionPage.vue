@@ -6,91 +6,15 @@
 		<TopBar :title="title" :subtitle="doc?.party_name" :back_to="list_view" />
 
 		<div class="ss-content">
-			<div v-if="doc" class="ss-list-head">
-				<StatusTabs v-model="tab" :options="TABS" />
-				<div class="ss-list-tools">
-					<a
-						v-if="doc.name"
-						class="ss-icon-btn"
-						:href="desk_url(doc.doctype, doc.name)"
-						title="เปิดในระบบเต็ม"
-						aria-label="เปิดในระบบเต็ม"
-						><Icon name="external" :size="17"
-					/></a>
-					<button
-						v-if="view.pdf_url"
-						type="button"
-						class="ss-icon-btn"
-						title="PDF"
-						aria-label="PDF"
-						@click="pdf = true"
-					>
-						<Icon name="printer" :size="17" />
-					</button>
-					<!-- เงินประกันที่ถูกหัก -->
-					<template v-if="source">
-						<button
-							v-if="view.can_claim"
-							type="button"
-							class="ss-btn ss-btn--primary ss-list-create"
-							@click="make_claim"
-						>
-							<Icon name="plus" :size="18" />
-							<span>ทำ{{ text.claim }}</span>
-						</button>
-					</template>
-					<!-- ใบขอคืน / ใบคืน -->
-					<template v-else-if="editable">
-						<button
-							v-if="view.can_delete"
-							type="button"
-							class="ss-btn ss-btn--ghost-danger ss-list-create"
-							:disabled="busy"
-							@click="deleting = true"
-						>
-							ลบ
-						</button>
-						<button
-							v-if="view.can_submit"
-							type="button"
-							class="ss-btn ss-btn--soft ss-list-create"
-							:disabled="busy || dirty"
-							:title="dirty ? 'บันทึกก่อนยืนยัน' : ''"
-							@click="confirm_submit = true"
-						>
-							ยืนยัน{{ text.claim_short }}
-						</button>
-						<button
-							type="button"
-							class="ss-btn ss-btn--primary ss-list-create"
-							:disabled="busy || !dirty || !can_save"
-							@click="save"
-						>
-							<Icon name="save" :size="18" /> <span>บันทึก</span>
-						</button>
-					</template>
-					<template v-else>
-						<button
-							v-if="view.can_cancel"
-							type="button"
-							class="ss-btn ss-btn--ghost-danger ss-list-create"
-							:disabled="busy"
-							@click="confirm_cancel = true"
-						>
-							ยกเลิก
-						</button>
-						<button
-							v-if="view.can_pay"
-							type="button"
-							class="ss-btn ss-btn--primary ss-list-create"
-							:disabled="busy"
-							@click="open_pay"
-						>
-							<Icon name="receive" :size="18" /> <span>{{ text.pay }}</span>
-						</button>
-					</template>
-				</div>
-			</div>
+			<FormHead
+				v-if="doc"
+				v-model="tab"
+				:tabs="TABS"
+				:actions="actions"
+				:menu="menu"
+				:busy="busy"
+				:on-print="view.pdf_url ? () => (pdf = true) : null"
+			/>
 
 			<Skeleton v-if="!doc" :rows="6" />
 
@@ -178,10 +102,11 @@
 						<table class="ss-table ss-table--list">
 							<thead>
 								<tr>
-									<th>เลขที่</th>
+									<th>{{ accounting_list ? "เลขที่ / สถานะ" : "เลขที่" }}</th>
 									<th>วันที่</th>
 									<th class="is-num">ยอด</th>
-									<th>สถานะ</th>
+									<th v-if="!accounting_list">สถานะ</th>
+									<th class="col-modified"></th>
 								</tr>
 							</thead>
 							<tbody>
@@ -192,6 +117,9 @@
 								>
 									<td>
 										<span class="ss-doc-no">{{ c.name }}</span>
+										<small v-if="accounting_list && c.status_label">
+											<span class="ss-tag" :class="`tone-${c.status_tone}`">{{ c.status_label }}</span>
+										</small>
 									</td>
 									<td>
 										{{
@@ -203,11 +131,12 @@
 									<td class="is-num">
 										<b>{{ money(c.amount) }}</b>
 									</td>
-									<td>
+									<td v-if="!accounting_list">
 										<span class="ss-tag" :class="`tone-${c.status_tone}`">{{
 											c.status_label
 										}}</span>
 									</td>
+									<ModifiedCell :value="c.modified" :row="c" />
 								</tr>
 							</tbody>
 						</table>
@@ -531,6 +460,7 @@
 </template>
 
 <script setup>
+import ModifiedCell from "../../../shared/components/ModifiedCell.vue";
 import { computed, inject, ref } from "vue";
 import DateInput from "../../../shared/components/DateInput.vue";
 import DeleteSheet from "../../../shared/components/DeleteSheet.vue";
@@ -542,8 +472,9 @@ import Picker from "../../../shared/components/Picker.vue";
 import SelectBox from "../../../shared/components/SelectBox.vue";
 import Sheet from "../../../shared/components/Sheet.vue";
 import Skeleton from "../../../shared/components/Skeleton.vue";
-import StatusTabs from "../../../shared/components/StatusTabs.vue";
 import TopBar from "../../../shared/components/TopBar.vue";
+import FormHead from "../../../shared/components/FormHead.vue";
+import { LABELS, doc_menu, step_actions } from "../../../shared/form_actions.js";
 import {
 	back,
 	boot,
@@ -566,6 +497,7 @@ const reload_summary = inject("reload_summary");
 const params = state.route.params;
 const page = state.route.view;
 const list_view = DOC_PAGES[page];
+const accounting_list = list_view.startsWith("acc-");
 const side = SIDE_OF_TYPE[params.type] || "in";
 const text = SIDE_TEXT[side];
 const source = is_source(params.type);
@@ -816,5 +748,31 @@ async function load() {
 		back(list_view);
 	}
 }
+// หัวฟอร์ม เงินประกันที่ถูกหัก: ทำใบขอคืน/ใบคืน, ใบขอคืน/ใบคืน: ร่าง → บันทึก → ยืนยัน → บันทึกรับ/จ่ายเงิน
+const actions = computed(() => {
+	const d = doc.value;
+	const v = view.value;
+	const claim = v.can_claim && { label: `ทำ${text.claim}`, icon: "plus", run: make_claim };
+	if (source) return step_actions({ stage: "done", next: [claim] });
+	return step_actions({
+		stage: editable.value ? "draft" : "done",
+		is_new: !d.name,
+		dirty: dirty.value,
+		save: editable.value && { run: save, disabled: !can_save.value },
+		submit: v.can_submit && { label: LABELS.confirm, run: () => (confirm_submit.value = true) },
+		cancel: v.can_cancel && (() => (confirm_cancel.value = true)),
+		next: [v.can_pay && { label: text.pay, icon: "receive", run: open_pay }, claim],
+	});
+});
+const menu = computed(() => {
+	const d = doc.value;
+	const v = view.value;
+	return doc_menu({
+		refresh: d.name && load,
+		desk: [d.doctype, d.name],
+		remove: !source && editable.value && v.can_delete && (() => (deleting.value = true)),
+	});
+});
+
 load();
 </script>

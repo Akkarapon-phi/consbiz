@@ -5,14 +5,15 @@
 	<div class="ss-perm">
 		<Skeleton v-if="!setup || !rules" :rows="6" />
 		<template v-else>
-			<div class="ss-list-head ss-list-head--many">
-				<StatusTabs v-model="active" :options="tabs" />
-				<div class="ss-list-tools">
+			<ListHead
+				many
+				v-model="active"
+				:tabs="tabs"
+				create="เพิ่ม Role"
+				@create="open_picker"
+			>
+				<template #tools>
 					<div ref="adder" class="ss-perm-add">
-						<button type="button" class="ss-btn ss-btn--primary ss-list-create" @click="open_picker">
-							<Icon name="plus" :size="18" :stroke="2.6" />
-							<span>เพิ่ม Role</span>
-						</button>
 						<div v-if="picking" class="ss-perm-picker">
 							<input
 								ref="search"
@@ -31,8 +32,8 @@
 							</div>
 						</div>
 					</div>
-				</div>
-			</div>
+				</template>
+			</ListHead>
 
 			<p class="ss-muted ss-perm-note">มีผลทันทีทั้งแอปและระบบเต็ม ผู้ใช้ต้องโหลดหน้าใหม่จึงจะเห็นเมนูและปุ่มที่เปลี่ยน</p>
 
@@ -97,7 +98,7 @@ import { computed, nextTick, onBeforeUnmount, reactive, ref } from "vue";
 import Icon from "../Icon.vue";
 import Empty from "../Empty.vue";
 import Skeleton from "../Skeleton.vue";
-import StatusTabs from "../StatusTabs.vue";
+import ListHead from "../ListHead.vue";
 import { MODULE_META } from "../../modules.js";
 import { call, post, show_error } from "../../api.js";
 

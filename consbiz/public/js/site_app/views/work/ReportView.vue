@@ -1,34 +1,22 @@
 <template>
-	<div class="ss-has-bar">
+	<div>
 		<TopBar
 			:title="kind.label"
 			:subtitle="params.name"
 			back_to="reports"
 			:back_params="doc ? { day: doc.date } : {}"
-		>
-			<template #actions>
-				<button
-					v-if="setup?.pdf_url"
-					type="button"
-					class="ss-icon-btn"
-					aria-label="PDF / พิมพ์ / แชร์"
-					title="PDF / พิมพ์ / แชร์"
-					@click="pdf_sheet = true"
-				>
-					<Icon name="printer" :size="19" />
-				</button>
-				<a
-					class="ss-icon-btn"
-					:href="desk_url(kind.doctype, params.name)"
-					aria-label="เปิดในระบบเต็ม"
-					title="เปิดในระบบเต็ม"
-				>
-					<Icon name="external" :size="19" />
-				</a>
-			</template>
-		</TopBar>
+		/>
 
 		<div class="ss-content">
+			<FormHead
+				v-if="setup"
+				model-value="main"
+				:tabs="[{ value: 'main', label: kind.label }]"
+				:actions="actions"
+				:menu="menu"
+				:busy="busy"
+				:on-print="setup.pdf_url ? () => (pdf_sheet = true) : null"
+			/>
 			<Skeleton v-if="!setup" :rows="3" />
 			<div v-else class="ss-split">
 				<div class="ss-split-main">
@@ -160,30 +148,6 @@
 			</div>
 		</div>
 
-		<Teleport to="#ss-layer">
-			<Transition name="ss-bar">
-				<div v-if="setup && actions.length" class="ss-bottom-bar">
-					<button
-						v-for="a in actions"
-						:key="a.label"
-						type="button"
-						class="ss-btn ss-btn--lg"
-						:class="[
-							a.primary
-								? 'ss-btn--primary ss-grow'
-								: a.danger
-								? 'ss-btn--ghost-danger'
-								: 'ss-btn--ghost',
-						]"
-						:disabled="busy"
-						@click="a.run"
-					>
-						<span v-if="busy && a.primary" class="ss-spinner"></span>
-						<template v-else>{{ a.label }}</template>
-					</button>
-				</div>
-			</Transition>
-		</Teleport>
 
 		<DeleteSheet
 			:open="deleting"
@@ -233,6 +197,8 @@
 </template>
 
 <script setup>
+import FormHead from "../../../shared/components/FormHead.vue";
+import { LABELS, doc_menu, step_actions } from "../../../shared/form_actions.js";
 import { computed, inject, ref } from "vue";
 import Icon from "../../../shared/components/Icon.vue";
 import TopBar from "../../../shared/components/TopBar.vue";
@@ -304,38 +270,49 @@ const text_blocks = computed(() => {
 });
 
 const deleting = ref(false);
+// หัวฟอร์ม: รายงานประจำวัน ร่าง → ยืนยัน, คำขออนุมัติ รออนุมัติ → ผู้อนุมัติ: ไม่อนุมัติ / อนุมัติ → ทำรายงานจากคำขอ
 const actions = computed(() => {
 	const s = setup.value;
 	const d = doc.value;
-	const list = [];
-	if (!s) return list;
-	if (s.can_delete) list.push({ label: "ลบ", danger: true, run: () => (deleting.value = true) });
-	if (s.can_approve) {
-		list.push({ label: "ไม่อนุมัติ", danger: true, run: () => (rejecting.value = true) });
-		list.push({ label: "อนุมัติ", primary: true, run: approve });
-		return list;
-	}
-	if (s.editable) {
-		list.push({
-			label: d.status === "Rejected" ? "แก้ไขแล้วส่งใหม่" : "แก้ไข",
-			primary: !s.can_submit,
-			run: () => go("report-form", { kind: params.kind, name: d.name }),
-		});
-		if (s.can_submit) list.push({ label: "ส่งรายงาน", primary: true, run: submit });
-	}
-	if (s.report) {
-		list.push({
-			label: "เปิดรายงานของคำขอนี้",
-			run: () => go("report-view", { kind: "dr", name: s.report }),
-		});
-	} else if (s.can_make_report) {
-		list.push({
-			label: "ทำรายงานจากคำขอนี้",
-			primary: true,
-			run: () => go("report-form", { kind: "dr", name: "new", date: d.date, from: d.name }),
-		});
-	}
-	return list;
+	if (!s) return [];
+	const edit = s.editable && {
+		label: d.status === "Rejected" ? "แก้ไขแล้วส่งใหม่" : "แก้ไข",
+		icon: "pen",
+		tone: s.can_submit ? "soft" : "primary",
+		run: () => go("report-form", { kind: params.kind, name: d.name }),
+	};
+	return step_actions({
+		stage: s.can_approve ? "pending" : s.editable ? "draft" : "done",
+		submit: s.can_approve
+			? { label: LABELS.approve, run: approve }
+			: s.can_submit && { label: LABELS.confirm, run: submit },
+		reject: s.can_approve && (() => (rejecting.value = true)),
+		next: [
+			!s.report &&
+				s.can_make_report && {
+					label: "ทำรายงานจากคำขอนี้",
+					icon: "plus",
+					run: () => go("report-form", { kind: "dr", name: "new", date: d.date, from: d.name }),
+				},
+		],
+		extra: [!s.can_approve && edit],
+	});
+});
+const menu = computed(() => {
+	const s = setup.value;
+	if (!s) return [];
+	return doc_menu({
+		items: [
+			s.report && {
+				label: "เปิดรายงานของคำขอนี้",
+				icon: "file",
+				run: () => go("report-view", { kind: "dr", name: s.report }),
+			},
+		],
+		refresh: load,
+		desk: [kind.doctype, params.name],
+		remove: s.can_delete && (() => (deleting.value = true)),
+	});
 });
 
 function after_delete() {

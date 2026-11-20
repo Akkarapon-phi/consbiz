@@ -1,8 +1,17 @@
 <template>
-	<div class="ss-has-bar">
+	<div>
 		<TopBar title="ยืมอุปกรณ์" :subtitle="state.project?.project_name" back_to="borrow" />
 
 		<div class="ss-content">
+			<FormHead
+				v-if="setup"
+				model-value="main"
+				:tabs="[{ value: 'main', label: 'ยืมอุปกรณ์' }]"
+				:actions="actions"
+				:busy="saving"
+			>
+				<template #summary><b>{{ lines.length }}</b> รายการ</template>
+			</FormHead>
 			<Skeleton v-if="!setup" :rows="3" />
 			<template v-else>
 				<div class="ss-split">
@@ -137,24 +146,6 @@
 			</template>
 		</div>
 
-		<Teleport to="#ss-layer">
-			<Transition name="ss-bar">
-				<div v-if="setup" class="ss-bottom-bar">
-					<div class="ss-bar-summary">
-						<b>{{ lines.length }}</b> รายการ
-					</div>
-					<button
-						type="button"
-						class="ss-btn ss-btn--primary ss-btn--lg"
-						:disabled="!ready || saving"
-						@click="submit"
-					>
-						<span v-if="saving" class="ss-spinner"></span>
-						<template v-else>ส่งมอบอุปกรณ์</template>
-					</button>
-				</div>
-			</Transition>
-		</Teleport>
 
 		<Sheet
 			:open="picking"
@@ -200,6 +191,8 @@
 </template>
 
 <script setup>
+import FormHead from "../../../shared/components/FormHead.vue";
+import { step_actions } from "../../../shared/form_actions.js";
 import { computed, inject, reactive, ref, watch } from "vue";
 import DateInput from "../../../shared/components/DateInput.vue";
 import Icon from "../../../shared/components/Icon.vue";
@@ -279,6 +272,14 @@ const ready = computed(() => {
 		!photos.value.some((p) => p.uploading)
 	);
 });
+
+// หัวฟอร์ม: ส่งมอบเป็นขั้นเดียว (ไม่มีร่าง)
+const actions = computed(() =>
+	step_actions({
+		stage: "draft",
+		submit: { label: "ส่งมอบอุปกรณ์", icon: "check", disabled: !ready.value, run: submit },
+	})
+);
 
 function toggle(item) {
 	vibrate(8);

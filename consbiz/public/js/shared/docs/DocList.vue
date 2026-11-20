@@ -3,7 +3,8 @@
      ท้ายตาราง: ยอดรวมทั้งชุดตามตัวกรอง + แบ่งหน้า  มือถือ: การ์ด + ตัวกรองใน sheet + โหลดเพิ่ม -->
 <template>
 	<div :class="{ 'ss-has-bar': selected.size }">
-		<TopBar :title="config.label" :subtitle="subtitle" no_project>
+		<!-- หน้างาน: ปุ่มเลือกโครงการที่แถบบน (รายการเป็นของโครงการที่เลือกเท่านั้น) / ออฟฟิศ: ตัวกรองโครงการในหัวรายการ -->
+		<TopBar :title="config.label" :subtitle="subtitle" :no_project="app.project_filter">
 			<template #actions>
 				<button
 					v-if="!wide"
@@ -21,7 +22,7 @@
 					type="button"
 					class="ss-btn ss-btn--primary ss-list-create"
 					:aria-label="`สร้าง${config.label}`"
-					@click="go(`${config.section}-form`, { kind, name: 'new' })"
+					@click="go_doc(kind, 'form', { name: 'new' })"
 				>
 					<Icon name="plus" :size="18" :stroke="2.6" />
 					<span>สร้าง{{ config.label }}</span>
@@ -46,9 +47,86 @@
 				</button>
 			</nav>
 
-			<!-- แถบเครื่องมือ -->
-			<div :class="wide ? 'ss-list-head' : 'ss-toolbar'">
-				<label v-if="!wide" class="ss-toolbar-search">
+			<!-- จอ ≥768: หัวรายการกลาง (แท็บ / ส่งออก โหลดใหม่ สร้าง / ค้นหา ตัวกรอง ตัวกรองรวม) -->
+			<ListHead
+				v-if="wide"
+				ref="search_input"
+				v-model="filter"
+				:tabs="status_options"
+				v-model:search="search"
+				:search_placeholder="search_placeholder"
+				:loading="loading"
+				:create="can_create ? `สร้าง${config.label}` : ''"
+				:filter_count="filter_count"
+				@refresh="reload"
+				@create="go_doc(kind, 'form', { name: 'new' })"
+				@filters="filter_sheet = true"
+			>
+				<template v-if="can_export" #tools>
+					<button
+						type="button"
+						class="ss-icon-btn"
+						:disabled="exporting"
+						aria-label="ส่งออก CSV"
+						title="ส่งออก CSV (ตามตัวกรอง)"
+						@click="export_csv()"
+					>
+						<Icon name="receive" :size="19" />
+					</button>
+				</template>
+				<template #filters>
+						<SelectBox
+							v-model="range"
+							variant="tool"
+							label="ช่วงวันที่"
+							:options="RANGES"
+							placeholder="ทุกวันที่"
+						>
+							<template #prefix><Icon name="calendar" :size="15" /></template>
+						</SelectBox>
+						<template v-if="range === 'custom'">
+							<DateInput
+								v-model="date_from"
+								variant="tool"
+								label="ตั้งแต่"
+								placeholder="ตั้งแต่"
+								clearable
+							/>
+							<DateInput
+								v-model="date_to"
+								variant="tool"
+								label="ถึง"
+								placeholder="ถึง"
+								clearable
+							/>
+						</template>
+						<Picker
+							v-if="config.party"
+							v-model="party"
+							class="ss-tool-picker"
+							:label="config.party"
+							:placeholder="`${config.party}ทั้งหมด`"
+							:display_value="party_label"
+							:remote_fn="search_parties"
+							clearable
+							@select="(o) => (party_label = o.label)"
+						/>
+						<button
+							v-if="config.due"
+							type="button"
+							class="ss-tool ss-tool--toggle"
+							:class="{ 'is-active': overdue }"
+							:aria-pressed="overdue"
+							@click="overdue = !overdue"
+						>
+							<Icon name="alert" :size="15" /> เกินกำหนด
+						</button>
+						<ProjectFilter v-if="app.project_filter && config.project" />
+				</template>
+			</ListHead>
+			<!-- มือถือ: ค้นหา + ปุ่มตัวกรอง -->
+			<div v-else class="ss-toolbar">
+				<label class="ss-toolbar-search">
 					<Icon name="search" :size="17" />
 					<input
 						ref="search_input"
@@ -57,122 +135,7 @@
 						:placeholder="search_placeholder"
 					/>
 				</label>
-				<template v-if="wide">
-					<StatusTabs v-model="filter" :options="status_options" />
-					<div class="ss-list-tools">
-						<button
-							v-if="can_export"
-							type="button"
-							class="ss-icon-btn"
-							:disabled="exporting"
-							aria-label="ส่งออก CSV"
-							title="ส่งออก CSV (ตามตัวกรอง)"
-							@click="export_csv()"
-						>
-							<Icon name="receive" :size="19" />
-						</button>
-						<button
-							v-if="can_create"
-							type="button"
-							class="ss-btn ss-btn--primary ss-list-create"
-							:aria-label="`สร้าง${config.label}`"
-							@click="go(`${config.section}-form`, { kind, name: 'new' })"
-						>
-							<Icon name="plus" :size="18" :stroke="2.6" />
-							<span>สร้าง{{ config.label }}</span>
-						</button>
-						<button
-							type="button"
-							class="ss-icon-btn"
-							:class="{ 'is-spinning': loading }"
-							aria-label="โหลดใหม่"
-							title="โหลดใหม่"
-							@click="reload"
-						>
-							<Icon name="refresh" :size="17" />
-						</button>
-					</div>
-					<!-- แถวตัวกรอง: ค้นหา → ตัวกรองแบบเลือก (ที่ไม่พอซ่อนด้วย use_overflow_row) → ปุ่มตัวกรองรวมขวาสุด -->
-					<div class="ss-list-filterbar ss-list-filterbar--doc">
-						<ListSearch
-							ref="search_input"
-							v-model="search"
-							:placeholder="search_placeholder"
-						/>
-						<div ref="filters_box" class="ss-list-filters">
-							<SelectBox
-								v-model="range"
-								variant="tool"
-								label="ช่วงวันที่"
-								:options="RANGES"
-								placeholder="ทุกวันที่"
-							>
-								<template #prefix><Icon name="calendar" :size="15" /></template>
-							</SelectBox>
-							<template v-if="range === 'custom'">
-								<DateInput
-									v-model="date_from"
-									variant="tool"
-									label="ตั้งแต่"
-									placeholder="ตั้งแต่"
-									clearable
-								/>
-								<DateInput
-									v-model="date_to"
-									variant="tool"
-									label="ถึง"
-									placeholder="ถึง"
-									clearable
-								/>
-							</template>
-							<Picker
-								v-if="config.party"
-								v-model="party"
-								class="ss-tool-picker"
-								:label="config.party"
-								:placeholder="`${config.party}ทั้งหมด`"
-								:display_value="party_label"
-								:remote_fn="search_parties"
-								clearable
-								@select="(o) => (party_label = o.label)"
-							/>
-							<button
-								v-if="config.due"
-								type="button"
-								class="ss-tool ss-tool--toggle"
-								:class="{ 'is-active': overdue }"
-								:aria-pressed="overdue"
-								@click="overdue = !overdue"
-							>
-								<Icon name="alert" :size="15" /> เกินกำหนด
-							</button>
-							<ProjectFilter v-if="app.project_filter && config.project" />
-							<SelectBox
-								v-else-if="config.project"
-								:model-value="state.doc_scope"
-								variant="tool"
-								label="ขอบเขต"
-								:options="SCOPES"
-								@update:model-value="set_doc_scope"
-							/>
-						</div>
-						<button
-							type="button"
-							class="ss-tool ss-tool--filter"
-							:class="{ 'is-active': filter_count }"
-							aria-label="ตัวกรองทั้งหมด"
-							title="ตัวกรองทั้งหมด"
-							@click="filter_sheet = true"
-						>
-							<Icon name="sliders" :size="17" />
-							<span v-if="filter_count" class="ss-tab-count">{{
-								filter_count
-							}}</span>
-						</button>
-					</div>
-				</template>
 				<button
-					v-else
 					type="button"
 					class="ss-tool ss-tool--filter"
 					:class="{ 'is-active': active_filters.length }"
@@ -196,95 +159,79 @@
 				<button type="button" class="ss-link" @click="clear_filters">ล้างทั้งหมด</button>
 			</div>
 
-			<Skeleton v-if="rows === null" :rows="4" />
-			<Empty
-				v-else-if="!rows.length"
-				:icon="config.icon"
-				:title="`ไม่มี${config.label}`"
-				:text="empty_text"
-			/>
-			<div v-else class="ss-list-body" :class="{ 'has-preview': preview_on }">
+			<!-- จอ ≥768: การ์ดเดียวต่อจากหัวรายการ สูงถึงล่างจอ (ข้อมูลน้อย = พื้นที่ว่างในการ์ด, ไม่มีข้อมูล = Empty ในการ์ด)
+			     จอ ≥1480 คลิกแถว = ตัวอย่างเอกสารเป็นช่องขวาของการ์ดเดียวกัน (คั่นด้วยเส้น) หัวรายการไม่ขยับ -->
+			<div v-if="wide" class="ss-list-card" :class="{ 'has-preview': preview_on }">
 				<div class="ss-list-main">
-					<DocTable
-						v-if="wide"
-						:rows="rows"
-						:kind="kind"
-						:sort="sort"
-						:order="order"
-						:selected="selected"
-						:preview="preview_on"
-						:active="active"
-						@sort="set_sort"
-						@toggle="toggle"
-						@toggle-all="toggle_all"
-						@select="(row) => (active = row.name)"
+					<Skeleton v-if="rows === null" :rows="4" />
+					<Empty
+						v-else-if="!rows.length"
+						:icon="config.icon"
+						:title="`ไม่มี${config.label}`"
+						:text="empty_text"
 					/>
-					<TransitionGroup v-else tag="div" class="ss-list" name="ss-list" appear>
-						<DocCard
-							v-for="(row, i) in rows"
-							:key="row.name"
-							:row="row"
+					<template v-else>
+						<DocTable
+							:rows="rows"
 							:kind="kind"
-							:i="i % 30"
+							:sort="sort"
+							:order="order"
+							:selected="selected"
+							:previewable="xl"
+							:preview="preview_on"
+							:active="active"
+							@sort="set_sort"
+							@toggle="toggle"
+							@toggle-all="toggle_all"
+							@select="toggle_preview"
 						/>
-					</TransitionGroup>
-
-					<!-- ท้ายรายการ: ยอดรวมทั้งชุด + แบ่งหน้า (มือถือ = โหลดเพิ่ม) -->
-					<footer v-if="wide" class="ss-list-foot">
-						<span class="ss-list-range">
-							แสดง <b>{{ start + 1 }}–{{ start + rows.length }}</b> จาก
-							<b>{{ total }}</b>
-						</span>
-						<span v-if="sums.amount != null" class="ss-list-sum">
-							ยอดรวม <b>{{ money(sums.amount) }}</b>
-						</span>
-						<span v-if="sums.outstanding" class="ss-list-sum is-due">
-							ค้าง <b>{{ money(sums.outstanding) }}</b>
-						</span>
-						<span class="ss-toolbar-gap"></span>
-						<label class="ss-list-size">
-							แถวต่อหน้า
-							<SelectBox
-								v-model="page_size"
-								variant="tool"
-								label="แถวต่อหน้า"
-								:options="
-									[30, 50, 100].map((n) => ({ value: n, label: String(n) }))
-								"
-							/>
-						</label>
-						<div class="ss-pager">
-							<button
-								type="button"
-								class="ss-icon-btn ss-icon-btn--sm"
-								aria-label="หน้าก่อน"
-								:disabled="!start || loading"
-								@click="page(-1)"
-							>
-								<Icon name="chevron-left" :size="18" />
-							</button>
-							<span>{{ page_no }} / {{ page_count }}</span>
-							<button
-								type="button"
-								class="ss-icon-btn ss-icon-btn--sm"
-								aria-label="หน้าถัดไป"
-								:disabled="!more || loading"
-								@click="page(1)"
-							>
-								<Icon name="chevron-right" :size="18" />
-							</button>
-						</div>
-					</footer>
-					<button
-						v-else-if="more"
-						type="button"
-						class="ss-btn ss-btn--ghost ss-btn--block"
-						:disabled="loading"
-						@click="load(true)"
-					>
-						<span v-if="loading" class="ss-spinner"></span>
-						<template v-else>โหลดเพิ่ม ({{ rows.length }} จาก {{ total }})</template>
-					</button>
+						<!-- ท้ายรายการ: ยอดรวมทั้งชุด + แบ่งหน้า (มือถือ = โหลดเพิ่ม) -->
+						<footer class="ss-list-foot">
+							<span class="ss-list-range">
+								แสดง <b>{{ start + 1 }}–{{ start + rows.length }}</b> จาก
+								<b>{{ total }}</b>
+							</span>
+							<span v-if="sums.amount != null" class="ss-list-sum">
+								ยอดรวม <b>{{ money(sums.amount) }}</b>
+							</span>
+							<span v-if="sums.outstanding" class="ss-list-sum is-due">
+								ค้าง <b>{{ money(sums.outstanding) }}</b>
+							</span>
+							<span class="ss-toolbar-gap"></span>
+							<label class="ss-list-size">
+								แถวต่อหน้า
+								<SelectBox
+									v-model="page_size"
+									variant="tool"
+									label="แถวต่อหน้า"
+									:options="
+										[30, 50, 100].map((n) => ({ value: n, label: String(n) }))
+									"
+								/>
+							</label>
+							<div class="ss-pager">
+								<button
+									type="button"
+									class="ss-icon-btn ss-icon-btn--sm"
+									aria-label="หน้าก่อน"
+									:disabled="!start || loading"
+									@click="page(-1)"
+								>
+									<Icon name="chevron-left" :size="18" />
+								</button>
+								<span>{{ page_no }} / {{ page_count }}</span>
+								<button
+									type="button"
+									class="ss-icon-btn ss-icon-btn--sm"
+									aria-label="หน้าถัดไป"
+									:disabled="!more || loading"
+									@click="page(1)"
+								>
+									<Icon name="chevron-right" :size="18" />
+								</button>
+							</div>
+						</footer>
+					</template>
 				</div>
 				<!-- จอ ≥1480: ตัวอย่างเอกสารข้างตาราง -->
 				<DocPreview
@@ -296,9 +243,40 @@
 					@changed="load()"
 				/>
 			</div>
+			<!-- มือถือ: การ์ดเอกสาร + โหลดเพิ่ม -->
+			<template v-else>
+				<Skeleton v-if="rows === null" :rows="4" />
+				<Empty
+					v-else-if="!rows.length"
+					:icon="config.icon"
+					:title="`ไม่มี${config.label}`"
+					:text="empty_text"
+				/>
+				<template v-else>
+					<TransitionGroup tag="div" class="ss-list" name="ss-list" appear>
+						<DocCard
+							v-for="(row, i) in rows"
+							:key="row.name"
+							:row="row"
+							:kind="kind"
+							:i="i % 30"
+						/>
+					</TransitionGroup>
+					<button
+						v-if="more"
+						type="button"
+						class="ss-btn ss-btn--ghost ss-btn--block"
+						:disabled="loading"
+						@click="load(true)"
+					>
+						<span v-if="loading" class="ss-spinner"></span>
+						<template v-else>โหลดเพิ่ม ({{ rows.length }} จาก {{ total }})</template>
+					</button>
+				</template>
+			</template>
 		</div>
 
-		<!-- เลือกหลายแถว: ส่งเอกสารร่าง / ส่งออกที่เลือก -->
+		<!-- เลือกหลายแถว: ยืนยันเอกสารร่าง / ส่งออกที่เลือก -->
 		<Teleport to="#ss-layer">
 			<Transition name="ss-bar">
 				<div v-if="selected.size" class="ss-bottom-bar ss-bulk-bar">
@@ -326,10 +304,10 @@
 						type="button"
 						class="ss-btn ss-btn--primary"
 						:disabled="!selected_drafts.length"
-						:title="selected_drafts.length ? '' : 'ส่งได้เฉพาะเอกสารร่าง'"
+						:title="selected_drafts.length ? '' : 'ยืนยันได้เฉพาะเอกสารร่าง'"
 						@click="bulk_sheet = true"
 					>
-						<Icon name="send" :size="16" /> ส่งเอกสาร ({{ selected_drafts.length }})
+						<Icon name="send" :size="16" /> ยืนยันเอกสาร ({{ selected_drafts.length }})
 					</button>
 				</div>
 			</Transition>
@@ -337,7 +315,7 @@
 
 		<Sheet
 			:open="bulk_sheet"
-			:title="`ส่ง${config.label} ${selected_drafts.length} ใบ`"
+			:title="`ยืนยัน${config.label} ${selected_drafts.length} ใบ`"
 			@close="bulk_sheet = false"
 		>
 			<template v-if="bulk_results">
@@ -350,12 +328,12 @@
 					>
 						<Icon :name="r.ok ? 'check' : 'alert'" :size="16" />
 						<b>{{ r.name }}</b>
-						<span>{{ r.ok ? "ส่งแล้ว" : r.error }}</span>
+						<span>{{ r.ok ? "ยืนยันแล้ว" : r.error }}</span>
 					</div>
 				</div>
 			</template>
 			<p v-else class="ss-muted">
-				ส่งแล้วแก้ไขไม่ได้ ใบที่ส่งไม่ผ่านจะไม่กระทบใบอื่น
+				ยืนยันแล้วแก้ไขไม่ได้ ใบที่ไม่ผ่านจะไม่กระทบใบอื่น
 				<template v-if="selected.size > selected_drafts.length">
 					(ข้ามใบที่ไม่ใช่ร่าง {{ selected.size - selected_drafts.length }} ใบ)</template
 				>
@@ -369,7 +347,7 @@
 					@click="bulk_submit"
 				>
 					<span v-if="busy" class="ss-spinner"></span>
-					<template v-else>ยืนยันส่ง {{ selected_drafts.length }} ใบ</template>
+					<template v-else>ยืนยัน {{ selected_drafts.length }} ใบ</template>
 				</button>
 				<button
 					v-else
@@ -445,7 +423,6 @@
 					<span><b>เฉพาะที่เกินกำหนด</b></span>
 				</label>
 				<ProjectFilter v-if="app.project_filter && config.project" />
-				<ScopeSwitch v-else-if="config.project" />
 			</div>
 			<template #footer>
 				<button type="button" class="ss-btn ss-btn--ghost" @click="clear_filters">
@@ -481,37 +458,33 @@ import Picker from "../components/Picker.vue";
 import Sheet from "../components/Sheet.vue";
 import PdfViewer from "../components/PdfViewer.vue";
 import SelectBox from "../components/SelectBox.vue";
-import StatusTabs from "../components/StatusTabs.vue";
-import { use_overflow_row } from "../table.js";
-import ListSearch from "../components/ListSearch.vue";
 import DateInput from "../components/DateInput.vue";
 import DocCard from "./DocCard.vue";
 import DocTable from "./DocTable.vue";
 import DocPreview from "./DocPreview.vue";
-import ScopeSwitch from "./ScopeSwitch.vue";
 import ProjectFilter from "./ProjectFilter.vue";
+import ListHead from "../components/ListHead.vue";
 import { use_shortcuts } from "../shortcuts.js";
 import { app } from "../app.js";
-import { DOC_KINDS, can_doc } from "./kinds.js";
+import { DOC_KINDS, can_doc, doc_kind, go_doc } from "./kinds.js";
 import {
 	call,
-	go,
 	iso_date,
 	money,
 	post,
 	replace_params,
 	scope_args,
 	scope_key,
-	set_doc_scope,
 	show_error,
 	state,
 	thai_date,
 	toast,
 } from "../api.js";
 
-const kind = state.route.view;
+const view = state.route.view;
+const kind = doc_kind(view);
 const config = DOC_KINDS[kind];
-const FILTERS = ["todo", "draft", "done", "all"];
+const FILTERS = ["todo", "pending", "draft", "done", "all"];
 const RANGES = [
 	{ value: "", label: "ทุกวันที่" },
 	{ value: "month", label: "เดือนนี้" },
@@ -520,14 +493,12 @@ const RANGES = [
 	{ value: "year", label: "ปีนี้" },
 	{ value: "custom", label: "กำหนดเอง" },
 ];
-const SCOPES = [
-	{ value: "project", label: "โครงการนี้" },
-	{ value: "all", label: "ทุกโครงการ" },
-];
 const PREF_KEY = `consbiz.site.list.${kind}`;
 
+// ชนิดที่มีขั้นอนุมัติ/ลงนาม (config.pending = ป้าย, consbiz/doc_approval.py) มีแท็บ รออนุมัติ/รอลงนาม
 const tabs = [
 	{ value: "todo", label: config.todo },
+	...(config.pending ? [{ value: "pending", label: config.pending }] : []),
 	{ value: "draft", label: "ร่าง" },
 	{ value: "done", label: "เสร็จแล้ว" },
 	{ value: "all", label: "ทั้งหมด" },
@@ -592,10 +563,13 @@ mq_xl.addEventListener("change", on_xl);
 onBeforeUnmount(() => mq_xl.removeEventListener("change", on_xl));
 const active = ref(null);
 const preview_on = computed(() => xl.value && !!active.value && !!rows.value?.length);
-// โหลดรายการใหม่: แถวที่ดูอยู่ไม่อยู่ในหน้านี้ = ดูแถวแรกแทน
+// คลิกแถว (จอ ≥1480) = ดูตัวอย่างของแถวนั้น ไม่เปิดเองตอนเข้าหน้า ปิดด้วย X ของตัวอย่าง
+function toggle_preview(row) {
+	active.value = row.name;
+}
+// โหลดรายการใหม่: แถวที่ดูอยู่ไม่อยู่ในหน้านี้แล้ว = ปิดตัวอย่าง
 watch(rows, (list) => {
-	if (!xl.value || !list) return;
-	if (!list.some((r) => r.name === active.value)) active.value = list[0]?.name || null;
+	if (list && active.value && !list.some((r) => r.name === active.value)) active.value = null;
 });
 
 const mq_wide = window.matchMedia("(min-width: 768px)");
@@ -615,8 +589,6 @@ const page_count = computed(() => Math.max(1, Math.ceil((total.value || 0) / pag
 const empty_text = computed(() =>
 	search.value || active_filters.value.length
 		? "ลองเปลี่ยนคำค้นหรือล้างตัวกรอง"
-		: scope_args().scope === "project" && config.project
-		? "ลองดูทุกโครงการ"
 		: ""
 );
 
@@ -666,16 +638,6 @@ const filter_count = computed(
 		active_filters.value.length +
 		(app.project_filter && config.project && state.project ? 1 : 0)
 );
-const filters_box = ref(null);
-use_overflow_row(filters_box, [
-	range,
-	date_from,
-	date_to,
-	party_label,
-	overdue,
-	() => state.project,
-	() => state.doc_scope,
-]);
 
 function clear_filters() {
 	range.value = "";
@@ -765,7 +727,7 @@ watch(search, () => {
 	timer = setTimeout(reload, 300);
 });
 watch(filter, (value) => {
-	replace_params(kind, { filter: value });
+	replace_params(view, { filter: value });
 	reload();
 });
 watch([scope_key, dates, party, overdue], reload);
@@ -881,7 +843,7 @@ const search_placeholder = `ค้นหาเลขที่${config.party ? ` 
 } / สินค้า`;
 use_shortcuts({
 	"/": () => search_input.value?.focus(),
-	n: () => can_create && go(`${config.section}-form`, { kind, name: "new" }),
+	n: () => can_create && go_doc(kind, "form", { name: "new" }),
 	j: () => document.querySelector(".ss-table--list tbody tr")?.focus(),
 	k: () => document.querySelector(".ss-table--list tbody tr:last-child")?.focus(),
 });

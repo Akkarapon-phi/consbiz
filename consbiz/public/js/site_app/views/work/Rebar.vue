@@ -38,36 +38,17 @@
 					</div>
 				</div>
 
-				<div v-if="wide" class="ss-list-head">
-					<StatusTabs
-						model-value="all"
-						:options="[{ value: 'all', label: 'แผนตัดเหล็ก', count: rows.length }]"
-					/>
-					<div class="ss-list-tools">
-						<button
-							v-if="boot.can.bar_cut_write"
-							type="button"
-							class="ss-btn ss-btn--primary ss-list-create"
-							@click="create"
-						>
-							<Icon name="plus" :size="18" :stroke="2.6" />
-							<span>แผนตัดเหล็ก</span>
-						</button>
-						<button
-							type="button"
-							class="ss-icon-btn"
-							:class="{ 'is-spinning': loading }"
-							aria-label="โหลดใหม่"
-							@click="load"
-						>
-							<Icon name="refresh" :size="17" />
-						</button>
-					</div>
-					<!-- แถวตัวกรอง: ค้นหา -->
-					<div class="ss-list-filterbar">
-						<ListSearch v-model="txt" placeholder="ค้นหาแผนตัดเหล็ก" />
-					</div>
-				</div>
+				<ListHead
+					v-if="wide"
+					model-value="all"
+					:tabs="[{ value: 'all', label: 'แผนตัดเหล็ก', count: rows.length }]"
+					v-model:search="txt"
+					search_placeholder="ค้นหาแผนตัดเหล็ก"
+					:loading="loading"
+					:create="boot.can.bar_cut_write ? 'แผนตัดเหล็ก' : ''"
+					@refresh="load"
+					@create="create"
+				/>
 				<label v-else class="ss-search">
 					<Icon name="search" :size="17" />
 					<input v-model="txt" type="search" placeholder="ค้นหาแผนตัดเหล็ก" />
@@ -97,7 +78,6 @@
 					<template #loss_percent="{ row }">{{
 						(row.loss_percent || 0).toFixed(1)
 					}}</template>
-					<template #modified="{ row }">{{ time_ago(row.modified) }}</template>
 				</DataTable>
 				<div v-else class="ss-list">
 					<button
@@ -158,11 +138,10 @@
 import { computed, ref } from "vue";
 import DataTable from "../../../shared/components/DataTable.vue";
 import Empty from "../../../shared/components/Empty.vue";
-import ListSearch from "../../../shared/components/ListSearch.vue";
 import Icon from "../../../shared/components/Icon.vue";
 import Skeleton from "../../../shared/components/Skeleton.vue";
-import StatusTabs from "../../../shared/components/StatusTabs.vue";
 import TopBar from "../../../shared/components/TopBar.vue";
+import ListHead from "../../../shared/components/ListHead.vue";
 import { matches, use_wide } from "../../../shared/table.js";
 import {
 	boot,
@@ -172,7 +151,6 @@ import {
 	show_error,
 	state,
 	thai_date,
-	time_ago,
 } from "../../../shared/api.js";
 
 const API = "consbiz.bar_cut_app";
@@ -183,7 +161,6 @@ const COLUMNS = [
 	{ key: "pieces", label: "ชิ้น", sort: true, class: "is-num" },
 	{ key: "total_weight", label: "เหล็กที่ใช้ (กก.)", sort: true, class: "is-num" },
 	{ key: "loss_percent", label: "เศษทิ้ง %", sort: true, class: "is-num" },
-	{ key: "modified", label: "แก้ไขล่าสุด", sort: true, class: "col-modified col-wide" },
 ];
 
 const wide = use_wide();

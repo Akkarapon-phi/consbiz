@@ -13,9 +13,13 @@
 		<div class="ss-content">
 			<Skeleton v-if="!doc" :rows="5" />
 			<template v-else>
-				<div class="ss-list-head">
-					<StatusTabs v-model="tab" :options="TABS" />
-					<div class="ss-list-tools">
+				<ListHead
+					v-model="tab"
+					:tabs="TABS"
+					:create="view.can_claim ? 'สร้างใบเบิกงวด' : ''"
+					@create="go('contractor-claim', { name: 'new', agreement: doc.name })"
+				>
+					<template #tools>
 						<button
 							v-if="view.open_claim"
 							type="button"
@@ -24,16 +28,8 @@
 						>
 							ใบเบิกที่ค้างอยู่
 						</button>
-						<button
-							v-if="view.can_claim"
-							type="button"
-							class="ss-btn ss-btn--primary ss-list-create"
-							@click="go('contractor-claim', { name: 'new', agreement: doc.name })"
-						>
-							<Icon name="plus" :size="18" :stroke="2.6" /> <span>สร้างใบเบิกงวด</span>
-						</button>
-					</div>
-				</div>
+					</template>
+				</ListHead>
 
 				<section v-if="tab === 'summary'" class="ss-card">
 					<div class="ss-doc-head-top">
@@ -128,10 +124,9 @@
 <script setup>
 import { computed, ref } from "vue";
 import Empty from "../../shared/components/Empty.vue";
-import Icon from "../../shared/components/Icon.vue";
 import Skeleton from "../../shared/components/Skeleton.vue";
-import StatusTabs from "../../shared/components/StatusTabs.vue";
 import TopBar from "../../shared/components/TopBar.vue";
+import ListHead from "../../shared/components/ListHead.vue";
 import { back, boot, go, money, num, show_error, state, thai_date } from "../../shared/api.js";
 import { capi } from "../api.js";
 

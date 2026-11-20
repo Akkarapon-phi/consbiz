@@ -1,19 +1,18 @@
 <template>
-	<div :class="{ 'ss-has-bar': open_items.length }">
-		<TopBar :title="doc?.borrower_name || 'ใบยืม'" :subtitle="params.name" back_to="borrow">
-			<template #actions>
-				<a
-					v-if="boot.desk"
-					class="ss-icon-btn"
-					:href="desk_url('Equipment Borrowing', params.name)"
-					aria-label="เปิดในระบบ"
-				>
-					<Icon name="external" :size="20" />
-				</a>
-			</template>
-		</TopBar>
+	<div>
+		<TopBar :title="doc?.borrower_name || 'ใบยืม'" :subtitle="params.name" back_to="borrow" />
 
 		<div class="ss-content">
+			<FormHead
+				v-if="doc"
+				model-value="main"
+				:tabs="[{ value: 'main', label: 'ใบยืม' }]"
+				:actions="actions"
+				:menu="menu"
+				:busy="saving"
+			>
+				<template v-if="open_items.length" #summary><b>คืน {{ returning.length }}</b> รายการ</template>
+			</FormHead>
 			<Skeleton v-if="!doc" :rows="3" />
 			<template v-else>
 				<div class="ss-split">
@@ -175,28 +174,12 @@
 			</template>
 		</div>
 
-		<Teleport to="#ss-layer">
-			<Transition name="ss-bar">
-				<div v-if="open_items.length" class="ss-bottom-bar">
-					<div class="ss-bar-summary">
-						<b>คืน {{ returning.length }}</b> รายการ
-					</div>
-					<button
-						type="button"
-						class="ss-btn ss-btn--primary ss-btn--lg"
-						:disabled="!returning.length || saving || photos.some((p) => p.uploading)"
-						@click="submit"
-					>
-						<span v-if="saving" class="ss-spinner"></span>
-						<template v-else>บันทึกรับคืน</template>
-					</button>
-				</div>
-			</Transition>
-		</Teleport>
 	</div>
 </template>
 
 <script setup>
+import FormHead from "../../../shared/components/FormHead.vue";
+import { doc_menu, step_actions } from "../../../shared/form_actions.js";
 import { computed, inject, ref } from "vue";
 import Icon from "../../../shared/components/Icon.vue";
 import TopBar from "../../../shared/components/TopBar.vue";
@@ -244,6 +227,24 @@ const saving = ref(false);
 
 const returning = computed(() => open_items.value.filter((r) => r.qty > 0));
 const item_name = (code) => doc.value.items.find((i) => i.item_code === code)?.item_name || code;
+
+// หัวฟอร์ม: ใบยืมที่ยังมีของค้าง = บันทึกรับคืน (ขั้นเดียว)
+const actions = computed(() =>
+	open_items.value.length
+		? step_actions({
+				stage: "draft",
+				submit: {
+					label: "บันทึกรับคืน",
+					icon: "check",
+					disabled: !returning.value.length || photos.value.some((p) => p.uploading),
+					run: submit,
+				},
+		  })
+		: []
+);
+const menu = computed(() =>
+	doc_menu({ refresh: load, desk: boot.desk ? ["Equipment Borrowing", params.name] : null })
+);
 
 function return_all() {
 	vibrate(12);

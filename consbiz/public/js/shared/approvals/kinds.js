@@ -8,14 +8,25 @@ import { advance_status, claim_status, TYPE } from "./status.js";
 export const KINDS = {
 	leave: { label: "ใบลา", tone: "teal", module: "hr", method: "consbiz.approvals.review_leave", reason: "reason" },
 	checkin: { label: "ลงเวลา", tone: "amber", module: "hr", method: "consbiz.self_service.review_checkin", reason: "note" },
+	attendance: { label: "แจ้งมาทำงาน", tone: "blue", module: "hr", method: "consbiz.self_home.review_attendance_request", reason: "reason" },
 	advance: { label: "ใบเบิก", tone: "green", module: "hr", method: "consbiz.self_advance.review_advance", reason: "reason" },
-	claim: { label: "เคลียร์/เบิกคืน", tone: "violet", module: "hr", method: "consbiz.self_advance.review_claim", reason: "reason" },
+	claim: { label: "เคลียร์/สำรองจ่าย", tone: "violet", module: "hr", method: "consbiz.self_advance.review_claim", reason: "reason" },
+	// เอกสารจัดซื้อ (consbiz/doc_approval.py): แตะ = เปิดหน้าเอกสารในหมวดจัดซื้อ (page) อนุมัติ/ลงนามที่นั่น
+	mr: { label: "ใบขอซื้อ", tone: "teal", module: "purchase", page: "mr" },
+	po: { label: "ใบสั่งซื้อ", tone: "blue", module: "purchase", page: "po" },
+	pi: { label: "ใบแจ้งหนี้ซื้อ", tone: "violet", module: "purchase", page: "pi" },
 };
+// หน้าเอกสารจัดซื้อ (bundle ออฟฟิศ) ของรายการในโมดูลอนุมัติ
+export const doc_page_url = (item) => `/conserp/purchase/buy-doc/${item.kind}/${encodeURIComponent(item.row.name)}`;
 // โมดูลเจ้าของเอกสาร = เมนูย่อยของโมดูลอนุมัติ (view = approve-<key>)
 export const MODULES = {
 	hr: { label: "บุคคล", icon: "users" },
+	purchase: { label: "จัดซื้อ", icon: "cart" },
 };
 export const kinds_of = (module) => Object.keys(KINDS).filter((k) => !module || KINDS[k].module === module);
+
+// เหตุผลของ Attendance Request (HRMS) → ข้อความ (ตรงกับ REQUEST_REASONS ใน consbiz/self_home.py)
+export const REQUEST_REASON = { "On Duty": "มาทำงาน / นอกสถานที่", "Work From Home": "ทำงานที่บ้าน" };
 
 const DONE = {
 	Approved: { label: "อนุมัติ", tone: "green" },
@@ -34,7 +45,7 @@ export function leave_range(row) {
 }
 // ช่วงวันที่ของเอกสาร (ใช้หาคนในโครงการที่ลาชนวัน)
 export function context_dates(item) {
-	if (item.kind === "leave") return [item.row.from_date, item.row.to_date];
+	if (item.kind === "leave" || item.kind === "attendance") return [item.row.from_date, item.row.to_date];
 	if (item.kind === "checkin") return [String(item.row.time).slice(0, 10), String(item.row.time).slice(0, 10)];
 	return [undefined, undefined];
 }
@@ -52,12 +63,23 @@ export function to_item(kind, row, history = false) {
 			date: row.time,
 		});
 		if (history) item.status = DONE[row.approval];
+	} else if (kind === "attendance") {
+		Object.assign(item, { title: REQUEST_REASON[row.reason] || "แจ้งมาทำงาน", sub: leave_range(row), date: row.from_date });
+		if (history) item.status = DONE[row.approval];
 	} else if (kind === "advance") {
 		Object.assign(item, { title: TYPE[row.advance_type], sub: row.purpose, amount: row.advance_amount, date: row.posting_date });
 		item.status = history ? advance_status(row) : row.over_limit ? { label: "เกินวงเงิน", tone: "violet" } : null;
+	} else if (KINDS[kind].page) {
+		Object.assign(item, {
+			title: `${row.action} ${KINDS[kind].label}`,
+			sub: [row.name, row.party || row.title].filter(Boolean).join(" · "),
+			amount: row.amount,
+			date: history ? row.signed_on || row.date : row.sent_on || row.date,
+		});
+		if (history) item.status = { label: row.result, tone: row.docstatus === 1 ? "green" : "rose" };
 	} else {
 		Object.assign(item, {
-			title: row.total_advance_amount ? "เคลียร์เงินสำรองจ่าย" : "เบิกค่าใช้จ่ายคืน",
+			title: row.total_advance_amount ? "เคลียร์เงินทดรองจ่าย" : "เบิกสำรองจ่าย",
 			sub: thai_date(row.posting_date, { year: true }),
 			amount: row.total_claimed_amount,
 			date: row.posting_date,

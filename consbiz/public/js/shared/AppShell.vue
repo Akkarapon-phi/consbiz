@@ -7,6 +7,8 @@
 	>
 		<!-- แถบล่าง/ปุ่มลอยของแต่ละหน้า (Teleport มาที่นี่: ไม่ให้ transform ตอนเปลี่ยนหน้าดึงตำแหน่ง fixed) -->
 		<div id="ss-layer"></div>
+		<!-- แถบบน (TopBar.vue ของหน้า Teleport มาที่นี่): แถวบนสุดของโครง เต็มความกว้าง Dock และเนื้อหาอยู่ใต้แถวนี้ -->
+		<div id="ss-header"></div>
 		<main class="ss-stage">
 			<Transition :name="`ss-${state.direction}`">
 				<component
@@ -81,25 +83,6 @@
 						<span class="ss-rail-text">{{ pin_label }}</span>
 					</button>
 					<button
-						v-if="app.project_filter && companies.length > 1"
-						ref="company_button"
-						type="button"
-						class="ss-rail-row ss-rail-ctx"
-						:class="{ 'is-open': dock_menu === 'company' }"
-						:title="`บริษัท: ${company_label}`"
-						aria-haspopup="menu"
-						:aria-expanded="dock_menu === 'company'"
-						@click="toggle_dock_menu('company')"
-					>
-						<span class="ss-avatar" :class="`tone-${tone(state.company || 'all')}`">{{
-							state.company ? initials(company_label) : "ทั้ง"
-						}}</span>
-						<span class="ss-rail-text ss-rail-ctx-text">
-							<span>{{ company_label }}</span>
-							<small>บริษัท</small>
-						</span>
-					</button>
-					<button
 						v-if="!boot.guest"
 						ref="user_button"
 						type="button"
@@ -129,16 +112,15 @@
 		</Transition>
 
 		<AppTooltip />
-		<ProfileSheet :open="profile_open" @close="profile_open = false" />
 		<GlobalSearch v-if="!boot.guest" :open="search_open" @close="search_open = false" />
-		<SettingsDialog v-if="boot.can?.settings || boot.can?.labour_settings" :open="settings_open" @close="settings_open = false" />
-
-		<DockMenu
-			:open="dock_menu === 'company'"
-			:anchor="company_button"
-			:groups="company_groups"
-			@close="dock_menu = ''"
+		<SettingsDialog
+			:open="settings.open"
+			:pages="settings.pages"
+			:title="settings.title"
+			:initial="settings.initial"
+			@close="settings.open = false"
 		/>
+
 		<DockMenu
 			:open="dock_menu === 'user'"
 			:anchor="header_user_anchor || user_button"
@@ -163,8 +145,9 @@
 					class="ss-nav-item"
 					:class="{ 'is-active': tab.view === MORE ? more_active : tab.view === active_view }"
 					:title="tab.label"
+					:aria-haspopup="tab.view === MORE || tab.menu ? 'dialog' : undefined"
 					:style="{ '--i': i }"
-					@click="tab.view === MORE ? (more_open = true) : open_tab(tab.view)"
+					@click="tap_nav(tab)"
 				>
 					<span class="ss-nav-icon">
 						<Icon
@@ -187,20 +170,24 @@
 			</nav>
 		</Transition>
 
-		<!-- มือถือ: เมนูที่เกินแถบล่าง (เกิน NAV_MAX) -->
-		<Sheet :open="more_open" title="เมนูอื่นๆ" @close="more_open = false">
-			<div class="ss-list">
+		<!-- มือถือ: ใช้ sheet เดียวสำหรับกลุ่มและเมนูอื่นๆ เพื่อคงการล็อกเลื่อนหน้าระหว่างเปิดกลุ่ม -->
+		<Sheet
+			:open="more_open || !!group_sheet"
+			:title="group_sheet?.label || 'เมนูอื่นๆ'"
+			@close="close_nav_menu"
+		>
+			<div class="ss-menu-grid">
 				<button
-					v-for="tab in more_tabs"
+					v-for="tab in group_sheet?.tabs || more_tabs"
 					:key="tab.view"
 					type="button"
-					class="ss-card ss-card--row"
+					class="ss-menu-tile"
 					:class="{ 'is-active': tab.view === active_view }"
-					@click="(more_open = false), open_tab(tab.view)"
+					@click="select_nav_item(tab)"
 				>
-					<span class="ss-nav-icon"><Icon :name="tab.icon" :size="22" /></span>
-					<span class="ss-card-main"><span class="ss-card-title">{{ tab.label }}</span></span>
-					<span v-if="tab.badge" class="ss-badge" :class="tab.badge_tone">{{ tab.badge }}</span>
+					<span class="ss-menu-tile-icon"><Icon :name="tab.icon" :size="22" /></span>
+					<span class="ss-menu-tile-label">{{ tab.label }}</span>
+					<span v-if="tab.badge" class="ss-menu-tile-badge" :class="tab.badge_tone">{{ tab.badge }}</span>
 				</button>
 			</div>
 		</Sheet>
@@ -269,6 +256,49 @@
 			</div>
 		</Sheet>
 
+		<!-- กลุ่มออฟฟิศ: เลือกบริษัทจากปุ่มบนแถบบน (TopBar) แทนปุ่มโครงการ -->
+		<Sheet
+			:open="company_picker"
+			title="เลือกบริษัท"
+			subtitle="แสดงเอกสารเฉพาะบริษัทที่เลือก"
+			half
+			@close="company_picker = false"
+		>
+			<div class="ss-options">
+				<button
+					type="button"
+					class="ss-option ss-option--project"
+					:class="{ 'is-active': !state.company }"
+					@click="choose_company('')"
+				>
+					<span class="ss-avatar"><Icon name="layers" :size="18" /></span>
+					<span class="ss-option-main">
+						<span class="ss-option-label">ทุกบริษัท</span>
+						<span class="ss-option-desc">เอกสารของทุกบริษัท</span>
+					</span>
+					<Icon v-if="!state.company" name="check" :size="18" />
+				</button>
+				<button
+					v-for="c in companies"
+					:key="c.name"
+					type="button"
+					class="ss-option ss-option--project"
+					:class="{ 'is-active': c.name === state.company }"
+					@click="choose_company(c.name)"
+				>
+					<span class="ss-avatar" :class="{ 'has-logo': c.company_logo }">
+						<img v-if="c.company_logo" :src="c.company_logo" alt="" />
+						<template v-else>{{ initials(c.name) }}</template>
+					</span>
+					<span class="ss-option-main">
+						<span class="ss-option-label">{{ c.name }}</span>
+						<span v-if="c.abbr" class="ss-option-desc">{{ c.abbr }}</span>
+					</span>
+					<Icon v-if="c.name === state.company" name="check" :size="18" />
+				</button>
+			</div>
+		</Sheet>
+
 		<SectionLauncher :open="launcher" @close="launcher = false" />
 
 		<div class="ss-toasts" aria-live="polite">
@@ -316,13 +346,13 @@ import Icon from "./components/Icon.vue";
 import Sheet from "./components/Sheet.vue";
 import DockMenu from "./components/DockMenu.vue";
 import AppTooltip from "./components/AppTooltip.vue";
-import ProfileSheet from "./components/ProfileSheet.vue";
 import GlobalSearch from "./components/GlobalSearch.vue";
 import SettingsDialog from "./components/SettingsDialog.vue";
+import { module_pages, personal_pages } from "./settings_pages.js";
 import SectionLauncher from "./components/SectionLauncher.vue";
 import Desktop from "./components/Desktop.vue";
 import { app, app_of, is_desktop, is_filter_section, is_tab } from "./app.js";
-import { group_of, module_badge, module_list, MODULE_META, NEW_LOOK } from "./modules.js";
+import { group_of, is_company_section, module_badge, module_list, MODULE_META, NEW_LOOK } from "./modules.js";
 import {
 	boot,
 	call,
@@ -350,16 +380,23 @@ const LOGO = "/assets/consbiz/site_app/logo-96.png";
 
 const section = computed(() => SECTIONS[state.section]);
 const view = computed(() => VIEWS[state.route.view] || VIEWS[section.value.home]);
-const route_key = computed(
-	() => `${state.route.view}:${JSON.stringify(state.route.params)}:${state.project?.name}`
-);
+const route_key = computed(() => {
+	const { view, params } = state.route;
+	const key = app.routes[view]?.query_params ? state.route_revision : JSON.stringify(params);
+	return `${view}:${key}:${state.project?.name}`;
+});
 const desktop = computed(() => is_desktop(state.section));
 // ออฟฟิศ / หน้าแรก: แสดงทั้งเปลือกแอปและหน้าโดยไม่ต้องเลือกโครงการ
 const has_shell = computed(
 	() => !!(state.project || app.project_filter || app.no_project || desktop.value)
 );
+// หน้าแสดงหลัง AppShell อยู่ในหน้าเว็บแล้ว: TopBar ของหน้า Teleport ไป #ss-header ซึ่งต้องหาเจอใน document ตอน mount
+// (Vue 3.3 ไม่มี Teleport defer และ render แรกสร้างลูกก่อนใส่ .ss-app ลงหน้าเว็บ)
+const shell_mounted = ref(false);
 const ready = computed(
-	() => has_shell.value || state.route.view === SECTIONS[state.section]?.home
+	() =>
+		shell_mounted.value &&
+		(has_shell.value || state.route.view === SECTIONS[state.section]?.home)
 );
 
 // มือถือ: แถบล่างเฉพาะหน้าหลักของเมนู (หน้าแรกไม่มี)
@@ -372,13 +409,81 @@ const show_nav = computed(
 // tab.sub = หน้าระดับเมนูแต่ไม่แสดงเป็นเมนู (tab ในหน้าของเมนู PARENT_TAB เช่น ยอดวัสดุ ในทรัพยากร)
 const visible_tabs = (s) => s.tabs.filter((tab) => !tab.sub && (!tab.when || tab.when(boot)));
 
+// เมนูทั้งหมดของหมวด (รวมเมนูย่อยในกลุ่ม) พร้อมตัวเลข
+const all_tabs = computed(() => {
+	return visible_tabs(section.value).map((tab) => {
+		const summary = state.summaries[tab.summary || state.section];
+		return {
+			...tab,
+			badge: tab.badge?.(summary) || 0,
+			badge_tone: tab.alert?.(summary) ? "is-danger" : "",
+		};
+	});
+});
+// กลุ่มเมนู (section.groups + tab.group, ตกลง 2026-11-18 หมวดบุคคล): แถบบน/แถบล่างแสดง 1 ช่องต่อกลุ่ม
+// เมนูในกลุ่ม = dropdown ของช่องนั้นบนแถบบน (SectionTabs) / bottom sheet บนมือถือ (group_sheet) ไม่มีแถวเมนูย่อย
+const last_in_group = ref({});
+const group_of_view = (view) => {
+	const s = section.value;
+	if (!s?.groups) return null;
+	return s.tabs.find((t) => t.view === view)?.group || null;
+};
+const active_group = computed(() => group_of_view(active_view.value));
 const tabs = computed(() => {
-	const summary = state.summaries[state.section];
-	return visible_tabs(section.value).map((tab) => ({
-		...tab,
-		badge: tab.badge?.(summary) || 0,
-		badge_tone: tab.alert?.(summary) ? "is-danger" : "",
-	}));
+	const groups = section.value?.groups;
+	if (!groups) return all_tabs.value;
+	const out = [];
+	for (const tab of all_tabs.value) {
+		if (!tab.group) {
+			out.push(tab);
+			continue;
+		}
+		if (out.some((t) => t.group === tab.group)) continue;
+		const members = all_tabs.value.filter((t) => t.group === tab.group);
+		const meta = groups[tab.group] || {};
+		// ช่องของกลุ่ม: กลุ่มที่เปิดอยู่ = view ปัจจุบัน (ไฮไลต์) / กลุ่มอื่น = หน้าล่าสุดที่เปิดในกลุ่ม หรือหน้าแรกของกลุ่ม
+		const remembered = last_in_group.value[`${state.section}:${tab.group}`];
+		const view =
+			active_group.value === tab.group
+				? active_view.value
+				: members.find((t) => t.view === remembered)?.view || members[0].view;
+		out.push({
+			view,
+			group: tab.group,
+			menu: members.length > 1 || section.value.always_group_menu,
+			label: meta.label || tab.label,
+			icon: meta.icon || tab.icon,
+			badge: members.reduce((sum, t) => sum + (Number(t.badge) || 0), 0),
+			badge_tone: members.some((t) => t.badge_tone) ? "is-danger" : "",
+		});
+	}
+	return out;
+});
+// เมนูในกลุ่ม (dropdown ของแถบบน / sheet ของแถบล่าง)
+const group_members = (group) => all_tabs.value.filter((t) => t.group === group);
+const group_label = (group) => section.value?.groups?.[group]?.label || "";
+const group_sheet = ref(null);
+function tap_nav(tab) {
+	if (tab.view === MORE) more_open.value = true;
+	else if (tab.menu)
+		group_sheet.value = { label: group_label(tab.group), tabs: group_members(tab.group) };
+	else open_tab(tab.view);
+}
+function close_nav_menu() {
+	more_open.value = false;
+	group_sheet.value = null;
+}
+function select_nav_item(tab) {
+	close_nav_menu();
+	tap_nav(tab);
+}
+// ตั้งค่าของหมวด (ตกลง 2026-11-18): เมนู ⋯ ในหัวรายการ (ListHead) ของหน้าเมนูหลัก
+// key = groups[กลุ่มที่เปิด].settings หรือ section.settings (หัวข้อใน settings_pages.js MODULE) ไม่มีสิทธิ์ = ไม่มีเมนู
+const module_settings = computed(() => {
+	const s = section.value;
+	if (!s || !is_tab(state.route.view)) return null;
+	const key = s.groups?.[active_group.value]?.settings || s.settings;
+	return key && module_pages(key).length ? key : null;
 });
 const mobile_tabs = computed(() => tabs.value.filter((t) => !t.wide_only));
 // แถบล่างมีได้ NAV_MAX ช่อง เกินแล้วช่องสุดท้ายเป็น "อื่นๆ" (เปิด sheet เลือกเมนูที่เหลือ)
@@ -429,6 +534,12 @@ const active_view = computed(
 		(app.kind_pages.includes(state.route.view) && state.route.params.kind) ||
 		state.route.view
 );
+watch(
+	() => [active_view.value, active_group.value],
+	([view, group]) => {
+		if (group) last_in_group.value[`${state.section}:${group}`] = view;
+	}
+);
 // ตำแหน่งแถบไฮไลต์ของแถบล่าง (มือถือไม่มีเมนู wide_only)
 const tab_index = computed(() =>
 	Math.max(
@@ -456,7 +567,7 @@ const filtered_projects = computed(() => {
 	const q = project_txt.value.trim().toLowerCase();
 	// ออฟฟิศ: เฉพาะโครงการของบริษัทที่เลือก
 	const list = (projects.value || []).filter(
-		(p) => !app.project_filter || !state.company || p.company === state.company
+		(p) => !is_company_section(state.section) || !state.company || p.company === state.company
 	);
 	return q
 		? list.filter((p) =>
@@ -504,29 +615,10 @@ watch(
 
 const companies = boot.companies || [];
 const company_label = computed(() => state.company || "ทุกบริษัท");
-const company_groups = computed(() => [
-	{
-		label: "เปลี่ยนบริษัท",
-		items: [
-			{
-				key: "",
-				label: "ทุกบริษัท",
-				icon: "layers",
-				selected: !state.company,
-				onclick: () => choose_company(""),
-			},
-			...companies.map((c) => ({
-				key: c.name,
-				label: c.name,
-				image: c.company_logo,
-				icon: "building",
-				selected: c.name === state.company,
-				onclick: () => choose_company(c.name),
-			})),
-		],
-	},
-]);
+const company_picker = ref(false);
+provide("open_company_picker", () => (company_picker.value = true));
 function choose_company(company) {
+	company_picker.value = false;
 	const changed = company !== state.company;
 	set_company(company);
 	if (!changed) return;
@@ -567,7 +659,11 @@ function load_summaries() {
 			.forEach((key) => load_summary(key))
 	);
 }
-provide("reload_summary", (key) => load_summary(typeof key === "string" ? key : undefined));
+provide("reload_summary", (key) => {
+	const target = typeof key === "string" ? key : state.section;
+	const related = SECTIONS[target] ? visible_tabs(SECTIONS[target]).map((tab) => tab.summary).filter(Boolean) : [];
+	return Promise.all([...new Set([target, ...related])].map(load_summary));
+});
 provide("open_project_picker", () => (picker.value = true));
 provide("choose_project", (project) => choose_project(project));
 
@@ -629,10 +725,9 @@ function close_peek(event) {
 	if (peek.value && !event.target.closest?.(".ss-rail, .ss-menu")) peek.value = false;
 }
 
-// ---------------------------------------------------------------- เมนูท้าย Dock (บริษัท / ผู้ใช้)
+// ---------------------------------------------------------------- เมนูท้าย Dock (ผู้ใช้)
 
 const dock_menu = ref("");
-const company_button = ref(null);
 const user_button = ref(null);
 const header_user_anchor = ref(null);
 function toggle_dock_menu(name) {
@@ -643,8 +738,17 @@ function toggle_header_user_menu(anchor) {
 	header_user_anchor.value = anchor;
 	dock_menu.value = dock_menu.value === "user" ? "" : "user";
 }
-const profile_open = ref(false);
-const settings_open = ref(false);
+// หน้าต่างตั้งค่าเดียว 2 ชุดหัวข้อ: ส่วนตัว (avatar) / ของหมวด (⋯ ในหัวรายการ)
+const settings = ref({ open: false, pages: [], title: "ตั้งค่า", initial: null });
+const PERSONAL = personal_pages();
+function open_settings(initial = null) {
+	settings.value = { open: true, pages: PERSONAL, title: "ตั้งค่า", initial };
+}
+function open_module_settings(key = module_settings.value) {
+	const pages = module_pages(key);
+	if (!pages.length) return;
+	settings.value = { open: true, pages, title: `ตั้งค่า${section.value?.label || ""}`, initial: key };
+}
 const user_groups = [
 	{
 		items: [
@@ -657,12 +761,12 @@ const user_groups = [
 					text: initials(boot.full_name || boot.user || ""),
 					tone: tone(boot.user || ""),
 				},
-				onclick: () => (profile_open.value = true),
+				onclick: () => open_settings("profile"),
 			},
 		],
 	},
-	...(boot.can?.settings || boot.can?.labour_settings
-		? [{ items: [{ key: "settings", label: "ตั้งค่า", icon: "sliders", onclick: () => (settings_open.value = true) }] }]
+	...(PERSONAL.length
+		? [{ items: [{ key: "settings", label: "ตั้งค่า", icon: "sliders", onclick: () => open_settings() }] }]
 		: []),
 	...(boot.desk
 		? [{ items: [{ key: "desk", label: "ระบบเต็ม", icon: "monitor", href: "/app" }] }]
@@ -695,9 +799,13 @@ if (!boot.guest) {
 }
 provide("open_user_menu", toggle_header_user_menu);
 // เมนูของหมวดบนแถบบน (SectionTabs.vue ใน TopBar จอ ≥768)
-provide("section_nav", { tabs, active_view, open_tab });
+provide("section_nav", { tabs, active_view, open_tab, group_members, group_label });
+// heads = จำนวน ListHead ที่แสดงอยู่ (หน้าที่ไม่มีหัวรายการ เช่น มือถือของหน้าเวลาทำงาน TopBar แสดงปุ่มตั้งค่าแทน)
+const list_heads = ref(0);
+provide("module_settings", { key: module_settings, open: open_module_settings, heads: list_heads });
 
 onMounted(async () => {
+	shell_mounted.value = true;
 	// ?project=<รหัส> เลือกโครงการให้เลย (ลิงก์จากฟอร์ม Project / CM, กดการแจ้งเตือน)
 	const wanted = new URLSearchParams(location.search).get("project");
 	const remembered = remembered_project();
@@ -723,7 +831,12 @@ onMounted(async () => {
 	}
 	// ออฟฟิศ: โครงการเป็นแค่ตัวกรอง ไม่ต้องเลือกก่อน (ตัวกรองต้องเป็นของบริษัทที่เลือก)
 	if (app.project_filter) {
-		if (state.project && state.company && state.project.company !== state.company)
+		if (
+			is_company_section(state.section) &&
+			state.project &&
+			state.company &&
+			state.project.company !== state.company
+		)
 			state.project = null;
 		load_summaries();
 	} else if (!state.project && projects.value.length === 1) {

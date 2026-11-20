@@ -1,7 +1,7 @@
 # Copyright (c) 2026, Siricons and contributors
 # For license information, please see license.txt
 
-"""ตั้งค่า HR (หมวด hr ของแอปออฟฟิศ, หน้า hr-setup) ตรวจความพร้อมของการตั้งค่า HR/เงินเดือนของบริษัท (ตกลง 2026-11-11)
+"""ตั้งค่า HR (หน้าตั้งค่ารวมของแอป หัวข้อหมวดบุคคล, URL เดิม hr-setup) ตรวจความพร้อมของการตั้งค่า HR/เงินเดือนของบริษัท (ตกลง 2026-11-11)
 
 CHECKS = รายการตรวจ แต่ละข้อคืน status ok / warn / error + คำอธิบาย + วิธีแก้:
 - fix = แก้อัตโนมัติได้ (apply_fix, เฉพาะ HR Manager / System Manager) ข้อมูลตั้งค่ามาตรฐานของบริษัทไทย
@@ -15,7 +15,7 @@ from urllib.parse import quote
 
 import frappe
 from frappe import _
-from frappe.utils import getdate, nowdate
+from frappe.utils import cint, flt, getdate, nowdate
 
 from consbiz import hr_attendance
 
@@ -115,7 +115,7 @@ def check_payroll_account(company):
 def check_advance_account(company):
 	account = company_value(company, "default_employee_advance_account")
 	if not account:
-		return result("error", _("ยังไม่ได้ตั้งบัญชีเงินทดรองจ่ายพนักงาน (ใช้กับเบิกเงินล่วงหน้า/เงินสำรองจ่าย)"), link=form("Company", company))
+		return result("error", _("ยังไม่ได้ตั้งบัญชีเงินทดรองจ่ายพนักงาน (ใช้กับเบิกเงินล่วงหน้า/เงินทดรองจ่าย)"), link=form("Company", company))
 	if account_type(account) != "Receivable":
 		return result("error", _("{0} ต้องตั้ง Account Type = Receivable (HRMS หายอดเบิกตามชนิดบัญชี)").format(account), link=form("Account", account))
 	return result("ok", account)
@@ -126,7 +126,7 @@ def check_claim_account(company):
 	if not account:
 		return result(
 			"error",
-			_("ยังไม่ได้ตั้งบัญชีค้างจ่ายเบิกค่าใช้จ่าย (Default Expense Claim Payable Account) พนักงานเบิกค่าใช้จ่ายคืนไม่ได้"),
+			_("ยังไม่ได้ตั้งบัญชีค้างจ่ายเบิกค่าใช้จ่าย (Default Expense Claim Payable Account) พนักงานเบิกสำรองจ่ายไม่ได้"),
 			link=form("Company", company),
 			link_label=_("เลือกบัญชี (ประเภท Payable)"),
 		)
@@ -439,6 +439,57 @@ def check_employee_users(company):
 	return result("ok", _("ทุกคนมีผู้ใช้และโครงการ"))
 
 
+def check_default_shift(company):
+	"""กะที่ใช้อยู่ (กะเริ่มต้นของบริษัท/พนักงาน/กำหนดเป็นช่วง) ต้องมีเวลาพัก ไม่งั้นชั่วโมงทำงานไม่หักพักเที่ยง (hr_attendance.shift_of)"""
+	from consbiz import hr_attendance
+
+	used = set(
+		frappe.get_all("Shift Assignment", filters={"docstatus": 1, "status": "Active", "company": company}, pluck="shift_type")
+	)
+	used |= set(frappe.get_all("Employee", filters={"company": company, "status": "Active", "default_shift": ("is", "set")}, pluck="default_shift"))
+	default = hr_attendance.company_shift(company)
+	if default:
+		used.add(default)
+	no_break = sorted(n for n in used if not frappe.db.get_value("Shift Type", n, "custom_break_start"))
+	broken = sorted(n for n in used if not hr_attendance.shift_type(n))
+	notes = []
+	if broken:
+		notes.append(_("กะที่ใช้ไม่ได้ (ไม่มีเวลา/ข้ามเที่ยงคืน ใช้ 08:00-17:00 แทน): {0}").format(", ".join(broken)))
+	if no_break:
+		notes.append(_("กะที่ไม่มีเวลาพัก (นับชั่วโมงไม่หักพัก): {0}").format(", ".join(no_break)))
+	if notes:
+		return result("warn", " · ".join(notes), link="/conserp/hr/hr-shifts/types", link_label=_("แก้ประเภทกะ"))
+	if not default:
+		return result("ok", _("ไม่ได้ตั้งกะเริ่มต้น ใช้ 08:00-17:00 พักเที่ยง 12:00-13:00"))
+	return result("ok", _("กะเริ่มต้นของบริษัท: {0}").format(default))
+
+
+def check_checkin_locations(company):
+	"""พนักงานที่ลงเวลาไม่ได้เพราะจุดลงเวลา (ของตัวเอง หรือของโครงการที่ประจำ) ยังไม่ตั้ง/ไม่มีพิกัด/รัศมี 0 (self_service.resolve_location)
+	ตั้งจุดในฟอร์มโครงการของแอป (หมวดข้อมูลหลัก ปุ่มตั้งจุดด้วย GPS)"""
+
+	from consbiz.self_service import resolve_location
+
+	rows = frappe.get_all(
+		"Employee",
+		filters={"company": company, "status": "Active"},
+		fields=["name", "custom_project", "custom_checkin_location"],
+	)
+	blocked = [r for r in rows if not resolve_location(r)[0]]
+	if not blocked:
+		return result("ok", _("พนักงานทุกคนมีจุดลงเวลา"))
+	projects = sorted({r.custom_project for r in blocked if r.custom_project})
+	names = dict(frappe.get_all("Project", filters={"name": ("in", projects or [""])}, fields=["name", "project_name"], as_list=True))
+	notes = [_("ลงเวลาไม่ได้ {0} คน").format(len(blocked))]
+	if projects:
+		notes.append(_("โครงการที่ยังไม่มีจุดลงเวลา: {0}").format(", ".join(names.get(p) or p for p in projects)))
+	no_project = sum(1 for r in blocked if not r.custom_project)
+	if no_project:
+		notes.append(_("ไม่ได้ประจำโครงการและไม่มีจุดเฉพาะคน {0} คน").format(no_project))
+	link = f"/conserp/master/md-doc/md-projects/{quote(projects[0])}" if projects else "/conserp/master/md-employees"
+	return result("warn", " · ".join(notes), link=link, link_label=_("ตั้งจุดลงเวลา"))
+
+
 CHECKS = [
 	("company", "holiday", _("วันหยุดของบริษัท"), check_holiday),
 	("company", "payroll_account", _("บัญชีเงินเดือนค้างจ่าย"), check_payroll_account),
@@ -459,22 +510,134 @@ CHECKS = [
 	("leave", "leave_allocations", _("โควตาวันลาของพนักงาน"), check_leave_allocations),
 	("people", "roles", _("ผู้ดูแลและผู้อนุมัติ"), check_roles),
 	("people", "employees", _("ข้อมูลพนักงาน"), check_employee_users),
+	("people", "checkin_locations", _("จุดลงเวลา"), check_checkin_locations),
+	("people", "default_shift", _("กะทำงาน"), check_default_shift),
 ]
 GROUPS = {"company": _("บริษัทและบัญชี"), "payroll": _("เงินเดือน"), "leave": _("วันลา"), "people": _("ผู้ใช้และพนักงาน")}
 
 
+# ตั้งค่าแยกตามกลุ่มเมนูของหมวดบุคคล (ตกลง 2026-11-17) แสดงในหน้าตั้งค่ารวม หัวข้อ hr-<module> (shared/settings_pages.js + HrSettings.vue)
+# key = groups ใน office_app/sections.js ข้อตรวจ (CHECKS key) อยู่ได้กลุ่มเดียว
+MODULES = {
+	"time": {
+		"label": _("เวลาทำงาน"),
+		"checks": ("holiday", "default_shift", "checkin_locations", "leave_holidays", "leave_policy", "leave_allocations"),
+	},
+	"pay": {
+		"label": _("เงินเดือน"),
+		"checks": (
+			"payroll_account",
+			"advance_component",
+			"unpaid_component",
+			"payroll_settings",
+			"structure",
+			"salary_proration",
+			"sso",
+			"tax_slab",
+			"payroll_period",
+			"assignments",
+			"foreign_components",
+		),
+	},
+	"expense": {"label": _("ค่าใช้จ่าย"), "checks": ("advance_account", "claim_account")},
+	"people": {"label": _("พนักงาน"), "checks": ("roles", "employees")},
+}
+# ค่าตั้งที่แก้ได้ในหน้าตั้งค่าของกลุ่ม (ช่องของ Company) type: int / float / link
+PARAMS = {
+	"time": (
+		{
+			"fieldname": "custom_default_shift",
+			"label": _("กะเริ่มต้นของบริษัท"),
+			"type": "link",
+			"doctype": "Shift Type",
+			"note": _("ใช้กับพนักงานที่ไม่ได้กำหนดกะ ไม่ตั้ง = 08:00-17:00 พักเที่ยง 12:00-13:00"),
+		},
+	),
+	"pay": (
+		{
+			"fieldname": "custom_salary_advance_limit_percent",
+			"label": _("วงเงินเบิกเงินเดือนล่วงหน้า (% ของเงินเดือน)"),
+			"type": "float",
+			"min": 0,
+			"max": 100,
+			"note": _("เกินวงเงินต้องให้ผู้บริหารอนุมัติ"),
+		},
+	),
+	"expense": (
+		{
+			"fieldname": "custom_expense_clear_days",
+			"label": _("ต้องเคลียร์เงินทดรองจ่ายภายใน (วัน)"),
+			"type": "int",
+			"min": 1,
+			"max": 365,
+			"note": _("นับจากวันจ่ายเงิน เลยกำหนดแจ้งเตือนพนักงานทุก 3 วัน"),
+		},
+	),
+	"people": (),
+}
+
+
+def module_of(key):
+	return next((m for m, conf in MODULES.items() if key in conf["checks"]), "people")
+
+
+def params_of(module, company):
+	out = []
+	for param in PARAMS.get(module, ()):
+		if not frappe.get_meta("Company").has_field(param["fieldname"]):
+			continue
+		row = {**param, "value": frappe.db.get_value("Company", company, param["fieldname"])}
+		if param["type"] == "link":
+			row["options"] = frappe.get_all(param["doctype"], pluck="name", order_by="name asc", limit_page_length=200)
+		out.append(row)
+	return out
+
+
 @frappe.whitelist()
-def get_checks(company=None):
+def get_checks(company=None, module=None):
+	"""ข้อตรวจ (module = เฉพาะกลุ่มนั้น) + ค่าตั้งของกลุ่ม"""
 	hr_attendance.require_hr()
 	company = hr_attendance.default_company(company)
+	if module and module not in MODULES:
+		frappe.throw(_("ไม่รู้จักกลุ่ม {0}").format(module))
 	rows = []
 	for group, key, title, fn in CHECKS:
+		if module and module_of(key) != module:
+			continue
 		try:
 			row = fn(company)
 		except Exception as error:
 			row = result("error", _("ตรวจไม่สำเร็จ: {0}").format(error))
-		rows.append({"group": group, "key": key, "title": title, **row})
-	return {"company": company, "groups": GROUPS, "checks": rows, "can_fix": can_fix()}
+		rows.append({"group": group, "key": key, "title": title, "module": module_of(key), **row})
+	return {
+		"company": company,
+		"groups": GROUPS,
+		"modules": {k: v["label"] for k, v in MODULES.items()},
+		"module": module,
+		"params": params_of(module, company) if module else [],
+		"checks": rows,
+		"can_fix": can_fix(),
+	}
+
+
+@frappe.whitelist(methods=["POST"])
+def save_param(company, module, fieldname, value=None):
+	"""แก้ค่าตั้งของกลุ่ม (HR Manager / System Manager)"""
+	if not can_fix():
+		frappe.throw(_("แก้ค่าตั้งได้เฉพาะ HR Manager / System Manager"), frappe.PermissionError)
+	param = next((p for p in PARAMS.get(module, ()) if p["fieldname"] == fieldname), None)
+	if not param:
+		frappe.throw(_("ไม่รู้จักค่าตั้งนี้"))
+	if param["type"] in ("int", "float"):
+		value = (cint if param["type"] == "int" else flt)(value)
+		if not param.get("min", value) <= value <= param.get("max", value):
+			frappe.throw(_("{0} ต้องอยู่ระหว่าง {1} ถึง {2}").format(param["label"], param["min"], param["max"]))
+	elif param["type"] == "link":
+		value = value or None
+		if value and not frappe.db.exists(param["doctype"], value):
+			frappe.throw(_("ไม่พบ {0}").format(value))
+	frappe.db.set_value("Company", company, fieldname, value)
+	return params_of(module, company)
 
 
 # ---------------------------------------------------------------- แก้ (apply_fix)

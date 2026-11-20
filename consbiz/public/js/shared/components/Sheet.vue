@@ -11,6 +11,7 @@
 				:style="drag ? { transform: `translateY(${drag}px)`, transition: 'none' } : null"
 				role="dialog"
 				aria-modal="true"
+				:aria-label="title"
 			>
 				<div class="ss-sheet-grip" @pointerdown="start_drag">
 					<span></span>
@@ -24,7 +25,7 @@
 						<Icon name="x" />
 					</button>
 				</div>
-				<div class="ss-sheet-body">
+				<div class="ss-sheet-body" :class="{ 'is-form': form }">
 					<slot />
 				</div>
 				<div v-if="$slots.footer" class="ss-sheet-foot">
@@ -47,6 +48,8 @@ const props = defineProps({
 	full: Boolean,
 	half: Boolean,
 	wide: Boolean,
+	// ฟอร์มกรอก: เว้นระยะช่อง/กล่องในตัวเท่ากัน (.ss-sheet-body.is-form) sheet ดูข้อมูลไม่ต้องใส่
+	form: Boolean,
 });
 const emit = defineEmits(["close"]);
 const drag = ref(0);

@@ -47,7 +47,7 @@
 				</div>
 				<div v-if="ctx.money.advances.length" class="ss-facts">
 					<div v-for="a in ctx.money.advances" :key="a.name" class="ss-fact">
-						<span>{{ thai_date(a.posting_date) }} · {{ a.advance_type === "Salary Advance" ? "เงินเดือนล่วงหน้า" : "เงินสำรองจ่าย" }}</span>
+						<span>{{ thai_date(a.posting_date) }} · {{ a.advance_type === "Salary Advance" ? "เงินเดือนล่วงหน้า" : "เงินทดรองจ่าย" }}</span>
 						<b>
 							{{ money(a.advance_amount) }}
 							<template v-if="a.repayment"> · ค้างหัก {{ money(a.repayment.remaining) }}</template>
@@ -69,7 +69,7 @@ import { call, money, num, thai_date } from "../api.js";
 
 const props = defineProps({
 	employee: { type: String, required: true },
-	// leave / checkin / advance / claim
+	// leave / checkin / attendance / advance / claim
 	kind: { type: String, required: true },
 	from_date: String,
 	to_date: String,

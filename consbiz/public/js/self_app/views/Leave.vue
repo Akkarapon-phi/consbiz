@@ -37,24 +37,15 @@
 					</div>
 				</div>
 
-				<div v-if="wide" class="ss-list-head">
-					<StatusTabs v-model="tab" :options="tabs" />
-					<div class="ss-list-tools">
-						<button
-							type="button"
-							class="ss-icon-btn"
-							:class="{ 'is-spinning': loading }"
-							aria-label="โหลดใหม่"
-							@click="load"
-						>
-							<Icon name="refresh" :size="17" />
-						</button>
-						<button type="button" class="ss-btn ss-btn--primary ss-list-create" @click="open_form">
-							<Icon name="plus" :size="18" :stroke="2.6" />
-							<span>ขอลา</span>
-						</button>
-					</div>
-				</div>
+				<ListHead
+					v-if="wide"
+					v-model="tab"
+					:tabs="tabs"
+					:loading="loading"
+					@refresh="load"
+					create="ขอลา"
+					@create="open_form"
+				/>
 				<div v-else class="ss-tabs">
 					<button
 						v-for="t in tabs"
@@ -114,6 +105,7 @@
 			:open="form_open"
 			title="ขอลา"
 			:subtitle="approver_text"
+			form
 			@close="form_open = false"
 		>
 			<div class="ss-field">
@@ -219,9 +211,9 @@ import Sheet from "../../shared/components/Sheet.vue";
 import SelectBox from "../../shared/components/SelectBox.vue";
 import DateInput from "../../shared/components/DateInput.vue";
 import PhotoInput from "../../shared/components/PhotoInput.vue";
-import StatusTabs from "../../shared/components/StatusTabs.vue";
+import ListHead from "../../shared/components/ListHead.vue";
 import { use_wide } from "../../shared/table.js";
-import { call, celebrate, post, show_error, thai_date, toast, today } from "../../shared/api.js";
+import { call, celebrate, post, replace_params, show_error, state, thai_date, toast, today } from "../../shared/api.js";
 
 const API = "consbiz.self_service.";
 const STATUS = {
@@ -279,7 +271,13 @@ async function load() {
 		loading.value = false;
 	}
 }
-load();
+// ทางลัดจากหน้าแรก: /leave/new = เปิดฟอร์มขอลาทันที
+const start_action = state.route.params.action;
+load().then(() => {
+	if (start_action !== "new") return;
+	replace_params("leave", {});
+	open_form();
+});
 
 // ---------------------------------------------------------------- ฟอร์มขอลา
 

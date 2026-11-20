@@ -1,6 +1,6 @@
 <!-- ค้นหาทั้งระบบ: ปุ่มค้นหาบนแถบบน หรือ Ctrl/⌘ + G (AppShell)
      ค้นเลขที่/ชื่อเรื่องของเอกสารตาม GLOBAL_SEARCH_DOCTYPES ใน site_app.py แล้วเปิดด้วย open_document()
-     ↑ ↓ เลือก, Enter เปิด, Esc ปิด (ค้นหาในหน้ารายการแต่ละหน้ายังเป็น HeaderSearch ของหน้านั้น) -->
+     ↑ ↓ เลือก, Enter เปิด, Esc ปิด (ค้นหาในหน้ารายการแต่ละหน้าอยู่ในหัวรายการของหน้านั้น: ListHead) -->
 <template>
 	<Sheet
 		:open="open"

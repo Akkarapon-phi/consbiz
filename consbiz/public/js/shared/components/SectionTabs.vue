@@ -2,7 +2,8 @@
      ข้อมูลเมนู/ตัวเลข/เมนูที่เลือกจาก AppShell (provide "section_nav") มือถือใช้แถบเมนูล่างของ AppShell แทน
      ที่ไม่พอ (2026-11-16): เมนูที่ล้นซ่อนแล้วรวมไว้ที่ปุ่ม "…" ท้ายแถบ (DockMenu below) เมนูที่เลือกอยู่แสดงเสมอ
      กรอบนอก .ss-sectabs-wrap กินที่ว่างของแถบบน (วัดที่ว่างจากตัวนี้) ส่วน nav กว้างเท่าเมนูที่แสดง
-     วัดความกว้างจริงของแต่ละเมนูจากแถวเงา .ss-sectabs-measure (class เดียวกัน มองไม่เห็น) -->
+     วัดความกว้างจริงของแต่ละเมนูจากแถวเงา .ss-sectabs-measure (class เดียวกัน มองไม่เห็น)
+     ช่องของกลุ่มเมนู (tab.group, ตกลง 2026-11-18) = dropdown รายการเมนูในกลุ่ม (DockMenu below-start) มือถือใช้ bottom sheet ของ AppShell -->
 <template>
 	<div v-if="nav && nav.tabs.value.length > 1" ref="wrap" class="ss-sectabs-wrap">
 		<nav class="ss-sectabs" :class="`ss-sectabs--${variant}`" aria-label="เมนูของหมวด">
@@ -13,12 +14,15 @@
 				class="ss-sectab"
 				:class="{ 'is-active': tab.view === active }"
 				:aria-current="tab.view === active ? 'page' : undefined"
+				:aria-haspopup="is_group(tab) ? 'menu' : undefined"
+				:aria-expanded="is_group(tab) ? group_menu?.group === tab.group : undefined"
 				:title="tab.label"
-				@click="nav.open_tab(tab.view)"
+				@click="click_tab(tab, $event)"
 			>
 				<Icon :name="tab.icon" :size="16" :stroke="tab.view === active ? 2.4 : 2" />
 				<span class="ss-sectab-label">{{ tab.label }}</span>
 				<span v-if="tab.badge" class="ss-sectab-badge" :class="tab.badge_tone">{{ tab.badge }}</span>
+				<Icon v-if="is_group(tab)" class="ss-sectab-caret" name="chevron-down" :size="12" :stroke="2.4" />
 			</button>
 			<button
 				v-if="hidden.length"
@@ -46,10 +50,18 @@
 				<Icon :name="tab.icon" :size="16" />
 				<span class="ss-sectab-label">{{ tab.label }}</span>
 				<span v-if="tab.badge" class="ss-sectab-badge">{{ tab.badge }}</span>
+				<Icon v-if="is_group(tab)" class="ss-sectab-caret" name="chevron-down" :size="12" />
 			</span>
 			<span class="ss-sectab ss-sectab--more"><Icon name="more" :size="18" /></span>
 		</div>
 		<DockMenu :open="menu" :anchor="more" :groups="menu_groups" placement="below" @close="menu = false" />
+		<DockMenu
+			:open="!!group_menu"
+			:anchor="group_menu?.anchor"
+			:groups="group_menu?.groups || []"
+			placement="below-start"
+			@close="group_menu = null"
+		/>
 	</div>
 </template>
 
@@ -77,16 +89,44 @@ const shown = computed(() => {
 	return out;
 });
 const hidden = computed(() => tabs.value.filter((t) => !shown.value.includes(t)));
-const menu_groups = computed(() => [
-	{
-		items: hidden.value.map((t) => ({
-			key: t.view,
-			label: t.badge ? `${t.label} (${t.badge})` : t.label,
-			icon: t.icon,
-			onclick: () => nav.open_tab(t.view),
-		})),
-	},
-]);
+const is_group = (tab) => !!tab.menu;
+const item_of = (t) => ({
+	key: t.view,
+	label: t.badge ? `${t.label} (${t.badge})` : t.label,
+	icon: t.icon,
+	selected: t.view === active.value,
+	onclick: () => nav.open_tab(t.view),
+});
+// เมนูที่ล้น: เมนูเดี่ยวรวมกลุ่มเดียว กลุ่มเมนูแยกเป็นหัวข้อ
+const menu_groups = computed(() => {
+	const groups = [];
+	for (const tab of hidden.value) {
+		if (is_group(tab)) {
+			groups.push({ label: nav.group_label(tab.group), items: nav.group_members(tab.group).map(item_of) });
+		} else if (groups.length && !groups.at(-1).label) {
+			groups.at(-1).items.push(item_of(tab));
+		} else {
+			groups.push({ items: [item_of(tab)] });
+		}
+	}
+	return groups;
+});
+const group_menu = ref(null);
+function click_tab(tab, event) {
+	if (!is_group(tab)) {
+		nav.open_tab(tab.view);
+		return;
+	}
+	if (group_menu.value?.group === tab.group) {
+		group_menu.value = null;
+		return;
+	}
+	group_menu.value = {
+		group: tab.group,
+		anchor: event.currentTarget,
+		groups: [{ items: nav.group_members(tab.group).map(item_of) }],
+	};
+}
 
 function relayout() {
 	const box = wrap.value;

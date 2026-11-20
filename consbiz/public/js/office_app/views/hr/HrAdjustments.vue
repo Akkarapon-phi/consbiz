@@ -3,9 +3,6 @@
 <template>
 	<div>
 		<TopBar title="รายการเพิ่ม/หัก">
-			<template #search>
-				<HeaderSearch v-if="wide" v-model="txt" placeholder="ค้นหาชื่อพนักงานหรือรายการ" />
-			</template>
 			<template #actions>
 				<button v-if="!wide" type="button" class="ss-btn ss-btn--primary ss-list-create" aria-label="ลงรายการ" @click="open_form">
 					<Icon name="plus" :size="18" :stroke="2.6" />
@@ -14,43 +11,46 @@
 		</TopBar>
 
 		<div class="ss-content">
-			<div class="ss-list-head">
-				<div class="hr-month">
-					<button type="button" class="ss-icon-btn" aria-label="เดือนก่อน" @click="shift(-1)"><Icon name="chevron-left" :size="17" /></button>
-					<DateInput v-model="month" picker="month" variant="tool" label="เลือกเดือน" />
-					<button type="button" class="ss-icon-btn" aria-label="เดือนถัดไป" @click="shift(1)"><Icon name="chevron-right" :size="17" /></button>
+			<!-- ตัวเลขสรุปอยู่เหนือหัวรายการ (หัวรายการต้องติดกับการ์ดตาราง) -->
+			<div v-if="data" class="ss-stats ss-stats--3">
+				<div class="ss-stat" style="--i: 0">
+					<span class="ss-stat-icon"><Icon name="list" :size="20" /></span>
+					<span class="ss-stat-value">{{ data.rows.length }}</span>
+					<span class="ss-stat-label">รายการ</span>
 				</div>
-				<div v-if="wide" class="ss-list-tools">
-					<button type="button" class="ss-icon-btn" :class="{ 'is-spinning': loading }" aria-label="โหลดใหม่" title="โหลดใหม่" @click="load">
-						<Icon name="refresh" :size="17" />
-					</button>
-					<button type="button" class="ss-btn ss-btn--primary ss-list-create" @click="open_form">
-						<Icon name="plus" :size="18" :stroke="2.6" />
-						<span>ลงรายการ</span>
-					</button>
+				<div class="ss-stat" style="--i: 1">
+					<span class="ss-stat-icon"><Icon name="plus" :size="20" /></span>
+					<span class="ss-stat-value ss-stat-value--money">{{ money(data.totals.earning) }}</span>
+					<span class="ss-stat-label">รายได้เพิ่ม</span>
+				</div>
+				<div class="ss-stat" style="--i: 2">
+					<span class="ss-stat-icon"><Icon name="minus" :size="20" /></span>
+					<span class="ss-stat-value ss-stat-value--money">{{ money(data.totals.deduction) }}</span>
+					<span class="ss-stat-label">รายการหัก</span>
 				</div>
 			</div>
 
+			<!-- จอเล็ก: เลือกเดือนอย่างเดียว (ลงรายการอยู่บนแถบบน) -->
+			<ListHead
+				v-model:search="txt"
+				search_placeholder="ค้นหาชื่อพนักงานหรือรายการ"
+				:loading="loading"
+				:on-refresh="wide ? load : undefined"
+				:create="wide ? 'ลงรายการ' : ''"
+				@create="open_form"
+			>
+				<template #lead>
+					<div class="hr-month">
+						<button type="button" class="ss-icon-btn" aria-label="เดือนก่อน" @click="shift(-1)"><Icon name="chevron-left" :size="17" /></button>
+						<DateInput v-model="month" picker="month" variant="tool" label="เลือกเดือน" />
+						<button type="button" class="ss-icon-btn" aria-label="เดือนถัดไป" @click="shift(1)"><Icon name="chevron-right" :size="17" /></button>
+					</div>
+				</template>
+			</ListHead>
+
+			<ListCard :on="wide">
 			<Skeleton v-if="data === null" :rows="5" />
 			<template v-else>
-				<div class="ss-stats ss-stats--3">
-					<div class="ss-stat" style="--i: 0">
-						<span class="ss-stat-icon"><Icon name="list" :size="20" /></span>
-						<span class="ss-stat-value">{{ data.rows.length }}</span>
-						<span class="ss-stat-label">รายการ</span>
-					</div>
-					<div class="ss-stat" style="--i: 1">
-						<span class="ss-stat-icon"><Icon name="plus" :size="20" /></span>
-						<span class="ss-stat-value ss-stat-value--money">{{ money(data.totals.earning) }}</span>
-						<span class="ss-stat-label">รายได้เพิ่ม</span>
-					</div>
-					<div class="ss-stat" style="--i: 2">
-						<span class="ss-stat-icon"><Icon name="minus" :size="20" /></span>
-						<span class="ss-stat-value ss-stat-value--money">{{ money(data.totals.deduction) }}</span>
-						<span class="ss-stat-label">รายการหัก</span>
-					</div>
-				</div>
-
 				<Empty v-if="!shown.length" icon="list" title="ยังไม่มีรายการเดือนนี้" text="เช่น OT โบนัส หักเครดิตร้านค้า" />
 				<DataTable v-else-if="wide" :rows="shown" :columns="COLUMNS" @open="open_row">
 					<template #employee_name="{ row }">
@@ -76,6 +76,7 @@
 					</button>
 				</div>
 			</template>
+			</ListCard>
 		</div>
 
 		<Sheet :open="form_open" title="ลงรายการเพิ่ม/หัก" :subtitle="month_label" @close="form_open = false">
@@ -130,7 +131,8 @@ import SelectBox from "../../../shared/components/SelectBox.vue";
 import MoneyInput from "../../../shared/components/MoneyInput.vue";
 import DataTable from "../../../shared/components/DataTable.vue";
 import DateInput from "../../../shared/components/DateInput.vue";
-import HeaderSearch from "../../../shared/components/HeaderSearch.vue";
+import ListHead from "../../../shared/components/ListHead.vue";
+import ListCard from "../../../shared/components/ListCard.vue";
 import { matches, use_wide } from "../../../shared/table.js";
 import { call, money, post, replace_params, show_error, state, strip_html, thai_date, toast } from "../../../shared/api.js";
 

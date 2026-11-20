@@ -27,20 +27,14 @@
 		</div>
 
 		<div v-else class="ss-content">
-			<div v-if="wide" class="ss-list-head">
-				<StatusTabs :model-value="active_tab" :options="tabs" @update:model-value="set_tab" />
-				<div class="ss-list-tools">
-					<button
-						type="button"
-						class="ss-icon-btn"
-						:class="{ 'is-spinning': loading }"
-						aria-label="โหลดใหม่"
-						@click="load"
-					>
-						<Icon name="refresh" :size="17" />
-					</button>
-				</div>
-			</div>
+			<ListHead
+				v-if="wide"
+				:model-value="active_tab"
+				:tabs="tabs"
+				:loading="loading"
+				@update:model-value="set_tab"
+				@refresh="load"
+			/>
 			<Empty
 				v-if="data === false"
 				icon="layers"
@@ -231,10 +225,10 @@
 import { computed, ref } from "vue";
 import ReportList from "./ReportList.vue";
 import Icon from "../../../shared/components/Icon.vue";
-import StatusTabs from "../../../shared/components/StatusTabs.vue";
 import TopBar from "../../../shared/components/TopBar.vue";
 import Skeleton from "../../../shared/components/Skeleton.vue";
 import Empty from "../../../shared/components/Empty.vue";
+import ListHead from "../../../shared/components/ListHead.vue";
 import {
 	boot,
 	call,

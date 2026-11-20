@@ -6,9 +6,12 @@
 ตอนนี้เฉพาะงาน HR แต่ละชนิดใช้กติกาผู้อนุมัติเดิมของตัวเอง:
 - leave   ใบลา (Leave Application Open) Role Leave Approver หรือ HR
 - checkin ลงเวลานอกพื้นที่ / แจ้งลืมลงเวลาออก Role Leave Approver หรือ HR
+- attendance แจ้งมาทำงาน (Attendance Request, self_home) Role Leave Approver หรือ HR
   (ผู้อนุมัติที่ประจำโครงการเห็นเฉพาะพนักงานโครงการเดียวกัน: self_service.scope_employees)
-- advance ใบเบิกเงินเดือนล่วงหน้า / เงินสำรองจ่าย (self_advance: Role Expense Approver, เกินวงเงิน Executive Approver)
-- claim   ใบเคลียร์ / เบิกค่าใช้จ่ายคืน (self_advance: Role Expense Approver)
+- advance ใบเบิกเงินเดือนล่วงหน้า / เงินทดรองจ่าย (self_advance: Role Expense Approver, เกินวงเงิน Executive Approver)
+- claim   ใบเคลียร์ / เบิกสำรองจ่าย (self_advance: Role Expense Approver)
+- mr / po / pi ใบขอซื้อ / ใบสั่งซื้อ / ใบแจ้งหนี้ซื้อ (consbiz/doc_approval.py: ผู้อนุมัติ/ผู้ลงนามที่ระบุในเอกสาร)
+  แตะรายการ = เปิดหน้าเอกสารในหมวดจัดซื้อ (อนุมัติ/ลงนามที่นั่น)
 ชนิดใหม่: เพิ่มใน KINDS (ฟังก์ชันรายการ + ฟังก์ชันอนุมัติ) และหน้า ApproveInbox.vue
 """
 
@@ -16,13 +19,14 @@ import frappe
 from frappe import _
 from frappe.utils import add_days, cint, nowdate
 
-from consbiz import self_advance, self_service
+from consbiz import doc_approval, self_advance, self_home, self_service
 
 HR_ROLES = self_service.HR_ROLES
 HISTORY_DAYS = 31
 # โมดูลเจ้าของเอกสาร (ตรงกับ MODULES / KINDS[].module ใน public/js/shared/approvals/kinds.js)
 # โมดูลอนุมัติเป็นแค่ที่รวม แต่ละโมดูลอนุมัติในหน้าของตัวเองได้ (API อนุมัติชุดเดียวกัน)
-MODULES = {"hr": ("leave", "checkin", "advance", "claim")}
+MODULES = {"hr": ("leave", "checkin", "attendance", "advance", "claim"), "purchase": ("mr", "po", "pi")}
+PURCHASE_KINDS = MODULES["purchase"]
 
 
 def kinds_of(module=None):
@@ -80,7 +84,9 @@ def leave_rows(pending=True):
 	)
 	for row in rows:
 		if pending:
-			row.balance = get_leave_balance_on(row.employee, row.leave_type, row.from_date, consider_all_leaves_in_the_allocation_period=True)
+			row.balance = get_leave_balance_on(
+				row.employee, row.leave_type, row.from_date, consider_all_leaves_in_the_allocation_period=True
+			)
 		row.attachments = frappe.get_all(
 			"File",
 			filters={"attached_to_doctype": "Leave Application", "attached_to_name": row.name},
@@ -108,7 +114,8 @@ def attachment(name):
 	)
 	owner = leave and frappe.db.get_value("Employee", leave.employee, "user_id")
 	if not leave or not (
-		frappe.session.user in (owner, leave.leave_approver) or self_service.can_approve_employee(leave.employee)
+		frappe.session.user in (owner, leave.leave_approver)
+		or self_service.can_approve_employee(leave.employee)
 	):
 		frappe.throw(_("ไม่มีสิทธิ์ดูไฟล์นี้"), frappe.PermissionError)
 	frappe.local.response.filename = file.file_name
@@ -154,8 +161,10 @@ def can_approve_any():
 	return {
 		"leave": can_approve_leave(),
 		"checkin": self_service.can_review(),
+		"attendance": self_service.is_approver(),
 		"advance": self_advance.can_approve(),
 		"claim": self_advance.APPROVER_ROLE in self_advance.roles(),
+		**{kind: doc_approval.can_inbox(kind) for kind in PURCHASE_KINDS},
 	}
 
 
@@ -178,8 +187,10 @@ def get_inbox(module=None, quiet=0):
 		"can": can,
 		"leave": leave_rows() if can.get("leave") else [],
 		"checkin": self_service.get_reviews() if can.get("checkin") else [],
+		"attendance": self_home.approval_rows() if can.get("attendance") else [],
 		"advance": money["advances"],
 		"claim": money["claims"] if can.get("claim") else [],
+		**{kind: doc_approval.inbox_rows(kind) if can.get(kind) else [] for kind in PURCHASE_KINDS},
 	}
 
 
@@ -193,6 +204,7 @@ def get_history(module=None):
 	user = frappe.session.user
 	out = {"leave": leave_rows(pending=False) if can["leave"] else []}
 	out["checkin"] = self_service.get_reviews(status="Done") if can["checkin"] else []
+	out["attendance"] = self_home.approval_rows(pending=False) if can["attendance"] else []
 	advances = []
 	if can["advance"]:
 		filters = {
@@ -228,6 +240,8 @@ def get_history(module=None):
 			if c.docstatus == 1 or c.reject_reason
 		]
 	out["claim"] = claims
+	for kind in PURCHASE_KINDS:
+		out[kind] = doc_approval.inbox_rows(kind, pending=False, since=since) if can[kind] else []
 	return out
 
 
@@ -237,7 +251,12 @@ def get_summary(project=None):
 	can = can_approve_any()
 	counts = {
 		"leave": len(leave_rows()) if can["leave"] else 0,
-		"checkin": frappe.db.count("Employee Checkin", self_service.review_filters()) if can["checkin"] else 0,
+		"checkin": frappe.db.count("Employee Checkin", self_service.review_filters())
+		if can["checkin"]
+		else 0,
+		"attendance": frappe.db.count("Attendance Request", self_home.request_filters())
+		if can["attendance"]
+		else 0,
 		"advance": 0,
 		"claim": 0,
 	}
@@ -245,6 +264,8 @@ def get_summary(project=None):
 		money = self_advance.get_approvals()
 		counts["advance"] = len(money["advances"])
 		counts["claim"] = len(money["claims"]) if can["claim"] else 0
+	for kind in PURCHASE_KINDS:
+		counts[kind] = len(doc_approval.inbox_rows(kind)) if can[kind] else 0
 	counts["total"] = sum(counts.values())
 	# ตัวเลขของเมนูย่อยรายโมดูล (approve-<โมดูล>)
 	for module, kinds in MODULES.items():
@@ -295,7 +316,11 @@ def leave_context(employee, from_date=None, to_date=None):
 	overlap = []
 	project = frappe.db.get_value("Employee", employee, "custom_project")
 	if project and from_date and to_date:
-		team = frappe.get_all("Employee", filters={"custom_project": project, "status": "Active", "name": ("!=", employee)}, pluck="name")
+		team = frappe.get_all(
+			"Employee",
+			filters={"custom_project": project, "status": "Active", "name": ("!=", employee)},
+			pluck="name",
+		)
 		overlap = frappe.get_all(
 			"Leave Application",
 			filters={
@@ -323,7 +348,11 @@ def money_context(employee):
 	company = frappe.db.get_value("Employee", employee, "company")
 	advances = frappe.get_all(
 		"Employee Advance",
-		filters={"employee": employee, "docstatus": ("<", 2), "custom_advance_type": ("in", self_advance.TYPES)},
+		filters={
+			"employee": employee,
+			"docstatus": ("<", 2),
+			"custom_advance_type": ("in", self_advance.TYPES),
+		},
 		fields=self_advance.ADVANCE_FIELDS,
 		order_by="posting_date desc",
 		limit_page_length=8,
@@ -358,7 +387,12 @@ def repayment_of(advance):
 		row.deducted = bool(
 			frappe.db.exists(
 				"Salary Slip",
-				{"employee": row.employee, "docstatus": 1, "start_date": ("<=", row.payroll_date), "end_date": (">=", row.payroll_date)},
+				{
+					"employee": row.employee,
+					"docstatus": 1,
+					"start_date": ("<=", row.payroll_date),
+					"end_date": (">=", row.payroll_date),
+				},
 			)
 		)
 		done += flt(row.amount) if row.deducted else 0
@@ -370,12 +404,22 @@ def repayment_of(advance):
 def get_context(employee, kind, from_date=None, to_date=None):
 	"""ข้อมูลประกอบของพนักงานในหน้ารายละเอียดเอกสารที่รออนุมัติ"""
 	info = frappe.db.get_value(
-		"Employee", employee, ["name", "employee_name", "designation", "department", "date_of_joining", "custom_project as project"], as_dict=True
+		"Employee",
+		employee,
+		[
+			"name",
+			"employee_name",
+			"designation",
+			"department",
+			"date_of_joining",
+			"custom_project as project",
+		],
+		as_dict=True,
 	)
 	if not info:
 		frappe.throw(_("ไม่พบพนักงาน"), frappe.DoesNotExistError)
 	out = {"employee": info}
-	if kind in ("leave", "checkin"):
+	if kind in ("leave", "checkin", "attendance"):
 		if not self_service.can_approve_employee(employee):
 			frappe.throw(_("ไม่มีสิทธิ์ดูข้อมูลพนักงานคนนี้"), frappe.PermissionError)
 		out["leave"] = leave_context(employee, from_date, to_date)

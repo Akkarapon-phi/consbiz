@@ -1,6 +1,6 @@
 <!-- ช่องค้นหาของหน้ารายการ ในแถวตัวกรองของหัวรายการ (.ss-list-filterbar, หน้าตาใหม่) ซ้ายสุดของแถว ตัวกรองแบบเลือกต่อท้าย
      มีคำค้น = ปุ่ม X ท้ายช่องล้างคำค้น (Esc ในช่องที่มีคำค้น = ล้าง, ว่างแล้ว = ออกจากช่อง)
-     API เดียวกับ HeaderSearch.vue (v-model, placeholder, focus()) HeaderSearch ที่ย้ายลงหัวรายการใช้ตัวนี้ -->
+     ListHead.vue ใช้ตัวนี้ (v-model, placeholder, focus()) -->
 <template>
 	<label class="ss-toolbar-search ss-list-search" :class="{ 'has-value': modelValue }">
 		<Icon name="search" :size="16" />

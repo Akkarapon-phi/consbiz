@@ -28,33 +28,19 @@
 			/>
 			<Empty v-else-if="!tabs.length" icon="file" title="ไม่มีเอกสารที่เปิดดูได้" />
 			<template v-else>
-				<div v-if="wide" class="ss-list-head ss-list-head--many">
-					<StatusTabs v-model="tab" :options="tabs" />
-					<div class="ss-list-tools">
-						<button
-							v-if="can_create"
-							type="button"
-							class="ss-btn ss-btn--primary ss-list-create"
-							@click="create"
-						>
-							<Icon name="plus" :size="18" :stroke="2.6" />
-							<span>สร้าง</span>
-						</button>
-						<button
-							type="button"
-							class="ss-icon-btn"
-							:class="{ 'is-spinning': loading }"
-							aria-label="โหลดใหม่"
-							@click="load"
-						>
-							<Icon name="refresh" :size="17" />
-						</button>
-					</div>
-					<!-- แถวตัวกรอง: ค้นหา -->
-					<div v-if="active" class="ss-list-filterbar">
-						<ListSearch v-model="txt" placeholder="ค้นหาเลขที่ หรือเรื่อง" />
-					</div>
-				</div>
+				<ListHead
+					v-if="wide"
+					v-model="tab"
+					many
+					:tabs="tabs"
+					:search="active ? txt : undefined"
+					search_placeholder="ค้นหาเลขที่ หรือเรื่อง"
+					:loading="loading"
+					:create="can_create ? 'สร้าง' : ''"
+					@update:search="txt = $event"
+					@refresh="load"
+					@create="create"
+				/>
 				<nav v-else class="ss-tabs" aria-label="ชนิดเอกสาร">
 					<button
 						v-for="t in tabs"
@@ -189,8 +175,7 @@ import TopBar from "../../../shared/components/TopBar.vue";
 import Skeleton from "../../../shared/components/Skeleton.vue";
 import Empty from "../../../shared/components/Empty.vue";
 import DataTable from "../../../shared/components/DataTable.vue";
-import ListSearch from "../../../shared/components/ListSearch.vue";
-import StatusTabs from "../../../shared/components/StatusTabs.vue";
+import ListHead from "../../../shared/components/ListHead.vue";
 import {
 	boot,
 	call,

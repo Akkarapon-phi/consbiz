@@ -21,6 +21,17 @@
   "prob_days",
   "prob_end_date",
   "probation",
+  "section_break_terms",
+  "contract_template",
+  "heading",
+  "designation",
+  "department",
+  "column_break_terms",
+  "employer_signer",
+  "witnesses",
+  "layout",
+  "section_break_body",
+  "terms",
   "amended_from"
  ],
  "fields": [
@@ -31,7 +42,7 @@
   {
    "fieldname": "company",
    "fieldtype": "Link",
-   "label": "\u0e1a\u0e23\u0e34\u0e29\u0e31\u0e17",
+   "label": "บริษัท",
    "options": "Company",
    "reqd": 1
   },
@@ -39,7 +50,7 @@
    "fieldname": "employee",
    "fieldtype": "Link",
    "in_list_view": 1,
-   "label": "\u0e1e\u0e19\u0e31\u0e01\u0e07\u0e32\u0e19",
+   "label": "พนักงาน",
    "options": "Employee",
    "reqd": 1
   },
@@ -47,20 +58,20 @@
    "fetch_from": "employee.salutation",
    "fieldname": "salutation",
    "fieldtype": "Data",
-   "label": "\u0e04\u0e33\u0e19\u0e33\u0e2b\u0e19\u0e49\u0e32",
+   "label": "คำนำหน้า",
    "read_only": 1
   },
   {
    "fetch_from": "employee.employee_name",
    "fieldname": "full_name",
    "fieldtype": "Data",
-   "label": "\u0e0a\u0e37\u0e48\u0e2d - \u0e19\u0e32\u0e21\u0e2a\u0e01\u0e38\u0e25",
+   "label": "ชื่อ - นามสกุล",
    "read_only": 1
   },
   {
    "fieldname": "base",
    "fieldtype": "Currency",
-   "label": "\u0e40\u0e07\u0e34\u0e19\u0e40\u0e14\u0e37\u0e2d\u0e19\u0e40\u0e23\u0e34\u0e48\u0e21\u0e15\u0e49\u0e19"
+   "label": "เงินเดือนเริ่มต้น"
   },
   {
    "fieldname": "column_break_crxh",
@@ -69,38 +80,38 @@
   {
    "fieldname": "naming_series",
    "fieldtype": "Data",
-   "label": "\u0e40\u0e25\u0e02\u0e17\u0e35\u0e48\u0e40\u0e2d\u0e01\u0e2a\u0e32\u0e23",
+   "label": "เลขที่เอกสาร",
    "reqd": 1
   },
   {
    "default": "Today",
    "fieldname": "date",
    "fieldtype": "Date",
-   "label": "\u0e27\u0e31\u0e19\u0e17\u0e35\u0e48",
+   "label": "วันที่",
    "reqd": 1
   },
   {
    "fieldname": "prob_start_date",
    "fieldtype": "Date",
-   "label": "\u0e27\u0e31\u0e19\u0e17\u0e35\u0e48\u0e40\u0e23\u0e34\u0e48\u0e21\u0e17\u0e14\u0e25\u0e2d\u0e07\u0e07\u0e32\u0e19"
+   "label": "วันที่เริ่มทดลองงาน"
   },
   {
    "fieldname": "prob_days",
    "fieldtype": "Select",
-   "label": "\u0e08\u0e33\u0e19\u0e27\u0e19\u0e27\u0e31\u0e19\u0e17\u0e35\u0e48\u0e17\u0e14\u0e25\u0e2d\u0e07\u0e07\u0e32\u0e19",
+   "label": "จำนวนวันที่ทดลองงาน",
    "options": "30\n60\n90\n119"
   },
   {
    "fieldname": "prob_end_date",
    "fieldtype": "Date",
-   "label": "\u0e27\u0e31\u0e19\u0e17\u0e35\u0e48\u0e2a\u0e34\u0e49\u0e19\u0e2a\u0e38\u0e14\u0e17\u0e14\u0e25\u0e2d\u0e07\u0e07\u0e32\u0e19"
+   "label": "วันที่สิ้นสุดทดลองงาน"
   },
   {
    "allow_on_submit": 1,
    "fieldname": "probation",
    "fieldtype": "Select",
-   "label": "\u0e2a\u0e16\u0e32\u0e19\u0e30\u0e17\u0e14\u0e25\u0e2d\u0e07\u0e07\u0e32\u0e19",
-   "options": "\n\u0e1c\u0e48\u0e32\u0e19\n\u0e44\u0e21\u0e48\u0e1c\u0e48\u0e32\u0e19"
+   "label": "สถานะทดลองงาน",
+   "options": "\nผ่าน\nไม่ผ่าน"
   },
   {
    "fieldname": "amended_from",
@@ -111,13 +122,73 @@
    "print_hide": 1,
    "read_only": 1,
    "search_index": 1
+  },
+  {
+   "fieldname": "section_break_terms",
+   "fieldtype": "Section Break",
+   "label": "เนื้อหาสัญญา"
+  },
+  {
+   "fieldname": "contract_template",
+   "fieldtype": "Link",
+   "label": "แม่แบบสัญญา",
+   "options": "Employment Contract Template"
+  },
+  {
+   "fieldname": "heading",
+   "fieldtype": "Data",
+   "label": "ชื่อเอกสาร",
+   "default": "สัญญาจ้างพนักงาน"
+  },
+  {
+   "fieldname": "designation",
+   "fieldtype": "Data",
+   "label": "ตำแหน่ง"
+  },
+  {
+   "fieldname": "department",
+   "fieldtype": "Data",
+   "label": "แผนก/ฝ่าย"
+  },
+  {
+   "fieldname": "column_break_terms",
+   "fieldtype": "Column Break",
+   "label": ""
+  },
+  {
+   "fieldname": "employer_signer",
+   "fieldtype": "Data",
+   "label": "ผู้ลงนามฝ่ายนายจ้าง"
+  },
+  {
+   "fieldname": "witnesses",
+   "fieldtype": "Check",
+   "label": "มีช่องพยาน",
+   "default": "0"
+  },
+  {
+   "fieldname": "section_break_body",
+   "fieldtype": "Section Break",
+   "label": ""
+  },
+  {
+   "fieldname": "terms",
+   "fieldtype": "Text Editor",
+   "label": "เนื้อหาสัญญา",
+   "description": "คัดลอกจากแม่แบบแล้วแก้เฉพาะฉบับนี้ได้ ตัวแปร {{ ... }} แทนค่าตอนพิมพ์"
+  },
+  {
+   "fieldname": "layout",
+   "fieldtype": "JSON",
+   "label": "รูปแบบหน้ากระดาษ",
+   "description": "ฟอนต์ ขนาด ระยะบรรทัด ขอบกระดาษ (มม.) การย่อหน้า: consbiz/contract_terms.py LAYOUT"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-11-15 13:25:53.179261",
+ "modified": "2026-11-18 15:00:00.000000",
  "modified_by": "Administrator",
  "module": "ConsBiz",
  "name": "Employment Contract",
@@ -145,23 +216,23 @@
  "states": [
   {
    "color": "Gray",
-   "title": "\u0e23\u0e48\u0e32\u0e07"
+   "title": "ร่าง"
   },
   {
    "color": "Blue",
-   "title": "\u0e17\u0e14\u0e25\u0e2d\u0e07\u0e07\u0e32\u0e19"
+   "title": "ทดลองงาน"
   },
   {
    "color": "Green",
-   "title": "\u0e1c\u0e48\u0e32\u0e19"
+   "title": "ผ่าน"
   },
   {
    "color": "Orange",
-   "title": "\u0e44\u0e21\u0e48\u0e1c\u0e48\u0e32\u0e19"
+   "title": "ไม่ผ่าน"
   },
   {
    "color": "Red",
-   "title": "\u0e22\u0e01\u0e40\u0e25\u0e34\u0e01"
+   "title": "ยกเลิก"
   }
  ],
  "track_changes": 1

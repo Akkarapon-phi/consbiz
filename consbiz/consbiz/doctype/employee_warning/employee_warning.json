@@ -1,0 +1,244 @@
+{
+ "actions": [],
+ "autoname": "naming_series:",
+ "creation": "2026-11-17 12:00:00.000000",
+ "description": "หนังสือเตือนพนักงาน (ใบเตือน) ระดับ ด้วยวาจา / ครั้งที่ 1 / ครั้งที่ 2 / ครั้งสุดท้าย ยืนยัน (Submit) = ออกหนังสือแล้ว รับทราบแก้ได้หลังยืนยัน",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "naming_series",
+  "employee",
+  "employee_name",
+  "designation",
+  "company",
+  "column_break_head",
+  "date",
+  "level",
+  "category",
+  "incident_section",
+  "incident_date",
+  "description",
+  "regulation",
+  "corrective_action",
+  "ack_section",
+  "issued_by",
+  "witness",
+  "column_break_ack",
+  "acknowledged",
+  "acknowledged_date",
+  "refused",
+  "amended_from"
+ ],
+ "fields": [
+  {
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "label": "ชุดเลขที่",
+   "options": "WRN-.YY.-.####",
+   "default": "WRN-.YY.-.####",
+   "reqd": 1,
+   "hidden": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "employee",
+   "fieldtype": "Link",
+   "options": "Employee",
+   "label": "พนักงาน",
+   "reqd": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "search_index": 1
+  },
+  {
+   "fetch_from": "employee.employee_name",
+   "fieldname": "employee_name",
+   "fieldtype": "Data",
+   "label": "ชื่อพนักงาน",
+   "read_only": 1,
+   "in_list_view": 1
+  },
+  {
+   "fetch_from": "employee.designation",
+   "fieldname": "designation",
+   "fieldtype": "Data",
+   "label": "ตำแหน่ง",
+   "read_only": 1
+  },
+  {
+   "fetch_from": "employee.company",
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "options": "Company",
+   "label": "บริษัท",
+   "read_only": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "column_break_head",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "date",
+   "fieldtype": "Date",
+   "label": "วันที่ออกหนังสือ",
+   "reqd": 1,
+   "default": "Today",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "level",
+   "fieldtype": "Select",
+   "label": "ระดับ",
+   "options": "Verbal\nWritten 1\nWritten 2\nFinal",
+   "default": "Written 1",
+   "reqd": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "category",
+   "fieldtype": "Select",
+   "label": "เรื่อง",
+   "options": "Late\nAbsence\nMisconduct\nSafety\nPerformance\nOther",
+   "default": "Late",
+   "reqd": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "incident_section",
+   "fieldtype": "Section Break",
+   "label": "เหตุการณ์"
+  },
+  {
+   "fieldname": "incident_date",
+   "fieldtype": "Date",
+   "label": "วันที่เกิดเหตุ"
+  },
+  {
+   "fieldname": "description",
+   "fieldtype": "Small Text",
+   "label": "รายละเอียดการกระทำผิด",
+   "reqd": 1
+  },
+  {
+   "fieldname": "regulation",
+   "fieldtype": "Data",
+   "label": "ข้อบังคับ/ระเบียบที่ฝ่าฝืน"
+  },
+  {
+   "fieldname": "corrective_action",
+   "fieldtype": "Small Text",
+   "label": "สิ่งที่ต้องปรับปรุง / บทลงโทษถ้าทำซ้ำ"
+  },
+  {
+   "fieldname": "ack_section",
+   "fieldtype": "Section Break",
+   "label": "การรับทราบ"
+  },
+  {
+   "fieldname": "issued_by",
+   "fieldtype": "Link",
+   "options": "User",
+   "label": "ผู้ออกหนังสือ",
+   "default": "__user",
+   "read_only": 1
+  },
+  {
+   "fieldname": "witness",
+   "fieldtype": "Data",
+   "label": "พยาน"
+  },
+  {
+   "fieldname": "column_break_ack",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "acknowledged",
+   "fieldtype": "Check",
+   "label": "พนักงานรับทราบแล้ว",
+   "allow_on_submit": 1
+  },
+  {
+   "fieldname": "acknowledged_date",
+   "fieldtype": "Date",
+   "label": "วันที่รับทราบ",
+   "allow_on_submit": 1,
+   "depends_on": "acknowledged"
+  },
+  {
+   "fieldname": "refused",
+   "fieldtype": "Check",
+   "label": "พนักงานไม่ยอมลงชื่อรับทราบ",
+   "allow_on_submit": 1
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "options": "Employee Warning",
+   "label": "แก้ไขจาก",
+   "read_only": 1,
+   "no_copy": 1,
+   "print_hide": 1
+  }
+ ],
+ "grid_page_length": 50,
+ "is_submittable": 1,
+ "links": [],
+ "modified": "2026-11-17 12:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "ConsBiz",
+ "name": "Employee Warning",
+ "naming_rule": "By \"Naming Series\" field",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "role": "System Manager",
+   "create": 1,
+   "write": 1,
+   "delete": 1,
+   "submit": 1,
+   "cancel": 1,
+   "amend": 1
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "role": "HR Manager",
+   "create": 1,
+   "write": 1,
+   "delete": 1,
+   "submit": 1,
+   "cancel": 1,
+   "amend": 1
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "role": "HR User",
+   "create": 1,
+   "write": 1,
+   "submit": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "date",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "employee_name",
+ "track_changes": 1
+}

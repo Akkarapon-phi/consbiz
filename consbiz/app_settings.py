@@ -100,6 +100,7 @@ MODULES = (
 			("Attendance", "การเข้างาน (Attendance)", 0),
 			("Employment Contract", "สัญญาจ้างพนักงาน", 0),
 			("WHT Employee", "หนังสือรับรองหัก ณ ที่จ่าย พนักงาน (50 ทวิ)", 0),
+			("Employee Warning", "ใบเตือนพนักงาน", 0),
 		),
 	),
 	(
@@ -125,6 +126,14 @@ MODULES = (
 		"office",
 		"accounting",
 		(
+			("Sales Invoice", "ใบแจ้งหนี้ลูกค้า", 0),
+			("Purchase Invoice", "ใบแจ้งหนี้ผู้ขาย", 0),
+			("File", "ไฟล์หนังสือรับรอง", 0),
+			("Bank Account", "บัญชีธนาคารของบริษัท", 0),
+			("GL Entry", "รายการบัญชีแยกประเภท", 0),
+			("Account", "ผังบัญชี", 0),
+			("Bank", "ธนาคาร", 0),
+			("Company", "บริษัท", 0),
 			("Payment Entry", "รับชำระ / จ่ายชำระ (Payment Entry)", 0),
 			("Withholding Tax Cert", "หนังสือรับรองหัก ณ ที่จ่าย (ที่เราออก)", 0),
 			("Sales Tax Invoice", "ใบกำกับภาษีขาย (ภาษีขาย)", 0),

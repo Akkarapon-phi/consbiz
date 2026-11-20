@@ -1,8 +1,12 @@
 <!-- แถบบนของทุกหน้า แถวเดียว สีพื้นตามหมวด สูงเท่ากันทุกหน้า ปุ่มจึงไม่ขยับเมื่อเปลี่ยนหน้า
      หมวด (จอ ≥768 ไอคอน + ชื่อ, มือถือ ไอคอน = ปุ่มเปลี่ยนหมวด) / ย้อนกลับ / ชื่อหน้า / โครงการ / ปุ่มของหน้า (slot actions) / แจ้งเตือน
      โครงการ: หน้างาน = โครงการที่ทำงาน, ออฟฟิศ = ตัวกรองโครงการ (ว่าง = ทุกโครงการ) กดแล้วเปิดหน้าเลือกโครงการของ AppShell
-     แสดงเฉพาะหน้าเมนูหลัก (ไม่มีปุ่มย้อนกลับ) หน้าดู/ฟอร์มไม่ให้เปลี่ยนโครงการกลางคัน มือถือเหลือ avatar -->
+     แสดงเฉพาะหน้าเมนูหลัก (ไม่มีปุ่มย้อนกลับ) หน้าดู/ฟอร์มไม่ให้เปลี่ยนโครงการกลางคัน มือถือเหลือ avatar
+     กลุ่มออฟฟิศ (is_company_section): ปุ่มบริษัทแทนปุ่มโครงการ (ดูเอกสารทุกโครงการ) เปิดหน้าเลือกบริษัทของ AppShell -->
 <template>
+	<!-- แถบบนอยู่ในโครงแอป (#ss-header ของ AppShell: แถวบนเต็มความกว้าง Dock/เนื้อหาอยู่ใต้) ไม่ใช่ในหน้า
+	     ตอนเปลี่ยนหน้ามี 2 ชุดชั่วครู่ CSS แสดงเฉพาะชุดล่าสุด (.ss-head:last-child) -->
+	<Teleport to="#ss-header"><div class="ss-head">
 	<header
 		class="ss-topbar"
 		:class="{ 'is-scrolled': scrolled, 'ss-topbar--hero': hero, 'has-tabs': show_tabs }"
@@ -43,9 +47,27 @@
 			<div v-if="subtitle" class="ss-topbar-sub" :class="{ 'is-project': sub_is_project }">
 				{{ subtitle }}
 			</div>
+			<!-- ป้ายสถานะของเอกสาร (หน้าดู/ฟอร์ม) ต่อจากเลขที่ -->
+			<slot name="status" />
 		</div>
 		<!-- จอ ≥768 หน้าเมนูหลัก: แท็บเมนูของหมวดแทนชื่อหน้า (ชื่อหน้า = แท็บที่เลือก) -->
 		<SectionTabs v-if="show_tabs" />
+		<button
+			v-if="show_company"
+			type="button"
+			class="ss-topbar-project ss-topbar-company"
+			:class="{ 'is-active': state.company }"
+			:title="`บริษัท: ${company_label}`"
+			@click="open_company()"
+		>
+			<span class="ss-avatar" :class="{ 'has-logo': company?.company_logo }">
+				<img v-if="company?.company_logo" :src="company.company_logo" alt="" />
+				<Icon v-else-if="!state.company" name="layers" :size="15" />
+				<template v-else>{{ initials(state.company) }}</template>
+			</span>
+			<span class="ss-topbar-project-text">{{ company_label }}</span>
+			<Icon name="chevron-down" :size="14" />
+		</button>
 		<button
 			v-if="show_project"
 			type="button"
@@ -76,6 +98,17 @@
 		<!-- ผู้ที่เปิดจากลิงก์โดยไม่ login (boot.guest, แอปผู้รับเหมา) ไม่มีการแจ้งเตือน -->
 		<NotificationBell v-if="!boot.guest" />
 		<slot name="actions" />
+		<!-- ตั้งค่าของหมวด: ปกติอยู่เมนู ⋯ ของหัวรายการ หน้าที่ไม่มีหัวรายการ (มือถือบางหน้า) ใช้ปุ่มนี้แทน -->
+		<button
+			v-if="settings_here"
+			type="button"
+			class="ss-icon-btn ss-topbar-settings"
+			title="ตั้งค่า"
+			aria-label="ตั้งค่า"
+			@click="module_settings.open()"
+		>
+			<Icon name="sliders" :size="19" />
+		</button>
 		<button
 			v-if="show_header_user"
 			ref="header_user_button"
@@ -92,6 +125,19 @@
 			</span>
 		</button>
 	</header>
+	<!-- มือถือ: ปุ่มบริษัท (กลุ่มออฟฟิศ) / ปุ่มโครงการ เต็มแถวใต้แถบบน -->
+	<button v-if="show_company" type="button" class="ss-project-bar ss-company-bar" @click="open_company()">
+		<span class="ss-avatar" :class="{ 'has-logo': company?.company_logo }">
+			<img v-if="company?.company_logo" :src="company.company_logo" alt="" />
+			<Icon v-else-if="!state.company" name="layers" :size="17" />
+			<template v-else>{{ initials(state.company) }}</template>
+		</span>
+		<span class="ss-project-bar-text">
+			<small>บริษัท</small>
+			<b>{{ company_label }}</b>
+		</span>
+		<Icon name="chevron-down" :size="16" />
+	</button>
 	<!-- มือถือ: ปุ่มโครงการเต็มแถวใต้แถบบน แสดงชื่อเต็ม (จอ ≥768 ใช้ปุ่มในแถบบน) -->
 	<button v-if="show_project" type="button" class="ss-project-bar" @click="open_picker()">
 		<span class="ss-avatar" :class="`tone-${tone(state.project?.name || 'all')}`">{{
@@ -103,6 +149,7 @@
 		</span>
 		<Icon name="chevron-down" :size="16" />
 	</button>
+</div></Teleport>
 </template>
 
 <script setup>
@@ -112,7 +159,7 @@ import SectionTabs from "./SectionTabs.vue";
 import NotificationBell from "./NotificationBell.vue";
 import { app } from "../app.js";
 import { back, boot, initials, project_abbr, state, tone } from "../api.js";
-import { module_list, NEW_LOOK } from "../modules.js";
+import { is_company_section, module_list, NEW_LOOK } from "../modules.js";
 
 const props = defineProps({
 	title: String,
@@ -125,9 +172,14 @@ const props = defineProps({
 });
 
 const open_picker = inject("open_project_picker", null);
+const open_company = inject("open_company_picker", null);
 const open_launcher = inject("open_launcher", null);
 const open_user_menu = inject("open_user_menu", null);
 const open_global_search = inject("open_global_search", null);
+const module_settings = inject("module_settings", null);
+const settings_here = computed(
+	() => !props.back_to && !!module_settings?.key.value && module_settings.heads.value === 0
+);
 // ป้ายคีย์ลัดเป็น ⌘G ทุกเครื่อง (ตกลง 2026-11-16) Windows/Linux ไม่มีปุ่ม ⌘ กด Ctrl+G ได้เหมือนกัน (AppShell)
 const search_key = "⌘G";
 const header_user_button = ref(null);
@@ -143,9 +195,25 @@ const project_initials = computed(() =>
 const project_label = computed(() =>
 	state.project ? project_name.value : app.project_filter ? "ทุกโครงการ" : "เลือกโครงการ"
 );
+const company_section = computed(() => is_company_section(state.section));
 const show_project = computed(
-	() => !props.no_project && !app.no_project && !props.back_to && open_picker
+	() =>
+		!props.no_project &&
+		!app.no_project &&
+		!props.back_to &&
+		open_picker &&
+		!company_section.value
 );
+// กลุ่มออฟฟิศ: ปุ่มบริษัท (มีบริษัทเดียว = ไม่ต้องเลือก) หน้าเมนูหลักเท่านั้น
+const show_company = computed(
+	() =>
+		company_section.value &&
+		!props.back_to &&
+		open_company &&
+		(boot.companies || []).length > 1
+);
+const company = computed(() => (boot.companies || []).find((c) => c.name === state.company));
+const company_label = computed(() => state.company || "ทุกบริษัท");
 // ปุ่มเปลี่ยนหมวด (ซ่อนที่จอ ≥768 เพราะมี Dock): หน้าเมนูหลัก มีหมวดอื่นหรือระบบเต็มให้ไป
 const show_launcher = computed(
 	() =>

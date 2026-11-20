@@ -1,5 +1,5 @@
-// ป้ายสถานะของใบเบิก (Employee Advance) และใบเคลียร์/เบิกคืน (Expense Claim) ใช้ทั้งหน้าเบิกเงินและหน้าอนุมัติ
-export const TYPE = { "Salary Advance": "เบิกเงินเดือนล่วงหน้า", "Expense Advance": "เงินสำรองจ่าย" };
+// ป้ายสถานะของใบเบิก (Employee Advance) และใบเคลียร์/สำรองจ่าย (Expense Claim) ใช้ทั้งหน้าเบิกเงินและหน้าอนุมัติ
+export const TYPE = { "Salary Advance": "เบิกเงินเดือนล่วงหน้า", "Expense Advance": "เงินทดรองจ่าย" };
 
 export function advance_status(row) {
 	if (row.docstatus === 0) {

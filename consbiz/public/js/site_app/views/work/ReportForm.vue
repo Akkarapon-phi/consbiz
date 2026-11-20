@@ -1,5 +1,5 @@
 <template>
-	<div class="ss-has-bar">
+	<div>
 		<TopBar :title="title" :subtitle="subtitle" back_to="reports" :back_params="back_params">
 			<template #actions>
 				<span v-if="doc?.name" class="ss-tag tone-gray">ร่าง</span>
@@ -7,6 +7,14 @@
 		</TopBar>
 
 		<div class="ss-content">
+			<!-- หัวฟอร์ม: หัวข้อของฟอร์มทีละขั้นอยู่ที่แถบขั้นตอน (.ss-steps) หัวนี้มีแค่ปุ่ม (มือถือ = แถบล่าง) -->
+			<FormHead
+				v-if="setup"
+				:model-value="current"
+				:tabs="wide ? [{ value: current, label: `${step + 1}. ${steps[step].label}` }] : null"
+				:actions="actions"
+				:busy="saving"
+			/>
 			<Skeleton v-if="!setup" :rows="3" />
 			<div v-else class="ss-wizard">
 				<!-- ขั้นตอน: แตะย้อนไปขั้นที่ผ่านมาได้ จอกว้าง (≥1180) เป็นแถบซ้ายพร้อมสรุปของแต่ละขั้น -->
@@ -437,63 +445,6 @@
 			</div>
 		</div>
 
-		<Teleport to="#ss-layer">
-			<Transition name="ss-bar">
-				<div v-if="setup" class="ss-bottom-bar">
-					<button
-						v-if="step > 0"
-						type="button"
-						class="ss-btn ss-btn--ghost ss-btn--lg"
-						:disabled="saving"
-						@click="move(-1)"
-					>
-						<Icon name="chevron-left" :size="18" :stroke="2.4" /> ย้อนกลับ
-					</button>
-					<template v-if="step < steps.length - 1">
-						<button
-							type="button"
-							class="ss-btn ss-btn--primary ss-btn--lg ss-grow"
-							@click="move(1)"
-						>
-							ถัดไป: {{ steps[step + 1].label }}
-							<Icon name="chevron-right" :size="18" :stroke="2.4" />
-							<kbd class="ss-kbd">Ctrl ↵</kbd>
-						</button>
-					</template>
-					<template v-else-if="is_report">
-						<button
-							type="button"
-							class="ss-btn ss-btn--ghost ss-btn--lg"
-							:class="{ 'ss-grow': !setup.can_submit }"
-							:disabled="saving"
-							@click="save(0)"
-						>
-							บันทึกร่าง
-						</button>
-						<button
-							v-if="setup.can_submit"
-							type="button"
-							class="ss-btn ss-btn--primary ss-btn--lg ss-grow"
-							:disabled="saving"
-							@click="save(1)"
-						>
-							<span v-if="saving" class="ss-spinner"></span>
-							<template v-else>ส่งรายงาน</template>
-						</button>
-					</template>
-					<button
-						v-else
-						type="button"
-						class="ss-btn ss-btn--primary ss-btn--lg ss-grow"
-						:disabled="saving"
-						@click="save(0)"
-					>
-						<span v-if="saving" class="ss-spinner"></span>
-						<template v-else>ส่งขออนุมัติ</template>
-					</button>
-				</div>
-			</Transition>
-		</Teleport>
 
 		<!-- เลือกงานจากแผน (เลือกได้หลายงาน) -->
 		<Sheet
@@ -565,6 +516,9 @@
 </template>
 
 <script setup>
+import FormHead from "../../../shared/components/FormHead.vue";
+import { LABELS, step_actions } from "../../../shared/form_actions.js";
+import { use_wide } from "../../../shared/table.js";
 import { computed, inject, onBeforeUnmount, ref, watch } from "vue";
 import DateInput from "../../../shared/components/DateInput.vue";
 import Icon from "../../../shared/components/Icon.vue";
@@ -632,6 +586,35 @@ const reached = ref(is_new ? 0 : STEPS.length - 1);
 
 const steps = STEPS;
 const current = computed(() => steps[step.value].key);
+const wide = use_wide();
+// ปุ่มของหัวฟอร์ม: ขั้นกลาง = ย้อนกลับ / ถัดไป, ขั้นสุดท้าย = บันทึก (รายงาน: ยืนยันที่หน้าดู) หรือ ส่งอนุมัติ (คำขอ)
+const actions = computed(() => {
+	const back_step = step.value > 0 && {
+		key: "prev",
+		label: "ย้อนกลับ",
+		icon: "chevron-left",
+		run: () => move(-1),
+	};
+	if (step.value < steps.length - 1)
+		return step_actions({
+			stage: "draft",
+			extra: [back_step],
+		}).concat([
+			{
+				key: "next",
+				label: `ถัดไป: ${steps[step.value + 1].label}`,
+				tone: "primary",
+				title: "Ctrl + Enter",
+				onClick: () => move(1),
+			},
+		]);
+	return step_actions({
+		stage: "draft",
+		is_new: true,
+		save: is_report ? () => save(0) : { label: LABELS.send, icon: "send", run: () => save(0) },
+		extra: [back_step],
+	});
+});
 const title = computed(() =>
 	is_new ? (is_report ? "เขียนรายงาน" : "ขออนุมัติล่วงหน้า") : `แก้ไข${kind.short}`
 );

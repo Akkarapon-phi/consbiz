@@ -51,40 +51,40 @@
 	color-scheme: light;
 }
 
-@media (prefers-color-scheme: dark) {
-	:root {
-		--ss-brand: #4b8dff;
-		--ss-brand-2: #8b74ff;
-		--ss-brand-soft: rgba(75, 141, 255, 0.16);
-		--ss-bg: #0b1020;
-		--ss-surface: #141a2c;
-		--ss-surface-2: #1b2236;
-		--ss-border: rgba(255, 255, 255, 0.08);
-		--ss-border-strong: rgba(255, 255, 255, 0.16);
-		--ss-text: #e8ecf5;
-		--ss-text-2: #b2bccd;
-		--ss-muted: #7d889c;
-		--ss-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 10px 30px -14px rgba(0, 0, 0, 0.6);
-		--ss-shadow-lg: 0 24px 60px -20px rgba(0, 0, 0, 0.8);
-		--tone-blue: #6ea2ff;
-		--tone-blue-bg: rgba(75, 141, 255, 0.16);
-		--tone-violet: #a592ff;
-		--tone-violet-bg: rgba(139, 116, 255, 0.18);
-		--tone-teal: #34d3c0;
-		--tone-teal-bg: rgba(45, 212, 191, 0.14);
-		--tone-amber: #fbbf24;
-		--tone-amber-bg: rgba(251, 191, 36, 0.14);
-		--tone-rose: #fb7185;
-		--tone-rose-bg: rgba(251, 113, 133, 0.15);
-		--tone-green: #34d399;
-		--tone-green-bg: rgba(52, 211, 153, 0.14);
-		--tone-indigo: #a5b4fc;
-		--tone-indigo-bg: rgba(129, 140, 248, 0.16);
-		--tone-orange: #fb923c;
-		--tone-orange-bg: rgba(251, 146, 60, 0.15);
-		color-scheme: dark;
-	}
+/* โหมดมืด = html[data-theme="dark"] (theme.js) :where ไม่เพิ่ม specificity */
+:root:where([data-theme="dark"]) {
+	--ss-brand: #4b8dff;
+	--ss-brand-2: #8b74ff;
+	--ss-brand-soft: rgba(75, 141, 255, 0.16);
+	--ss-bg: #0b1020;
+	--ss-surface: #141a2c;
+	--ss-surface-2: #1b2236;
+	--ss-border: rgba(255, 255, 255, 0.08);
+	--ss-border-strong: rgba(255, 255, 255, 0.16);
+	--ss-text: #e8ecf5;
+	--ss-text-2: #b2bccd;
+	--ss-muted: #7d889c;
+	--ss-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 10px 30px -14px rgba(0, 0, 0, 0.6);
+	--ss-shadow-lg: 0 24px 60px -20px rgba(0, 0, 0, 0.8);
+	--tone-blue: #6ea2ff;
+	--tone-blue-bg: rgba(75, 141, 255, 0.16);
+	--tone-violet: #a592ff;
+	--tone-violet-bg: rgba(139, 116, 255, 0.18);
+	--tone-teal: #34d3c0;
+	--tone-teal-bg: rgba(45, 212, 191, 0.14);
+	--tone-amber: #fbbf24;
+	--tone-amber-bg: rgba(251, 191, 36, 0.14);
+	--tone-rose: #fb7185;
+	--tone-rose-bg: rgba(251, 113, 133, 0.15);
+	--tone-green: #34d399;
+	--tone-green-bg: rgba(52, 211, 153, 0.14);
+	--tone-indigo: #a5b4fc;
+	--tone-indigo-bg: rgba(129, 140, 248, 0.16);
+	--tone-orange: #fb923c;
+	--tone-orange-bg: rgba(251, 146, 60, 0.15);
+	color-scheme: dark;
 }
+
 
 *,
 *::before,
@@ -175,13 +175,27 @@ a {
 	position: relative;
 	/* ตัดส่วนที่ล้นด้านข้างตอนเปลี่ยนหน้า (หน้าใหม่เลื่อนเข้าจาก translateX 42%) ไม่งั้นหน้าเว็บกว้างเกินจอชั่วขณะ
 	   มือถือย่อทั้งหน้าให้พอดีแล้วขยายกลับ (กดแก้ไข/ย้อนกลับแล้วหน้าย่อแวบหนึ่ง) clip ไม่สร้างกล่องเลื่อน แถบบน sticky ยังทำงาน
-	   ต้องตัดที่ .ss-app (เต็มจอ) ห้ามตัดที่ .ss-stage: แถบบนหน้าตาใหม่ใช้ margin ติดลบยื่นไปใต้ Dock จะถูกตัดหัว */
+	   ต้องตัดที่ .ss-app (เต็มจอ) */
 	overflow-x: clip;
+	/* โครงแอป: แถบบน (#ss-header) แถวบนเต็มความกว้าง → .ss-stage (เนื้อหา) ยืดเต็มที่เหลือ Dock อยู่ซ้ายของ stage ใต้แถบบน */
+	display: flex;
+	flex-direction: column;
+	--ss-head-h: calc(62px + var(--ss-top));
+}
+/* แถบบนของหน้า (TopBar Teleport มา) อยู่ในโครงแอปตรงๆ (sticky เทียบ .ss-app)
+   ตอนเปลี่ยนหน้ามีของหน้าเก่าค้างชั่วครู่: แสดงเฉพาะของหน้าล่าสุด */
+#ss-header,
+#ss-header > .ss-head {
+	display: contents;
+}
+#ss-header > .ss-head:not(:last-child) {
+	display: none;
 }
 
 .ss-stage {
 	position: relative;
 	display: grid;
+	flex: 1 0 auto;
 }
 
 .ss-stage > .ss-view {
@@ -285,17 +299,17 @@ a {
 		linear-gradient(120deg, var(--ss-brand) 0%, var(--ss-brand-2) 100%);
 	transition: box-shadow 0.25s ease;
 }
-@media (prefers-color-scheme: dark) {
-	/* สีหลักของธีมมืดสว่างเกินสำหรับตัวอักษรขาว */
-	.ss-topbar {
-		background: radial-gradient(90% 220% at 100% 0%, rgba(255, 255, 255, 0.1), transparent 55%),
-			linear-gradient(
-				120deg,
-				color-mix(in srgb, var(--ss-brand) 58%, #000) 0%,
-				color-mix(in srgb, var(--ss-brand-2) 58%, #000) 100%
-			);
-	}
+/* โหมดมืด = html[data-theme="dark"] (theme.js) :where ไม่เพิ่ม specificity */
+/* สีหลักของธีมมืดสว่างเกินสำหรับตัวอักษรขาว */
+:where([data-theme="dark"]) .ss-topbar {
+	background: radial-gradient(90% 220% at 100% 0%, rgba(255, 255, 255, 0.1), transparent 55%),
+		linear-gradient(
+			120deg,
+			color-mix(in srgb, var(--ss-brand) 58%, #000) 0%,
+			color-mix(in srgb, var(--ss-brand-2) 58%, #000) 100%
+		);
 }
+
 .ss-topbar.is-scrolled {
 	box-shadow: 0 8px 18px -12px rgba(15, 23, 42, 0.55);
 }
@@ -398,14 +412,14 @@ a {
 	--viz-2: #1f9e6b;
 	--viz-3: #c9650a;
 }
-@media (prefers-color-scheme: dark) {
-	.ss-fin,
-	.ss-money-chart {
-		--viz-1: #3987e5;
-		--viz-2: #199e70;
-		--viz-3: #d95926;
-	}
+/* โหมดมืด = html[data-theme="dark"] (theme.js) :where ไม่เพิ่ม specificity */
+:where([data-theme="dark"]) .ss-fin,
+:where([data-theme="dark"]) .ss-money-chart {
+	--viz-1: #3987e5;
+	--viz-2: #199e70;
+	--viz-3: #d95926;
 }
+
 .ss-fin {
 	display: flex;
 	flex-direction: column;
@@ -2012,6 +2026,7 @@ button.ss-card:active {
 	transform: translateX(-50%);
 	width: 100%;
 	max-height: calc(92vh - var(--ss-top));
+	max-height: calc(92dvh - var(--ss-top));
 	display: flex;
 	flex-direction: column;
 	border-radius: 28px 28px 0 0;
@@ -2021,9 +2036,11 @@ button.ss-card:active {
 }
 .ss-sheet--full {
 	height: calc(92vh - var(--ss-top));
+	height: calc(92dvh - var(--ss-top));
 }
 .ss-sheet--half {
 	height: 60vh;
+	height: 60dvh;
 }
 .ss-sheet-grip {
 	display: grid;
@@ -2064,6 +2081,34 @@ button.ss-card:active {
 	overflow-y: auto;
 	overscroll-behavior: contain;
 	padding: 4px 16px 16px;
+}
+/* Sheet แบบฟอร์ม (prop form ของ Sheet.vue): ช่อง/กล่องในตัวห่างเท่ากัน */
+.ss-sheet-body.is-form {
+	display: flex;
+	flex-direction: column;
+	gap: 14px;
+	padding-top: 8px;
+}
+.ss-sheet-body.is-form > .ss-note {
+	margin: 0;
+}
+/* ประเภทการเบิก (Advances.vue ขั้นเลือก) */
+.ss-advance-types .ss-option {
+	border: 1px solid var(--ss-border);
+	background: var(--ss-surface);
+}
+.ss-advance-types .ss-option-desc { white-space: normal; }
+.ss-advance-types .ss-option > .ss-icon:last-child { color: var(--ss-muted); }
+.ss-advance-change {
+	display: inline-flex;
+	align-items: center;
+	gap: 2px;
+	align-self: flex-start;
+}
+.ss-review-installments { margin-top: 12px; }
+.ss-review-installments small {
+	color: var(--ss-muted);
+	font-size: var(--ss-fs-sm);
 }
 .ss-sheet-foot {
 	padding: 12px 16px calc(12px + var(--ss-bottom));
@@ -2533,7 +2578,8 @@ button.ss-card:active {
 	animation: ss-spin 0.7s linear infinite;
 }
 .ss-options-note .ss-spinner,
-.ss-btn--ghost .ss-spinner {
+.ss-btn--ghost .ss-spinner,
+.ss-pdf-bar .ss-spinner {
 	border-color: var(--ss-border);
 	border-top-color: var(--ss-brand);
 }
@@ -2887,7 +2933,8 @@ svg.ss-check {
 	.ss-app {
 		max-width: none;
 	}
-	.ss-app.has-side {
+	/* ช่องของ Dock อยู่ที่ stage (เนื้อหา) ไม่ใช่ทั้งแอป แถบบนจึงเต็มความกว้างโดยไม่ต้องยื่นออกไป */
+	.ss-app.has-side > .ss-stage {
 		padding-left: var(--ss-side);
 	}
 	.ss-stage > .ss-view {
@@ -3076,38 +3123,38 @@ svg.ss-check {
 	--ss-brand-2: #d6336c;
 	--ss-brand-soft: #fff0e6;
 }
-@media (prefers-color-scheme: dark) {
-	[data-section="work"] {
-		--ss-brand: #ff8a4c;
-		--ss-brand-2: #f06595;
-		--ss-brand-soft: rgba(255, 138, 76, 0.16);
-	}
+/* โหมดมืด = html[data-theme="dark"] (theme.js) :where ไม่เพิ่ม specificity */
+:where([data-theme="dark"]) [data-section="work"], [data-section="work"]:where([data-theme="dark"]) {
+	--ss-brand: #ff8a4c;
+	--ss-brand-2: #f06595;
+	--ss-brand-soft: rgba(255, 138, 76, 0.16);
 }
+
 
 [data-section="pm"] {
 	--ss-brand: #1e3a8a;
 	--ss-brand-2: #0369a1;
 	--ss-brand-soft: #e3eaf8;
 }
-@media (prefers-color-scheme: dark) {
-	[data-section="pm"] {
-		--ss-brand: #8fb0f5;
-		--ss-brand-2: #5fb6e0;
-		--ss-brand-soft: rgba(143, 176, 245, 0.18);
-	}
+/* โหมดมืด = html[data-theme="dark"] (theme.js) :where ไม่เพิ่ม specificity */
+:where([data-theme="dark"]) [data-section="pm"], [data-section="pm"]:where([data-theme="dark"]) {
+	--ss-brand: #8fb0f5;
+	--ss-brand-2: #5fb6e0;
+	--ss-brand-soft: rgba(143, 176, 245, 0.18);
 }
+
 [data-section="resources"] {
 	--ss-brand: #6d28d9;
 	--ss-brand-2: #4f46e5;
 	--ss-brand-soft: #efe8fb;
 }
-@media (prefers-color-scheme: dark) {
-	[data-section="resources"] {
-		--ss-brand: #b79af5;
-		--ss-brand-2: #9aa0f7;
-		--ss-brand-soft: rgba(183, 154, 245, 0.18);
-	}
+/* โหมดมืด = html[data-theme="dark"] (theme.js) :where ไม่เพิ่ม specificity */
+:where([data-theme="dark"]) [data-section="resources"], [data-section="resources"]:where([data-theme="dark"]) {
+	--ss-brand: #b79af5;
+	--ss-brand-2: #9aa0f7;
+	--ss-brand-soft: rgba(183, 154, 245, 0.18);
 }
+
 [data-section="buy"],
 [data-section="purchase"] {
 	--ss-brand: #0d9488;
@@ -3166,66 +3213,66 @@ svg.ss-check {
 	--ss-brand-2: #7c3aed;
 	--ss-brand-soft: #e0e7ff;
 }
-@media (prefers-color-scheme: dark) {
-	[data-section="buy"],
-	[data-section="purchase"] {
-		--ss-brand: #2dd4bf;
-		--ss-brand-2: #38bdf8;
-		--ss-brand-soft: rgba(45, 212, 191, 0.15);
-	}
-	[data-section="sell"],
-	[data-section="sales"] {
-		--ss-brand: #e879f9;
-		--ss-brand-2: #a78bfa;
-		--ss-brand-soft: rgba(232, 121, 249, 0.15);
-	}
-	[data-section="boq"] {
-		--ss-brand: #f0a94b;
-		--ss-brand-2: #e0b84a;
-		--ss-brand-soft: rgba(240, 169, 75, 0.16);
-	}
-	[data-section="labour"] {
-		--ss-brand: #94a3b8;
-		--ss-brand-2: #2dd4bf;
-		--ss-brand-soft: rgba(148, 163, 184, 0.16);
-	}
-	[data-section="hr"] {
-		--ss-brand: #fb7185;
-		--ss-brand-2: #fb923c;
-		--ss-brand-soft: rgba(251, 113, 133, 0.15);
-	}
-	[data-section="saraban"] {
-		--ss-brand: #22d3ee;
-		--ss-brand-2: #818cf8;
-		--ss-brand-soft: rgba(34, 211, 238, 0.15);
-	}
-	[data-section="subcontract"],
-	[data-section="contractor"] {
-		--ss-brand: #fb923c;
-		--ss-brand-2: #fbbf24;
-		--ss-brand-soft: rgba(251, 146, 60, 0.15);
-	}
-	[data-section="accounting"] {
-		--ss-brand: #60a5fa;
-		--ss-brand-2: #2dd4bf;
-		--ss-brand-soft: rgba(96, 165, 250, 0.15);
-	}
-	[data-section="master"] {
-		--ss-brand: #a3e635;
-		--ss-brand-2: #2dd4bf;
-		--ss-brand-soft: rgba(163, 230, 53, 0.15);
-	}
-	[data-section="self"] {
-		--ss-brand: #4ade80;
-		--ss-brand-2: #2dd4bf;
-		--ss-brand-soft: rgba(74, 222, 128, 0.15);
-	}
-	[data-section="approve"] {
-		--ss-brand: #818cf8;
-		--ss-brand-2: #a78bfa;
-		--ss-brand-soft: rgba(129, 140, 248, 0.16);
-	}
+/* โหมดมืด = html[data-theme="dark"] (theme.js) :where ไม่เพิ่ม specificity */
+:where([data-theme="dark"]) [data-section="buy"], [data-section="buy"]:where([data-theme="dark"]),
+:where([data-theme="dark"]) [data-section="purchase"], [data-section="purchase"]:where([data-theme="dark"]) {
+	--ss-brand: #2dd4bf;
+	--ss-brand-2: #38bdf8;
+	--ss-brand-soft: rgba(45, 212, 191, 0.15);
 }
+:where([data-theme="dark"]) [data-section="sell"], [data-section="sell"]:where([data-theme="dark"]),
+:where([data-theme="dark"]) [data-section="sales"], [data-section="sales"]:where([data-theme="dark"]) {
+	--ss-brand: #e879f9;
+	--ss-brand-2: #a78bfa;
+	--ss-brand-soft: rgba(232, 121, 249, 0.15);
+}
+:where([data-theme="dark"]) [data-section="boq"], [data-section="boq"]:where([data-theme="dark"]) {
+	--ss-brand: #f0a94b;
+	--ss-brand-2: #e0b84a;
+	--ss-brand-soft: rgba(240, 169, 75, 0.16);
+}
+:where([data-theme="dark"]) [data-section="labour"], [data-section="labour"]:where([data-theme="dark"]) {
+	--ss-brand: #94a3b8;
+	--ss-brand-2: #2dd4bf;
+	--ss-brand-soft: rgba(148, 163, 184, 0.16);
+}
+:where([data-theme="dark"]) [data-section="hr"], [data-section="hr"]:where([data-theme="dark"]) {
+	--ss-brand: #fb7185;
+	--ss-brand-2: #fb923c;
+	--ss-brand-soft: rgba(251, 113, 133, 0.15);
+}
+:where([data-theme="dark"]) [data-section="saraban"], [data-section="saraban"]:where([data-theme="dark"]) {
+	--ss-brand: #22d3ee;
+	--ss-brand-2: #818cf8;
+	--ss-brand-soft: rgba(34, 211, 238, 0.15);
+}
+:where([data-theme="dark"]) [data-section="subcontract"], [data-section="subcontract"]:where([data-theme="dark"]),
+:where([data-theme="dark"]) [data-section="contractor"], [data-section="contractor"]:where([data-theme="dark"]) {
+	--ss-brand: #fb923c;
+	--ss-brand-2: #fbbf24;
+	--ss-brand-soft: rgba(251, 146, 60, 0.15);
+}
+:where([data-theme="dark"]) [data-section="accounting"], [data-section="accounting"]:where([data-theme="dark"]) {
+	--ss-brand: #60a5fa;
+	--ss-brand-2: #2dd4bf;
+	--ss-brand-soft: rgba(96, 165, 250, 0.15);
+}
+:where([data-theme="dark"]) [data-section="master"], [data-section="master"]:where([data-theme="dark"]) {
+	--ss-brand: #a3e635;
+	--ss-brand-2: #2dd4bf;
+	--ss-brand-soft: rgba(163, 230, 53, 0.15);
+}
+:where([data-theme="dark"]) [data-section="self"], [data-section="self"]:where([data-theme="dark"]) {
+	--ss-brand: #4ade80;
+	--ss-brand-2: #2dd4bf;
+	--ss-brand-soft: rgba(74, 222, 128, 0.15);
+}
+:where([data-theme="dark"]) [data-section="approve"], [data-section="approve"]:where([data-theme="dark"]) {
+	--ss-brand: #818cf8;
+	--ss-brand-2: #a78bfa;
+	--ss-brand-soft: rgba(129, 140, 248, 0.16);
+}
+
 a.ss-option {
 	color: inherit;
 	text-decoration: none;
@@ -4524,12 +4571,18 @@ a.ss-btn--soft {
 .ss-planner {
 	display: flex;
 	flex-direction: column;
-	height: 100vh;
-	height: 100dvh;
+	min-height: 0;
 	overflow: hidden;
 }
-.ss-planner > .ss-topbar {
-	flex: none;
+/* หน้าแผนงานเต็มจอ: แอปสูงเท่าจอ stage ได้ที่เหลือใต้แถบบน (+ แถบโครงการบนมือถือ) */
+.ss-app:has(> .ss-stage > .ss-view.ss-planner) {
+	height: 100vh;
+	height: 100dvh;
+}
+.ss-app:has(> .ss-stage > .ss-view.ss-planner) > .ss-stage {
+	flex: 1 1 0;
+	min-height: 0;
+	grid-template-rows: minmax(0, 1fr);
 }
 .pl-save-state {
 	max-width: 160px;
@@ -7135,9 +7188,6 @@ a.ss-btn--soft {
 
 /* ================================================================ จัดซื้อ / ขาย */
 
-.ss-scope {
-	max-width: 420px;
-}
 .ss-chips--wrap {
 	flex-wrap: wrap;
 }
@@ -7417,6 +7467,22 @@ a.ss-btn--soft {
 	background: #fff;
 	box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35);
 }
+/* HtmlViewer.vue: iframe ขนาดเอกสารจริงย่อ/ขยายด้วย transform กรอบนอกกว้าง/สูงตามขนาดหลังย่อ
+   iframe ไม่รับการแตะ ให้ซูมสองนิ้ว/เลื่อน/แตะสองครั้งที่กรอบนอก */
+.ss-html-sheet {
+	position: relative;
+	overflow: hidden;
+	flex: none;
+}
+.ss-html-frame {
+	position: absolute;
+	top: 0;
+	left: 0;
+	border: 0;
+	transform-origin: 0 0;
+	pointer-events: none;
+	background: transparent;
+}
 .ss-pdf-note {
 	display: flex;
 	flex-direction: column;
@@ -7494,7 +7560,7 @@ a.ss-btn--soft {
 	html[data-side="expanded"] {
 		--ss-side: var(--ss-rail-open);
 	}
-	.ss-app.has-side {
+	.ss-app.has-side > .ss-stage {
 		transition: padding-left 0.3s var(--ss-ease);
 	}
 
@@ -7753,6 +7819,70 @@ a.ss-btn--soft {
 .ss-menu-item:hover,
 .ss-menu-item:focus-visible {
 	background: color-mix(in srgb, var(--ss-text) 5%, transparent);
+}
+/* เมนูใน bottom sheet ของมือถือ (กลุ่มเมนู / อื่นๆ ใน AppShell): ช่องไอคอน+ชื่อ 3 คอลัมน์ จอแคบ 2 (ตกลง 2026-11-18) */
+.ss-menu-grid {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	gap: 10px;
+}
+@media (max-width: 359px) {
+	.ss-menu-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+.ss-menu-tile {
+	position: relative;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: 8px;
+	min-height: 88px;
+	padding: 12px 8px;
+	border: 1px solid var(--ss-border);
+	border-radius: 16px;
+	background: var(--ss-surface);
+	color: var(--ss-text);
+	font-size: var(--ss-fs);
+	font-weight: 500;
+	text-align: center;
+	cursor: pointer;
+}
+.ss-menu-tile-icon {
+	display: grid;
+	place-items: center;
+	width: 40px;
+	height: 40px;
+	border-radius: 50%;
+	color: var(--ss-text-2);
+	background: var(--ss-surface-2);
+}
+.ss-menu-tile-label { line-height: 1.3; overflow-wrap: anywhere; }
+.ss-menu-tile.is-active { border-color: var(--ss-brand); font-weight: 600; }
+.ss-menu-tile.is-active .ss-menu-tile-icon { color: #fff; background: var(--ss-brand); }
+.ss-menu-tile-badge {
+	position: absolute;
+	top: 8px;
+	right: 8px;
+	min-width: 20px;
+	padding: 0 6px;
+	border-radius: 999px;
+	color: var(--ss-brand);
+	background: var(--ss-brand-soft);
+	font-size: var(--ss-fs-sm);
+	font-weight: 700;
+	line-height: 20px;
+}
+.ss-menu-tile-badge.is-danger { color: #fff; background: #e11d48; }
+/* ช่องของกลุ่มเมนูบนแถบบน (SectionTabs): ลูกศรบอกว่าเป็น dropdown */
+.ss-sectab-caret {
+	flex: none;
+	margin-left: -2px;
+	opacity: 0.7;
+}
+/* ⋯ ของหัวรายการ (ListHead: ตั้งค่าของหมวด + คำสั่งของหน้า) */
+.ss-list-more.is-open {
+	color: var(--ss-text);
+	background: var(--ss-surface-2);
 }
 .ss-menu-item.is-selected {
 	background: color-mix(in srgb, var(--ss-text) 9%, transparent);
@@ -9439,8 +9569,18 @@ input[type="number"] {
 	white-space: nowrap;
 }
 .ss-table--list .col-modified {
-	color: var(--ss-muted);
-	font-size: var(--ss-fs);
+	color: color-mix(in srgb, var(--ss-muted) 45%, var(--ss-text-2));
+	font-size: var(--ss-fs-sm);
+	font-variant-numeric: tabular-nums;
+	text-align: right;
+}
+.ss-table--list .col-modified .ss-th-sort .is-idle {
+	opacity: 0.75;
+}
+@media (max-width: 767px) {
+	.ss-table--list .col-modified {
+		display: none;
+	}
 }
 .ss-table--list .col-pct .ss-table-pct i {
 	width: 40px;
@@ -9509,13 +9649,27 @@ input[type="number"] {
 	max-width: 1px;
 	min-width: 160px;
 }
+/* The party column takes the space left by the compact document columns. */
+.ss-table--list .col-flex-party {
+	width: 100%;
+}
+.ss-table--list td.col-flex-party {
+	max-width: 1px;
+}
+.ss-table--list .col-flex-party .ss-cell-main,
+.ss-table--list .col-flex-party small {
+	display: block;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
 .ss-table--list th,
 .ss-table--list td {
 	padding-left: 10px;
 	padding-right: 10px;
 }
 /* ตารางต้องพอดีกรอบ ไม่เลื่อนซ้าย-ขวา: ดูความกว้างกรอบตาราง (เปลี่ยนตาม sidebar ปักหมุด/แผงตัวอย่าง) ไม่ใช่ความกว้างจอ
-   ลดทีละขั้น: แถบ % เหลือตัวเลข → ซ่อนมอบหมาย/แก้ไขล่าสุด → ซ่อน % (สถานะบอกอยู่แล้ว) */
+   ลดทีละขั้น: แถบ % เหลือตัวเลข → ซ่อนมอบหมาย → ซ่อน % (สถานะบอกอยู่แล้ว) */
 .ss-table-wrap:has(> .ss-table--list) {
 	container: doclist / inline-size;
 }
@@ -10260,10 +10414,7 @@ div.ss-line-del {
 	gap: 20px;
 	align-items: start;
 }
-/* ตารางคู่ตัวอย่าง: ซ่อนคอลัมน์รอง */
-.ss-table--list.is-compact .col-wide {
-	display: none;
-}
+/* ตารางคู่ตัวอย่าง: คอลัมน์ลดตามความกว้างกรอบตาราง (container doclist) ไม่ซ่อนทั้งหมดในครั้งเดียว */
 .ss-table tbody tr.is-active {
 	background: var(--ss-brand-soft);
 }
@@ -10764,9 +10915,9 @@ div.ss-line-del {
 		--ss-rside: 380px;
 	}
 }
-.ss-app {
+.ss-stage {
 	padding-right: var(--ss-rside);
-	transition: padding-right 0.3s var(--ss-ease);
+	transition: padding-right 0.3s var(--ss-ease), padding-left 0.3s var(--ss-ease);
 }
 @media (min-width: 768px) {
 	.ss-bottom-bar {
@@ -11273,7 +11424,7 @@ div.ss-line-del {
 	order: 1;
 }
 /* มีตารางตามมา: ติดกับตาราง (ลบระยะห่างของ .ss-content) */
-.ss-content .ss-list-head:has(~ * .ss-table-wrap) {
+.ss-content .ss-list-head:not(.ss-form-head):has(~ * .ss-table-wrap) {
 	margin-bottom: calc(-1 * var(--ss-list-gap, 16px));
 	border-bottom: 0;
 	border-radius: var(--ss-radius-sm) var(--ss-radius-sm) 0 0;
@@ -11282,18 +11433,18 @@ div.ss-line-del {
 	--ss-list-gap: 14px;
 }
 /* กรอบเส้นเดียวไม่มีเงา แบบการ์ดของหน้าแก้แผนงาน (เงาของหัวรายการทำให้เส้นใต้แท็บเบลอ) */
-.ss-content .ss-list-head ~ * .ss-table-wrap {
+.ss-content .ss-list-head:not(.ss-form-head) ~ * .ss-table-wrap {
 	border: 1px solid var(--ss-border);
 	border-top: 0;
 	border-radius: 0;
 	box-shadow: none;
 }
-.ss-content .ss-list-head ~ * .ss-list-foot {
+.ss-content .ss-list-head:not(.ss-form-head) ~ * .ss-list-foot {
 	border: 1px solid var(--ss-border);
 	border-radius: 0 0 var(--ss-radius-sm) var(--ss-radius-sm);
 	box-shadow: none;
 }
-.ss-content .ss-list-head ~ * .ss-table-wrap:has(+ .ss-list-foot) {
+.ss-content .ss-list-head:not(.ss-form-head) ~ * .ss-table-wrap:has(+ .ss-list-foot) {
 	border-bottom: 0;
 }
 .ss-list-body.has-preview > .ss-preview {
@@ -12732,6 +12883,9 @@ html.ss-boq-grabbing * {
 	min-height: 0;
 	border-top: 1px solid var(--ss-border);
 }
+.ss-settings.is-single {
+	grid-template-columns: minmax(0, 1fr);
+}
 .ss-settings-menu {
 	display: flex;
 	flex-direction: column;
@@ -12786,6 +12940,32 @@ html.ss-boq-grabbing * {
 	display: flex;
 	min-width: 0;
 	min-height: 0;
+}
+/* มือถือ: เมนูหัวข้อเป็นแถวเลื่อนแนวนอนบนสุด (ไม่มีหัวข้อหลัก) */
+@media (max-width: 767px) {
+	.ss-settings {
+		grid-template-columns: minmax(0, 1fr);
+		grid-template-rows: auto minmax(0, 1fr);
+	}
+	.ss-settings-menu {
+		flex-direction: row;
+		gap: 6px;
+		padding: 8px 12px;
+		overflow-x: auto;
+		border-right: 0;
+		border-bottom: 1px solid var(--ss-border);
+		scrollbar-width: none;
+	}
+	.ss-settings-group {
+		display: none;
+	}
+	.ss-settings-link {
+		flex: none;
+		white-space: nowrap;
+	}
+	.ss-settings-form-inner {
+		padding: 12px 16px 24px;
+	}
 }
 .ss-perm {
 	display: flex;
@@ -13102,11 +13282,11 @@ html.ss-boq-grabbing * {
 	font-size: var(--ss-fs-sm);
 }
 /* เบิกเงิน / อนุมัติ */
-.ss-claim-row {
+/* รายการค่าใช้จ่ายในใบเคลียร์/สำรองจ่าย (Self Service) ห้ามใช้ชื่อ .ss-claim-row (เป็นแถวของแอปผู้รับเหมา) */
+.ss-expense-row {
 	display: grid;
-	gap: 10px;
-	padding: 12px;
-	margin-bottom: 10px;
+	gap: 12px;
+	padding: 14px;
 }
 .ss-money {
 	font-variant-numeric: tabular-nums;
@@ -13778,6 +13958,7 @@ html[data-theme="dark"] .ss-work-variance.is-rose { color: #f0a0a6; background: 
 .ss-work-followups th:first-child,
 .ss-work-followups td:first-child { padding-left: 0; }
 .ss-work-followups td:last-child { width: 20px; padding-right: 0; color: var(--ss-work-muted); }
+.ss-work-followups td.col-modified { width: 1%; text-align: right; font-size: var(--ss-fs-sm); }
 .ss-work-followups tr:last-child td { border-bottom: 0; }
 .ss-work-followups tbody tr.is-clickable { cursor: pointer; }
 .ss-work-followups tbody tr.is-clickable:hover { background: var(--ss-brand-soft); }
@@ -13835,6 +14016,7 @@ html[data-theme="dark"] .ss-work-variance.is-rose { color: #f0a0a6; background: 
 	.ss-work-followups td:nth-child(4) { grid-area: status; font-size: var(--ss-fs-sm); }
 	.ss-work-followups td:nth-child(5) { display: none; }
 	.ss-work-followups td:nth-child(6) { grid-area: chev; width: auto; }
+	.ss-work-followups td.col-modified { display: none; }
 }
 @media (max-width: 767px) {
 	.ss-work-greeting h1 { font-size: var(--ss-fs-xl); }
@@ -13842,6 +14024,205 @@ html[data-theme="dark"] .ss-work-variance.is-rose { color: #f0a0a6; background: 
 	.ss-work-stats { gap: 10px; }
 	.ss-work-grid { gap: 10px; }
 }
+
+/* ---------------------------------------------------------------- ภาพรวม Self Service (self_app/views/Checkin.vue, ตกลง 2026-11-17)
+   การ์ดชุดเดียวกับภาพรวมควบคุมงาน (.ss-work-*) วางด้วย grid-area ของตัวเอง ลำดับมือถือ = ลำดับใน template */
+.ss-self-grid > .ss-self-clock { grid-area: clock; }
+.ss-self-grid > .ss-self-stats { grid-area: stats; }
+.ss-self-grid > .ss-self-todo { grid-area: todo; }
+.ss-self-grid > .ss-self-cal { grid-area: cal; }
+.ss-self-grid > .ss-self-pending { grid-area: pending; }
+.ss-self-grid > .ss-work-quick { grid-area: quick; }
+.ss-work-grid.ss-self-grid { grid-template-areas: "clock" "stats" "todo" "cal" "pending" "quick"; }
+@container work-dash (min-width: 640px) {
+	.ss-work-grid.ss-self-grid {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		grid-template-areas: "clock stats" "todo todo" "cal pending" "cal quick";
+	}
+}
+@container work-dash (min-width: 1080px) {
+	.ss-work-grid.ss-self-grid {
+		grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.15fr);
+		grid-template-rows: auto auto 1fr;
+		grid-template-areas: "clock stats todo" "cal cal pending" "cal cal quick";
+	}
+}
+.ss-self-stats > button { min-height: 112px; }
+.ss-self-time {
+	display: block;
+	margin-top: 4px;
+	font-size: 38px;
+	font-weight: 700;
+	line-height: 1;
+	font-variant-numeric: tabular-nums;
+}
+.ss-self-clock .ss-work-head > div > span {
+	color: var(--ss-work-muted);
+	font-size: var(--ss-fs-sm);
+}
+.ss-self-place {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	max-width: 55%;
+	padding: 3px 8px;
+	border-radius: 999px;
+	color: var(--ss-brand);
+	background: var(--ss-brand-soft);
+	font-size: var(--ss-fs-sm);
+	font-weight: 600;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.ss-self-place.is-danger { color: #b4323b; background: #fbe6e7; }
+html[data-theme="dark"] .ss-self-place.is-danger { color: #f0a0a6; background: #41252b; }
+.ss-self-issue { margin: 10px 0 0; }
+.ss-self-clock-actions .ss-btn { gap: 6px; }
+/* ลงเวลาออก = ปุ่มสีทอง (สีเดียวกับตัวเลขเด่น) */
+.ss-self-clock.is-out .ss-self-clock-actions .ss-btn--primary {
+	color: var(--ss-accent-ink);
+	background: var(--ss-accent);
+}
+.ss-self-todo .ss-work-quick-list button.is-rose > i { color: #b4323b; background: #fbe6e7; }
+.ss-self-todo .ss-work-quick-list button.is-amber > i { color: #8a6116; background: #fbefd2; }
+.ss-self-todo .ss-work-quick-list button.is-blue > i { color: var(--ss-brand); background: var(--ss-brand-soft); }
+html[data-theme="dark"] .ss-self-todo .ss-work-quick-list button.is-rose > i { color: #f0a0a6; background: #41252b; }
+html[data-theme="dark"] .ss-self-todo .ss-work-quick-list button.is-amber > i { color: #f0cd7a; background: #3b3120; }
+.ss-self-todo .ss-work-quick-list button:disabled { opacity: 1; }
+.ss-self-pending .ss-work-quick-list button > .ss-self-amount {
+	font-size: var(--ss-fs);
+	font-variant-numeric: tabular-nums;
+}
+.ss-self-shortcuts { grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); }
+
+/* ปฏิทินเดือน: สีช่องชุดเดียวกับหน้าสรุปวันทำงานของ HR (hr-cell) */
+.ss-self-cal-nav {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+}
+.ss-self-cal-today { height: 30px; padding: 0 12px; border-radius: 999px; }
+.ss-self-cal-grid {
+	display: grid;
+	grid-template-columns: repeat(7, minmax(0, 1fr));
+	gap: 4px;
+	transition: opacity 0.15s ease;
+}
+.ss-self-cal-grid.is-loading { opacity: 0.5; pointer-events: none; }
+.ss-self-cal-dow {
+	padding-bottom: 2px;
+	color: var(--ss-work-muted);
+	font-size: var(--ss-fs-sm);
+	text-align: center;
+}
+.ss-self-cal-dow:first-child { color: #b4323b; }
+.ss-self-cal-day {
+	--c: var(--ss-work-muted);
+	--c-bg: transparent;
+	position: relative;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 2px;
+	min-height: 54px;
+	padding: 5px 0;
+	border: 1px solid transparent;
+	border-radius: 10px;
+	background: none;
+	color: var(--ss-work-ink);
+	cursor: pointer;
+}
+.ss-self-cal-day:hover:not(:disabled) { border-color: var(--ss-work-line); }
+.ss-self-cal-day:disabled { cursor: default; }
+.ss-self-cal-day small {
+	color: var(--ss-work-muted);
+	font-size: var(--ss-fs-sm);
+	font-variant-numeric: tabular-nums;
+}
+.ss-self-cal-day > span {
+	display: grid;
+	place-items: center;
+	width: 28px;
+	height: 28px;
+	border-radius: 50%;
+	color: var(--c);
+	background: var(--c-bg);
+	font-size: var(--ss-fs-sm);
+	font-weight: 700;
+}
+.ss-self-cal-day.is-today { border-color: var(--ss-brand); }
+.ss-self-cal-day.is-today small { color: var(--ss-brand); font-weight: 700; }
+.ss-self-cal-day.has-request > span { box-shadow: inset 0 0 0 1.5px #1d4ed8; }
+.ss-self-cal-late {
+	position: absolute;
+	top: 6px;
+	right: 6px;
+	width: 6px;
+	height: 6px;
+	border-radius: 50%;
+	background: #d39a2d;
+}
+.ss-self-cal-day.is-green, .ss-self-legend .is-green { --c: #15803d; --c-bg: #dcfce7; }
+.ss-self-cal-day.is-orange, .ss-self-legend .is-orange { --c: #c2410c; --c-bg: #ffedd5; }
+.ss-self-cal-day.is-red, .ss-self-legend .is-red { --c: #be123c; --c-bg: #ffe4e6; }
+.ss-self-cal-day.is-blue, .ss-self-legend .is-blue { --c: #1d4ed8; --c-bg: #dbeafe; }
+.ss-self-cal-day.is-amber, .ss-self-legend .is-amber { --c: #92400e; --c-bg: #fde68a; }
+.ss-self-cal-day.is-gray, .ss-self-legend .is-gray { --c: var(--ss-work-muted); --c-bg: color-mix(in srgb, var(--ss-work-ink) 6%, transparent); }
+html[data-theme="dark"] .ss-self-cal-day.is-green, html[data-theme="dark"] .ss-self-legend .is-green { --c: #4ade80; --c-bg: rgba(74, 222, 128, 0.16); }
+html[data-theme="dark"] .ss-self-cal-day.is-orange, html[data-theme="dark"] .ss-self-legend .is-orange { --c: #fb923c; --c-bg: rgba(251, 146, 60, 0.16); }
+html[data-theme="dark"] .ss-self-cal-day.is-red, html[data-theme="dark"] .ss-self-legend .is-red { --c: #fb7185; --c-bg: rgba(251, 113, 133, 0.16); }
+html[data-theme="dark"] .ss-self-cal-day.is-blue, html[data-theme="dark"] .ss-self-legend .is-blue { --c: #60a5fa; --c-bg: rgba(96, 165, 250, 0.16); }
+html[data-theme="dark"] .ss-self-cal-day.is-amber, html[data-theme="dark"] .ss-self-legend .is-amber { --c: #fbbf24; --c-bg: rgba(251, 191, 36, 0.18); }
+.ss-self-legend {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px 14px;
+	margin-top: 12px;
+	padding-top: 12px;
+	border-top: 1px solid var(--ss-work-line);
+	color: var(--ss-work-muted);
+	font-size: var(--ss-fs-sm);
+}
+.ss-self-legend span { display: inline-flex; align-items: center; gap: 5px; }
+.ss-self-legend i {
+	display: grid;
+	place-items: center;
+	width: 18px;
+	height: 18px;
+	border-radius: 50%;
+	color: var(--c);
+	background: var(--c-bg);
+	font-style: normal;
+	font-weight: 700;
+}
+.ss-self-legend b { color: var(--ss-work-ink); font-variant-numeric: tabular-nums; }
+
+/* เงินเดือน (self_app/views/Pay.vue) */
+.ss-pay-hero {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	padding: 18px 16px;
+}
+.ss-pay-label,
+.ss-pay-meta {
+	color: var(--ss-muted);
+	font-size: var(--ss-fs-sm);
+}
+.ss-pay-amount {
+	font-size: 32px;
+	font-weight: 700;
+	line-height: 1.15;
+	font-variant-numeric: tabular-nums;
+}
+.ss-pay-amount small {
+	margin-left: 4px;
+	color: var(--ss-muted);
+	font-size: var(--ss-fs);
+	font-weight: 500;
+}
+.ss-pay-upcoming { margin-top: 8px; }
 
 @media (min-width: 768px) {
 	.ss-app[data-look="new"] .ss-rail {
@@ -14367,7 +14748,7 @@ html[data-theme="dark"] .ss-work-stats > button.is-featured {
    เนื้อหาห่างจาก Dock 16px ขวาเว้น 12px เท่าแถบบน */
 @media (min-width: 768px) {
 	.ss-app[data-look="new"] .ss-topbar {
-		margin: 10px 12px 0 calc(12px - var(--ss-side));
+		margin: 10px 12px 0;
 	}
 	.ss-app[data-look="new"] .ss-rail {
 		top: 80px;
@@ -14523,8 +14904,9 @@ html[data-theme="dark"] .ss-work-stats > button.is-featured {
 /* ---------------------------------------------------------------- 2026-11-16 ขยายหน้าตาใหม่ทั้งหมวดควบคุมงาน
    ใช้ html[data-section] เพื่อให้ sheet ที่ Teleport ไป body ได้ด้วย */
 @media (min-width: 768px) {
-	/* ทุกหน้าของหมวด: เนื้อหาห่าง Dock 16px ขวาเว้น 12px เท่าแถบบน */
+	/* ทุกหน้าของหมวด: เนื้อหาห่าง Dock 16px ขวาเว้น 12px เท่าแถบบน บนเว้น 12px ใต้แถบบนเท่า Dock */
 	.ss-app[data-look="new"] .ss-content {
+		padding-top: 12px;
 		padding-left: 4px;
 		padding-right: 12px;
 	}
@@ -14606,16 +14988,16 @@ html[data-look="new"] .ss-btn {
 .ss-app[data-look="new"] .ss-list-head {
 	border-radius: 22px;
 }
-.ss-app[data-look="new"] .ss-content .ss-list-head:has(~ * .ss-table-wrap) {
+.ss-app[data-look="new"] .ss-content .ss-list-head:not(.ss-form-head):has(~ * .ss-table-wrap) {
 	border-radius: 22px 22px 0 0;
 }
-.ss-app[data-look="new"] .ss-content .ss-list-head ~ * .ss-table-wrap {
+.ss-app[data-look="new"] .ss-content .ss-list-head:not(.ss-form-head) ~ * .ss-table-wrap {
 	border-color: var(--ss-work-line);
 }
-.ss-app[data-look="new"] .ss-content .ss-list-head ~ * .ss-table-wrap:not(:has(+ .ss-list-foot)) {
+.ss-app[data-look="new"] .ss-content .ss-list-head:not(.ss-form-head) ~ * .ss-table-wrap:not(:has(+ .ss-list-foot)) {
 	border-radius: 0 0 22px 22px;
 }
-.ss-app[data-look="new"] .ss-content .ss-list-head ~ * .ss-list-foot {
+.ss-app[data-look="new"] .ss-content .ss-list-head:not(.ss-form-head) ~ * .ss-list-foot {
 	border-color: var(--ss-work-line);
 	border-radius: 0 0 22px 22px;
 }
@@ -14707,20 +15089,6 @@ html[data-look="new"] .ss-segmented button.is-active {
 	color: #fff;
 }
 
-/* หน้าแผนงานเต็มจอ (.ss-planner, overflow: hidden) ตัดแถบบนที่ยื่นไปซ้าย: ขยายตัวหน้าไปชิดซ้าย 12px แทน
-   แล้วเลื่อนเนื้อหาอื่นกลับมาห่าง Dock 16px เท่าหน้าอื่น */
-@media (min-width: 768px) {
-	.ss-app[data-look="new"] .ss-stage > .ss-view.ss-planner {
-		width: calc(100% + var(--ss-side) - 12px);
-		margin-left: calc(12px - var(--ss-side));
-	}
-	.ss-app[data-look="new"] .ss-planner > .ss-topbar {
-		margin-left: 0;
-	}
-	.ss-app[data-look="new"] .ss-planner > :not(.ss-topbar):not(.ss-project-bar) {
-		margin-left: calc(var(--ss-side) - 8px);
-	}
-}
 /* HeaderSearch ที่ย้ายลงแถวตัวกรอง: อยู่ซ้ายสุดของแถว, ที่เหลือบนแถบบนไม่กินที่ */
 .ss-header-search-anchor {
 	display: contents;
@@ -15054,8 +15422,1215 @@ html[data-look="new"] .ss-segmented button.is-active {
 	.ss-app[data-look="new"] .ss-sectab:not(.ss-sectab--more) > .ss-icon {
 		display: none;
 	}
+	.ss-app[data-section="accounting"] .ss-sectab:not(.ss-sectab--more) > .ss-sectab-caret {
+		display: block;
+	}
 	.ss-app[data-look="new"] .ss-sectab .ss-sectab-label,
 	.ss-app[data-look="new"] .ss-sectab:not(.is-active) .ss-sectab-label {
 		display: inline;
+	}
+}
+
+/* ---------------------------------------------------------------- 2026-11-17 iOS แถบสถานะ
+   แอปที่ติดตั้งบน iPhone/iPad (black-translucent) วาดเนื้อหาใต้แถบสถานะ ทำให้ --ss-top > 0
+   แถบบนแบบลอยเดิมยืดตัวขึ้นไปใต้นาฬิกา (การ์ดขาว + ตัวอักษรสถานะสีขาวมองไม่เห็น)
+   ย้ายแถบบนลงมาใต้ safe area และทาแถบสถานะเป็นสีกรมท่าเหมือน theme-color ที่ Android ใช้
+   (Android/เดสก์ท็อป --ss-top = 0 จึงไม่เปลี่ยน) */
+html[data-look="new"] body::before {
+	content: "";
+	position: fixed;
+	z-index: 2000;
+	top: 0;
+	left: 0;
+	right: 0;
+	height: var(--ss-top);
+	background: #17233f;
+	pointer-events: none;
+}
+@media (max-width: 767px) {
+	.ss-app[data-look="new"] .ss-topbar {
+		top: calc(8px + var(--ss-top));
+		height: 54px;
+		margin-top: calc(8px + var(--ss-top));
+		padding-block: 5px;
+	}
+}
+@media (min-width: 768px) {
+	.ss-app[data-look="new"] .ss-topbar {
+		top: calc(10px + var(--ss-top));
+		margin-top: calc(10px + var(--ss-top));
+	}
+	.ss-app[data-look="new"] {
+		--ss-head-h: calc(68px + var(--ss-top));
+	}
+	/* Dock เริ่มใต้แถบบน (เว้น 12px) */
+	.ss-app[data-look="new"] .ss-rail {
+		top: calc(var(--ss-head-h) + 12px);
+	}
+}
+
+/* ---------------------------------------------------------------- 2026-11-17 dark: เมนู/แท็บที่ยังไม่เลือกเป็นสีขาว
+   เดิมเป็นเทาอมฟ้า (#7d889c / #9ca6b7) บนพื้นกรมท่าเข้มอ่านยาก ตัวที่เลือกแล้วยังเด่นด้วยพื้นทอง/พื้นทึบ */
+html[data-theme="dark"] .ss-app[data-look="new"] .ss-list-tab:not(.is-active),
+html[data-theme="dark"] .ss-app[data-look="new"] .ss-tab:not(.is-active),
+html[data-theme="dark"] .ss-app[data-look="new"] .ss-sectab:not(.is-active),
+html[data-theme="dark"] .ss-app[data-look="new"] .ss-nav-item:not(.is-active),
+html[data-theme="dark"] .ss-app[data-look="new"] .ss-nav-item:not(.is-active) .ss-nav-icon,
+html[data-theme="dark"] .ss-app[data-look="new"] .ss-nav-item:not(.is-active) .ss-nav-label,
+html[data-theme="dark"] .ss-app[data-look="new"] .ss-rail-row:not(.is-open):not(.is-active),
+html[data-theme="dark"] .ss-app[data-look="new"] .ss-rail-row:not(.is-open):not(.is-active) .ss-rail-icon,
+html[data-theme="dark"] .ss-app[data-look="new"] .ss-select--tool,
+html[data-theme="dark"] .ss-app[data-look="new"] .ss-tool,
+html[data-theme="dark"] .ss-app[data-look="new"] .ss-project-bar {
+	color: #f2f4f8;
+}
+/* อักษรย่อโครงการบนวงกลมทองเข้ม (dark) ที่ยังไม่เลือก: กรมท่าบนพื้น #3a2f17 มองไม่เห็น → ขาว */
+html[data-theme="dark"] .ss-app[data-look="new"] .ss-topbar-project:not(.is-active) .ss-avatar,
+html[data-theme="dark"] .ss-app[data-look="new"] .ss-project-bar .ss-avatar,
+html[data-theme="dark"][data-look="new"] .ss-option--project:not(.is-active) .ss-avatar {
+	color: #f2f4f8;
+}
+
+/* ตัวอย่างงานพิมพ์ HTML (HtmlPreview.vue): กระดาษขาวกลางพื้นเทาเหมือนหน้า PDF จอแคบเลื่อนซ้าย-ขวา */
+.ss-html-preview {
+	flex: none;
+	margin: 16px auto;
+	max-width: none;
+	background: #fff;
+	box-shadow: 0 4px 18px rgba(0, 0, 0, 0.25);
+}
+.ss-html-preview iframe {
+	/* prefers-color-scheme ใน iframe ตาม color-scheme ของ iframe: กระดาษเป็นโหมดสว่างเสมอ */
+	color-scheme: light;
+	display: block;
+	width: 100%;
+	border: 0;
+	background: #fff;
+}
+
+/* ปุ่ม/ตัวเลือกบริษัท (กลุ่มออฟฟิศ): โลโก้บริษัทบนพื้นขาว ไม่มีโลโก้ = อักษรย่อ */
+.ss-avatar.has-logo,
+html[data-look="new"] .ss-avatar.has-logo {
+	aspect-ratio: 1;
+	contain: size;
+	grid-template: minmax(0, 1fr) / minmax(0, 1fr);
+	padding: 3px;
+	background: #fff;
+	overflow: hidden;
+}
+.ss-avatar.has-logo img {
+	width: 100%;
+	height: 100%;
+	object-fit: contain;
+}
+
+/* ---------------------------------------------------------------- 2026-11-17 ListHead.vue (หัวรายการกลาง)
+   ตัวกรองของหน้าต่อจากช่องค้นหา (ชิดซ้าย) ไม่มีปุ่มตัวกรองรวม = ตกบรรทัดได้ ไม่ล็อกความสูงแถวเดียว */
+.ss-list-filterbar > .ss-list-filters {
+	justify-content: flex-start;
+}
+.ss-list-filterbar:not(.ss-list-filterbar--doc) > .ss-list-filters {
+	height: auto;
+}
+
+/* ---------------------------------------------------------------- 2026-11-17 รายการเอกสาร (DocList.vue, จอ ≥768): หัวรายการ + การ์ดเดียว
+   การ์ดต่อจากหัวรายการสูงถึงล่างจอพอดี (ข้อมูลมาก = เลื่อนในตาราง ดูกฎ ≥768 ด้านล่าง): ข้อมูลน้อย = พื้นที่ว่างในการ์ด (ท้ายตารางชิดล่าง), ไม่มีข้อมูล = Empty กลางการ์ด
+   จอ ≥1480 ตัวอย่างเอกสาร (DocPreview) เป็นช่องขวาของการ์ดเดียวกัน คั่นด้วยเส้น ไม่มีเงา ติดจอ (sticky) ตอนเลื่อน */
+.ss-app[data-look] .ss-stage > .ss-view:has(.ss-list-card) {
+	display: flex;
+	flex-direction: column;
+	min-height: calc(100dvh - var(--ss-head-h));
+	padding-bottom: var(--ss-bottom);
+}
+/* หน้า (.ss-view = root ของ DocList) → เนื้อหา → การ์ด ยืดเต็มความสูงที่เหลือ */
+.ss-content:has(> .ss-list-card) {
+	flex: 1;
+}
+.ss-content .ss-list-head:not(.ss-form-head):has(+ .ss-list-card) {
+	margin-bottom: calc(-1 * var(--ss-list-gap, 16px));
+	border-bottom: 0;
+	border-radius: var(--ss-radius-sm) var(--ss-radius-sm) 0 0;
+}
+.ss-app[data-look="new"] .ss-content .ss-list-head:not(.ss-form-head):has(+ .ss-list-card) {
+	border-radius: 22px 22px 0 0;
+}
+.ss-list-card {
+	flex: 1;
+	display: flex;
+	align-items: stretch;
+	min-height: 320px;
+	border: 1px solid var(--ss-border);
+	border-radius: 0 0 var(--ss-radius-sm) var(--ss-radius-sm);
+	background: var(--ss-surface);
+	/* clip ไม่ใช่ hidden: มุมโค้งตัดเนื้อหา แต่ตัวอย่างเอกสารยัง sticky ได้ */
+	overflow: clip;
+}
+.ss-app[data-look="new"] .ss-list-card {
+	border-color: var(--ss-work-line);
+	border-radius: 0 0 22px 22px;
+	background: var(--ss-work-card);
+}
+.ss-list-card > .ss-list-main {
+	flex: 1;
+	min-width: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 0;
+}
+.ss-content .ss-list-card .ss-list-main > .ss-table-wrap {
+	border: 0;
+	border-radius: 0;
+	box-shadow: none;
+}
+.ss-list-page .ss-list-card .ss-list-main > .ss-list-foot {
+	margin-top: auto;
+	border: 0;
+	border-top: 1px solid var(--ss-border);
+	border-radius: 0;
+	box-shadow: none;
+	background: transparent;
+}
+.ss-app[data-look="new"] .ss-list-page .ss-list-card .ss-list-main > .ss-list-foot {
+	border-top-color: var(--ss-work-line);
+}
+.ss-list-card > .ss-list-main > .ss-empty {
+	margin: auto;
+}
+/* ListCard (ตกลง 2026-11-18): ตาราง/รายการในการ์ดไม่มีกรอบของตัวเอง (การ์ดเป็นกรอบ) */
+.ss-content .ss-list-card .ss-list-main > .ss-data-table > .ss-table-wrap,
+.ss-content .ss-list-card .ss-list-main > .ss-list-scroll {
+	border: 0;
+	border-radius: 0;
+	box-shadow: none;
+	max-height: none;
+}
+.ss-list-card > .ss-list-main > .ss-data-table > .ss-list-foot,
+.ss-list-card > .ss-list-main > .ss-list-foot {
+	margin-top: auto;
+	border: 0;
+	border-top: 1px solid var(--ss-border);
+	border-radius: 0;
+	box-shadow: none;
+	background: transparent;
+}
+.ss-app[data-look="new"] .ss-list-card > .ss-list-main > .ss-data-table > .ss-list-foot,
+.ss-app[data-look="new"] .ss-list-card > .ss-list-main > .ss-list-foot {
+	border-top-color: var(--ss-work-line);
+}
+.ss-list-card > .ss-list-main > .ss-skeleton,
+.ss-list-card > .ss-list-main > .ss-card-grid {
+	padding: 14px;
+}
+.ss-list-card > .ss-list-main > .ss-list {
+	padding: 14px;
+}
+.ss-list-card > .ss-preview {
+	/* สัดส่วนตามการ์ด: ~38% ของความกว้าง (ไม่แคบกว่า 440 ไม่กว้างกว่า 680) ตารางได้ที่เหลือ */
+	flex: 0 0 clamp(440px, 38%, 680px);
+	/* สูงเท่าการ์ด (การ์ดสูงถึงล่างจอ) ตารางยาวกว่าจอ = สูงไม่เกินจอและติดจอตอนเลื่อน */
+	align-self: stretch;
+	position: sticky;
+	top: calc(84px + var(--ss-top));
+	max-height: calc(100dvh - 84px - var(--ss-top) - 16px - var(--ss-bottom));
+	margin: 0;
+	border-left: 1px solid var(--ss-border);
+	border-radius: 0;
+	background: transparent;
+	box-shadow: none;
+	animation: ss-fade-in 0.2s ease both;
+}
+.ss-app[data-look="new"] .ss-list-card > .ss-preview {
+	border-left-color: var(--ss-work-line);
+}
+/* จอ ≥768: การ์ดพอดีจอ (ตกลง 2026-11-17) หัวรายการ + หัวคอลัมน์ + ท้ายตาราง (แสดง/แถวต่อหน้า) อยู่ในจอเสมอ
+   เลื่อนเฉพาะแถวในตาราง (หัวคอลัมน์ th sticky top 0 ในกรอบตาราง) ตัวอย่างเอกสารเลื่อนในช่องตัวเอง
+   จอเตี้ยจนการ์ดเหลือน้อยกว่า 320px = หน้าเลื่อนตามปกติ */
+@media (min-width: 768px) {
+	.ss-app[data-look] .ss-stage > .ss-view:has(.ss-list-card) {
+		height: calc(100dvh - var(--ss-head-h));
+	}
+	.ss-content:has(> .ss-list-card) {
+		min-height: 0;
+	}
+	/* ListCard: DataTable / ตารางของหน้า (.ss-list-scroll) เลื่อนในการ์ด */
+	.ss-list-card > .ss-list-main > .ss-data-table {
+		flex: 1 1 auto;
+		min-height: 0;
+		display: flex;
+		flex-direction: column;
+	}
+	.ss-list-card > .ss-list-main > .ss-data-table > .ss-table-wrap,
+	.ss-list-card > .ss-list-main > .ss-list-scroll {
+		flex: 1 1 auto;
+		min-height: 0;
+		overflow: auto;
+	}
+	.ss-list-card > .ss-list-main {
+		min-height: 0;
+	}
+	.ss-list-card > .ss-list-main > .ss-table-wrap {
+		flex: 1 1 auto;
+		min-height: 0;
+		overflow: auto;
+	}
+	.ss-list-card > .ss-list-main > .ss-list {
+		flex: 1 1 auto;
+		min-height: 0;
+		overflow-y: auto;
+	}
+	.ss-list-card > .ss-preview {
+		position: static;
+		max-height: none;
+		min-height: 0;
+	}
+	/* หน้ารายการอื่น (KindList, ทะเบียน, สโตร์ ฯลฯ) = หัวรายการ + DataTable ท้ายหน้า: พอดีจอแบบเดียวกัน
+	   ตารางยืดถึงล่างจอ (ข้อมูลน้อย = ท้ายตารางชิดล่าง) ข้อมูลมาก = เลื่อนในตาราง */
+	.ss-app[data-look] .ss-stage > .ss-view:has(> .ss-content > .ss-list-head + .ss-data-table:last-child) {
+		display: flex;
+		flex-direction: column;
+		height: calc(100dvh - var(--ss-head-h));
+		padding-bottom: var(--ss-bottom);
+	}
+	.ss-content:has(> .ss-list-head + .ss-data-table:last-child) {
+		flex: 1;
+		min-height: 0;
+	}
+	.ss-content > .ss-list-head + .ss-data-table:last-child {
+		flex: 1 1 auto;
+		min-height: 240px;
+		display: flex;
+		flex-direction: column;
+	}
+	.ss-content > .ss-list-head + .ss-data-table:last-child > .ss-table-wrap {
+		flex: 1 1 auto;
+		min-height: 0;
+		overflow: auto;
+	}
+	/* Look-ahead (ตาราง ≥768): ตารางงาน × วันเลื่อนในกรอบตัวเอง หัวสัปดาห์ + หัววันค้างบนสุดของกรอบ
+	   สรุปจำนวนงานอยู่บน คำอธิบายสีอยู่ล่าง ในจอเสมอ (ตกลง 2026-11-17) */
+	.ss-app[data-look] .ss-stage > .ss-view:has(> .ss-content > .ss-la-table),
+	.ss-app[data-look] .ss-stage > .ss-view:has(> .ss-content > .ss-split--calendar) {
+		display: flex;
+		flex-direction: column;
+		height: calc(100dvh - var(--ss-head-h));
+		padding-bottom: var(--ss-bottom);
+	}
+	.ss-content:has(> .ss-la-table),
+	.ss-content:has(> .ss-split--calendar) {
+		flex: 1;
+		min-height: 0;
+	}
+	.ss-content > .ss-la-table {
+		flex: 1 1 auto;
+		min-height: 240px;
+		overflow: auto;
+	}
+	.ss-content > .ss-la-table > .ss-la-weeks,
+	.ss-content > .ss-la-table > .ss-la-thead {
+		position: sticky;
+		z-index: 3;
+		background: var(--ss-surface);
+	}
+	.ss-content > .ss-la-table > .ss-la-weeks {
+		top: 0;
+		height: 28px;
+	}
+	.ss-content > .ss-la-table > .ss-la-thead {
+		top: 28px;
+	}
+	.ss-app[data-look="new"] .ss-content > .ss-la-table > .ss-la-weeks,
+	.ss-app[data-look="new"] .ss-content > .ss-la-table > .ss-la-thead {
+		background: var(--ss-work-card, var(--ss-surface));
+	}
+}
+/* ปฏิทินรายงาน (ควบคุมงาน, ≥900 ปฏิทินซ้าย + เอกสารของวันขวา): ช่องวันยืด/หดให้ทั้งเดือนพอดีจอ
+   เอกสารของวันที่เลือกเลื่อนในแผงขวา จอเตี้ยมาก = ช่องวันไม่ต่ำกว่า 40px แล้วหน้าเลื่อนตามปกติ (ตกลง 2026-11-17) */
+@media (min-width: 900px) {
+	.ss-content > .ss-split--calendar {
+		flex: 1 1 auto;
+		min-height: 0;
+		align-items: stretch;
+	}
+	.ss-split--calendar > .ss-split-main {
+		display: flex;
+		flex-direction: column;
+		min-height: 0;
+	}
+	.ss-split--calendar > .ss-split-main > .ss-cal {
+		flex: 1 1 auto;
+		min-height: 0;
+	}
+	.ss-split--calendar .ss-cal-grid {
+		flex: 1 1 auto;
+		min-height: 0;
+		grid-template-rows: auto;
+		grid-auto-rows: minmax(40px, 1fr);
+	}
+	.ss-split--calendar .ss-cal-day {
+		min-height: 0;
+	}
+	.ss-split--calendar > .ss-split-side {
+		position: static;
+		max-height: none;
+		min-height: 0;
+		overflow-y: auto;
+	}
+}
+@keyframes ss-fade-in {
+	from {
+		opacity: 0;
+	}
+}
+/* หัวตัวอย่างเอกสาร = แถบหัวคอลัมน์ของตาราง (สี/ความสูงเดียวกัน) อ่านเป็นแถวเดียวกันทั้งการ์ด */
+.ss-list-card > .ss-preview > .ss-preview-head {
+	height: var(--ss-list-card-th, 39px);
+	padding: 0 8px 0 16px;
+	background: var(--ss-th-bg);
+	border-bottom-color: var(--ss-th-line, var(--ss-border));
+}
+
+
+/* ---------------------------------------------------------------- 2026-11-17 หัวฟอร์มกลาง (FormHead.vue)
+   ใช้การ์ด/แท็บ/ปุ่มชุดเดียวกับหัวรายการ (.ss-list-head) ปุ่มตามขั้นตอนขวาสุด เมนู ⋯ คำสั่งอื่น
+   มือถือ: ปุ่มอยู่แถบล่าง (.ss-form-bar) หัวเหลือแท็บ ไม่มีแท็บ = ไม่แสดงหัว
+   หัวฟอร์มเป็นแถบแยก เว้นห่างจากการ์ดด้านล่างตามระยะของหน้าเสมอ ไม่ต่อกับตาราง/การ์ด (ตกลง 2026-11-17)
+   กฎ "ต่อกับตาราง" ของหัวรายการจึงใส่ :not(.ss-form-head) ไว้ */
+.ss-form-head.is-empty {
+	display: none;
+}
+.ss-form-head .ss-list-tools {
+	margin-left: auto;
+}
+.ss-form-more.is-on {
+	background: color-mix(in srgb, var(--ss-text) 9%, transparent);
+}
+.ss-form-bar .ss-form-more {
+	flex: 0 0 auto;
+	padding-inline: 12px;
+}
+.ss-form-bar .ss-docview-print + .ss-form-more {
+	margin-right: auto;
+}
+.ss-form-bar .ss-docview-print:has(+ .ss-form-more) {
+	margin-right: 0;
+}
+.ss-form-bar > .ss-btn--lg:not(.ss-docview-print):not(.ss-form-more) {
+	white-space: nowrap;
+}
+.ss-menu-item.is-danger,
+.ss-menu-item.is-danger > svg {
+	color: var(--ss-danger, #d24f57);
+}
+/* มือถือ: เว้นท้ายหน้าให้เนื้อหาไม่จมใต้แถบปุ่มของหัวฟอร์ม */
+@media (max-width: 767px) {
+	.ss-view:has(.ss-form-head) {
+		padding-bottom: calc(74px + var(--ss-bottom));
+	}
+}
+
+/* ---------------------------------------------------------------- 2026-11-17 โครงแอป: แถบบนเต็มแถว → ใต้แถบบน Dock | เนื้อหา | แผงขวา
+   แผงขวาของหน้าดูเอกสาร (.ss-rside) อยู่ใต้แถบบนเหมือน Dock (เดิมสูงเต็มจอทับปลายแถบบน) จอ ≥1480 ที่กางค้างดันเนื้อหาเท่าแผง + ระยะขอบ */
+@media (min-width: 768px) {
+	.ss-app[data-look="new"] .ss-rside {
+		top: calc(var(--ss-head-h) + 12px);
+		right: 12px;
+		bottom: 12px;
+		border: 1px solid var(--ss-work-line);
+		border-radius: 28px;
+		background: var(--ss-work-card);
+		overflow: hidden;
+	}
+}
+@media (min-width: 1480px) {
+	html[data-rside] .ss-app[data-look="new"] {
+		--ss-rside: 392px;
+	}
+}
+/* หน้าพอดีจอ (รายการ, Look-ahead, ปฏิทิน): ขอบบน-ล่างของการ์ดตรงกับ Dock (ห่างแถบบน 12px, ห่างล่างจอ 12px) */
+@media (min-width: 768px) {
+	.ss-app[data-look="new"] .ss-stage > .ss-view:is(
+			:has(.ss-list-card),
+			:has(> .ss-content > .ss-list-head + .ss-data-table:last-child),
+			:has(> .ss-content > .ss-la-table),
+			:has(> .ss-content > .ss-split--calendar)
+		) > .ss-content {
+		padding-bottom: 12px;
+	}
+}
+/* หน้าแผนงาน (PlanEdit): กรอบเดียวกับหน้ารายการ บน 12px ใต้แถบบน ล่าง 12px เท่า Dock ห่าง Dock 16px (เนื้อหาอื่น padding-left 4px) */
+@media (min-width: 768px) {
+	.ss-app[data-look="new"] .ss-planner > .pl-ribbon {
+		margin: 12px 12px 0 4px;
+	}
+	.ss-app[data-look="new"] .ss-planner > .pl-main {
+		margin: 0 12px 0 4px;
+	}
+	.ss-app[data-look="new"] .ss-planner > .pl-statusbar {
+		margin: 0 12px 12px 4px;
+	}
+}
+
+/* ---------------------------------------------------------------- 2026-11-18 สัญญาจ้าง: เนื้อหา + ตัวอย่าง real-time (shared/components/contract/)
+   HrDocPage จอ ≥1180 = ฟอร์มซ้าย + ตัวอย่างขวา (sticky สูงเท่าจอ) จอเล็ก = เมนู ⋯ > ดูตัวอย่างสัญญา (Sheet เต็มจอ) */
+.ec-split {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) minmax(420px, 46%);
+	gap: 14px;
+	align-items: start;
+}
+.ec-split-main {
+	display: flex;
+	flex-direction: column;
+	gap: 14px;
+	min-width: 0;
+}
+.ec-split-side {
+	position: sticky;
+	top: calc(var(--ss-head-h, 64px) + 8px);
+	height: calc(100dvh - var(--ss-head-h, 64px) - 24px);
+	min-height: 420px;
+}
+.ec-preview {
+	position: relative;
+	height: 100%;
+	min-height: 360px;
+	overflow: hidden;
+	border: 1px solid var(--ss-work-line, var(--ss-border));
+	border-radius: 16px;
+	background: #e9ebef;
+}
+.ec-preview iframe {
+	display: block;
+	width: 100%;
+	height: 100%;
+	border: 0;
+	background: #e9ebef;
+	color-scheme: light;
+}
+.ec-preview-busy {
+	position: absolute;
+	top: 10px;
+	right: 12px;
+}
+.ec-preview-error {
+	position: absolute;
+	inset: auto 12px 12px;
+	margin: 0;
+	padding: 8px 12px;
+	border-radius: 10px;
+	color: #9f1239;
+	background: #ffe4e6;
+	font-size: var(--ss-fs-sm);
+}
+.ss-sheet-body > .ec-preview--sheet {
+	flex: 1;
+	min-height: 70dvh;
+}
+.ec-terms-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 10px;
+}
+.ec-terms-note {
+	margin: 0;
+	font-size: var(--ss-fs-sm);
+}
+.ec-insert {
+	display: inline-flex !important;
+	align-items: center;
+	width: auto !important;
+	gap: 4px;
+	padding: 0 10px !important;
+	margin-left: auto;
+	font-size: var(--ss-fs-sm);
+	font-weight: 600;
+}
+.ec-editor .ss-rich-area {
+	min-height: 360px;
+	max-height: 70dvh;
+	overflow-y: auto;
+}
+/* เยื้องแบบ Quill (ข้อย่อยของสัญญา) ในช่องแก้: ค่าเริ่มต้น = ย่อหน้าบรรทัดแรก (หลักเอกสารไทย) ตรงกับ indent_css ใน contract_terms.py
+   ช่องแก้สัญญาแสดงตามรูปแบบที่เลือก (.ec-editor--block / --hanging) ระดับละ 2em ในช่อง (ไม่ใช่ ซม. จริง) */
+.ss-rich .ql-indent-1 { text-indent: 2em; }
+.ss-rich .ql-indent-2 { text-indent: 4em; }
+.ss-rich .ql-indent-3 { text-indent: 6em; }
+.ec-editor--block .ss-rich [class*="ql-indent-"] { text-indent: 0; }
+.ec-editor--block .ss-rich .ql-indent-1 { padding-left: 2em; }
+.ec-editor--block .ss-rich .ql-indent-2 { padding-left: 4em; }
+.ec-editor--block .ss-rich .ql-indent-3 { padding-left: 6em; }
+.ec-editor--hanging .ss-rich [class*="ql-indent-"] { text-indent: -2.2em; }
+.ec-editor--hanging .ss-rich .ql-indent-1 { padding-left: 4.2em; }
+.ec-editor--hanging .ss-rich .ql-indent-2 { padding-left: 6.2em; }
+.ec-editor--hanging .ss-rich .ql-indent-3 { padding-left: 8.2em; }
+.ss-rich .ql-align-center { text-align: center; }
+.ss-rich .ql-align-right { text-align: right; }
+@media (max-width: 1179px) {
+	.ec-split { display: block; }
+}
+.ec-terms-head .ss-link {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	white-space: nowrap;
+}
+
+/* ---------------------------------------------------------------- 2026-11-18 หน้าเอกสารซื้อ-ขายแบบการ์ด (DocView ดู / DocForm แก้)
+   .ss-doc-frame = แท็บหัวฟอร์ม + การ์ดเนื้อหา (.ss-doc-sheet) ต่อกันเป็นชิ้นเดียว (ยกเว้นกติกา "หัวฟอร์มแยกจากการ์ด" ของหน้าอื่น)
+   ในการ์ด: แถบขั้นตอนเล็ก → [ข้อมูลเอกสาร | รายละเอียดการจัดซื้อ/ขาย] → รายการ (ปุ่มใต้ตาราง) → [ตัวเลือก+หมายเหตุ | สรุปยอด]
+   หน้าดู = ข้อความล้วน, หน้าแก้ = เฉพาะช่องที่แก้ได้เป็นช่องกรอก เลขที่ + สถานะอยู่แถบบน
+   ติดบนจอเฉพาะแถวแท็บ (จอ ≥768) เนื้อหาที่เลื่อนขึ้นไม่โผล่เหนือแถวแท็บ ไม่มีแถบปุ่มด้านล่าง */
+.ss-doc-frame {
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+}
+.ss-content .ss-doc-stick > .ss-form-head {
+	border-bottom-left-radius: 0;
+	border-bottom-right-radius: 0;
+}
+.ss-app[data-look="new"] .ss-content .ss-doc-stick > .ss-form-head {
+	border-radius: 22px 22px 0 0;
+}
+/* แถวแท็บทึบ (หัวรายการปกติโปร่ง + เบลอ) พื้นกั้นด้านหลังจึงไม่โผล่ผ่าน */
+.ss-content .ss-doc-stick > .ss-form-head {
+	background: var(--ss-work-card, var(--ss-surface));
+	backdrop-filter: none;
+	-webkit-backdrop-filter: none;
+}
+@media (min-width: 768px) {
+	.ss-doc-frame > .ss-doc-stick {
+		position: sticky;
+		top: calc(var(--ss-head-h, 64px) + 6px);
+		z-index: 6;
+		background: var(--ss-work-canvas, var(--ss-bg));
+	}
+	/* พื้นหน้ากั้นเหนือแถวแท็บถึงแถบบน: เนื้อหาที่เลื่อนขึ้นหายใต้แถวแท็บ ไม่โผล่ในช่องว่าง (แถบบน z-index สูงกว่า) */
+	.ss-doc-frame > .ss-doc-stick::before {
+		content: "";
+		position: absolute;
+		left: -2px;
+		right: -2px;
+		bottom: 100%;
+		height: calc(var(--ss-head-h, 64px) + 8px);
+		background: inherit;
+		pointer-events: none;
+	}
+}
+.ss-doc-sheet {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+	min-width: 0;
+	padding: 12px 16px 16px;
+	border: 1px solid var(--ss-work-line, var(--ss-border));
+	border-top: 0;
+	border-radius: 0 0 22px 22px;
+	background: var(--ss-work-card, var(--ss-surface));
+}
+.ss-doc-sheet > .ss-docform-body {
+	min-width: 0;
+}
+.ss-doc-sheet .ss-docform-main {
+	gap: 12px;
+}
+
+/* แถบขั้นตอนขนาดเล็ก (MiniSteps.vue) บนสุดของการ์ดเนื้อหา */
+.ss-mini-steps {
+	display: flex;
+	align-items: center;
+	width: min(100%, 760px);
+	margin: 0 auto;
+	padding: 2px 0;
+	list-style: none;
+	overflow-x: auto;
+	scrollbar-width: none;
+}
+.ss-mini-steps::-webkit-scrollbar {
+	display: none;
+}
+.ss-mini-steps li {
+	flex: 1 1 0;
+	min-width: max-content;
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	font-size: var(--ss-fs-sm);
+	color: var(--ss-muted);
+	white-space: nowrap;
+}
+.ss-mini-steps li:not(:last-child)::after {
+	content: "";
+	flex: 1 1 auto;
+	min-width: 16px;
+	height: 2px;
+	margin: 0 8px 0 2px;
+	border-radius: 2px;
+	background: var(--ss-work-line, var(--ss-border));
+}
+.ss-mini-steps li.is-done:not(:last-child)::after {
+	background: var(--ss-brand);
+}
+.ss-mini-steps li:last-child {
+	flex: 0 0 auto;
+}
+.ss-mini-step-dot {
+	flex: 0 0 auto;
+	display: grid;
+	place-items: center;
+	width: 20px;
+	height: 20px;
+	border-radius: 50%;
+	border: 1.5px solid var(--ss-border-strong, #cfd4dc);
+	background: var(--ss-work-card, var(--ss-surface));
+	font-size: var(--ss-fs-sm);
+	font-weight: 700;
+	line-height: 1;
+	color: var(--ss-muted);
+}
+.ss-mini-steps li:is(.is-done, .is-current) .ss-mini-step-dot {
+	border-color: var(--ss-brand);
+	background: var(--ss-brand);
+	color: #fff;
+}
+.ss-mini-steps li.is-current .ss-mini-step-dot {
+	box-shadow: 0 0 0 3px color-mix(in srgb, var(--ss-brand) 16%, transparent);
+}
+.ss-mini-steps li.is-error .ss-mini-step-dot {
+	border-color: var(--ss-danger, #d24f57);
+	background: var(--ss-danger, #d24f57);
+	color: #fff;
+}
+.ss-mini-steps li:is(.is-done, .is-current) .ss-mini-step-label {
+	color: var(--ss-text);
+	font-weight: 600;
+}
+.ss-mini-steps li.is-current .ss-mini-step-label {
+	font-weight: 700;
+}
+.ss-mini-steps small {
+	color: var(--ss-muted);
+	font-size: var(--ss-fs-sm);
+}
+
+/* แถบบน: เลขที่เอกสาร + ป้ายสถานะต่อจากชื่อหน้า */
+html[data-look="new"] .ss-topbar-sub {
+	flex: 0 1 auto;
+	color: var(--ss-muted);
+	font-weight: 600;
+	font-variant-numeric: tabular-nums;
+}
+.ss-topbar-title > .ss-tag {
+	align-self: center;
+	flex: 0 0 auto;
+}
+@media (max-width: 767px) {
+	html[data-look="new"] .ss-topbar-title > .ss-topbar-sub {
+		display: none;
+	}
+}
+
+/* กล่องย่อยในการ์ดเนื้อหา */
+.ss-doc-cards {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr));
+	gap: 12px;
+}
+.ss-doc-card {
+	min-width: 0;
+	padding: 12px 16px 14px;
+	border: 1px solid var(--ss-work-line, var(--ss-border));
+	border-radius: 14px;
+	background: var(--ss-work-card, var(--ss-surface));
+}
+.ss-doc-card-title {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin: 0 0 10px;
+	font-size: var(--ss-fs-title);
+	font-weight: 700;
+	color: var(--ss-text);
+}
+.ss-doc-card-title > .ss-icon {
+	color: var(--ss-brand);
+}
+
+/* ช่องข้อมูล 2 คอลัมน์ (ช่องยาว = เต็มแถว) ระยะบน-ล่างกระชับ */
+.ss-doc-fields {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 8px 16px;
+	margin: 0;
+}
+.ss-doc-fields > .is-wide {
+	grid-column: 1 / -1;
+}
+@media (max-width: 520px) {
+	.ss-doc-fields {
+		grid-template-columns: minmax(0, 1fr);
+	}
+}
+.ss-doc-fields > div > dt,
+.ss-doc-fields .ss-field-label {
+	margin: 0 0 2px;
+	font-size: var(--ss-fs-sm);
+	font-weight: 500;
+	line-height: 1.4;
+	color: var(--ss-muted);
+}
+.ss-doc-fields > div > dd {
+	margin: 0;
+	font-size: var(--ss-fs);
+	font-weight: 600;
+	line-height: 1.5;
+	color: var(--ss-text);
+	overflow-wrap: anywhere;
+}
+.ss-doc-fields dd small,
+.ss-doc-value small {
+	font-weight: 500;
+	color: var(--ss-muted);
+}
+.ss-doc-fields dd.is-empty,
+.ss-doc-value.is-empty {
+	color: var(--ss-muted);
+	font-weight: 500;
+}
+.ss-doc-fields dd.is-due {
+	color: var(--ss-danger, #d24f57);
+}
+.ss-doc-person {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+}
+.ss-doc-person > .ss-icon {
+	color: var(--ss-muted);
+}
+/* หน้าแก้: ช่องกรอกสูง 28px (จอ ≥768 ทั้งเมาส์และสัมผัส, ผู้ใช้เลือก 2026-11-18) มือถือ 36px มีกรอบ */
+.ss-doc-fields.is-edit {
+	--ss-doc-input-h: 36px;
+	align-items: end;
+}
+@media (min-width: 768px) {
+	.ss-doc-fields.is-edit {
+		--ss-doc-input-h: 28px;
+	}
+}
+.ss-doc-fields.is-edit > .ss-field,
+.ss-doc-fields.is-edit > .ss-picker-wrap,
+.ss-doc-fields.is-edit > .ss-picker-wrap > .ss-field {
+	min-width: 0;
+	margin: 0;
+	gap: 0;
+}
+.ss-doc-fields.is-edit :is(.ss-input, .ss-select--field, .ss-picker-value) {
+	min-height: var(--ss-doc-input-h);
+	height: var(--ss-doc-input-h);
+	padding-top: 0;
+	padding-bottom: 0;
+	border: 1px solid var(--ss-border-strong, #d5d9e0);
+	border-radius: 9px;
+	background: var(--ss-work-card, var(--ss-surface));
+}
+.ss-doc-fields.is-edit .ss-picker-value {
+	display: flex;
+	align-items: center;
+}
+.ss-doc-fields.is-edit :is(.ss-input, .ss-select--field, .ss-picker-value):focus-within,
+.ss-doc-fields.is-edit .ss-input:focus {
+	border-color: var(--ss-brand);
+}
+.ss-doc-value {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	height: var(--ss-doc-input-h, 28px);
+	padding: 0 12px;
+	border-radius: 9px;
+	background: var(--ss-surface-2);
+	font-weight: 600;
+	color: var(--ss-text);
+	overflow: hidden;
+	white-space: nowrap;
+	text-overflow: ellipsis;
+}
+
+/* รายการ: ตารางเต็มกว้างกล่อง หัวตารางเทาอ่อน ตัวหนาสีเข้ม (แบบตัวอย่าง) */
+.ss-doc-card--items {
+	padding: 12px 0 0;
+}
+.ss-doc-card--items > .ss-doc-card-title {
+	padding: 0 16px;
+}
+.ss-doc-card--items > :is(.ss-empty, .ss-doc-lines, div:not([class])) {
+	padding: 0 12px;
+}
+.ss-doc-table-wrap,
+.ss-doc-card--items .ss-grid-wrap {
+	border-radius: 0;
+	background: transparent;
+	box-shadow: none;
+	overflow-x: auto;
+}
+.ss-doc-card--items :is(.ss-doc-table, .ss-grid) {
+	width: 100%;
+}
+/* แท็บเล็ต: ตารางแก้กว้างอย่างน้อยเท่านี้ เลื่อนซ้าย-ขวาแทนการเปลี่ยนเป็นการ์ด */
+.ss-doc-card--items .ss-grid {
+	min-width: 1000px;
+}
+.ss-doc-card--items .ss-grid .c-idx { width: 40px; }
+.ss-doc-card--items .ss-grid .c-qty { width: 96px; }
+.ss-doc-card--items .ss-grid .c-uom { width: 112px; }
+.ss-doc-card--items .ss-grid .c-rate { width: 120px; }
+.ss-doc-card--items .ss-grid .c-amount { width: 124px; }
+.ss-doc-card--items .ss-grid .c-date { width: 144px; }
+.ss-doc-card--items .ss-grid .c-tools { width: 72px; }
+.ss-doc-card--items :is(.ss-doc-table, .ss-grid) thead th {
+	padding-top: 10px;
+	padding-bottom: 10px;
+	background: var(--ss-surface-2, #f1f3f6);
+	border-top: 1px solid var(--ss-work-line, var(--ss-border));
+	border-bottom: 1px solid var(--ss-work-line, var(--ss-border));
+	font-size: var(--ss-fs);
+	font-weight: 700;
+	color: var(--ss-text);
+}
+.ss-doc-card--items :is(.ss-doc-table, .ss-grid) tbody td {
+	border-bottom: 1px solid var(--ss-work-line, var(--ss-border));
+	vertical-align: middle;
+}
+.ss-doc-card--items .ss-doc-table :is(th, td):first-child {
+	padding-left: 16px;
+}
+.ss-doc-card--items .ss-doc-table :is(th, td):last-child {
+	padding-right: 16px;
+}
+.ss-doc-card--items .ss-doc-table tbody td {
+	padding-top: 8px;
+	padding-bottom: 8px;
+}
+.ss-doc-card--items .ss-grid tbody td {
+	padding-top: 6px;
+	padding-bottom: 6px;
+}
+.ss-doc-card--items :is(.ss-doc-table, .ss-grid) .is-item b {
+	font-weight: 600;
+}
+/* ช่องกรอกในตาราง: มีกรอบเสมอ */
+.ss-doc-card--items .ss-grid :is(.ss-cell, .ss-select--cell) {
+	height: 28px;
+	min-height: 28px;
+	border: 1px solid var(--ss-border-strong, #d5d9e0);
+	border-radius: 8px;
+	background: var(--ss-work-card, var(--ss-surface));
+}
+.ss-doc-card--items .ss-grid .ss-cell:focus {
+	border-color: var(--ss-brand);
+}
+.ss-typeahead-list.ss-typeahead-list--fixed {
+	position: fixed;
+	z-index: 60;
+}
+/* ใต้ตาราง: ปุ่มของรายการ ชิดขวา */
+.ss-doc-items-foot {
+	display: flex;
+	align-items: center;
+	justify-content: flex-start;
+	flex-wrap: wrap;
+	gap: 8px;
+	padding: 10px 12px 12px;
+}
+.ss-doc-items-btn {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+}
+/* มือถือ: แถวรายการในกล่อง (ไม่ซ้อนการ์ด) ช่องกรอกมีกรอบแบบเดียวกับตาราง */
+.ss-doc-lines {
+	display: flex;
+	flex-direction: column;
+}
+.ss-doc-line {
+	display: flex;
+	flex-direction: column;
+	align-items: stretch;
+	gap: 3px;
+	padding: 10px 4px;
+	text-align: left;
+	border-top: 1px solid var(--ss-work-line, var(--ss-border));
+}
+.ss-doc-line > .ss-doc-row {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: 12px;
+}
+.ss-doc-line .ss-doc-title {
+	flex: 1;
+	min-width: 0;
+	font-weight: 600;
+}
+.ss-doc-card--items .ss-lines {
+	gap: 0;
+}
+.ss-doc-card--items .ss-lines > .ss-line {
+	padding: 10px 4px;
+	border: 0;
+	border-top: 1px solid var(--ss-work-line, var(--ss-border));
+	border-radius: 0;
+	background: none;
+	box-shadow: none;
+}
+.ss-doc-card--items .ss-lines :is(.ss-input, .ss-select--field) {
+	min-height: 36px;
+	height: 36px;
+	padding-top: 0;
+	padding-bottom: 0;
+	border: 1px solid var(--ss-border-strong, #d5d9e0);
+	border-radius: 9px;
+	background: var(--ss-work-card, var(--ss-surface));
+}
+
+/* ท้ายเอกสาร */
+.ss-doc-foot {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) minmax(300px, 400px);
+	gap: 12px 20px;
+	align-items: start;
+}
+@media (max-width: 899px) {
+	.ss-doc-foot {
+		grid-template-columns: minmax(0, 1fr);
+	}
+}
+.ss-doc-notes {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+	min-width: 0;
+	padding-top: 2px;
+}
+.ss-doc-notes .ss-dv-flags {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px 24px;
+}
+.ss-doc-remarks {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+}
+.ss-doc-remarks-label {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	font-weight: 700;
+	color: var(--ss-text);
+}
+.ss-doc-remarks-label > .ss-icon {
+	color: var(--ss-brand);
+}
+.ss-doc-remarks .ss-text-block {
+	padding: 0;
+	border: 0;
+	background: none;
+	box-shadow: none;
+	white-space: pre-wrap;
+}
+.ss-doc-remarks .ss-text-block.is-empty {
+	color: var(--ss-muted);
+}
+.ss-doc-textarea {
+	position: relative;
+	display: block;
+}
+.ss-doc-textarea .ss-input {
+	min-height: 72px;
+	padding-bottom: 20px;
+	border: 1px solid var(--ss-border-strong, #d5d9e0);
+	border-radius: 9px;
+	background: var(--ss-work-card, var(--ss-surface));
+	resize: vertical;
+}
+.ss-doc-textarea .ss-input:focus {
+	border-color: var(--ss-brand);
+}
+.ss-doc-textarea small {
+	position: absolute;
+	right: 12px;
+	bottom: 5px;
+	font-size: var(--ss-fs-sm);
+	color: var(--ss-muted);
+	pointer-events: none;
+}
+.ss-doc-totals {
+	display: flex;
+	gap: 12px;
+	padding: 12px 16px;
+	border: 1px solid var(--ss-work-line, var(--ss-border));
+	border-radius: 14px;
+	background: var(--ss-work-card, var(--ss-surface));
+}
+.ss-doc-totals-icon {
+	flex: 0 0 auto;
+	color: var(--ss-brand);
+	padding-top: 2px;
+}
+.ss-doc-totals > .ss-totals {
+	flex: 1;
+	min-width: 0;
+	gap: 6px;
+	padding: 0;
+	border-radius: 0;
+	background: none;
+	box-shadow: none;
+}
+/* ป้ายเยื้องเข้าขวา ตัวเลขเยื้องเข้าซ้าย ตรงกับแถวรวมเป็นเงิน (ผู้ใช้ขอ 2026-11-18) */
+.ss-doc-totals > .ss-totals > div:not(.ss-totals-words) {
+	padding-left: 12px;
+	padding-right: 12px;
+}
+.ss-doc-totals > .ss-totals > div:not(.is-grand):not(.ss-totals-words) {
+	padding-bottom: 6px;
+	border-bottom: 1px solid var(--ss-work-line, var(--ss-border));
+}
+.ss-doc-totals > .ss-totals .is-grand {
+	align-items: center;
+	padding: 8px 12px;
+	border-top: 0;
+	border-radius: 9px;
+	background: var(--ss-accent-soft, #fef3d7);
+	font-size: var(--ss-fs-title);
+}
+.ss-doc-totals > .ss-totals .is-grand b {
+	font-size: var(--ss-fs-lg);
+	color: var(--ss-text);
+}
+.ss-doc-totals .ss-totals-words {
+	padding-right: 12px;
+	justify-content: flex-end;
+	text-align: right;
+	font-size: var(--ss-fs-sm);
+	color: var(--ss-muted);
+}
+
+/* ปุ่มทุกปุ่มในหน้าเอกสาร (แถวแท็บ + ใต้ตาราง) สูง 28px ทุกจอ ≥768 (ผู้ใช้เลือก 2026-11-18) */
+@media (min-width: 768px) {
+	.ss-doc-frame :is(.ss-btn:not(.ss-btn--lg):not(.ss-btn--block), .ss-list-create) {
+		height: 28px;
+		min-height: 28px;
+		padding: 0 12px;
+		border-radius: 999px;
+		font-size: var(--ss-fs-sm);
+	}
+	.ss-doc-frame .ss-form-head .ss-icon-btn {
+		width: 28px;
+		height: 28px;
+	}
+	.ss-doc-frame .ss-ie-form > :is(.ss-input, .ss-date) {
+		min-height: 28px;
+		height: 28px;
+		padding-top: 0;
+		padding-bottom: 0;
+	}
+	.ss-doc-frame .ss-ie-actions .ss-icon-btn {
+		width: 28px;
+		height: 28px;
+	}
+}
+.ss-doc-items-btn[disabled] {
+	opacity: 0.45;
+}
+
+/* ช่องเลือกแบบพิมพ์ค้นหา (ComboBox.vue) */
+.ss-combo {
+	min-width: 0;
+}
+.ss-combo-box {
+	position: relative;
+	display: block;
+}
+.ss-combo-input {
+	width: 100%;
+	padding-right: 52px;
+	text-overflow: ellipsis;
+	cursor: text;
+}
+.ss-combo-caret {
+	position: absolute;
+	right: 10px;
+	top: 50%;
+	transform: translateY(-50%);
+	color: var(--ss-muted);
+	pointer-events: none;
+	transition: transform 0.15s ease;
+}
+.ss-combo.is-open .ss-combo-caret {
+	transform: translateY(-50%) rotate(180deg);
+}
+.ss-combo-clear {
+	position: absolute;
+	right: 30px;
+	top: 50%;
+	transform: translateY(-50%);
+	display: grid;
+	place-items: center;
+	width: 20px;
+	height: 20px;
+	border-radius: 50%;
+	color: var(--ss-muted);
+}
+.ss-combo-clear:hover {
+	color: var(--ss-text);
+	background: var(--ss-surface-2);
+}
+.ss-combo-list li {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+}
+.ss-combo-list li > span {
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+}
+.ss-combo-list li.is-chosen b {
+	color: var(--ss-brand);
+}
+.ss-combo-list li > .ss-icon {
+	flex: none;
+	color: var(--ss-brand);
+}
+/* ผลค้นหาสินค้าที่ไม่ตรงทุกคำ (ค้นแบบเผื่อพิมพ์ผิด) */
+.ss-fuzzy {
+	margin-left: 6px;
+	padding: 0 6px;
+	border-radius: 99px;
+	background: var(--ss-accent-soft, #fef3d7);
+	color: var(--ss-text-2, var(--ss-text));
+	font-style: normal;
+	font-size: var(--ss-fs-sm);
+}
+
+/* ตัวเลือกของเอกสารในแถบหน้าตัวอย่าง (HtmlViewer slot tools) เช่น ฉบับที่พิมพ์ ต้นฉบับ/สำเนา */
+.ss-pdf-tools {
+	display: flex;
+	align-items: center;
+	gap: 14px;
+	margin-right: 10px;
+}
+.ss-pdf-check {
+	white-space: nowrap;
+	font-size: var(--ss-fs);
+}
+@media (max-width: 560px) {
+	.ss-pdf-tools {
+		gap: 8px;
+		margin-right: 4px;
 	}
 }

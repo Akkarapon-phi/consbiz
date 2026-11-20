@@ -1,5 +1,5 @@
 <!-- ตารางเอกสารจัดซื้อ/ขาย (แท็บเล็ต/จอใหญ่) มือถือใช้การ์ด (DocCard.vue)
-     คอลัมน์ตามชนิดเอกสาร (COLUMNS) ท้ายตาราง: ผู้รับมอบหมาย / แก้ไขล่าสุด / ถูกใจ แบบรายการของระบบเต็ม
+     คอลัมน์ตามชนิดเอกสาร (COLUMNS) ท้ายตาราง: ผู้รับมอบหมาย / แก้ไขล่าสุด / ความคิดเห็น / ถูกใจ
      หัวคอลัมน์กดเรียงได้ (emit sort) ช่องเลือกหลายแถว (toggle / toggle-all)
      สถานะอยู่ใต้เลขที่ทุกขนาด, แท็บเล็ต (<1180): ซ่อน .col-wide -->
 <template>
@@ -17,8 +17,8 @@
 							@change="$emit('toggle-all')"
 						/>
 					</th>
-					<th v-for="c in columns" :key="c.key" :class="c.class" :aria-sort="aria_sort(c)">
-						<button v-if="c.sort" type="button" class="ss-th-sort" @click="$emit('sort', c.sort)">
+					<th v-for="c in list_columns" :key="c.key" :class="c.class" :aria-sort="aria_sort(c)">
+						<button v-if="c.sort" type="button" class="ss-th-sort" :aria-label="c.aria_label" @click="$emit('sort', c.sort)">
 							{{ c.label }}
 							<Icon
 								:name="
@@ -48,8 +48,7 @@
 					}"
 					:style="{ '--i': Math.min(i, 20) }"
 					tabindex="0"
-					@click="preview ? $emit('select', row) : open(row)"
-					@dblclick="open(row)"
+					@click="click_row(row)"
 					@keydown.enter="open(row)"
 					@keydown.down.prevent="step($event, 1)"
 					@keydown.up.prevent="step($event, -1)"
@@ -127,22 +126,8 @@
 								>+{{ row.assigned.length - 2 }}</span
 							>
 						</span>
-						<span v-else-if="c.key === 'modified'" :title="row.modified">{{
-							time_ago(row.modified)
-						}}</span>
-						<button
-							v-else-if="c.key === 'like'"
-							type="button"
-							class="ss-like"
-							:class="{ 'is-on': row.liked }"
-							:aria-pressed="row.liked"
-							:aria-label="row.liked ? 'เลิกถูกใจ' : 'ถูกใจ'"
-							:title="row.likes ? `ถูกใจ ${row.likes} คน` : 'ถูกใจ'"
-							@click.stop="like(row)"
-						>
-							<Icon name="heart" :size="16" :stroke="2.2" />
-						</button>
 					</td>
+					<ModifiedCell :value="row.modified" :row="row" />
 				</tr>
 			</tbody>
 		</table>
@@ -152,9 +137,10 @@
 <script setup>
 import { computed } from "vue";
 import Icon from "../components/Icon.vue";
+import ModifiedCell from "../components/ModifiedCell.vue";
 import { app } from "../app.js";
-import { DOC_KINDS } from "./kinds.js";
-import { go, initials, money, post, show_error, thai_date, time_ago, tone } from "../api.js";
+import { DOC_KINDS, go_doc } from "./kinds.js";
+import { initials, money, thai_date, tone } from "../api.js";
 
 const props = defineProps({
 	rows: Array,
@@ -162,7 +148,9 @@ const props = defineProps({
 	sort: String,
 	order: String,
 	selected: { type: Set, default: () => new Set() },
-	// จอ ≥1480: คลิก = เลือกดูตัวอย่างข้างตาราง (emit select) ดับเบิลคลิก/Enter = เปิดเต็มหน้า
+	// จอ ≥1480 (previewable): คลิกแถว = ดูตัวอย่างข้างตาราง (emit select) คลิกแถวที่ดูอยู่ซ้ำ = เปิดเต็มหน้า
+	// จอเล็กกว่า: คลิกแถว = เปิดเต็มหน้า (Enter = เปิดเต็มหน้าเสมอ)
+	previewable: Boolean,
 	preview: Boolean,
 	active: String,
 });
@@ -172,7 +160,7 @@ const config = computed(() => DOC_KINDS[props.kind]);
 
 // คอลัมน์ต่อชนิดเอกสาร sort = key ของ site_docs.SORTS, pct = ช่อง % ความคืบหน้า
 // class: col-wide = ซ่อนบนแท็บเล็ต (<1180) is-num = ชิดขวา
-// กรอบตารางแคบ (container query ใน site.css): ย่อแถบ % → ซ่อน col-meta (มอบหมาย/แก้ไขล่าสุด) → ซ่อน col-pct
+// กรอบตารางแคบ: ย่อแถบ % → ซ่อน col-meta (มอบหมาย) → ซ่อน col-pct
 const columns = computed(() => {
 	const c = config.value;
 	const head = [
@@ -207,37 +195,26 @@ const columns = computed(() => {
 		...head,
 		...money_cols,
 		{ key: "assigned", label: "มอบหมาย", class: "col-assign col-meta col-wide" },
-		{ key: "modified", label: "แก้ไขล่าสุด", class: "col-modified col-meta col-wide" },
-		{ key: "like", label: "", class: "col-like" },
 	];
 });
+const list_columns = computed(() => [
+	...columns.value,
+	{ key: "modified", sort: "modified", class: "col-modified", aria_label: "แก้ไขล่าสุด" },
+]);
 
 const all_checked = computed(() => props.rows.length && props.rows.every((r) => props.selected.has(r.name)));
 const some_checked = computed(() => props.rows.some((r) => props.selected.has(r.name)));
+
+function click_row(row) {
+	if (props.previewable && !(props.preview && row.name === props.active)) emit("select", row);
+	else open(row);
+}
 
 const subject = (row) => row.party || row.title || row.name;
 
 function aria_sort(column) {
 	if (!column.sort || props.sort !== column.sort) return undefined;
 	return props.order === "asc" ? "ascending" : "descending";
-}
-
-// ถูกใจแบบระบบเต็ม (frappe.desk.like.toggle_like) เปลี่ยนในตารางทันที ผิดพลาดแล้วคืนค่า
-async function like(row) {
-	const on = !row.liked;
-	row.liked = on;
-	row.likes = Math.max(0, (row.likes || 0) + (on ? 1 : -1));
-	try {
-		await post("frappe.desk.like.toggle_like", {
-			doctype: config.value.doctype,
-			name: row.name,
-			add: on ? "Yes" : "No",
-		});
-	} catch (error) {
-		row.liked = !on;
-		row.likes = Math.max(0, row.likes + (on ? -1 : 1));
-		show_error(error);
-	}
 }
 
 // ↑↓ เลื่อนแถว (โหมดตัวอย่าง: เลือกแถวใหม่ด้วย)
@@ -252,5 +229,5 @@ function step(event, delta) {
 	if (props.preview && props.rows[index]) emit("select", props.rows[index]);
 }
 
-const open = (row) => go(`${config.value.section}-doc`, { kind: props.kind, name: row.name });
+const open = (row) => go_doc(props.kind, "doc", { name: row.name });
 </script>

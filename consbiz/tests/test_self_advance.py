@@ -1,7 +1,7 @@
 # Copyright (c) 2026, Siricons and Contributors
 # See license.txt
 
-# เบิกเงินใน Self Service (consbiz/self_advance.py): เงินเดือนล่วงหน้า (วงเงิน/ผู้บริหาร/หักเป็นงวด), เงินสำรองจ่าย + เคลียร์, เบิกคืน
+# เบิกเงินใน Self Service (consbiz/self_advance.py): เงินเดือนล่วงหน้า (วงเงิน/ผู้บริหาร/หักเป็นงวด), เงินทดรองจ่าย + เคลียร์, เบิกคืน
 
 import frappe
 from frappe.tests import IntegrationTestCase
@@ -104,6 +104,15 @@ class IntegrationTestSelfAdvance(IntegrationTestCase):
 		doc = frappe.get_doc("Employee Advance", row.name)
 		self.assertEqual((doc.docstatus, doc.custom_approved_by, doc.repay_unclaimed_amount_from_salary), (1, APPROVER, 1))
 
+	def test_approver_sets_installments(self):
+		# ผู้ขอไม่เลือกงวดหักคืน ผู้อนุมัติกำหนดตอนอนุมัติ (ตกลง 2026-11-17)
+		row = self.request(3000)
+		self.assertRaises(
+			frappe.ValidationError, self.as_user, APPROVER, self_advance.review_advance, row.name, 1, None, 7
+		)
+		self.as_user(APPROVER, self_advance.review_advance, row.name, 1, None, 3)
+		self.assertEqual(frappe.db.get_value("Employee Advance", row.name, "custom_installments"), 3)
+
 	def test_over_limit_needs_executive(self):
 		self.request(6000)
 		row = self.request(5000)
@@ -160,7 +169,7 @@ class IntegrationTestSelfAdvance(IntegrationTestCase):
 		self.assertEqual(self_advance.installment_amounts(1000, 3), [333.33, 333.33, 333.34])
 		self.assertEqual(self_advance.installment_amounts(1000, 1), [1000])
 
-	# ------------------------------------------------------------ เงินสำรองจ่าย / เบิกคืน
+	# ------------------------------------------------------------ เงินทดรองจ่าย / เบิกคืน
 
 	def receipt(self):
 		frappe.set_user(EMPLOYEE)

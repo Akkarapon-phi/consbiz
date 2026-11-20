@@ -236,6 +236,10 @@ export function group_of(section, app_key = app_of(section)) {
 	return MODULE_META[app_key]?.[section]?.group || app_key;
 }
 
+// กลุ่มออฟฟิศ: ดูแลเอกสารทุกโครงการ แถบบนเป็นตัวเลือกบริษัท (ไม่มีปุ่มโครงการ)
+// กรองโครงการได้เฉพาะหน้าที่มีตัวกรองโครงการในหัวรายการ (ProjectFilter) (ตกลง 2026-11-17)
+export const is_company_section = (section) => group_of(section) === "office";
+
 // จัดกลุ่มตาม GROUPS (หัวข้อในหน้า Desktop / หมวดใน Dock)
 export function module_groups() {
 	const groups = [];

@@ -27,9 +27,9 @@
 			</template>
 		</TopBar>
 		<div class="ss-content">
-			<div :class="wide ? 'ss-list-head ss-res-head' : 'ss-res-head'">
-				<StatusTabs v-if="wide" :model-value="view" :options="TABS" @update:model-value="open_pane" />
-				<Segmented v-else :model-value="view" :options="TABS" @update:model-value="open_pane" />
+			<ListHead v-if="wide" class="ss-res-head" :model-value="view" :tabs="TABS" @update:model-value="open_pane" />
+			<div v-else class="ss-res-head">
+				<Segmented :model-value="view" :options="TABS" @update:model-value="open_pane" />
 			</div>
 			<Skeleton v-if="!board.loaded.value" :rows="6" />
 			<Empty
@@ -48,9 +48,9 @@ import Icon from "../../../shared/components/Icon.vue";
 import TopBar from "../../../shared/components/TopBar.vue";
 import Skeleton from "../../../shared/components/Skeleton.vue";
 import Empty from "../../../shared/components/Empty.vue";
-import StatusTabs from "../../../shared/components/StatusTabs.vue";
 import Segmented from "../../../shared/components/Segmented.vue";
 import ResourcePane from "../pm/planner/ResourcePane.vue";
+import ListHead from "../../../shared/components/ListHead.vue";
 import { boot, go, state } from "../../../shared/api.js";
 import { use_wide } from "../../../shared/table.js";
 import { load_board, resource_board } from "./resource_board.js";

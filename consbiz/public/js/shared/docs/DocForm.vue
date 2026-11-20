@@ -1,12 +1,30 @@
 <!-- สร้าง/แก้ไขร่างเอกสารจัดซื้อ/ขาย (ชุดเดียวทั้ง 6 ชนิด) ข้อมูล/บันทึกผ่าน site_docs.get_form / preview_doc / save_doc
      ยอดเงินและภาษีคำนวณที่ server (ERPNext) ทุกครั้งที่แก้ (หน่วงเล็กน้อย) ฟอร์มใหม่เก็บร่างใน localStorage -->
 <template>
-	<div class="ss-has-bar">
-		<TopBar :title="title" :subtitle="subtitle" :back_to="back_view" :back_params="back_params" />
+	<div>
+		<TopBar :title="title" :subtitle="subtitle" :back_to="back_view" :back_params="back_params">
+			<template #status>
+				<span v-if="form" class="ss-tag">{{ is_new ? "ใหม่" : "ร่าง" }}</span>
+			</template>
+		</TopBar>
 
 		<div class="ss-content ss-docform">
+			<!-- แท็บ (ติดบนจอ) + การ์ดเนื้อหาเป็นชิ้นเดียวกัน (ตกลง 2026-11-18) -->
+			<div class="ss-doc-frame">
+			<!-- ติดบนจอ: กล่องเหลี่ยมพื้นหน้ารองแถวแท็บ มุมโค้งจึงไม่เห็นเนื้อหาที่เลื่อนผ่าน -->
+			<div v-if="form" class="ss-doc-stick">
+				<FormHead
+					v-if="form"
+					model-value="main"
+					:tabs="[{ value: 'main', label: config.label }]"
+					:actions="form_actions"
+					:busy="saving"
+				/>
+			</div>
 			<Skeleton v-if="!form" :rows="3" />
-			<div v-else class="ss-docform-body" :class="{ 'has-insight': xl }">
+			<div v-else class="ss-doc-sheet">
+			<MiniSteps :steps="form.steps" />
+			<div class="ss-docform-body" :class="{ 'has-insight': xl }">
 				<div class="ss-docform-main">
 					<div v-if="from_plan" class="ss-banner tone-blue">
 						<Icon name="info" :size="22" />
@@ -27,125 +45,148 @@
 						</div>
 					</div>
 
-					<!-- หัวเอกสาร: แท็บเล็ต/จอใหญ่ = ตาราง 3-4 คอลัมน์ -->
-					<section class="ss-form ss-docform-head">
-						<Picker
-							v-if="party_field"
-							v-model="form[party_field]"
-							class="ss-docform-party"
-							:label="config.party"
-							:display_value="form.party_label"
-							:remote_fn="search_parties"
-							required
-							@select="(o) => (form.party_label = o.label)"
-						/>
-						<template v-if="is_mr">
-							<label class="ss-field ss-docform-party">
-								<span class="ss-field-label">เรื่อง</span>
-								<input
-									v-model="form.title"
-									class="ss-input"
-									placeholder="เช่น ขอซื้อวัสดุงานโครงสร้าง ชั้น 2"
+					<!-- หัวเอกสารแบบการ์ด (ตกลง 2026-11-18) ช่องเดียวกับหน้าดู แต่ช่องที่แก้ได้เป็นช่องกรอก (เลขที่/สถานะอยู่แถบบน) -->
+					<div class="ss-doc-cards">
+						<section class="ss-doc-card">
+							<h2 class="ss-doc-card-title"><Icon name="file" :size="18" /> ข้อมูลเอกสาร</h2>
+							<div class="ss-doc-fields is-edit">
+								<ComboBox
+									v-if="party_field"
+									v-model="form[party_field]"
+									class="is-wide"
+									:label="config.party"
+									:display_value="form.party_label"
+									:remote_fn="search_parties"
+									required
+									@select="(o) => (form.party_label = o?.label || '')"
 								/>
-							</label>
-							<div class="ss-field">
-								<span class="ss-field-label">วัตถุประสงค์<em>*</em></span>
-								<SelectBox
-									v-model="form.material_request_type"
-									label="วัตถุประสงค์"
-									:options="PURPOSES"
+								<label v-if="is_mr" class="ss-field is-wide">
+									<span class="ss-field-label">เรื่อง</span>
+									<input
+										v-model="form.title"
+										class="ss-input"
+										placeholder="เช่น ขอซื้อวัสดุงานโครงสร้าง ชั้น 2"
+									/>
+								</label>
+								<template v-for="f in doc_fields" :key="f.field">
+									<div v-if="f.type === 'date'" class="ss-field">
+										<span class="ss-field-label">{{ f.label === "วันที่" ? "วันที่เอกสาร" : f.label }}<em v-if="f.required">*</em></span>
+										<DateInput
+											v-model="form[f.field]"
+											:label="f.label"
+											:clearable="!f.required"
+											@change="(v) => f.rows && fill_rows(f.rows, v)"
+										/>
+									</div>
+									<label v-else class="ss-field">
+										<span class="ss-field-label">{{ f.label }}<em v-if="f.required">*</em></span>
+										<input v-model="form[f.field]" class="ss-input" :placeholder="f.placeholder" />
+									</label>
+								</template>
+								<!-- ออฟฟิศ: บริษัทของเอกสารใหม่ (มีหลายบริษัท) และโครงการเลือกในฟอร์ม -->
+								<div v-if="company_choice" class="ss-field">
+									<span class="ss-field-label">บริษัท<em>*</em></span>
+									<SelectBox
+										:model-value="form.company"
+										label="บริษัท"
+										:options="company_options"
+										@update:model-value="change_company"
+									/>
+								</div>
+								<ComboBox
+									v-if="editable_project"
+									v-model="form.project"
+									class="is-wide"
+									label="โครงการ"
+									placeholder="ไม่ระบุโครงการ"
+									:display_value="form.project_name"
+									:remote_fn="search_projects"
+									clearable
+									@select="(o) => (form.project_name = o?.label || '')"
 								/>
+								<div v-else class="ss-field is-wide">
+									<span class="ss-field-label">โครงการ</span>
+									<span class="ss-doc-value" :class="{ 'is-empty': !form.project }" :title="form.project_name"
+										><template v-if="form.project"
+											>{{ form.project_name || form.project }} <small>({{ form.project }})</small></template
+										><template v-else>–</template></span
+									>
+								</div>
 							</div>
-						</template>
-						<div v-for="f in fields" :key="f.field" class="ss-field">
-							<span class="ss-field-label">{{ f.label }}<em v-if="f.required">*</em></span>
-							<DateInput
-								v-if="f.type === 'date'"
-								v-model="form[f.field]"
-								:label="f.label"
-								:clearable="!f.required"
-								@change="(v) => f.rows && fill_rows(f.rows, v)"
-							/>
-							<input
-								v-else
-								v-model="form[f.field]"
-								class="ss-input"
-								:placeholder="f.placeholder"
-							/>
-						</div>
-						<template v-if="is_mr">
-							<Picker
-								v-model="form.custom_request_by"
-								label="ผู้จัดทำ"
-								:display_value="form.request_by_label"
-								:remote_fn="search_signatures"
-								clearable
-								@select="(o) => (form.request_by_label = o.label)"
-							/>
-							<Picker
-								v-model="form.custom_approve_by"
-								label="ผู้อนุมัติ"
-								:display_value="form.approve_by_label"
-								:remote_fn="search_signatures"
-								clearable
-								@select="(o) => (form.approve_by_label = o.label)"
-							/>
-						</template>
-						<div v-if="form.tax_templates.length" class="ss-field">
-							<span class="ss-field-label">ภาษี</span>
-							<SelectBox v-model="tax_value" label="ภาษี" :options="tax_options" />
-						</div>
-						<label v-if="has_discount" class="ss-field">
-							<span class="ss-field-label">ส่วนลดท้ายบิล (%)</span>
-							<input
-								v-model.number="form.additional_discount_percentage"
-								class="ss-input ss-input--num"
-								type="number"
-								inputmode="decimal"
-								min="0"
-								max="100"
-								step="any"
-								placeholder="0"
-							/>
-						</label>
-						<!-- ออฟฟิศ: บริษัทของเอกสารใหม่ (มีหลายบริษัท) และโครงการเลือกในฟอร์ม -->
-						<div v-if="company_choice" class="ss-field">
-							<span class="ss-field-label">บริษัท<em>*</em></span>
-							<SelectBox
-								:model-value="form.company"
-								label="บริษัท"
-								:options="company_options"
-								@update:model-value="change_company"
-							/>
-						</div>
-						<Picker
-							v-if="editable_project"
-							v-model="form.project"
-							class="ss-docform-project"
-							label="โครงการ"
-							placeholder="ไม่ระบุโครงการ"
-							:display_value="form.project_name"
-							:remote_fn="search_projects"
-							clearable
-							@select="(o) => (form.project_name = o?.label || '')"
-						/>
-						<div v-else-if="form.project" class="ss-field ss-docform-project">
-							<span class="ss-field-label">โครงการ</span>
-							<span class="ss-docform-project-name" :title="form.project_name"
-								>{{ form.project_name || form.project }}
-								<small>{{ form.project }}</small></span
-							>
-						</div>
-					</section>
+						</section>
+						<section class="ss-doc-card">
+							<h2 class="ss-doc-card-title">
+								<Icon :name="config.section === 'buy' ? 'cart' : 'briefcase'" :size="18" />
+								{{ config.section === "buy" ? "รายละเอียดการจัดซื้อ" : "รายละเอียดการขาย" }}
+							</h2>
+							<div class="ss-doc-fields is-edit">
+								<div v-if="is_mr" class="ss-field">
+									<span class="ss-field-label">วัตถุประสงค์<em>*</em></span>
+									<SelectBox v-model="form.material_request_type" label="วัตถุประสงค์" :options="PURPOSES" />
+								</div>
+								<div v-for="f in detail_fields" :key="f.field" class="ss-field">
+									<span class="ss-field-label">{{ f.label }}<em v-if="f.required">*</em></span>
+									<DateInput
+										v-model="form[f.field]"
+										:label="f.label"
+										:clearable="!f.required"
+										@change="(v) => f.rows && fill_rows(f.rows, v)"
+									/>
+								</div>
+								<template v-if="is_mr">
+									<ComboBox
+										v-model="form.custom_request_by"
+										label="ผู้ขอซื้อ"
+										:display_value="form.request_by_label"
+										:remote_fn="search_signatures"
+										clearable
+										@select="(o) => (form.request_by_label = o?.label || '')"
+									/>
+									<ComboBox
+										v-model="form.custom_approve_by"
+										label="ผู้อนุมัติ"
+										:display_value="form.approve_by_label"
+										:remote_fn="search_approvers"
+										clearable
+										@select="(o) => (form.approve_by_label = o?.label || '')"
+									/>
+								</template>
+								<!-- ผู้ลงนามของใบสั่งซื้อ/ใบแจ้งหนี้ซื้อ (ตกลง 2026-11-19): ปุ่มลงนามขึ้นเฉพาะคนนี้ ต้องเลือกก่อนส่งลงนาม -->
+								<ComboBox
+									v-if="form.fields.includes('custom_approver')"
+									v-model="form.custom_approver"
+									label="ผู้ลงนาม"
+									placeholder="เลือกผู้ลงนาม"
+									:display_value="form.approver_label"
+									:remote_fn="search_approvers"
+									clearable
+									@select="(o) => (form.approver_label = o?.label || '')"
+								/>
+								<div v-if="form.tax_templates.length" class="ss-field">
+									<span class="ss-field-label">ภาษี</span>
+									<SelectBox v-model="tax_value" label="ภาษี" :options="tax_options" />
+								</div>
+								<label v-if="has_discount" class="ss-field">
+									<span class="ss-field-label">ส่วนลดท้ายบิล (%)</span>
+									<input
+										v-model.number="form.additional_discount_percentage"
+										class="ss-input ss-input--num"
+										type="number"
+										inputmode="decimal"
+										min="0"
+										max="100"
+										step="any"
+										placeholder="0"
+									/>
+								</label>
+							</div>
+						</section>
+					</div>
 
-					<section class="ss-docform-items">
-						<h2 class="ss-section-title ss-section-title--first">
-							<span
-								>รายการ <span class="ss-count">{{ form.items.length }}</span></span
-							>
-							<span v-if="form.items.length" class="ss-section-total">{{
-								money(lines_total)
-							}}</span>
+					<section class="ss-doc-card ss-doc-card--items">
+						<h2 class="ss-doc-card-title">
+							<Icon name="layers" :size="18" /> {{ is_mr ? "รายการสินค้า/วัสดุ" : "รายการ" }}
+							<span class="ss-count">{{ form.items.length }}</span>
 						</h2>
 						<Empty
 							v-if="!form.items.length && !wide"
@@ -154,6 +195,7 @@
 							text="เลือกสินค้า/บริการ แล้วใส่จำนวนและราคา"
 						/>
 						<LineEditor
+					ref="line_editor"
 							:items="form.items"
 							:wide="wide"
 							:is_mr="is_mr"
@@ -162,6 +204,8 @@
 							:show_errors="show_errors"
 							:search_fn="find_items"
 							@add="add_item"
+					@fill="fill_item"
+					@add-row="add_blank"
 							@remove="remove_rows"
 							@reorder="(items) => (form.items = items)"
 							@detail="(row) => (detail_row = row)"
@@ -169,35 +213,71 @@
 							:active_row="xl ? insight_row : null"
 							@browse="item_sheet = true"
 						/>
+						<!-- ใต้ตาราง: เพิ่มรายการ (เลือกหลายรายการ) / ส่งออก -->
+						<!-- ใต้ตาราง (ตกลง 2026-11-18): ซ้าย = เพิ่มรายการ, เลือกหลายรายการ, ลบรายการ + ยกเลิกที่เลือก (เมื่อติ๊ก) / ขวา = ดาวน์โหลด, อัปโหลด -->
+						<div class="ss-doc-items-foot">
+							<button type="button" class="ss-btn ss-btn--primary ss-doc-items-btn" @click="add_blank">
+								<Icon name="plus" :size="15" :stroke="2.6" /> เพิ่มรายการ
+							</button>
+							<button type="button" class="ss-btn ss-btn--ghost ss-doc-items-btn" @click="item_sheet = true">
+								<Icon name="list-checks" :size="15" /> เลือกหลายรายการ
+							</button>
+							<template v-if="picked_count">
+								<button
+									type="button"
+									class="ss-btn ss-btn--ghost-danger ss-doc-items-btn"
+									@click="line_editor?.remove_picked()"
+								>
+									<Icon name="trash" :size="15" /> ลบรายการ ({{ picked_count }})
+								</button>
+								<button
+									type="button"
+									class="ss-btn ss-btn--ghost ss-doc-items-btn"
+									@click="line_editor?.clear_picked()"
+								>
+									<Icon name="x" :size="15" /> ยกเลิกที่เลือก
+								</button>
+							</template>
+							<span class="ss-grow"></span>
+							<button
+								type="button"
+								class="ss-btn ss-btn--ghost ss-doc-items-btn"
+								:disabled="!lines_count"
+								title="ดาวน์โหลดรายการเป็นไฟล์ Excel (CSV)"
+								@click="export_items"
+							>
+								<Icon name="receive" :size="15" /> ดาวน์โหลด
+							</button>
+							<button
+								type="button"
+								class="ss-btn ss-btn--ghost ss-doc-items-btn"
+								:disabled="importing"
+								title="นำเข้ารายการจากไฟล์ Excel (.xlsx) หรือ CSV: รหัส, รายการ, จำนวน, หน่วย, หน่วยละ"
+								@click="file_input?.click()"
+							>
+								<span v-if="importing" class="ss-spinner ss-spinner--sm"></span>
+								<Icon v-else name="issue" :size="15" /> อัปโหลด
+							</button>
+							<input
+								ref="file_input"
+								type="file"
+								accept=".xlsx,.csv"
+								hidden
+								@change="import_file"
+							/>
+						</div>
 					</section>
 
-					<!-- ท้ายเอกสาร: หมายเหตุ/ตัวเลือกภาษี (ซ้าย) + สรุปยอด (ขวา) แบบระบบเต็ม -->
-					<section class="ss-docform-foot">
-						<div class="ss-docform-notes">
-							<label v-if="remarks_field" class="ss-field">
-								<span class="ss-field-label">หมายเหตุ</span>
-								<textarea v-model="form[remarks_field]" class="ss-input" rows="3"></textarea>
-							</label>
-							<div
-								v-if="is_mr && form.material_request_type !== 'Customer Provided'"
-								class="ss-dv-flags"
-							>
+					<!-- ท้ายเอกสาร: ตัวเลือกภาษี/หัก + หมายเหตุ (ซ้าย) / สรุปยอด (ขวา) -->
+					<section class="ss-doc-foot">
+						<div class="ss-doc-notes">
+							<div v-if="is_mr && form.material_request_type !== 'Customer Provided'" class="ss-dv-flags">
 								<label class="ss-checkline">
-									<input
-										v-model="form.custom_included_vat"
-										type="checkbox"
-										:true-value="1"
-										:false-value="0"
-									/>
+									<input v-model="form.custom_included_vat" type="checkbox" :true-value="1" :false-value="0" />
 									<span>มูลค่ารวมภาษี</span>
 								</label>
 								<label class="ss-checkline">
-									<input
-										v-model="form.custom_vat_override"
-										type="checkbox"
-										:true-value="1"
-										:false-value="0"
-									/>
+									<input v-model="form.custom_vat_override" type="checkbox" :true-value="1" :false-value="0" />
 									<span>แก้ไขภาษี</span>
 								</label>
 							</div>
@@ -205,12 +285,7 @@
 							<div v-if="has_deduct" class="ss-deducts">
 								<div v-for="d in DEDUCTS" :key="d.subject" class="ss-deduct">
 									<label class="ss-checkline">
-										<input
-											v-model="form[d.subject]"
-											type="checkbox"
-											:true-value="1"
-											:false-value="0"
-										/>
+										<input v-model="form[d.subject]" type="checkbox" :true-value="1" :false-value="0" />
 										<span>{{ d.label }}</span>
 									</label>
 									<template v-if="form[d.subject]">
@@ -228,12 +303,7 @@
 										</label>
 										<template v-if="form.fields.includes(d.edit)">
 											<label class="ss-checkline ss-deduct-edit">
-												<input
-													v-model="form[d.edit]"
-													type="checkbox"
-													:true-value="1"
-													:false-value="0"
-												/>
+												<input v-model="form[d.edit]" type="checkbox" :true-value="1" :false-value="0" />
 												<span>กรอกยอดเอง</span>
 											</label>
 											<MoneyInput
@@ -246,42 +316,55 @@
 									</template>
 								</div>
 							</div>
+							<label v-if="remarks_field" class="ss-doc-remarks">
+								<span class="ss-doc-remarks-label"><Icon name="message" :size="17" /> หมายเหตุ</span>
+								<span class="ss-doc-textarea">
+									<textarea
+										v-model="form[remarks_field]"
+										class="ss-input"
+										rows="3"
+										maxlength="500"
+										placeholder="ระบุหมายเหตุ (ถ้ามี)"
+									></textarea>
+									<small>{{ (form[remarks_field] || "").length }} / 500</small>
+								</span>
+							</label>
 							<p v-if="!is_mr" class="ss-muted ss-docform-note">
-								<Icon name="info" :size="14" /> เงื่อนไขชำระเงินและบัญชีอื่นๆ
-								แก้ต่อได้ในระบบเต็มหลังบันทึก
+								<Icon name="info" :size="14" /> เงื่อนไขชำระเงินและบัญชีอื่นๆ แก้ต่อได้ในระบบเต็มหลังบันทึก
 							</p>
 						</div>
-						<div class="ss-totals" :class="{ 'is-stale': previewing }">
-							<div v-for="r in form.summary.rows" :key="r.label">
-								<span>{{ r.label }}</span>
-								<MoneyInput
-									v-if="r.tax && is_mr && form.custom_vat_override"
-									v-model="form.custom_vat"
-									class="ss-cell ss-cell--num ss-totals-input"
-									aria-label="ภาษีมูลค่าเพิ่ม"
-								/>
-								<b v-else>{{ money(r.value) }}</b>
-							</div>
-							<div class="is-grand">
-								<span
-									>{{ form.summary.grand_label }}
-									<span v-if="previewing" class="ss-spinner ss-spinner--sm"></span
-								></span>
-								<b>{{ money(grand_total) }}</b>
-							</div>
-							<div v-if="form.summary.in_words" class="ss-totals-words">
-								({{ form.summary.in_words }})
-							</div>
-							<template v-if="form.summary.net !== undefined">
-								<div v-for="d in form.summary.deductions" :key="d.label" class="is-deduct">
-									<span>{{ d.label }}</span
-									><b>{{ money(d.value) }}</b>
+						<div class="ss-doc-totals">
+							<span class="ss-doc-totals-icon"><Icon name="calculator" :size="20" /></span>
+							<div class="ss-totals" :class="{ 'is-stale': previewing }">
+								<div v-for="r in form.summary.rows" :key="r.label">
+									<span>{{ r.label }}</span>
+									<MoneyInput
+										v-if="r.tax && is_mr && form.custom_vat_override"
+										v-model="form.custom_vat"
+										class="ss-cell ss-cell--num ss-totals-input"
+										aria-label="ภาษีมูลค่าเพิ่ม"
+									/>
+									<b v-else>{{ money(r.value) }}</b>
 								</div>
-								<div class="is-net">
-									<span>{{ form.summary.net_label }}</span
-									><b>{{ money(form.summary.net) }}</b>
+								<div class="is-grand">
+									<span
+										>{{ form.summary.grand_label }}
+										<span v-if="previewing" class="ss-spinner ss-spinner--sm"></span
+									></span>
+									<b>{{ money(grand_total) }}</b>
 								</div>
-							</template>
+								<div v-if="form.summary.in_words" class="ss-totals-words">({{ form.summary.in_words }})</div>
+								<template v-if="form.summary.net !== undefined">
+									<div v-for="d in form.summary.deductions" :key="d.label" class="is-deduct">
+										<span>{{ d.label }}</span
+										><b>{{ money(d.value) }}</b>
+									</div>
+									<div class="is-net">
+										<span>{{ form.summary.net_label }}</span
+										><b>{{ money(form.summary.net) }}</b>
+									</div>
+								</template>
+							</div>
 						</div>
 					</section>
 
@@ -378,36 +461,10 @@
 				</div>
 				<ItemInsight v-if="xl" :kind="kind" :project="form.project || null" :row="insight_row" />
 			</div>
+			</div>
+			</div>
 		</div>
 
-		<Teleport to="#ss-layer">
-			<Transition name="ss-bar">
-				<div v-if="form" class="ss-bottom-bar">
-					<span class="ss-bar-summary">
-						<small>ยอดรวม</small> <b>{{ money(grand_total) }}</b>
-					</span>
-					<button
-						type="button"
-						class="ss-btn ss-btn--ghost ss-btn--lg"
-						:class="{ 'ss-grow': !form.can_submit }"
-						:disabled="saving"
-						@click="save(0)"
-					>
-						บันทึกร่าง
-					</button>
-					<button
-						v-if="form.can_submit"
-						type="button"
-						class="ss-btn ss-btn--primary ss-btn--lg ss-grow"
-						:disabled="saving"
-						@click="ask_submit"
-					>
-						<span v-if="saving" class="ss-spinner"></span>
-						<template v-else>บันทึกและส่ง</template>
-					</button>
-				</div>
-			</Transition>
-		</Teleport>
 
 		<!-- เลือกสินค้า/บริการ (แตะได้หลายรายการ) -->
 		<Sheet
@@ -493,10 +550,13 @@
 <script setup>
 import { computed, inject, nextTick, onBeforeUnmount, ref, watch } from "vue";
 import Icon from "../components/Icon.vue";
+import FormHead from "../components/FormHead.vue";
+import MiniSteps from "../components/MiniSteps.vue";
+import { step_actions } from "../form_actions.js";
 import TopBar from "../components/TopBar.vue";
 import Skeleton from "../components/Skeleton.vue";
 import Empty from "../components/Empty.vue";
-import Picker from "../components/Picker.vue";
+import ComboBox from "../components/ComboBox.vue";
 import Sheet from "../components/Sheet.vue";
 import LineEditor from "./LineEditor.vue";
 import ItemInsight from "./ItemInsight.vue";
@@ -504,20 +564,20 @@ import MoneyInput from "../components/MoneyInput.vue";
 import RichEditor from "../components/RichEditor.vue";
 import SelectBox from "../components/SelectBox.vue";
 import DateInput from "../components/DateInput.vue";
-import { DOC_KINDS, PLAN_SOURCE, clear_plan_request, plan_request } from "./kinds.js";
+import { DOC_KINDS, PLAN_SOURCE, clear_plan_request, doc_kind, doc_list_view, doc_target, go_doc, plan_request } from "./kinds.js";
 import { app } from "../app.js";
 import { boot, call, celebrate, go, money, post, show_error, state, toast } from "../api.js";
 
 const reload_summary = inject("reload_summary");
 
-// จอกว้าง ≥1000 (แท็บเล็ตแนวนอน/คอมพิวเตอร์): ตารางรายการแก้ไขในช่อง
-// แคบกว่านั้น (มือถือ, แท็บเล็ตแนวตั้ง ที่เนื้อหากว้างไม่ถึง ~650px): การ์ด กดง่ายบนจอสัมผัส
-const mq_wide = window.matchMedia("(min-width: 1000px)");
+// จอ ≥768 (แท็บเล็ต/คอมพิวเตอร์): ตารางรายการแก้ไขในช่องแบบตัวอย่าง (ตกลง 2026-11-18, เนื้อหาแคบเลื่อนตารางซ้าย-ขวา)
+// มือถือ: การ์ด กดง่ายบนจอสัมผัส
+const mq_wide = window.matchMedia("(min-width: 768px)");
 const wide = ref(mq_wide.matches);
 const on_media = () => (wide.value = mq_wide.matches);
 mq_wide.addEventListener("change", on_media);
 onBeforeUnmount(() => mq_wide.removeEventListener("change", on_media));
-const params = state.route.params;
+const params = { ...state.route.params, kind: doc_kind(state.route.params.kind) };
 const kind = DOC_KINDS[params.kind] ? params.kind : "po";
 const config = DOC_KINDS[kind];
 const is_mr = kind === "mr";
@@ -633,19 +693,21 @@ let uid = 0;
 const fields = computed(() =>
 	FIELDS[kind].filter((f) => !form.value?.fields || form.value.fields.includes(f.field))
 );
+// การ์ดข้อมูลเอกสาร = วันที่เอกสาร + เลขอ้างอิง / การ์ดรายละเอียด = วันที่ต้องการ กำหนดส่ง ครบกำหนด
+const DOC_DATES = ["transaction_date", "posting_date"];
+const doc_fields = computed(() => fields.value.filter((f) => f.type !== "date" || DOC_DATES.includes(f.field)));
+const detail_fields = computed(() => fields.value.filter((f) => f.type === "date" && !DOC_DATES.includes(f.field)));
 const title = computed(() => (is_new ? `${config.label}ใหม่` : `แก้ไข${config.label}`));
 const subtitle = computed(() =>
 	is_new ? form.value?.project_name || state.project?.project_name || "" : params.name
 );
 const source_label = computed(() => DOC_KINDS[SOURCE_KIND[kind]]?.label || "");
-const back_view = computed(() =>
-	from_plan ? "resources" : is_new && !params.source ? kind : `${config.section}-doc`
-);
-const back_params = computed(() =>
-	from_plan || (is_new && !params.source)
-		? {}
-		: { kind: is_new ? SOURCE_KIND[kind] : kind, name: is_new ? params.source : params.name }
-);
+const back_kind = (is_new && params.source && SOURCE_KIND[kind]) || kind;
+const back_target = doc_target(back_kind, "doc");
+const back_view = from_plan ? "resources" : is_new && !params.source ? doc_list_view(kind) : back_target.view;
+const back_params = from_plan || (is_new && !params.source)
+	? {}
+	: { kind: back_target.kind, name: is_new ? params.source : params.name };
 const grand_total = computed(() => form.value?.summary?.grand || 0);
 const tax_options = computed(() => [
 	...form.value.tax_templates.map((t) => ({ value: t.name, label: t.title || t.name })),
@@ -735,7 +797,7 @@ function payload() {
 	for (const field of [...(f.fields || []), party_field, remarks_field]) {
 		if (field) out[field] = f[field] ?? null;
 	}
-	out.items = f.items.map((row) => ({
+	out.items = f.items.filter((row) => row.item_code).map((row) => ({
 		key: row.key,
 		item_code: row.item_code,
 		qty: Number(row.qty) || 0,
@@ -851,6 +913,87 @@ function add_item(it) {
 	added.value++;
 }
 
+// แถวที่ติ๊กในตาราง (ปุ่มลบ/ยกเลิกใต้ตาราง) และจำนวนแถวที่มีสินค้าแล้ว
+const picked_count = computed(() => line_editor.value?.picked?.size || 0);
+const lines_count = computed(() => (form.value?.items || []).filter((r) => r.item_code).length);
+
+// อัปโหลด: Excel/CSV → site_docs.import_items (จับคู่รหัส/ชื่อ/ใกล้เคียง) ต่อท้ายตาราง แทนแถวว่าง
+const file_input = ref(null);
+const importing = ref(false);
+async function import_file(event) {
+	const file = event.target.files?.[0];
+	event.target.value = "";
+	if (!file) return;
+	if (file.size > 5 * 1024 * 1024) return toast("ไฟล์ใหญ่เกิน 5MB", "error");
+	importing.value = true;
+	try {
+		const content = await new Promise((resolve, reject) => {
+			const reader = new FileReader();
+			reader.onload = () => resolve(String(reader.result).split(",")[1] || "");
+			reader.onerror = reject;
+			reader.readAsDataURL(file);
+		});
+		const result = await post("consbiz.site_docs.import_items", { kind, filename: file.name, content });
+		const date_field = row_date.value.field;
+		form.value.items = form.value.items.filter((r) => r.item_code);
+		for (const it of result.rows) {
+			form.value.items.push({
+				uid: ++uid,
+				key: null,
+				item_code: it.item_code,
+				item_name: it.item_name,
+				qty: it.qty,
+				uom: it.uom,
+				uoms: it.uoms,
+				rate: it.rate || 0,
+				...(date_field ? { [date_field]: form.value[date_field] } : {}),
+			});
+		}
+		const approx = result.rows.filter((r) => r.approx).length;
+		let msg = `นำเข้า ${result.rows.length} รายการ`;
+		if (approx) msg += ` (ใกล้เคียง ${approx} รายการ ตรวจชื่อสินค้าอีกครั้ง)`;
+		if (result.missing.length) msg += ` ไม่พบ ${result.missing.length}: ${result.missing.slice(0, 3).join(", ")}${result.missing.length > 3 ? "…" : ""}`;
+		toast(msg, result.missing.length || approx ? "warning" : "success");
+	} catch (error) {
+		show_error(error);
+	} finally {
+		importing.value = false;
+	}
+}
+
+// ปุ่ม "เพิ่มรายการ" = แถวว่างท้ายตาราง แล้วพิมพ์ค้นหาสินค้าในช่องรายการของแถวนั้น (มือถือ = เลือกจาก sheet)
+const line_editor = ref(null);
+async function add_blank() {
+	if (!wide.value) return (item_sheet.value = true);
+	const blank = form.value.items.find((r) => !r.item_code);
+	if (!blank) {
+		const date_field = row_date.value.field;
+		form.value.items.push({
+			uid: ++uid,
+			key: null,
+			item_code: null,
+			item_name: "",
+			qty: 1,
+			uom: "",
+			uoms: [],
+			rate: 0,
+			...(date_field ? { [date_field]: form.value[date_field] } : {}),
+		});
+	}
+	await nextTick();
+	line_editor.value?.focus_blank();
+}
+// เลือกสินค้าในแถวว่าง: เติมแถวนั้น (คงลำดับ/วันที่ที่ตั้งไว้)
+function fill_item(row, it) {
+	Object.assign(row, {
+		item_code: it.item_code,
+		item_name: it.item_name,
+		uom: it.stock_uom,
+		uoms: it.uoms,
+		rate: it.rate || 0,
+	});
+}
+
 // ลบแถว (1 แถวจากปุ่มถังขยะ หรือหลายแถวที่เลือกในตาราง)
 function remove_rows(rows) {
 	const gone = new Set(Array.isArray(rows) ? rows : [rows]);
@@ -875,6 +1018,7 @@ watch(
 const detail_row = ref(null);
 
 const search_signatures = (txt) => call("consbiz.site_docs.search_signatures", { txt });
+const search_approvers = (txt) => call("consbiz.doc_approval.search_approvers", { kind, txt });
 
 function fill_rows(field, value) {
 	if (value) form.value.items.forEach((row) => (row[field] = value));
@@ -889,14 +1033,38 @@ async function search_parties(txt) {
 	return call("consbiz.site_docs.search_parties", { kind, txt, company: form.value.company });
 }
 
+// ส่งออกรายการเป็นไฟล์ที่เปิดใน Excel ได้ (CSV UTF-8 มี BOM ให้ภาษาไทยไม่เพี้ยน)
+function export_items() {
+	const d = form.value;
+	const head = ["#", "รหัส", "รายการ", "จำนวน", "หน่วย", "หน่วยละ", "เป็นเงิน"];
+	if (row_date.value.field) head.push(row_date.value.label);
+	const rows = d.items.filter((it) => it.item_code).map((it, i) => {
+		const r = [i + 1, it.item_code, it.item_name || "", it.qty, it.uom, it.rate, (Number(it.qty) || 0) * (Number(it.rate) || 0)];
+		if (row_date.value.field) r.push(it[row_date.value.field] || "");
+		return r;
+	});
+	const cell = (v) => {
+		const t = v == null ? "" : String(v);
+		return /[",\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t;
+	};
+	const csv = "﻿" + [head, ...rows].map((r) => r.map(cell).join(",")).join("\r\n");
+	const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+	const a = document.createElement("a");
+	a.href = url;
+	a.download = `${is_new ? config.label : params.name}.csv`;
+	a.click();
+	setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
 // ---------------------------------------------------------------- บันทึก
 
 function form_error() {
 	if (party_field && !form.value[party_field]) return `เลือก${config.party}`;
 	const missing = fields.value.find((f) => f.required && !form.value[f.field]);
 	if (missing) return `ใส่${missing.label}`;
-	if (!form.value.items.length) return "เพิ่มรายการอย่างน้อย 1 รายการ";
-	const bad = form.value.items.find(row_error);
+	const lines = form.value.items.filter((r) => r.item_code);
+	if (!lines.length) return "เพิ่มรายการอย่างน้อย 1 รายการ";
+	const bad = lines.find(row_error);
 	if (bad) return `${bad.item_name || bad.item_code}: ${row_error(bad)}`;
 	return "";
 }
@@ -909,6 +1077,9 @@ function ask_submit() {
 	}
 	confirm.value = true;
 }
+
+// หัวฟอร์ม: หน้านี้ = ร่าง ขั้นเดียวคือบันทึก แล้วยืนยันที่หน้าดูเอกสาร (ไม่ข้ามขั้น)
+const form_actions = computed(() => step_actions({ stage: "draft", is_new: true, save: () => save(0) }));
 
 async function save(submit) {
 	const error = form_error();
@@ -928,7 +1099,7 @@ async function save(submit) {
 		confirm.value = false;
 		reload_summary();
 		await celebrate(submit ? `ส่ง${config.label}แล้ว` : "บันทึกร่างแล้ว", result.name);
-		go(`${config.section}-doc`, { kind, name: result.name }, { replace: true });
+		go_doc(kind, "doc", { name: result.name }, { replace: true });
 	} catch (err) {
 		show_error(err);
 	} finally {

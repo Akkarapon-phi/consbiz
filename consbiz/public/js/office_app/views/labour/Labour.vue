@@ -44,18 +44,32 @@
 					</div>
 				</div>
 
-				<div v-if="wide" class="ss-list-head">
-					<StatusTabs v-if="!many_teams" v-model="team_tab" :options="team_tabs" />
+				<ListHead
+					v-if="wide"
+					v-model="team_tab"
+					:tabs="many_teams ? undefined : team_tabs"
+					v-model:search="txt"
+					search_placeholder="ค้นหาชื่อ ตำแหน่ง ทีม"
+					:loading="loading"
+					:create="data.can_submit ? 'อนุมัติรอบนี้' : ''"
+					create_icon="check"
+					:create_disabled="busy || dirty_count > 0"
+					:create_title="dirty_count ? 'บันทึกก่อนอนุมัติ' : 'อนุมัติค่าแรงของรอบนี้ หลังจากนี้แก้ไม่ได้'"
+					@refresh="load(anchor)"
+					@create="approve"
+				>
 					<!-- ทีมเยอะ (เกิน TAB_LIMIT) แท็บล้นแถบ: เหลือ "ทั้งหมด" + ทีมที่เลือก แล้วเลือกทีมจากรายการค้นหาได้ -->
-					<div v-else class="lb-team-switch">
-						<StatusTabs v-model="team_tab" :options="compact_tabs" />
-						<button type="button" class="ss-btn ss-btn--soft ss-list-create" @click="team_picker = true">
-							<Icon name="users" :size="16" />
-							<span>เลือกทีม ({{ all_teams.length }})</span>
-							<span v-if="idle_teams" class="ss-tab-count lb-idle" :title="`ยังไม่ได้ลงวันที่ ${day_no(fill_day)}`">{{ idle_teams }}</span>
-						</button>
-					</div>
-					<div class="ss-list-tools">
+					<template v-if="many_teams" #lead>
+						<div class="lb-team-switch">
+							<StatusTabs v-model="team_tab" :options="compact_tabs" />
+							<button type="button" class="ss-btn ss-btn--soft ss-list-create" @click="team_picker = true">
+								<Icon name="users" :size="16" />
+								<span>เลือกทีม ({{ all_teams.length }})</span>
+								<span v-if="idle_teams" class="ss-tab-count lb-idle" :title="`ยังไม่ได้ลงวันที่ ${day_no(fill_day)}`">{{ idle_teams }}</span>
+							</button>
+						</div>
+					</template>
+					<template #tools>
 						<button
 							type="button"
 							class="ss-icon-btn"
@@ -88,7 +102,7 @@
 							}}</span>
 						</span>
 						<button
-							v-if="wide && data.can_edit && data.workers.length"
+							v-if="data.can_edit && data.workers.length"
 							type="button"
 							class="ss-btn ss-btn--soft ss-list-create"
 							:title="`เติม 8 ชม. ในช่องว่างของวันที่ ${thai_date(fill_day)} (เฉพาะคนที่แสดงอยู่)`"
@@ -105,17 +119,6 @@
 							<Icon name="plus" :size="16" /> คนงานใหม่
 						</button>
 						<button
-							v-if="wide"
-							type="button"
-							class="ss-icon-btn"
-							:class="{ 'is-spinning': loading }"
-							aria-label="โหลดใหม่"
-							title="โหลดใหม่"
-							@click="load(anchor)"
-						>
-							<Icon name="refresh" :size="17" />
-						</button>
-						<button
 							v-if="data.can_print"
 							type="button"
 							class="ss-icon-btn"
@@ -125,23 +128,8 @@
 						>
 							<Icon name="printer" :size="17" />
 						</button>
-						<button
-							v-if="data.can_submit"
-							type="button"
-							class="ss-btn ss-btn--primary ss-list-create"
-							:disabled="busy || dirty_count > 0"
-							:title="dirty_count ? 'บันทึกก่อนอนุมัติ' : 'อนุมัติค่าแรงของรอบนี้ หลังจากนี้แก้ไม่ได้'"
-							@click="approve"
-						>
-							<Icon name="check" :size="18" :stroke="2.6" />
-							<span>อนุมัติรอบนี้</span>
-						</button>
-					</div>
-					<!-- แถวตัวกรอง: ค้นหา -->
-					<div class="ss-list-filterbar">
-						<ListSearch v-model="txt" placeholder="ค้นหาชื่อ ตำแหน่ง ทีม" />
-					</div>
-				</div>
+					</template>
+				</ListHead>
 
 				<div v-if="!wide" class="lb-mobile-head">
 					<span class="lb-period">
@@ -508,12 +496,12 @@ import StatusTabs from "../../../shared/components/StatusTabs.vue";
 import Stepper from "../../../shared/components/Stepper.vue";
 import DateInput from "../../../shared/components/DateInput.vue";
 import WorkerSheet from "./WorkerSheet.vue";
-import ListSearch from "../../../shared/components/ListSearch.vue";
 import SelectBox from "../../../shared/components/SelectBox.vue";
 import { matches } from "../../../shared/table.js";
 import Sheet from "../../../shared/components/Sheet.vue";
 import MoneyInput from "../../../shared/components/MoneyInput.vue";
 import PdfViewer from "../../../shared/components/PdfViewer.vue";
+import ListHead from "../../../shared/components/ListHead.vue";
 import { use_wide } from "../../../shared/table.js";
 import {
 	call,
