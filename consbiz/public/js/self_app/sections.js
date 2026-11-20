@@ -42,6 +42,14 @@ export const SECTIONS = {
 				badge: (s) => s?.hr,
 				when: (b) => ["leave", "checkin", "attendance", "advance", "claim"].some((k) => b.can?.[`approve_${k}`]),
 			},
+			// ใบขอซื้อ / ใบสั่งซื้อ / ใบแจ้งหนี้ซื้อ ที่รอผู้ใช้อนุมัติ/ลงนาม (consbiz/doc_approval.py)
+			{
+				view: "approve-purchase",
+				label: "จัดซื้อ",
+				icon: "cart",
+				badge: (s) => s?.purchase,
+				when: (b) => ["mr", "po", "pi"].some((k) => b.can?.[`approve_${k}`]),
+			},
 		],
 		badge: (s) => s?.total,
 	},
@@ -59,4 +67,5 @@ export const ROUTES = {
 	// name = เปิดเอกสารนั้นทันที (จากการแจ้งเตือน)
 	approve: { section: "approve", params: ["name"] },
 	"approve-hr": { section: "approve", params: ["name"] },
+	"approve-purchase": { section: "approve", params: ["name"] },
 };

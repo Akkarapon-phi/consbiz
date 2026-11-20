@@ -146,7 +146,7 @@
 					</div>
 					<div v-if="followups.length" class="ss-work-table-wrap">
 						<table>
-							<thead><tr><th>เลขที่</th><th>รายการ</th><th>รายละเอียด</th><th>สถานะ</th><th>อัปเดต</th><th></th></tr></thead>
+							<thead><tr><th>เลขที่</th><th>รายการ</th><th>รายละเอียด</th><th>สถานะ</th><th>อัปเดต</th><th></th><th class="col-modified"></th></tr></thead>
 							<tbody>
 								<tr
 									v-for="row in followups"
@@ -164,6 +164,7 @@
 									<td><span class="ss-work-row-status" :class="`is-${row.tone}`"><i></i>{{ row.status }}</span></td>
 									<td>{{ row.when }}</td>
 									<td><Icon v-if="row.run" name="chevron-right" :size="14" /></td>
+									<ModifiedCell :value="row.document?.modified" :row="row.document" />
 								</tr>
 							</tbody>
 						</table>
@@ -178,6 +179,7 @@
 <script setup>
 import { computed, inject, onMounted } from "vue";
 import Icon from "../../../shared/components/Icon.vue";
+import ModifiedCell from "../../../shared/components/ModifiedCell.vue";
 import Empty from "../../../shared/components/Empty.vue";
 import Hero from "../../../shared/components/Hero.vue";
 import SCurve from "../../../shared/components/SCurve.vue";
@@ -319,6 +321,7 @@ const followups = computed(() => {
 	const s = summary.value || {};
 	const requests = (s.requests_ready || []).map((row) => ({
 		key: `request-${row.name}`,
+		document: row,
 		ref: row.name,
 		title: row.requested_by || "ขออนุมัติปฏิบัติงาน",
 		detail: `คาดว่าได้ ${pct(row.expected_progress)}%`,

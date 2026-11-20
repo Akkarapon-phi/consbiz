@@ -8,7 +8,7 @@ import json
 
 import frappe
 from frappe.tests import IntegrationTestCase
-from frappe.utils import nowdate
+from frappe.utils import add_days, getdate, nowdate
 
 from consbiz import accounting_app
 from consbiz.consbiz.doctype.retention_receivable.test_retention_receivable import (
@@ -87,7 +87,10 @@ def make_invoice(amount=1000, wht=30):
 	pi.custom_wht_percent = 3
 	pi.append(
 		"custom_payment_entry_deduction",
-		{"account": wht_account, "amount": wht, "description": "ภาษีหัก ณ ที่จ่าย"},
+		{
+			"account": wht_account, "amount": wht, "description": "ภาษีหัก ณ ที่จ่าย",
+			"cost_center": frappe.get_cached_value("Company", COMPANY, "cost_center"),
+		},
 	)
 	pi.insert()
 	pi.submit()
@@ -150,6 +153,33 @@ class IntegrationTestAccountingApp(IntegrationTestCase):
 		self.assertEqual(again["outstanding"], 600)
 		rows = accounting_app.get_list("acc-payments", company=COMPANY)
 		self.assertIn(result["name"], [r.name for r in rows])
+
+	def test_postdated_cheque_clearance_and_undo(self):
+		mode = "_Test Cheque"
+		if not frappe.db.exists("Mode of Payment", mode):
+			frappe.get_doc({"doctype": "Mode of Payment", "mode_of_payment": mode, "type": "Bank"}).insert()
+		tomorrow = str(add_days(nowdate(), 1))
+		_, payment = self.pay(make_invoice(), mode_of_payment=mode, reference_no="CHK-01", reference_date=tomorrow)
+		name = payment["name"]
+
+		def row():
+			return next(r for r in accounting_app.get_list("acc-cheques-out", company=COMPANY) if r.name == name)
+
+		waiting = accounting_app.get_summary(company=COMPANY)["acc-cheques-out"]["count"]
+		self.assertTrue(row().postdated)
+		self.assertEqual(row().amount, 970)
+		self.assertFalse(any(r.name == name for r in accounting_app.get_list("acc-cheques-in")))
+		with self.assertRaises(frappe.ValidationError):
+			accounting_app.set_cheque_clearance(name, nowdate(), "")
+		accounting_app.set_cheque_clearance(name, tomorrow, "")
+		self.assertEqual(row().clearance_date, getdate(tomorrow))
+		self.assertFalse(row().waiting)
+		self.assertEqual(accounting_app.get_summary(company=COMPANY)["acc-cheques-out"]["count"], waiting - 1)
+		with self.assertRaises(frappe.ValidationError):
+			accounting_app.set_cheque_clearance(name, "", "")
+		accounting_app.set_cheque_clearance(name, "", tomorrow)
+		self.assertTrue(row().waiting)
+		self.assertEqual(row().docstatus, 1)
 
 	def test_unknown_list(self):
 		with self.assertRaises(frappe.PermissionError):

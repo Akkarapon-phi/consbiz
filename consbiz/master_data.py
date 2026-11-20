@@ -17,7 +17,7 @@ import frappe
 from frappe import _
 from frappe.utils import cint, flt, getdate
 
-from consbiz import store_app
+from consbiz import row_social, store_app
 
 # ช่องของฟอร์ม: (fieldname, {label, reqd, create_only (แก้ได้ตอนสร้างเท่านั้น), wide (เต็มแถว), filters (Link: {ช่องของ
 # DocType ปลายทาง: ช่องในฟอร์ม}), show (แสดงเมื่อ {ช่อง: ค่า}), labels (ป้ายไทยของ Select), select (Link ที่แสดงเป็นตัวเลือก)})
@@ -457,7 +457,7 @@ def get_list(kind, company=None, project=None):
 	filters = dict(config.get("filters") or {})
 	if company and config.get("company"):
 		filters["company"] = company
-	rows = frappe.get_list(
+	rows = row_social.get_list(
 		config["doctype"],
 		filters=filters,
 		fields=["name", "modified", "creation", *config["list"]],

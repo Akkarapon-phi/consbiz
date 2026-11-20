@@ -78,7 +78,6 @@
 					<template #loss_percent="{ row }">{{
 						(row.loss_percent || 0).toFixed(1)
 					}}</template>
-					<template #modified="{ row }">{{ time_ago(row.modified) }}</template>
 				</DataTable>
 				<div v-else class="ss-list">
 					<button
@@ -152,7 +151,6 @@ import {
 	show_error,
 	state,
 	thai_date,
-	time_ago,
 } from "../../../shared/api.js";
 
 const API = "consbiz.bar_cut_app";
@@ -163,7 +161,6 @@ const COLUMNS = [
 	{ key: "pieces", label: "ชิ้น", sort: true, class: "is-num" },
 	{ key: "total_weight", label: "เหล็กที่ใช้ (กก.)", sort: true, class: "is-num" },
 	{ key: "loss_percent", label: "เศษทิ้ง %", sort: true, class: "is-num" },
-	{ key: "modified", label: "แก้ไขล่าสุด", sort: true, class: "col-modified col-wide" },
 ];
 
 const wide = use_wide();

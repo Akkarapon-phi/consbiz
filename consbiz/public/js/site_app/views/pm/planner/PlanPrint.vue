@@ -156,6 +156,8 @@
 			:html="result.html"
 			:width="sheet_w"
 			:height="sheet_h"
+			:page_height="paper_h + 2 * GUTTER"
+			document_kind="plan"
 			:pages="result.pages"
 			:fetch_file="fetch_pdf"
 			:name="file_name"
@@ -471,11 +473,11 @@ const sheet_w = computed(() => {
 	const [short, long] = result.value.size || [297, 420];
 	return (options.orientation === "landscape" ? long : short) * MM + 2 * GUTTER;
 });
-const sheet_h = computed(() => {
+const paper_h = computed(() => {
 	const [short, long] = result.value.size || [297, 420];
-	const paper = (options.orientation === "landscape" ? short : long) * MM;
-	return GUTTER + (result.value.pages || 1) * (paper + GUTTER);
+	return (options.orientation === "landscape" ? short : long) * MM;
 });
+const sheet_h = computed(() => GUTTER + (result.value.pages || 1) * (paper_h.value + GUTTER));
 const fit_zoom = computed(() => (stage_w.value ? Math.min(stage_w.value / sheet_w.value, 2) : 0.5));
 const zoom = computed(() => manual_zoom.value ?? fit_zoom.value);
 const sheet_style = computed(() => ({

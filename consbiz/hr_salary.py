@@ -15,7 +15,7 @@ import frappe
 from frappe import _
 from frappe.utils import flt, getdate
 
-from consbiz import hr_attendance, hr_payroll
+from consbiz import hr_attendance, hr_payroll, row_social
 
 # ตัวย่อรายการที่ระบบคำนวณ/สร้างเอง ไม่ให้ลงด้วยมือ
 MANAGED_ABBR = {"SAL", "SSF", "WHT", "SAD", "UNP"}
@@ -97,10 +97,11 @@ def get_adjustments(month, company=None):
 	rows = frappe.get_all(
 		"Additional Salary",
 		filters={"company": company, "docstatus": 1, "payroll_date": ("between", [start, end])},
-		fields=["name", "employee", "employee_name", "salary_component", "type", "amount", "payroll_date", "owner", "creation"],
+		fields=["name", "employee", "employee_name", "salary_component", "type", "amount", "payroll_date", "owner", "creation", "modified"],
 		order_by="employee_name asc, creation asc",
 		limit_page_length=0,
 	)
+	row_social.attach(rows, "Additional Salary")
 	managed = managed_components(company)
 	for row in rows:
 		row.note = last_comment("Additional Salary", row.name)
@@ -190,7 +191,7 @@ def get_salaries(company=None):
 	assignments = frappe.get_all(
 		"Salary Structure Assignment",
 		filters={"company": company, "docstatus": 1},
-		fields=["name", "employee", "salary_structure", "base", "from_date"],
+		fields=["name", "employee", "salary_structure", "base", "from_date", "modified"],
 		order_by="from_date asc",
 		limit_page_length=0,
 	)
@@ -204,12 +205,14 @@ def get_salaries(company=None):
 	for e in frappe.get_all(
 		"Employee",
 		filters={"company": company, "status": "Active"},
-		fields=["name", "employee_name", "designation", "department", "date_of_joining", "custom_project as project"],
+		fields=["name", "employee_name", "designation", "department", "date_of_joining", "custom_project as project", "modified"],
 		order_by="employee_name asc",
 	):
 		e.current = current.get(e.name)
 		e.upcoming = upcoming.get(e.name)
+		e.modified = max([e.modified, *(a.modified for a in (e.current, e.upcoming) if a)])
 		rows.append(e)
+	row_social.attach(rows, "Employee")
 	return {
 		"company": company,
 		"rows": rows,

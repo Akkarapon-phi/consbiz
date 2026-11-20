@@ -13,7 +13,7 @@ from frappe.contacts.doctype.address.address import get_default_address
 from frappe.desk.form import assign_to
 from frappe.utils import cint, getdate, nowdate
 
-from consbiz import store_app
+from consbiz import row_social, store_app
 from consbiz.consbiz.doctype.envelope.envelope import make_envelope
 from consbiz.site_app import pdf_url
 
@@ -200,7 +200,7 @@ def get_list(kind, company=None, project=None):
 		filters["company"] = company
 	if project and kind != "envelopes":
 		filters["project"] = project
-	rows = frappe.get_list(
+	rows = row_social.get_list(
 		config["doctype"],
 		filters=filters,
 		fields=["name", "docstatus", "modified", *config["list"]],

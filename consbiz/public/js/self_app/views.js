@@ -16,4 +16,5 @@ export default {
 	advances: Advances,
 	approve: ApproveInbox,
 	"approve-hr": ApproveInbox,
+	"approve-purchase": ApproveInbox,
 };

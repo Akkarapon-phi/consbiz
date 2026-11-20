@@ -23,7 +23,7 @@ import frappe
 from frappe import _
 from frappe.utils import cint, flt, getdate, nowdate
 
-from consbiz import app_settings, store_app
+from consbiz import app_settings, row_social, store_app
 from consbiz.site_stock import construction_management_of
 
 LIST_LIMIT = 60
@@ -251,6 +251,7 @@ def add_office_boot(boot, sections):
 
 	# รับ/จ่ายชำระ หนังสือรับรองหัก ณ ที่จ่าย ภาษีซื้อ-ขาย รายงานภาษี (เมนูในหมวดบัญชี + ปุ่มรับ/จ่ายชำระในหน้าใบแจ้งหนี้)
 	boot["accounting"] = accounting_app.boot_permissions()
+	boot["accounting"]["expense_advances"] = readable("Employee Advance")
 	from consbiz import master_data
 
 	boot["master"] = master_data.boot_permissions()
@@ -447,10 +448,10 @@ def get_work_summary(project):
 			)
 		)
 		# อนุมัติแล้ว ยังไม่มี Daily Report (Daily Request สร้าง Daily Report ต่อได้ 1 ฉบับ)
-		result["requests_ready"] = frappe.get_list(
+		result["requests_ready"] = row_social.get_list(
 			"Daily Request",
 			filters={"construction_management": cm, "docstatus": 1, "status": "Approved"},
-			fields=["name", "date", "requested_by", "expected_progress"],
+			fields=["name", "date", "requested_by", "expected_progress", "modified"],
 			order_by="date asc",
 			limit_page_length=5,
 		)
@@ -576,10 +577,10 @@ DOCUMENT_LISTS = {
 def document_rows(cm, doctype):
 	"""รายการเอกสารของแผนงาน ล่าสุดก่อน มูลค่างานเพิ่ม-ลดเฉพาะผู้ที่เห็นงบต้นทุน (เกณฑ์เดียวกับเมนูการเงิน)"""
 	fields, status_field, date_field = DOCUMENT_LISTS[doctype]
-	fields = ["name", "docstatus", *fields]
+	fields = ["name", "docstatus", "modified", *fields]
 	if doctype == "Variation Order" and can_view_finance():
 		fields.append("net_amount")
-	rows = frappe.get_list(
+	rows = row_social.get_list(
 		doctype,
 		filters={"construction_management": cm, "docstatus": ("<", 2)},
 		fields=fields,
@@ -656,10 +657,10 @@ def get_report_list(project, kind):
 		frappe.throw(_("ไม่รองรับ {0}").format(kind))
 	rows = []
 	if readable(doctype):
-		rows = frappe.get_list(
+		rows = row_social.get_list(
 			doctype,
 			filters={"construction_management": cm, "docstatus": ("<", 2)},
-			fields=["name", "date", "docstatus", "owner", *REPORT_LIST_FIELDS[doctype]],
+			fields=["name", "date", "docstatus", "owner", "modified", *REPORT_LIST_FIELDS[doctype]],
 			order_by="date desc, creation desc",
 			limit_page_length=0,
 		)
@@ -768,8 +769,10 @@ ROW_VIEW_FIELDS = (
 
 def print_options(doctype):
 	"""Print Format ชื่อเดียวกับ DocType และตัวสร้าง PDF แบบปุ่ม PDF ของหน้าพิมพ์ในระบบเต็ม
-	(ของ Print Format ถ้าตั้งไว้ ไม่งั้นของ Print Settings)"""
-	print_format = doctype if frappe.db.exists("Print Format", doctype) else None
+	(ของ Print Format ถ้าตั้งไว้ ไม่งั้นของ Print Settings) แบบที่ตั้งในแอป (print_settings, เช่น ตั้งค่าจัดซื้อ) มาก่อน"""
+	from consbiz.print_settings import chosen_format
+
+	print_format = chosen_format(doctype) or (doctype if frappe.db.exists("Print Format", doctype) else None)
 	generator = (
 		(print_format and frappe.db.get_value("Print Format", print_format, "pdf_generator"))
 		or frappe.db.get_single_value("Print Settings", "pdf_generator")

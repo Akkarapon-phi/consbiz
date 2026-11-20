@@ -102,10 +102,11 @@
 						<table class="ss-table ss-table--list">
 							<thead>
 								<tr>
-									<th>เลขที่</th>
+									<th>{{ accounting_list ? "เลขที่ / สถานะ" : "เลขที่" }}</th>
 									<th>วันที่</th>
 									<th class="is-num">ยอด</th>
-									<th>สถานะ</th>
+									<th v-if="!accounting_list">สถานะ</th>
+									<th class="col-modified"></th>
 								</tr>
 							</thead>
 							<tbody>
@@ -116,6 +117,9 @@
 								>
 									<td>
 										<span class="ss-doc-no">{{ c.name }}</span>
+										<small v-if="accounting_list && c.status_label">
+											<span class="ss-tag" :class="`tone-${c.status_tone}`">{{ c.status_label }}</span>
+										</small>
 									</td>
 									<td>
 										{{
@@ -127,11 +131,12 @@
 									<td class="is-num">
 										<b>{{ money(c.amount) }}</b>
 									</td>
-									<td>
+									<td v-if="!accounting_list">
 										<span class="ss-tag" :class="`tone-${c.status_tone}`">{{
 											c.status_label
 										}}</span>
 									</td>
+									<ModifiedCell :value="c.modified" :row="c" />
 								</tr>
 							</tbody>
 						</table>
@@ -455,6 +460,7 @@
 </template>
 
 <script setup>
+import ModifiedCell from "../../../shared/components/ModifiedCell.vue";
 import { computed, inject, ref } from "vue";
 import DateInput from "../../../shared/components/DateInput.vue";
 import DeleteSheet from "../../../shared/components/DeleteSheet.vue";
@@ -491,6 +497,7 @@ const reload_summary = inject("reload_summary");
 const params = state.route.params;
 const page = state.route.view;
 const list_view = DOC_PAGES[page];
+const accounting_list = list_view.startsWith("acc-");
 const side = SIDE_OF_TYPE[params.type] || "in";
 const text = SIDE_TEXT[side];
 const source = is_source(params.type);

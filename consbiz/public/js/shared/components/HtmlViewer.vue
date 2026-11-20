@@ -3,7 +3,7 @@
      แถบบน: ซูม / พิมพ์ (พิมพ์ iframe นี้เอง) / แชร์ไฟล์ PDF / ดาวน์โหลด PDF
      ไฟล์ PDF (fetch_file) เริ่มสร้างเบื้องหลังตอนเปิด ไม่ต้องรอก่อนแสดง และพร้อมแล้วตอนกดแชร์
      (Web Share ต้องเรียกทันทีหลังผู้ใช้กด ถ้ารอสร้าง PDF นานเบราว์เซอร์จะไม่ยอมแชร์)
-     zoom 1 = พอดีความกว้างจอ iframe ไม่รับการแตะ (pointer-events: none) ให้ซูมสองนิ้ว/เลื่อนที่กรอบนอก -->
+     zoom 1 = ขนาดจริง iframe ไม่รับการแตะ (pointer-events: none) ให้ซูมสองนิ้ว/เลื่อนที่กรอบนอก -->
 <template>
 	<Teleport to="body">
 		<Transition name="ss-pdf">
@@ -18,17 +18,28 @@
 							>{{ name }}<template v-if="pages"> · {{ pages }} หน้า</template></small
 						>
 					</div>
+					<!-- ตัวเลือกของเอกสาร (เช่น ฉบับที่พิมพ์ ต้นฉบับ/สำเนา) -->
+					<div v-if="$slots.tools" class="ss-pdf-tools"><slot name="tools" /></div>
+					<button type="button" class="ss-btn ss-btn--ghost ss-html-fit" @click="toggle_fit">
+						{{ mode === "page" ? "พอดีความกว้าง" : "พอดีหน้า" }}
+					</button>
 					<div class="ss-pdf-zoom">
-						<button type="button" class="ss-icon-btn" aria-label="ย่อ" :disabled="zoom <= 1" @click="set_zoom(zoom - 0.5)">
+						<button
+							type="button"
+							class="ss-icon-btn"
+							aria-label="ย่อ"
+							:disabled="scale <= fit_page"
+							@click="set_zoom(scale / 1.25)"
+						>
 							<Icon name="minus" :size="18" :stroke="2.4" />
 						</button>
-						<span>{{ Math.round(zoom * 100) }}%</span>
+						<span>{{ Math.round(scale * 100) }}%</span>
 						<button
 							type="button"
 							class="ss-icon-btn"
 							aria-label="ขยาย"
-							:disabled="zoom >= max_zoom"
-							@click="set_zoom(zoom + 0.5)"
+							:disabled="scale >= max_zoom"
+							@click="set_zoom(scale * 1.25)"
 						>
 							<Icon name="plus" :size="18" :stroke="2.4" />
 						</button>
@@ -40,6 +51,7 @@
 					<button
 						type="button"
 						class="ss-icon-btn"
+						v-if="fetch_file"
 						:aria-label="file_label('แชร์ไฟล์ PDF ไปแอปอื่น')"
 						:title="file_label('แชร์ไฟล์ PDF ไปแอปอื่น')"
 						:disabled="file_state === 'loading'"
@@ -51,6 +63,7 @@
 					<button
 						type="button"
 						class="ss-icon-btn"
+						v-if="fetch_file"
 						:aria-label="file_label('ดาวน์โหลด PDF')"
 						:title="file_label('ดาวน์โหลด PDF')"
 						:disabled="file_state === 'loading'"
@@ -63,22 +76,26 @@
 
 				<div
 					ref="scroller"
-					class="ss-pdf-pages"
-					@dblclick="set_zoom(zoom > 1 ? 1 : 2)"
+					class="ss-pdf-pages ss-html-pages"
+					@dblclick="double_click_zoom"
 					@touchstart="pinch_start"
 					@touchmove="pinch_move"
 					@touchend="pinch_end"
 					@touchcancel="pinch_end"
 				>
 					<div ref="holder" class="ss-pdf-holder">
-						<div class="ss-html-sheet" :style="{ width: `${width * scale}px`, height: `${height * scale}px` }">
+						<div
+							ref="sheet"
+							class="ss-html-sheet"
+							:style="{ width: `${width * scale}px`, height: `${sheet_h * scale}px` }"
+						>
 							<iframe
 								ref="frame"
 								class="ss-html-frame"
 								:title="title"
 								tabindex="-1"
 								scrolling="no"
-								:style="{ width: `${width}px`, height: `${height}px`, transform: `scale(${scale})` }"
+								:style="{ width: `${width}px`, height: `${sheet_h}px`, transform: `scale(${scale})` }"
 							></iframe>
 						</div>
 					</div>
@@ -100,20 +117,27 @@ const props = defineProps({
 	html: String,
 	width: { type: Number, required: true },
 	height: { type: Number, required: true },
+	page_height: Number, // ความสูงหน้าเดียว เมื่อ height เป็นความสูงรวมหลายหน้า
+	document_kind: { type: String, required: true },
 	pages: Number,
 	name: String,
 	title: String,
 	fetch_file: Function,
 	file_name: String,
 	max_zoom: { type: Number, default: 8 },
+	// สูงตามเนื้อหาจริงของเอกสาร (หน้าพิมพ์ของ Frappe /printview ที่ไม่รู้ความสูงล่วงหน้า) height = ค่าเริ่มต้นก่อนวัด
+	fit_height: Boolean,
+	// เปลี่ยนค่า = สร้างไฟล์ PDF ใหม่ (ตัวเลือกของเอกสารเปลี่ยน เช่น ฉบับที่พิมพ์)
+	file_key: String,
 });
 const emit = defineEmits(["close"]);
 
 const scroller = ref(null);
 const holder = ref(null);
+const sheet = ref(null);
 const frame = ref(null);
-const zoom = ref(1);
-const view_w = ref(0);
+const preference = ref(null);
+const canvas = ref({ width: 0, height: 0, phone: false });
 const printing = ref(false);
 const file = shallowRef(null);
 // loading / ready / error (กดอีกครั้ง = ลองสร้างใหม่)
@@ -121,14 +145,54 @@ const file_state = ref("loading");
 let file_error = "";
 let file_job = 0;
 let pinch = null;
-let pending_scroll = null;
 
-const scale = computed(() => (view_w.value ? (view_w.value / props.width) * zoom.value : 0.3));
+const measured_h = ref(0);
+const sheet_h = computed(() => (props.fit_height && measured_h.value) || props.height);
+const storage_key = computed(() => `consbiz.print.zoom.${props.document_kind}`);
+const default_mode = computed(() => (canvas.value.phone ? "width" : "page"));
+const mode = computed(() => preference.value ?? default_mode.value);
+const fit_width = computed(() => Math.min(1, (canvas.value.width || props.width) / props.width));
+const fit_page = computed(() =>
+	Math.min(fit_width.value, (canvas.value.height || props.height) / (props.page_height || props.height))
+);
+const scale = computed(() => {
+	if (mode.value === "page") return fit_page.value;
+	if (mode.value === "width") return fit_width.value;
+	return Math.max(fit_page.value, Math.min(props.max_zoom, mode.value));
+});
 const file_label = (label) =>
 	file_state.value === "loading" ? "กำลังสร้าง PDF…" : file_state.value === "error" ? `${label} (ลองใหม่)` : label;
 
 function measure() {
-	if (scroller.value) view_w.value = scroller.value.clientWidth - 24;
+	const el = scroller.value;
+	if (!el) return;
+	const css = getComputedStyle(el);
+	canvas.value = {
+		width: Math.max(1, el.clientWidth - parseFloat(css.paddingLeft) - parseFloat(css.paddingRight)),
+		height: Math.max(1, el.clientHeight - parseFloat(css.paddingTop) - parseFloat(css.paddingBottom)),
+		phone: window.innerWidth < 768,
+	};
+}
+
+function read_zoom() {
+	preference.value = null;
+	try {
+		const saved = JSON.parse(localStorage.getItem(storage_key.value));
+		if (saved === "page" || saved === "width" || (Number.isFinite(saved) && saved > 0)) {
+			preference.value = saved;
+		}
+	} catch {
+		// ใช้ค่าเริ่มต้นเมื่อเบราว์เซอร์ปิดการเก็บข้อมูล
+	}
+}
+
+function remember_zoom(value) {
+	preference.value = value;
+	try {
+		localStorage.setItem(storage_key.value, JSON.stringify(value));
+	} catch {
+		// ยังใช้ค่าที่เลือกได้ในหน้าต่างนี้
+	}
 }
 
 function write() {
@@ -137,6 +201,18 @@ function write() {
 	doc.open();
 	doc.write(props.html);
 	doc.close();
+	if (props.fit_height) {
+		measured_h.value = 0;
+		const win = frame.value.contentWindow;
+		const fit = () => {
+			const d = frame.value?.contentDocument;
+			if (d?.documentElement) measured_h.value = Math.max(d.documentElement.scrollHeight, d.body?.scrollHeight || 0);
+		};
+		win.addEventListener("load", fit);
+		win.document.fonts?.ready.then(fit);
+		setTimeout(fit, 600);
+		setTimeout(fit, 1500);
+	}
 }
 
 async function server_reason(response) {
@@ -232,25 +308,40 @@ function print() {
 		});
 }
 
-// ซูมด้วยปุ่ม: คงจุดกลางจอไว้
-function set_zoom(value) {
-	const next = Math.max(1, Math.min(props.max_zoom, value));
-	if (next === zoom.value) return;
-	const el = scroller.value;
-	if (el && !pending_scroll) {
-		const k = next / zoom.value;
-		pending_scroll = {
-			left: (el.scrollLeft + el.clientWidth / 2) * k - el.clientWidth / 2,
-			top: (el.scrollTop + el.clientHeight / 2) * k - el.clientHeight / 2,
-		};
-	}
-	zoom.value = next;
+function toggle_fit() {
+	remember_zoom(mode.value === "page" ? "width" : "page");
+	scroller.value?.scrollTo(0, 0);
 }
-watch(zoom, async () => {
+
+// คงตำแหน่งบนกระดาษที่อยู่ใต้จุดกลางจอหรือจุดกึ่งกลางระหว่างนิ้ว
+async function set_zoom(value, x, y) {
+	const next = Math.max(fit_page.value, Math.min(props.max_zoom, value));
+	if (next === scale.value) return;
+	const el = scroller.value;
+	const paper = sheet.value;
+	if (!el || !paper) return;
+	const view = el.getBoundingClientRect();
+	const before = paper.getBoundingClientRect();
+	x ??= view.left + view.width / 2;
+	// เมื่อเห็นทั้งแผ่น ให้เริ่มขยายจากด้านบนของหน้า
+	y ??= before.height <= view.height ? before.top : view.top + view.height / 2;
+	const ratio = next / scale.value;
+	remember_zoom(next === fit_page.value ? "page" : next);
 	await nextTick();
-	if (pending_scroll && scroller.value) scroller.value.scrollTo(pending_scroll);
-	pending_scroll = null;
-});
+	if (sheet.value !== paper) return;
+	const after = paper.getBoundingClientRect();
+	el.scrollBy(after.left + (x - before.left) * ratio - x, after.top + (y - before.top) * ratio - y);
+}
+
+function double_click_zoom() {
+	const base = default_mode.value === "page" ? fit_page.value : fit_width.value;
+	if (scale.value > base) {
+		remember_zoom(default_mode.value);
+		scroller.value?.scrollTo(0, 0);
+	} else {
+		set_zoom(base * 2);
+	}
+}
 
 // ซูมสองนิ้ว: ระหว่างขยับใช้ transform ทั้งกรอบ ปล่อยนิ้วแล้วตั้ง scale ใหม่ (ตัวอักษรวาดใหม่ คม)
 const finger_gap = ([a, b]) => Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
@@ -260,28 +351,25 @@ function pinch_start(event) {
 	const x = (a.clientX + b.clientX) / 2;
 	const y = (a.clientY + b.clientY) / 2;
 	const box = holder.value.getBoundingClientRect();
-	pinch = { gap: finger_gap(event.touches), x, y, ox: x - box.left, oy: y - box.top, k: 1 };
-	holder.value.style.transformOrigin = `${pinch.ox}px ${pinch.oy}px`;
+	pinch = { gap: finger_gap(event.touches), x, y, k: 1 };
+	holder.value.style.transformOrigin = `${x - box.left}px ${y - box.top}px`;
 }
 function pinch_move(event) {
 	if (!pinch || event.touches.length !== 2) return;
 	event.preventDefault();
-	pinch.k = Math.min(props.max_zoom / zoom.value, Math.max(1 / zoom.value, finger_gap(event.touches) / pinch.gap));
+	pinch.k = Math.min(
+		props.max_zoom / scale.value,
+		Math.max(fit_page.value / scale.value, finger_gap(event.touches) / pinch.gap)
+	);
 	holder.value.style.transform = `scale(${pinch.k})`;
 }
 function pinch_end() {
 	if (!pinch) return;
-	const { k, x, y, ox, oy } = pinch;
+	const { k, x, y } = pinch;
 	pinch = null;
 	holder.value.style.transform = "";
 	if (Math.abs(k - 1) < 0.02) return;
-	const view = scroller.value.getBoundingClientRect();
-	const box = holder.value.getBoundingClientRect();
-	pending_scroll = {
-		left: scroller.value.scrollLeft + box.left - view.left + ox * k - (x - view.left),
-		top: scroller.value.scrollTop + box.top - view.top + oy * k - (y - view.top),
-	};
-	set_zoom(zoom.value * k);
+	set_zoom(scale.value * k, x, y);
 }
 
 const on_key = (event) => event.key === "Escape" && emit("close");
@@ -289,15 +377,16 @@ let observer = null;
 
 watch(
 	() => props.open,
-	async (open) => {
+	async (open, was_open) => {
+		if (!open && !was_open) return;
 		document.body.classList.toggle("ss-locked", open);
 		window[open ? "addEventListener" : "removeEventListener"]("keydown", on_key);
 		if (open) {
-			zoom.value = 1;
+			read_zoom();
 			if (props.fetch_file) make_file();
 			await nextTick();
+			if (!props.open || !scroller.value) return;
 			measure();
-			write();
 			observer = new ResizeObserver(measure);
 			observer.observe(scroller.value);
 		} else {
@@ -305,12 +394,19 @@ watch(
 			file.value = null;
 			observer?.disconnect();
 			observer = null;
+			pinch = null;
 		}
-	}
+	},
+	{ immediate: true }
 );
 watch(
-	() => props.html,
-	() => props.open && write()
+	() => props.document_kind,
+	() => props.open && read_zoom()
+);
+watch([frame, () => props.html], () => props.open && write(), { flush: "post" });
+watch(
+	() => props.file_key,
+	() => props.open && props.fetch_file && make_file()
 );
 
 onBeforeUnmount(() => {
@@ -319,3 +415,22 @@ onBeforeUnmount(() => {
 	observer?.disconnect();
 });
 </script>
+
+<style scoped>
+.ss-html-pages {
+	scrollbar-gutter: stable both-edges;
+	padding: 24px 24px calc(24px + var(--ss-bottom));
+}
+.ss-html-fit {
+	white-space: nowrap;
+}
+@media (max-width: 767px) {
+	.ss-html-pages {
+		scrollbar-gutter: auto;
+		padding: 12px 12px calc(12px + var(--ss-bottom));
+	}
+	.ss-html-fit {
+		display: none;
+	}
+}
+</style>

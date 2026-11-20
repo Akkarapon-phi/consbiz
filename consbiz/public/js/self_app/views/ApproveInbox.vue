@@ -91,7 +91,7 @@ import Empty from "../../shared/components/Empty.vue";
 import Segmented from "../../shared/components/Segmented.vue";
 import ApprovalSheet from "../../shared/approvals/ApprovalSheet.vue";
 import ListHead from "../../shared/components/ListHead.vue";
-import { inbox_items, KINDS, kinds_of, MODULES } from "../../shared/approvals/kinds.js";
+import { doc_page_url, inbox_items, KINDS, kinds_of, MODULES } from "../../shared/approvals/kinds.js";
 import { use_wide } from "../../shared/table.js";
 import { boot, call, initials, money, show_error, state, tone } from "../../shared/api.js";
 
@@ -144,7 +144,11 @@ watch(mode, () => {
 	load();
 });
 
-const open = (item) => (viewing.value = item);
+// เอกสารจัดซื้อ: เปิดหน้าเอกสาร (อีก bundle) ชนิดอื่น: แผงรายละเอียด + อนุมัติในหน้านี้
+const open = (item) => {
+	if (KINDS[item.kind].page) window.location.href = doc_page_url(item);
+	else viewing.value = item;
+};
 
 async function on_done() {
 	viewing.value = null;

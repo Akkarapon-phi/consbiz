@@ -9,6 +9,7 @@ import frappe
 from frappe import _
 from frappe.utils import flt, getdate, nowdate
 
+from consbiz import row_social
 from consbiz.consbiz.doctype.labour_timesheet.labour_timesheet import MAX_HOURS, period_of
 
 WORKER_FIELDS = ["name", "worker_name", "position", "team", "payee_type", "supplier", "daily_rate", "sso_registered"]
@@ -250,7 +251,7 @@ def get_workers(project=None, status="Active"):
 		filters["project"] = project
 	if status in ("Active", "Inactive"):
 		filters["status"] = status
-	rows = frappe.get_list(
+	rows = row_social.get_list(
 		"Daily Worker",
 		filters=filters,
 		fields=[
@@ -268,6 +269,7 @@ def get_workers(project=None, status="Active"):
 			"nationality",
 			"phone",
 			"status",
+			"modified",
 		],
 		order_by="worker_name asc",
 		limit_page_length=0,
@@ -319,7 +321,7 @@ def get_print_url(name):
 def get_advances(project):
 	frappe.has_permission("Project", "read", project, throw=True)
 	frappe.has_permission("Labour Advance", "read", throw=True)
-	rows = frappe.get_list(
+	rows = row_social.get_list(
 		"Labour Advance",
 		filters={"project": project, "docstatus": ("<", 2)},
 		fields=[
@@ -334,6 +336,7 @@ def get_advances(project):
 			"docstatus",
 			"remark",
 			"paid_from_account",
+			"modified",
 		],
 		order_by="date desc, creation desc",
 		limit_page_length=500,

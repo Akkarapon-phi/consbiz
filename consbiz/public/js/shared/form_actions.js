@@ -3,7 +3,7 @@
 // ขั้นตอน (แสดงทีละขั้น ไม่ขึ้นพร้อมกัน):
 //   ร่างใหม่ / ร่างที่ยังไม่บันทึก        → บันทึก
 //   ร่างที่บันทึกแล้ว                    → ส่งอนุมัติ / อนุมัติ / ยืนยัน (ตามชนิดเอกสาร)
-//   รออนุมัติ                            → ผู้ส่ง: ดึงกลับ  ผู้อนุมัติ: ไม่อนุมัติ + อนุมัติ
+//   รออนุมัติ                            → ผู้ส่ง: ดึงกลับ  ผู้อนุมัติ: ส่งกลับแก้ไข + ไม่อนุมัติ (ปิดเลย ถ้าชนิดนั้นมี) + อนุมัติ
 //   อนุมัติ/ยืนยันแล้ว                   → ยกเลิก (+ ขั้นถัดไปของเอกสาร เช่น สร้างใบแจ้งหนี้)
 //   ยกเลิกแล้ว                           → แก้ไขฉบับใหม่ (เฉพาะชนิดที่แอปทำ amend ได้)
 // ป้ายปุ่มยืนยันขั้นตอน:
@@ -17,6 +17,10 @@ export const LABELS = {
 	send: "ส่งอนุมัติ",
 	approve: "อนุมัติ",
 	reject: "ไม่อนุมัติ",
+	// เอกสารที่ "ลงนาม" แทนการอนุมัติ (ใบสั่งซื้อ/ใบแจ้งหนี้ซื้อ, consbiz/doc_approval.py)
+	send_sign: "ส่งลงนาม",
+	sign: "ลงนาม",
+	send_back: "ส่งกลับแก้ไข",
 	confirm: "ยืนยัน",
 	withdraw: "ดึงกลับ",
 	cancel: "ยกเลิก",
@@ -51,25 +55,29 @@ function action(key, step, tone, label) {
 // o = {
 //   stage: "draft" | "pending" | "done" | "cancelled",
 //   is_new, dirty,
-//   save, save_after (บันทึกช่องที่แก้ได้หลังยืนยัน แสดงเมื่อ dirty), submit (label = LABELS.send/approve/confirm), reject, withdraw, cancel, amend,
+//   save, save_after (บันทึกช่องที่แก้ได้หลังยืนยัน แสดงเมื่อ dirty), send (ส่งอนุมัติ/ส่งลงนาม), submit (label = LABELS.send/approve/confirm), reject, withdraw, cancel, amend,
+//   ร่างที่มีทั้ง send และ submit (ผู้มีสิทธิ์อนุมัติเอง) = ปุ่มหลักคือ submit ส่วน send เป็นปุ่มรอง
 //   next: [step] = ขั้นถัดไปหลังยืนยัน (ตัวแรก = ปุ่มหลักถ้าไม่ระบุ tone), extra: [step] = ปุ่มรองที่แสดงทุกขั้น
 // }
 export function step_actions(o) {
 	const out = [];
 	const add = (a) => a && out.push(a);
 	if (o.stage === "draft") {
-		const unsaved = o.is_new || o.dirty || !o.submit;
+		const unsaved = o.is_new || o.dirty || (!o.submit && !o.send);
 		if (unsaved && o.save) {
 			const s = typeof o.save === "function" ? { run: o.save } : { ...o.save };
 			if (!o.is_new && !o.dirty) s.disabled = true;
 			add(action("save", s, "primary", LABELS.save));
 		} else if (!unsaved) {
 			add(action("reject", o.reject, "danger", LABELS.reject));
+			add(action("send", o.send, o.submit ? "soft" : "primary", LABELS.send));
 			add(action("submit", o.submit, "primary", LABELS.confirm));
 		}
 	} else if (o.stage === "pending") {
 		add(action("withdraw", o.withdraw, "soft", LABELS.withdraw));
 		add(action("reject", o.reject, "danger", LABELS.reject));
+		// ไม่อนุมัติแบบปิดเลย (ใบขอซื้อ, ตกลง 2026-11-19)
+		add(action("decline", o.decline, "danger", LABELS.reject));
 		add(action("submit", o.submit, "primary", LABELS.approve));
 	} else if (o.stage === "done" && o.save_after && o.dirty) {
 		// แก้ช่องที่แก้ได้หลังยืนยันค้างอยู่: บันทึกก่อน ขั้นอื่นซ่อน
@@ -83,6 +91,12 @@ export function step_actions(o) {
 		add(action("amend", o.amend, "primary", LABELS.amend));
 	}
 	(o.extra || []).filter(Boolean).forEach((n, i) => add(action(n.key || `extra${i}`, n, "soft", n.label)));
+	// รออนุมัติ/ลงนาม (ตกลง 2026-11-19): เรียงตามลำดับที่ใส่ ดึงกลับ → ส่งกลับแก้ไข → (ลงนามแทน) → ลงนาม
+	if (o.stage === "pending") {
+		const submit = out.findIndex((a) => a.key === "submit");
+		if (submit >= 0) out.push(...out.splice(submit, 1));
+		return out;
+	}
 	out.sort((a, b) => ORDER[a.tone] - ORDER[b.tone]);
 	// ปุ่มหลักมีได้ 1 ปุ่ม (ขวาสุด)
 	const primaries = out.filter((a) => a.tone === "primary");

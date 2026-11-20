@@ -1,5 +1,5 @@
 <!-- ค่าที่แก้ได้ทีละช่อง (เช่น ช่อง Allow on Submit ของเอกสารที่ส่งแล้ว): ค่า + ดินสอเล็ก
-     จอใช้เมาส์ = แก้ตรงที่เดิม (✓ / ✕, Enter บันทึก, Esc ยกเลิก) จอสัมผัส = sheet เล็กจากด้านล่าง
+     แก้ตรงที่เดิมทุกจอ (✓ / ✕, Enter บันทึก, Esc ยกเลิก) ไม่มี popup (ตกลง 2026-11-18 เดิมจอสัมผัสเปิด sheet)
      ค่าว่าง = ปุ่ม "+ เพิ่ม" save(value, apply) คืน Promise ปิดตัวแก้เมื่อสำเร็จ -->
 <template>
 	<span class="ss-ie" :class="{ 'is-block': multiline, 'is-editing': editing && inline }">
@@ -69,47 +69,13 @@
 			</span>
 		</span>
 
-		<Sheet v-if="!inline" :open="editing" :title="`แก้ไข${label}`" :subtitle="subtitle" @close="cancel">
-			<div class="ss-ie-sheet">
-				<DateInput
-					v-if="fieldtype === 'Date'"
-					v-model="draft"
-					:label="label"
-					:min="min"
-					:clearable="!required"
-				/>
-				<textarea
-					v-else-if="multiline"
-					v-model="draft"
-					class="ss-input"
-					rows="4"
-					:aria-label="label"
-				></textarea>
-				<input v-else v-model="draft" class="ss-input" type="text" :aria-label="label" />
-				<label v-if="apply_label" class="ss-ie-apply">
-					<input v-model="apply" type="checkbox" class="ss-check" /> {{ apply_label }}
-				</label>
-			</div>
-			<template #footer>
-				<button
-					type="button"
-					class="ss-btn ss-btn--primary ss-btn--block ss-btn--lg"
-					:disabled="busy"
-					@click="commit"
-				>
-					<span v-if="busy" class="ss-spinner"></span>
-					<template v-else>บันทึก</template>
-				</button>
-			</template>
-		</Sheet>
 	</span>
 </template>
 
 <script setup>
-import { computed, nextTick, onBeforeUnmount, ref } from "vue";
+import { computed, nextTick, ref } from "vue";
 import Icon from "./Icon.vue";
 import DateInput from "./DateInput.vue";
-import Sheet from "./Sheet.vue";
 
 const props = defineProps({
 	modelValue: { type: [String, Number], default: null },
@@ -138,12 +104,8 @@ const empty = computed(
 	() => props.modelValue === null || props.modelValue === undefined || props.modelValue === ""
 );
 
-// แก้ตรงที่เดิมเฉพาะจอที่ใช้เมาส์ (≥768) จอสัมผัสเปิด sheet (ช่องเล็กกดยาก)
-const mq = window.matchMedia("(hover: hover) and (pointer: fine) and (min-width: 768px)");
-const inline = ref(mq.matches);
-const on_media = () => (inline.value = mq.matches);
-mq.addEventListener("change", on_media);
-onBeforeUnmount(() => mq.removeEventListener("change", on_media));
+// แก้ตรงที่เดิมทุกจอ (ตกลง 2026-11-18)
+const inline = true;
 
 async function start() {
 	draft.value = props.modelValue ?? (props.fieldtype === "Date" ? null : "");

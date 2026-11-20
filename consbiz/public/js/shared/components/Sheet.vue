@@ -11,6 +11,7 @@
 				:style="drag ? { transform: `translateY(${drag}px)`, transition: 'none' } : null"
 				role="dialog"
 				aria-modal="true"
+				:aria-label="title"
 			>
 				<div class="ss-sheet-grip" @pointerdown="start_drag">
 					<span></span>

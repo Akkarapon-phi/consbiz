@@ -5,7 +5,7 @@
 		class="ss-card"
 		:class="{ 'is-late': row.overdue }"
 		:style="{ '--i': i }"
-		@click="go(`${config.section}-doc`, { kind, name: row.name })"
+		@click="go_doc(kind, 'doc', { name: row.name })"
 	>
 		<!-- 2 บรรทัดเต็มความกว้าง (มือถือไม่บีบชื่อคู่ค้า): ชื่อ + สถานะ / เลขที่ วันที่ + ยอดเงิน -->
 		<div class="ss-doc-row">
@@ -19,7 +19,7 @@
 			>
 			<b v-if="row.amount !== undefined" class="ss-doc-money">{{ money(row.amount) }}</b>
 		</div>
-		<div v-if="progress.length || show_due || row.outstanding" class="ss-chips ss-chips--wrap">
+		<div v-if="progress.length || show_due || row.outstanding || row.doctype" class="ss-chips ss-chips--wrap">
 			<span v-if="row.outstanding && row.outstanding !== row.amount" class="ss-chip"
 				>ค้าง <b>{{ money(row.outstanding) }}</b></span
 			>
@@ -31,15 +31,17 @@
 				{{ p.label }} <b>{{ Math.round(p.value) }}%</b>
 				<i :style="{ width: `${Math.min(100, p.value)}%` }"></i>
 			</span>
+			<RowSocial :row="row" icons_only />
 		</div>
 	</button>
 </template>
 
 <script setup>
 import { computed } from "vue";
+import RowSocial from "../components/RowSocial.vue";
 import Icon from "../components/Icon.vue";
-import { DOC_KINDS } from "./kinds.js";
-import { go, money, relative_date, thai_date } from "../api.js";
+import { DOC_KINDS, go_doc } from "./kinds.js";
+import { money, relative_date, thai_date } from "../api.js";
 
 const props = defineProps({ row: Object, kind: String, i: { type: Number, default: 0 } });
 const config = computed(() => DOC_KINDS[props.kind]);

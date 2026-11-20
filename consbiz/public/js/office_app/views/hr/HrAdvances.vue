@@ -18,7 +18,7 @@
 				v-model="filter"
 				:tabs="tabs"
 				:loading="loading"
-				create="บันทึกแทน"
+				:create="can_act_on_behalf ? 'บันทึกแทน' : ''"
 				create_title="บันทึกใบเบิกแทนพนักงาน (คนที่ไม่มีมือถือ)"
 				@refresh="load"
 				@create="start_behalf"
@@ -115,7 +115,7 @@
 				<EmployeeContext :employee="viewing.employee" kind="advance" />
 			</template>
 			<template v-if="viewing" #footer>
-				<button v-if="viewing.can_clear" type="button" class="ss-btn ss-btn--primary" @click="clear_for(viewing)">
+				<button v-if="viewing.can_clear && can_act_on_behalf" type="button" class="ss-btn ss-btn--primary" @click="clear_for(viewing)">
 					<Icon name="file" :size="16" /><span>เคลียร์แทน</span>
 				</button>
 				<a class="ss-btn ss-btn--soft" :href="`/app/employee-advance/${viewing.name}`" target="_blank">เปิดในระบบเต็ม</a>
@@ -126,7 +126,7 @@
 
 		<Teleport to="#ss-layer">
 			<Transition name="ss-pop">
-				<button v-if="data && !wide" type="button" class="ss-fab" @click="start_behalf">
+				<button v-if="data && !wide && can_act_on_behalf" type="button" class="ss-fab" @click="start_behalf">
 					<Icon name="plus" :size="26" :stroke="2.6" />
 					<span>บันทึกแทน</span>
 				</button>
@@ -193,7 +193,7 @@ import ListHead from "../../../shared/components/ListHead.vue";
 import ListCard from "../../../shared/components/ListCard.vue";
 import { find_pending } from "../../../shared/approvals/kinds.js";
 import { matches, use_wide } from "../../../shared/table.js";
-import { call, celebrate, money, remember_tab, show_error, state, thai_date, toast } from "../../../shared/api.js";
+import { boot, call, celebrate, money, remember_tab, replace_params, show_error, state, thai_date, toast } from "../../../shared/api.js";
 
 const TYPE = { "Salary Advance": "เงินเดือนล่วงหน้า", "Expense Advance": "เงินทดรองจ่าย" };
 const STAGE = {
@@ -219,7 +219,12 @@ const MODES = {
 	"hr-claims": { title: "สำรองจ่าย", types: ["reimburse"], claims: "reimburse", only_claims: true, filters: ["claims"] },
 	"hr-advances": { title: "เบิกเงิน", types: ["Salary Advance", "Expense Advance", "reimburse"], clear: true, filters: ["pending", "to_pay", "repaying", "to_clear", "claims", "all"] },
 };
-const MODE = MODES[state.route.view] || MODES["hr-advances"];
+const view = state.route.view;
+const accounting = view === "acc-expense-advances";
+const can_act_on_behalf = !accounting || boot.sections.includes("hr");
+const MODE = accounting
+	? { ...MODES["hr-expense-advances"], title: "เงินทดรองจ่าย" }
+	: MODES[view] || MODES["hr-advances"];
 const FILTERS = MODE.filters;
 
 const wide = use_wide();
@@ -360,7 +365,8 @@ watch(
 async function load() {
 	loading.value = true;
 	try {
-		data.value = await call("consbiz.hr_advances.get_advances", { company: state.company || undefined });
+		const method = accounting ? "get_accounting_advances" : "get_advances";
+		data.value = await call(`consbiz.hr_advances.${method}`, { company: state.company || undefined });
 	} catch (error) {
 		show_error(error);
 	} finally {
@@ -368,7 +374,10 @@ async function load() {
 	}
 }
 
-watch(filter, (value) => remember_tab(state.route.view, value, FILTERS[0]));
+watch(filter, (value) => {
+	if (accounting) replace_params(view, value === FILTERS[0] ? {} : { filter: value });
+	else remember_tab(view, value, FILTERS[0]);
+});
 watch(() => state.company, load);
 load();
 </script>

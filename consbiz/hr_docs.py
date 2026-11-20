@@ -12,7 +12,7 @@ import frappe
 from frappe import _
 from frappe.utils import add_days, cint, flt, getdate, nowdate
 
-from consbiz import store_app
+from consbiz import row_social, store_app
 
 # kind = ชื่อหน้ารายการใน sections.js
 KINDS = {
@@ -135,7 +135,7 @@ def get_list(kind, company=None, project=None):
 	config = config_of(kind)
 	frappe.has_permission(config["doctype"], "read", throw=True)
 	filters = {"company": company} if company else {}
-	rows = frappe.get_list(
+	rows = row_social.get_list(
 		config["doctype"],
 		filters=filters,
 		fields=["name", "docstatus", "modified", *config["list"]],

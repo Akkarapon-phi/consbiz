@@ -22,7 +22,7 @@
 					type="button"
 					class="ss-btn ss-btn--primary ss-list-create"
 					:aria-label="`สร้าง${config.label}`"
-					@click="go(`${config.section}-form`, { kind, name: 'new' })"
+					@click="go_doc(kind, 'form', { name: 'new' })"
 				>
 					<Icon name="plus" :size="18" :stroke="2.6" />
 					<span>สร้าง{{ config.label }}</span>
@@ -59,7 +59,7 @@
 				:create="can_create ? `สร้าง${config.label}` : ''"
 				:filter_count="filter_count"
 				@refresh="reload"
-				@create="go(`${config.section}-form`, { kind, name: 'new' })"
+				@create="go_doc(kind, 'form', { name: 'new' })"
 				@filters="filter_sheet = true"
 			>
 				<template v-if="can_export" #tools>
@@ -466,10 +466,9 @@ import ProjectFilter from "./ProjectFilter.vue";
 import ListHead from "../components/ListHead.vue";
 import { use_shortcuts } from "../shortcuts.js";
 import { app } from "../app.js";
-import { DOC_KINDS, can_doc } from "./kinds.js";
+import { DOC_KINDS, can_doc, doc_kind, go_doc } from "./kinds.js";
 import {
 	call,
-	go,
 	iso_date,
 	money,
 	post,
@@ -482,9 +481,10 @@ import {
 	toast,
 } from "../api.js";
 
-const kind = state.route.view;
+const view = state.route.view;
+const kind = doc_kind(view);
 const config = DOC_KINDS[kind];
-const FILTERS = ["todo", "draft", "done", "all"];
+const FILTERS = ["todo", "pending", "draft", "done", "all"];
 const RANGES = [
 	{ value: "", label: "ทุกวันที่" },
 	{ value: "month", label: "เดือนนี้" },
@@ -495,8 +495,10 @@ const RANGES = [
 ];
 const PREF_KEY = `consbiz.site.list.${kind}`;
 
+// ชนิดที่มีขั้นอนุมัติ/ลงนาม (config.pending = ป้าย, consbiz/doc_approval.py) มีแท็บ รออนุมัติ/รอลงนาม
 const tabs = [
 	{ value: "todo", label: config.todo },
+	...(config.pending ? [{ value: "pending", label: config.pending }] : []),
 	{ value: "draft", label: "ร่าง" },
 	{ value: "done", label: "เสร็จแล้ว" },
 	{ value: "all", label: "ทั้งหมด" },
@@ -725,7 +727,7 @@ watch(search, () => {
 	timer = setTimeout(reload, 300);
 });
 watch(filter, (value) => {
-	replace_params(kind, { filter: value });
+	replace_params(view, { filter: value });
 	reload();
 });
 watch([scope_key, dates, party, overdue], reload);
@@ -841,7 +843,7 @@ const search_placeholder = `ค้นหาเลขที่${config.party ? ` 
 } / สินค้า`;
 use_shortcuts({
 	"/": () => search_input.value?.focus(),
-	n: () => can_create && go(`${config.section}-form`, { kind, name: "new" }),
+	n: () => can_create && go_doc(kind, "form", { name: "new" }),
 	j: () => document.querySelector(".ss-table--list tbody tr")?.focus(),
 	k: () => document.querySelector(".ss-table--list tbody tr:last-child")?.focus(),
 });

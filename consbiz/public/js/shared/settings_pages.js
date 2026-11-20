@@ -9,6 +9,8 @@ import HrSettings from "./components/settings/HrSettings.vue";
 import ProfileSettings from "./components/settings/ProfileSettings.vue";
 import AppearanceSettings from "./components/settings/AppearanceSettings.vue";
 import ContractTemplates from "./components/settings/ContractTemplates.vue";
+import PrintSettings from "./components/settings/PrintSettings.vue";
+import ApprovalSettings from "./components/settings/ApprovalSettings.vue";
 import { boot } from "./api.js";
 
 const has_hr = () => (boot.sections || []).includes("hr");
@@ -54,6 +56,27 @@ const MODULE = [
 		icon: "file",
 		component: ContractTemplates,
 		when: () => has_hr() && !!boot.hr_docs?.["hr-contracts"],
+	},
+	// หมวดจัดซื้อ: แบบฟอร์มพิมพ์ของใบขอซื้อ/สั่งซื้อ/แจ้งหนี้ (ตกลง 2026-11-18, consbiz/print_settings.py)
+	{
+		key: "purchase-print",
+		module: "purchase",
+		group: "จัดซื้อ",
+		label: "แบบฟอร์มพิมพ์",
+		icon: "printer",
+		component: PrintSettings,
+		props: { section: "buy" },
+		when: () => (boot.sections || []).includes("purchase"),
+	},
+	// หมวดจัดซื้อ: Role ที่อนุมัติใบขอซื้อ / ลงนามใบสั่งซื้อ-ใบแจ้งหนี้ซื้อ + บันทึกการลงนามแทน (ตกลง 2026-11-19, consbiz/doc_approval.py)
+	{
+		key: "purchase-approval",
+		module: "purchase",
+		group: "จัดซื้อ",
+		label: "การอนุมัติ/ลงนาม",
+		icon: "check",
+		component: ApprovalSettings,
+		when: () => (boot.sections || []).includes("purchase"),
 	},
 	{
 		key: "labour",

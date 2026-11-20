@@ -59,6 +59,15 @@ function side_kind(view, side, label) {
 		date_label: "ครบกำหนด",
 		amount: "amount",
 		amount_label: "ยอด",
+		...(view.startsWith("acc-") ? {
+			table_pair: {
+				project: true,
+				fields: [
+					{ key: "role", label: "รายการ", format: (r) => (source(r) ? t.source : t.claim) },
+					{ key: "refs", label: "เอกสารอ้างอิง" },
+				],
+			},
+		} : {}),
 		note: (r) =>
 			source(r) && r.docstatus === 1 && !r.due_date
 				? "ยังไม่ระบุวันคืน"

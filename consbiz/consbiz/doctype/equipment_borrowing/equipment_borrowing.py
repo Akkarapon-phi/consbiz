@@ -18,6 +18,8 @@ from frappe import _
 from frappe.model.document import Document
 from frappe.utils import flt, getdate, nowdate
 
+from consbiz import row_social
+
 LOST = "Lost"
 EPSILON = 1e-9
 # ค่าที่เทียบว่าแถวคืนเดิมถูกแก้หรือไม่
@@ -181,10 +183,10 @@ def get_outstanding(project=None):
 	filters = {"docstatus": 1, "status": ("in", ("Borrowed", "Partially Returned"))}
 	if project:
 		filters["project"] = project
-	docs = frappe.get_list(
+	docs = row_social.get_list(
 		"Equipment Borrowing",
 		filters=filters,
-		fields=["name", "borrower_name", "date", "due_date", "status"],
+		fields=["name", "borrower_name", "date", "due_date", "status", "modified"],
 		order_by="due_date asc, date asc",
 		limit_page_length=100,
 	)

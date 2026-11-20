@@ -60,7 +60,6 @@
 				<template #grand_total="{ row }"
 					><b>{{ money(row.grand_total) }}</b></template
 				>
-				<template #modified="{ row }">{{ time_ago(row.modified) }}</template>
 			</DataTable>
 			<div v-else class="ss-list">
 				<button
@@ -111,7 +110,6 @@ import {
 	show_error,
 	state,
 	thai_date,
-	time_ago,
 	boot,
 } from "../../../shared/api.js";
 
@@ -126,7 +124,6 @@ const COLUMNS = [
 	{ key: "customer", label: "ลูกค้า / โครงการ", sort: true, class: "col-subject" },
 	{ key: "date", label: "วันที่", sort: true, class: "col-date is-date" },
 	{ key: "grand_total", label: "มูลค่ารวม", sort: true, class: "is-num" },
-	{ key: "modified", label: "แก้ไขล่าสุด", sort: true, class: "col-modified col-wide" },
 ];
 const FILTERS = ["draft", "submitted", "all"];
 

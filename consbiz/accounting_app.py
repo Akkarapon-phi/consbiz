@@ -15,14 +15,16 @@ import json
 
 import frappe
 from frappe import _
-from frappe.utils import cint, flt, getdate, nowdate
+from frappe.utils import cint, flt, get_last_day, getdate, nowdate
 
-from consbiz import retention_app, store_app
+from consbiz import retention_app, row_social, store_app
 
 LIST_LIMIT = 500
 INVOICES = {"si": "Sales Invoice", "pi": "Purchase Invoice"}
+CHEQUE_SIDES = {"acc-cheques-in": "Receive", "acc-cheques-out": "Pay"}
 # หน้ารายการ (view ใน sections.js) → DocType + เงื่อนไข
 LISTS = {
+	**{view: frappe._dict(doctype="Payment Entry", filters={"payment_type": side}) for view, side in CHEQUE_SIDES.items()},
 	"acc-receipts": frappe._dict(doctype="Payment Entry", filters={"payment_type": "Receive"}),
 	"acc-payments": frappe._dict(doctype="Payment Entry", filters={"payment_type": "Pay"}),
 	"acc-wht": frappe._dict(doctype="Withholding Tax Cert", filters={}),
@@ -85,12 +87,16 @@ def readable_reports():
 
 def can_account():
 	"""เห็นหมวดบัญชี: เงินประกันผลงาน (retention_app) หรือเมนูใดเมนูหนึ่งของไฟล์นี้"""
-	return retention_app.can_account() or bool(readable_lists()) or bool(readable_reports())
+	return can_read("Sales Invoice") or can_read("Purchase Invoice") or (can_read("Account") and can_read("GL Entry")) or can_read("Bank Account") or retention_app.can_account() or bool(readable_lists()) or bool(readable_reports())
 
 
 def boot_permissions():
 	"""boot.accounting: <หน้ารายการ> = สิทธิ์อ่าน, reports = รายงานที่เปิดได้, pay = รับ/จ่ายชำระจากใบแจ้งหนี้ได้"""
 	out = {view: {"read": True, "create": False} for view in readable_lists()}
+	if can_read("Bank Account"):
+		out["acc-bank-accounts"] = {"read": True, "create": bool(frappe.has_permission("Bank Account", "create"))}
+	out["acc-general-ledger"] = can_read("Account") and can_read("GL Entry")
+	out["acc-wht-received"] = can_read("Payment Entry")
 	out["reports"] = readable_reports()
 	out["pay"] = bool(frappe.has_permission("Payment Entry", "create"))
 	return out
@@ -377,8 +383,52 @@ def scope_filters(company=None, project=None, has_project=False):
 	return filters
 
 
+def cheque_modes():
+	# Bank also covers transfers, credit cards and bills of exchange on Thai sites.
+	return [
+		name for name in frappe.get_all("Mode of Payment", pluck="name")
+		if "เช็ค" in name or "cheque" in name.casefold()
+	]
+
+
+def is_cheque(pe):
+	return pe.payment_type in CHEQUE_SIDES.values() and pe.mode_of_payment in cheque_modes()
+
+
+def cheque_rows(side, filters):
+	modes = cheque_modes()
+	if not modes:
+		return []
+	receive = side == "Receive"
+	rows = row_social.get_list(
+		"Payment Entry",
+		filters={**filters, "payment_type": side, "mode_of_payment": ["in", modes]},
+		fields=[
+			"name", "docstatus", "modified", "project", "party", "party_name", "reference_no",
+			"reference_date", "clearance_date", "bank_account", "bank",
+			"paid_to as account" if receive else "paid_from as account",
+			"received_amount as amount" if receive else "paid_amount as amount",
+			"paid_to_account_currency as currency" if receive else "paid_from_account_currency as currency",
+		],
+		order_by="reference_date desc, modified desc",
+		limit_page_length=0,
+	)
+	retention_app.set_project_names(rows)
+	today = getdate()
+	for row in rows:
+		row.waiting = row.docstatus == 1 and not row.clearance_date
+		row.postdated = bool(row.waiting and row.reference_date and getdate(row.reference_date) > today)
+		if row.waiting:
+			row.status_label, row.status_tone = (_("รอเข้าบัญชี") if receive else _("รอจ่าย")), "amber"
+		elif row.docstatus == 1:
+			row.status_label, row.status_tone = _("ผ่านแล้ว"), "green"
+		else:
+			row.status_label, row.status_tone = status_of(row.docstatus)
+	return rows
+
+
 def payment_rows(config, filters):
-	rows = frappe.get_list(
+	rows = row_social.get_list(
 		"Payment Entry",
 		filters={**config.filters, **filters},
 		fields=[
@@ -399,6 +449,7 @@ def payment_rows(config, filters):
 		order_by="posting_date desc, modified desc",
 		limit_page_length=LIST_LIMIT,
 	)
+	retention_app.set_project_names(rows)
 	names = [r.name for r in rows]
 	refs = retention_app.child_values("Payment Entry Reference", "Payment Entry", names, "reference_name")
 	wht = set()
@@ -440,8 +491,8 @@ def wht_by_account(names):
 	)
 
 
-def wht_rows(filters):
-	rows = frappe.get_list(
+def wht_rows(filters, limit=LIST_LIMIT):
+	rows = row_social.get_list(
 		"Withholding Tax Cert",
 		filters=filters,
 		fields=[
@@ -456,7 +507,7 @@ def wht_rows(filters):
 			"voucher_no",
 		],
 		order_by="date desc, modified desc",
-		limit_page_length=LIST_LIMIT,
+		limit_page_length=limit,
 	)
 	totals = {}
 	names = [r.name for r in rows]
@@ -479,7 +530,7 @@ def wht_rows(filters):
 	return rows
 
 
-def tax_rows(doctype, filters):
+def tax_rows(doctype, filters, limit=LIST_LIMIT):
 	fields = [
 		"name",
 		"docstatus",
@@ -497,12 +548,12 @@ def tax_rows(doctype, filters):
 	]
 	if doctype == "Purchase Tax Invoice":
 		fields.append("number")
-	rows = frappe.get_list(
+	rows = row_social.get_list(
 		doctype,
 		filters={**filters, "docstatus": ("<", 2)} if "docstatus" not in filters else filters,
 		fields=fields,
 		order_by="report_date desc, name desc",
-		limit_page_length=LIST_LIMIT,
+		limit_page_length=limit,
 	)
 	for row in rows:
 		row.amount = flt(row.tax_amount)
@@ -516,28 +567,47 @@ def tax_rows(doctype, filters):
 	return rows
 
 
+def report_month(year, month):
+	year, month = cint(year), cint(month)
+	if not (2000 <= year <= 2700 and 1 <= month <= 12):
+		frappe.throw(_("กรุณาเลือกเดือนและปี"))
+	start = getdate(f"{year}-{month:02d}-01")
+	return start, get_last_day(start)
+
+
 @frappe.whitelist()
-def get_list(kind, company=None, project=None):
+def get_list(kind, company=None, project=None, year=None, month=None, company_address=None):
 	if kind not in LISTS:
 		frappe.throw(_("ไม่รองรับ"), frappe.PermissionError)
 	config = LISTS[kind]
 	if not can_read(config.doctype):
 		frappe.throw(_("ไม่มีสิทธิ์ดู {0}").format(_(config.doctype)), frappe.PermissionError)
+	if kind in CHEQUE_SIDES:
+		return cheque_rows(CHEQUE_SIDES[kind], scope_filters(company, project, has_project=True))
 	if config.doctype == "Payment Entry":
 		return payment_rows(config, scope_filters(company, project, has_project=True))
-	if config.doctype == "Withholding Tax Cert":
-		return wht_rows(scope_filters(company))
-	return tax_rows(config.doctype, scope_filters(company))
+	filters = scope_filters(company)
+	is_wht = config.doctype == "Withholding Tax Cert"
+	limit = LIST_LIMIT
+	if year is not None or month is not None:
+		filters["date" if is_wht else "report_date"] = ["between", report_month(year, month)]
+		filters["docstatus"] = ["in", [0, 1, 2]]
+		limit = 0
+	if company_address:
+		filters["company_address" if is_wht else "company_tax_address"] = company_address
+	return wht_rows(filters, limit) if is_wht else tax_rows(config.doctype, filters, limit)
 
 
-def to_issue_count(company=None):
+def to_issue_count(company=None, project=None):
 	"""จ่ายชำระที่ Submit แล้ว มีหัก ณ ที่จ่าย แต่ยังไม่ออกหนังสือรับรอง"""
 	if not (can_read("Payment Entry") and can_read("Withholding Tax Cert")):
 		return 0
 	filters = {"payment_type": "Pay", "docstatus": 1, "wht_status": ("!=", "Issued")}
 	if company:
 		filters["company"] = company
-	names = frappe.get_all("Payment Entry", filters=filters, pluck="name", limit=LIST_LIMIT)
+	if project:
+		filters["project"] = project
+	names = frappe.get_list("Payment Entry", filters=filters, pluck="name", limit_page_length=0)
 	if not names:
 		return 0
 	typed = set(
@@ -560,13 +630,33 @@ def get_summary(company=None, project=None, **_kwargs):
 	out = retention_app.sides_summary(company, project)
 	if can_read("Payment Entry"):
 		base = scope_filters(company, project, has_project=True)
+		modes = cheque_modes()
+		if modes:
+			counts = frappe.get_list(
+				"Payment Entry",
+				filters={
+					**base,
+					"mode_of_payment": ["in", modes],
+					"payment_type": ["in", list(CHEQUE_SIDES.values())],
+					"docstatus": 1,
+					"clearance_date": ["is", "not set"],
+				},
+				fields=["payment_type", {"COUNT": "name", "as": "count"}],
+				group_by="payment_type",
+				order_by="payment_type",
+			)
+		else:
+			counts = []
+		waiting = {r.payment_type: r.count for r in counts}
+		for view, side in CHEQUE_SIDES.items():
+			out[view] = {"count": waiting.get(side, 0)}
 		out["receipts_draft"] = {
 			"count": frappe.db.count("Payment Entry", {**base, "payment_type": "Receive", "docstatus": 0})
 		}
 		out["payments_draft"] = {
 			"count": frappe.db.count("Payment Entry", {**base, "payment_type": "Pay", "docstatus": 0})
 		}
-	out["wht_to_issue"] = {"count": to_issue_count(company)}
+	out["wht_to_issue"] = {"count": to_issue_count(company, project)}
 	return out
 
 
@@ -610,6 +700,8 @@ def wht_deductions(pe):
 
 
 def payment_view(pe):
+	from consbiz.received_wht import payment_certificate
+
 	from consbiz.site_app import pdf_url
 
 	label, tone = status_of(pe.docstatus)
@@ -634,9 +726,12 @@ def payment_view(pe):
 				"total_amount": flt(r.total_amount),
 				"outstanding_amount": flt(r.outstanding_amount),
 				"allocated_amount": flt(r.allocated_amount),
+				"modified": r.modified,
 			}
 		)
+	row_social.attach(references)
 	cash = pe.paid_to if pe.payment_type == "Receive" else pe.paid_from
+	cheque = is_cheque(pe)
 	certs = linked_certs(pe.name) if pe.payment_type == "Pay" else []
 	has_wht = pe.payment_type == "Pay" and bool(wht_deductions(pe))
 	can_cert = (
@@ -665,6 +760,8 @@ def payment_view(pe):
 			"account_name": frappe.get_cached_value("Account", cash, "account_name") if cash else None,
 			"reference_no": pe.reference_no,
 			"reference_date": pe.reference_date,
+			"is_cheque": cheque,
+			"clearance_date": pe.clearance_date,
 			"paid_amount": flt(pe.paid_amount),
 			"total_allocated": flt(pe.total_allocated_amount),
 			"unallocated": flt(pe.unallocated_amount),
@@ -683,11 +780,20 @@ def payment_view(pe):
 		"tax_invoices": linked_tax_invoices(pe.name),
 		"certs": certs,
 		"has_wht": has_wht,
+		"received_certificate": payment_certificate(pe),
 		"pdf_url": pdf_url(pe.doctype, pe.name),
 		"can_submit": pe.docstatus == 0 and bool(pe.has_permission("submit")),
 		"can_cancel": pe.docstatus == 1 and bool(pe.has_permission("cancel")),
 		"can_delete": store_app.can_delete(pe),
 		"can_cert": can_cert,
+		"can_clear": bool(
+			cheque
+			and pe.docstatus == 1
+			and pe.has_permission("write")
+			and frappe.has_permission("Bank Clearance", "write")
+			and cash
+			and frappe.has_permission("Account", "read", doc=cash)
+		),
 	}
 
 
@@ -700,6 +806,23 @@ def load_payment(name):
 @frappe.whitelist()
 def get_payment(name):
 	return payment_view(load_payment(name))
+
+
+@frappe.whitelist(methods=["POST"])
+def set_cheque_clearance(name: str, clearance_date: str | None, previous_date: str | None):
+	from erpnext.accounts.doctype.bank_reconciliation_tool.bank_reconciliation_tool import update_clearance_date
+
+	pe = frappe.get_doc("Payment Entry", name, for_update=True)
+	pe.check_permission("read")
+	pe.check_permission("write")
+	if pe.docstatus != 1 or not is_cheque(pe):
+		frappe.throw(_("บันทึกวันที่เช็คผ่านได้เฉพาะเช็ครับหรือเช็คจ่ายที่ยืนยันแล้ว"))
+	if str(pe.clearance_date or "") != (previous_date or ""):
+		frappe.throw(_("วันที่เช็คผ่านมีการเปลี่ยนแปลง กรุณาโหลดข้อมูลใหม่"))
+	account = pe.paid_to if pe.payment_type == "Receive" else pe.paid_from
+	update_clearance_date(pe.doctype, pe.name, account, clearance_date or None)
+	pe.reload()
+	return payment_view(pe)
 
 
 @frappe.whitelist(methods=["POST"])
@@ -1058,8 +1181,9 @@ def save_tax_invoice(type, name, values):
 # ---------------------------------------------------------------- รายงานภาษี
 
 
-def company_names(doctype, company):
-	return set(frappe.get_all(doctype, filters={"company": company}, pluck="name"))
+def report_docname(key, row):
+	# Purchase report "name" is the supplier invoice number, tax_invoice is the ERPNext document.
+	return row.get("tax_invoice") if key == "purchase" else (row.get("name") or "").removesuffix(" (CANCEL)")
 
 
 def report_columns(key):
@@ -1067,7 +1191,7 @@ def report_columns(key):
 	if key in ("sales", "purchase"):
 		return [
 			("date", _("วันที่"), "Date"),
-			("tax_invoice" if key == "purchase" else "name", _("เลขที่ใบกำกับ"), "Data"),
+			("name", _("เลขที่ใบกำกับ"), "Data"),
 			("party_name", _("ลูกค้า") if key == "sales" else _("ผู้ขาย"), "Data"),
 			("tax_id", _("เลขประจำตัวผู้เสียภาษี"), "Data"),
 			("branch_code", _("สาขา"), "Data"),
@@ -1095,24 +1219,28 @@ def run_report(key, year, month, company=None, company_address=None):
 	if key not in readable_reports():
 		frappe.throw(_("ไม่มีสิทธิ์ดูรายงานนี้"), frappe.PermissionError)
 	report, module, doctype = REPORTS[key]
+	report_month(year, month)
 	year, month = cint(year), cint(month)
-	if not (2000 <= year <= 2700 and 1 <= month <= 12):
-		frappe.throw(_("กรุณาเลือกเดือนและปี"))
 	filters = frappe._dict(year=str(year), month=str(month), company_address=company_address or None)
 	if key in ("sales", "purchase"):
 		filters.update(filter_based_on="Fiscal Year", company_tax_address=company_address or None)
 	_columns, data, *_rest = frappe.get_attr(f"{module}.execute")(filters)
 	rows = [frappe._dict(r) for r in data or []]
-	if company:
-		names = company_names(doctype, company)
-		if key in ("sales", "purchase"):
-			# ใบที่ยกเลิก: รายงานต่อท้ายชื่อด้วย " (CANCEL)"
-			rows = [r for r in rows if str(r.get("name") or "").split(" (")[0] in names]
-		else:
-			rows = [r for r in rows if r.get("name") in names]
-		if key in ("pnd3", "pnd53"):
-			for i, r in enumerate(rows, 1):
-				r["no"] = i
+	if rows:
+		for row in rows:
+			row.docname = report_docname(key, row)
+		filters = {"name": ["in", [r.docname for r in rows]]}
+		if company:
+			filters["company"] = company
+		visible = {r.name: r for r in row_social.get_list(
+			doctype, filters=filters, fields=["name", "modified"], limit_page_length=0
+		)}
+		rows = [r for r in rows if r.docname in visible]
+		for row in rows:
+			row.update(row_social.metadata(visible[row.docname]), modified=visible[row.docname].modified)
+	if key in ("pnd3", "pnd53"):
+		for i, row in enumerate(rows, 1):
+			row.no = i
 	if key == "pnd3":
 		# ภ.ง.ด.3 แยกชื่อ/นามสกุล (แบบยื่น) แอปแสดงชื่อเต็ม
 		for r in rows:
@@ -1125,11 +1253,50 @@ def run_report(key, year, month, company=None, company_address=None):
 	return report, rows, totals
 
 
+OFFICIAL_FORMS = {
+	"sales": "sales_tax_report",
+	"purchase": "purchase_tax_report",
+	"pnd3": "pnd3",
+	"pnd53": "pnd53",
+}
+
+
+@frappe.whitelist()
+def get_official_form(key, year, month, company=None, company_address=None):
+	"""แม่แบบพิมพ์ทางการของ erpnext_thailand (query-report print template) + data/filters ที่ Desk ส่งให้แม่แบบ
+	data = แถวรายงานที่ผู้ใช้เห็น + แถวรวมท้ายตาราง (Desk เพิ่มเพราะรายงานตั้ง add_total_row; แม่แบบตัดแถวสุดท้ายออกเอง)"""
+	folder = OFFICIAL_FORMS.get(key)
+	if not folder:
+		frappe.throw(_("ไม่รองรับรายงานนี้"), frappe.PermissionError)
+	_report, rows, totals = run_report(key, year, month, company, company_address)
+	if not rows:
+		return {"empty": True}
+	path = frappe.get_app_path("erpnext_thailand", "thai_tax", "report", folder, f"{folder}.html")
+	with open(path, encoding="utf-8") as f:
+		template = f.read()
+	skip = {"docname", "modified", "doctype", "_comment_count", "_liked_by"}
+	data = [{k: v for k, v in r.items() if k not in skip} for r in rows]
+	data.append({"is_total_row": 1, "tax_base": totals["tax_base"], "tax_amount": totals["tax_amount"]})
+	from frappe.utils.jinja_globals import bundled_asset
+	from frappe.www.printview import get_print_style
+
+	print_style = frappe.db.get_single_value("Print Settings", "print_style") or "Redesign"
+	return {
+		"template": template,
+		"print_css": get_print_style(print_style, for_legacy=True),
+		"print_bundle": bundled_asset("print.bundle.css"),
+		"data": data,
+		"filters": {"year": str(cint(year)), "month": str(cint(month)), "company_address": company_address or None},
+	}
+
+
 @frappe.whitelist()
 def get_report(key, year, month, company=None, company_address=None):
 	report, rows, totals = run_report(key, year, month, company, company_address)
 	columns = report_columns(key)
-	fields = [c[0] for c in columns] + ["voucher_type", "voucher_no", "name"]
+	fields = [c[0] for c in columns] + ["voucher_type", "voucher_no", "name", "docname", "modified", "doctype", "_comment_count", "_liked_by"]
+	if key == "purchase":
+		fields.append("tax_invoice")
 	return {
 		"report": report,
 		"columns": [{"fieldname": f, "label": label, "fieldtype": t} for f, label, t in columns],

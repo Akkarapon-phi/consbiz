@@ -1,7 +1,10 @@
 <!-- รายละเอียดเอกสารจัดซื้อ/ขาย: หัวเอกสาร, ความคืบหน้า, รายการ, ยอดรวม, เอกสารต้นทาง/ปลายทาง, PDF, ส่งเอกสาร -->
 <template>
 <div>
-		<TopBar :title="config.label" :subtitle="params.name" :back_to="params.kind">
+		<TopBar :title="config.label" :subtitle="params.name" :back_to="list_view">
+			<template #status>
+				<span v-if="doc" class="ss-tag" :class="`tone-${doc.status_tone}`">{{ doc.status_label }}</span>
+			</template>
 			<template #actions>
 				<!-- เปิด/ปิด sidebar ขวา (มอบหมาย ไฟล์แนบ ความคิดเห็น ความเคลื่อนไหว) -->
 				<button
@@ -20,125 +23,140 @@
 		</TopBar>
 
 		<div class="ss-content ss-docview">
-			<FormHead
-				v-if="doc"
-				model-value="main"
-				:tabs="[{ value: 'main', label: config.label }]"
-				:actions="actions"
-				:menu="menu"
-				:busy="busy"
-				:on-print="() => (pdf = true)"
-			/>
+			<!-- แท็บ (ติดบนจอ) + การ์ดเนื้อหาเป็นชิ้นเดียวกัน (ตกลง 2026-11-18) -->
+			<div class="ss-doc-frame">
+			<!-- ติดบนจอ: กล่องเหลี่ยมพื้นหน้ารองแถวแท็บ มุมโค้งจึงไม่เห็นเนื้อหาที่เลื่อนผ่าน -->
+			<div v-if="doc" class="ss-doc-stick">
+				<FormHead
+					v-if="doc"
+					model-value="main"
+					:tabs="[{ value: 'main', label: config.label }]"
+					:actions="actions"
+					:menu="menu"
+					:busy="busy"
+					:on-print="print"
+				/>
+			</div>
 			<Skeleton v-if="!doc" :rows="3" />
-			<template v-else>
-				<section class="ss-dv-head">
-					<!-- ขั้นตอนของเอกสาร: ผ่านแล้ว / ขั้นปัจจุบัน (มี %) / ยังไม่ถึง -->
-					<ol class="ss-dv-steps" :aria-label="`ขั้นตอน: ${doc.status_label}`">
-						<li v-for="(st, i) in doc.steps" :key="i" :class="`is-${st.state}`">
-							<span class="ss-dv-step-dot">
-								<Icon v-if="st.state === 'done'" name="check" :size="13" :stroke="3" />
-								<Icon v-else-if="st.state === 'error'" name="x" :size="13" :stroke="3" />
-								<template v-else>{{ i + 1 }}</template>
-							</span>
-							<span class="ss-dv-step-text">
-								<b>{{ st.label }}</b>
-								<small v-if="st.note && st.state !== 'todo'">{{ st.note }}</small>
-							</span>
-						</li>
-					</ol>
+			<div v-else class="ss-doc-sheet">
+				<MiniSteps :steps="doc.steps" />
+				<!-- หัวเอกสารแบบการ์ด (ตกลง 2026-11-18): ข้อมูลเอกสาร | รายละเอียดการจัดซื้อ/ขาย เลขที่/สถานะอยู่แถบบน ขั้นตอนอยู่ใต้แท็บ -->
+				<div class="ss-doc-cards">
+					<section class="ss-doc-card">
+						<h2 class="ss-doc-card-title"><Icon name="file" :size="18" /> ข้อมูลเอกสาร</h2>
+						<dl class="ss-doc-fields">
+							<div class="is-wide">
+								<dt>{{ config.party || "เรื่อง" }}</dt>
+								<dd>
+									<InlineEdit
+										v-if="!config.party && edit.title"
+										:model-value="doc.title"
+										:label="edit.title.label"
+										:display="doc.title || doc.name"
+										editable
+										:save="(v) => save_field('title', v)"
+									/>
+									<template v-else>{{ doc.party || doc.title || doc.name }}</template>
+								</dd>
+							</div>
+							<div>
+								<dt>วันที่เอกสาร</dt>
+								<dd>{{ thai_date(doc.date, { year: true }) }}</dd>
+							</div>
+							<div v-if="doc.po_no && !edit.po_no">
+								<dt>เลขที่ใบสั่งซื้อลูกค้า</dt>
+								<dd>{{ doc.po_no }}</dd>
+							</div>
+							<div v-if="doc.bill_no">
+								<dt>เลขที่บิลผู้ขาย</dt>
+								<dd>{{ doc.bill_no }}</dd>
+							</div>
+							<div class="is-wide">
+								<dt>โครงการ</dt>
+								<dd :class="{ 'is-empty': !doc.project }" :title="doc.project_name">
+									<template v-if="doc.project"
+										>{{ doc.project_name || doc.project }}
+										<small>({{ doc.project }})</small></template
+									>
+									<template v-else>–</template>
+								</dd>
+							</div>
+						</dl>
+					</section>
+					<section class="ss-doc-card">
+						<h2 class="ss-doc-card-title">
+							<Icon :name="config.section === 'buy' ? 'cart' : 'briefcase'" :size="18" />
+							{{ detail_title }}
+						</h2>
+						<dl class="ss-doc-fields">
+							<div v-if="doc.purpose">
+								<dt>วัตถุประสงค์</dt>
+								<dd>{{ doc.purpose }}</dd>
+							</div>
+							<div v-if="doc.due || edit[due_field]">
+								<dt>{{ config.due || "วันที่ต้องการ" }}</dt>
+								<dd :class="{ 'is-due': overdue }">
+									<InlineEdit
+										v-if="edit[due_field]"
+										fieldtype="Date"
+										:model-value="doc.due"
+										:label="edit[due_field].label"
+										:display="thai_date(doc.due, { year: true })"
+										:min="doc.date"
+										:apply_label="
+											item_date_field === due_field ? 'ใช้วันนี้กับทุกรายการ' : null
+										"
+										required
+										editable
+										:save="(v, apply) => save_field(due_field, v, apply)"
+									/>
+									<template v-else>{{ thai_date(doc.due, { year: true }) }}</template>
+								</dd>
+							</div>
+							<div>
+								<dt>{{ is_mr ? "ผู้ขอซื้อ" : "ผู้จัดทำ" }}</dt>
+								<dd class="ss-doc-person">
+									<Icon name="user" :size="15" />{{ doc.request_by || doc.owner_name }}
+								</dd>
+							</div>
+							<div v-if="is_mr || doc.approval">
+								<dt>{{ doc.approval?.words.who || "ผู้อนุมัติ" }}</dt>
+								<dd :class="{ 'is-empty': !signer_name }">{{ signer_name || "–" }}</dd>
+							</div>
+							<!-- ช่องที่แก้ได้หลังส่ง (เลขที่ใบกำกับภาษี, เลขที่ PO ลูกค้า ฯลฯ) ที่ไม่ได้แสดงที่อื่น -->
+							<div v-for="f in extra_fields" :key="f.fieldname">
+								<dt>{{ f.label }}</dt>
+								<dd>
+									<InlineEdit
+										:model-value="f.value"
+										:label="f.label"
+										add_label=""
+										:fieldtype="f.fieldtype"
+										:display="
+											f.fieldtype === 'Date' ? thai_date(f.value, { year: true }) : f.value
+										"
+										editable
+										:save="(v) => save_field(f.fieldname, v)"
+									/>
+								</dd>
+							</div>
+						</dl>
+					</section>
+				</div>
 
-					<dl class="ss-dv-fields">
-						<div class="is-wide">
-							<dt>{{ config.party || "เรื่อง" }}</dt>
-							<dd>
-								<InlineEdit
-									v-if="!config.party && edit.title"
-									:model-value="doc.title"
-									:label="edit.title.label"
-									:display="doc.title || doc.name"
-									editable
-									:save="(v) => save_field('title', v)"
-								/>
-								<template v-else>{{ doc.party || doc.title || doc.name }}</template>
-							</dd>
+				<!-- ขั้นอนุมัติ/ลงนาม (consbiz/doc_approval.py): รออยู่ / ส่งกลับแก้ไข + เหตุผล / ลงนามแล้ว (บันทึกแทน + ไฟล์ที่เซ็น) -->
+				<div v-if="approval_banner" class="ss-banner" :class="`tone-${approval_banner.tone}`">
+					<Icon :name="approval_banner.icon" :size="22" />
+					<div class="ss-grow">
+						<div class="ss-banner-title">{{ approval_banner.title }}</div>
+						<div class="ss-banner-text">
+							{{ approval_banner.text }}
+							<template v-if="doc.approval.proof">
+								· <a :href="doc.approval.proof" target="_blank">เอกสารที่ลงนาม</a>
+							</template>
 						</div>
-						<div>
-							<dt>สถานะ</dt>
-							<dd>
-								<span class="ss-tag" :class="`tone-${doc.status_tone}`">{{
-									doc.status_label
-								}}</span>
-							</dd>
-						</div>
-						<div v-if="doc.purpose">
-							<dt>วัตถุประสงค์</dt>
-							<dd>{{ doc.purpose }}</dd>
-						</div>
-						<div>
-							<dt>วันที่</dt>
-							<dd>{{ thai_date(doc.date, { year: true }) }}</dd>
-						</div>
-						<div v-if="doc.due || edit[due_field]">
-							<dt>{{ config.due || "วันที่ต้องการ" }}</dt>
-							<dd :class="{ 'is-due': overdue }">
-								<InlineEdit
-									v-if="edit[due_field]"
-									fieldtype="Date"
-									:model-value="doc.due"
-									:label="edit[due_field].label"
-									:display="thai_date(doc.due, { year: true })"
-									:min="doc.date"
-									:apply_label="
-										item_date_field === due_field ? 'ใช้วันนี้กับทุกรายการ' : null
-									"
-									required
-									editable
-									:save="(v, apply) => save_field(due_field, v, apply)"
-								/>
-								<template v-else>{{ thai_date(doc.due, { year: true }) }}</template>
-							</dd>
-						</div>
-						<div v-if="doc.po_no && !edit.po_no">
-							<dt>เลขที่ใบสั่งซื้อลูกค้า</dt>
-							<dd>{{ doc.po_no }}</dd>
-						</div>
-						<div v-if="doc.bill_no">
-							<dt>เลขที่บิลผู้ขาย</dt>
-							<dd>{{ doc.bill_no }}</dd>
-						</div>
-						<div>
-							<dt>ผู้จัดทำ</dt>
-							<dd>{{ doc.request_by || doc.owner_name }}</dd>
-						</div>
-						<div v-if="params.kind === 'mr'">
-							<dt>ผู้อนุมัติ</dt>
-							<dd :class="{ 'is-empty': !doc.approve_by }">{{ doc.approve_by || "–" }}</dd>
-						</div>
-						<!-- ช่องที่แก้ได้หลังส่ง (เลขที่ใบกำกับภาษี, เลขที่ PO ลูกค้า ฯลฯ) ที่ไม่ได้แสดงที่อื่น -->
-						<div v-for="f in extra_fields" :key="f.fieldname">
-							<dt>{{ f.label }}</dt>
-							<dd>
-								<InlineEdit
-									:model-value="f.value"
-									:label="f.label"
-									add_label=""
-									:fieldtype="f.fieldtype"
-									:display="
-										f.fieldtype === 'Date' ? thai_date(f.value, { year: true }) : f.value
-									"
-									editable
-									:save="(v) => save_field(f.fieldname, v)"
-								/>
-							</dd>
-						</div>
-						<div v-if="doc.project" class="is-full">
-							<dt>โครงการ</dt>
-							<dd class="is-line" :title="doc.project_name">
-								{{ doc.project_name || doc.project }} <small>{{ doc.project }}</small>
-							</dd>
-						</div>
-					</dl>
-				</section>
+					</div>
+				</div>
 
 				<!-- PO ที่แก้ตามใบงานเพิ่ม ผรม.: Rev. ปัจจุบัน + รอส่งผู้รับเหมา (ใครในฝ่ายจัดซื้อก็กดส่งได้) + PDF ฉบับก่อนๆ -->
 				<div v-if="doc.revision" class="ss-banner" :class="doc.revision.pending ? 'tone-amber' : 'tone-blue'">
@@ -170,208 +188,198 @@
 					</button>
 				</div>
 
-				<div class="ss-dv-body">
-					<div class="ss-dv-main">
-						<h2 class="ss-section-title ss-section-title--first">
-							<span
-								>รายการ <span class="ss-count">{{ doc.items.length }}</span></span
-							>
-						</h2>
+				<section class="ss-doc-card ss-doc-card--items">
+					<h2 class="ss-doc-card-title">
+						<Icon name="layers" :size="18" /> {{ items_title }}
+						<span class="ss-count">{{ doc.items.length }}</span>
+					</h2>
 
-						<!-- จอกว้าง: ตารางรายการ -->
-						<div v-if="wide" class="ss-table-wrap">
-							<table class="ss-table ss-table--doc">
-								<thead>
-									<tr>
-										<th class="is-idx">#</th>
-										<th>รายการ</th>
-										<th class="is-num">จำนวน</th>
-										<th>หน่วย</th>
-										<th class="is-num">หน่วยละ</th>
-										<th class="is-num">เป็นเงิน</th>
-										<th v-if="has_item_date">วันที่ต้องการ</th>
-										<th v-if="is_mr" class="is-center">ไม่คิดภาษี</th>
-									</tr>
-								</thead>
-								<tbody>
-									<tr v-for="(it, i) in doc.items" :key="i" class="is-static">
-										<td class="is-idx">{{ i + 1 }}</td>
-										<td class="is-item">
-											<b>{{ it.item_name || it.item_code }}</b>
-											<small
-												>{{ it.item_code
-												}}<template v-if="item_progress(it)">
-													· {{ item_progress(it) }}</template
-												></small
-											>
-											<RichText
-												v-if="has_desc(it)"
-												:html="it.description"
-												class="ss-item-desc"
-											/>
-										</td>
-										<td class="is-num">{{ num(it.qty) }}</td>
-										<td>{{ it.uom }}</td>
-										<td class="is-num">{{ money(it.rate) }}</td>
-										<td class="is-num is-strong">{{ money(it.amount) }}</td>
-										<td v-if="has_item_date" class="is-date">
-											<InlineEdit
-												v-if="item_date_field"
-												fieldtype="Date"
-												:model-value="it[item_date_field]"
-												:label="item_date_label"
-												:subtitle="it.item_name || it.item_code"
-												:display="thai_date(it[item_date_field], { year: true })"
-												:min="doc.date"
-												required
-												editable
-												:save="(v) => save_item(it, v)"
-											/>
-											<template v-else>{{
-												thai_date(it.schedule_date || it.delivery_date, {
-													year: true,
-												})
-											}}</template>
-										</td>
-										<td v-if="is_mr" class="is-center">
-											<span
-												class="ss-checkmark"
-												:class="{ 'is-on': it.custom_vat_nocal }"
-											>
-												<Icon
-													v-if="it.custom_vat_nocal"
-													name="check"
-													:size="12"
-													:stroke="3.2"
-												/>
-											</span>
-										</td>
-									</tr>
-								</tbody>
-							</table>
-						</div>
+					<!-- จอกว้าง: ตารางรายการ -->
+					<div v-if="wide" class="ss-doc-table-wrap">
+						<table class="ss-table ss-table--doc ss-doc-table">
+							<thead>
+								<tr>
+									<th class="is-idx">#</th>
+									<th>รายการ</th>
+									<th class="is-num">จำนวน</th>
+									<th>หน่วย</th>
+									<th class="is-num">หน่วยละ</th>
+									<th class="is-num">เป็นเงิน</th>
+									<th v-if="has_item_date">{{ item_date_head }}</th>
+								</tr>
+							</thead>
+							<tbody>
+								<tr v-for="(it, i) in doc.items" :key="i" class="is-static">
+									<td class="is-idx">{{ i + 1 }}</td>
+									<td class="is-item">
+										<b>{{ it.item_name || it.item_code }}</b>
+										<small
+											>{{ it.item_code
+											}}<template v-if="item_progress(it)">
+												· {{ item_progress(it) }}</template
+											><template v-if="is_mr && it.custom_vat_nocal">
+												· ไม่คิดภาษี</template
+											></small
+										>
+										<RichText
+											v-if="has_desc(it)"
+											:html="it.description"
+											class="ss-item-desc"
+										/>
+									</td>
+									<td class="is-num">{{ num(it.qty) }}</td>
+									<td>{{ it.uom }}</td>
+									<td class="is-num">{{ money(it.rate) }}</td>
+									<td class="is-num is-strong">{{ money(it.amount) }}</td>
+									<td v-if="has_item_date" class="is-date">
+										<InlineEdit
+											v-if="item_date_field"
+											fieldtype="Date"
+											:model-value="it[item_date_field]"
+											:label="item_date_label"
+											:subtitle="it.item_name || it.item_code"
+											:display="thai_date(it[item_date_field], { year: true })"
+											:min="doc.date"
+											required
+											editable
+											:save="(v) => save_item(it, v)"
+										/>
+										<template v-else>{{
+											thai_date(it.schedule_date || it.delivery_date, {
+												year: true,
+											})
+										}}</template>
+									</td>
+								</tr>
+							</tbody>
+						</table>
+					</div>
 
-						<!-- มือถือ: การ์ดรายการ -->
-						<div v-else class="ss-list ss-list--form">
-							<div
-								v-for="(it, i) in doc.items"
-								:key="i"
-								class="ss-card"
-								:style="{ '--i': Math.min(i, 12) }"
-							>
-								<div class="ss-doc-row">
-									<span class="ss-doc-title">{{ it.item_name || it.item_code }}</span>
-									<b class="ss-doc-money">{{ money(it.amount) }}</b>
-								</div>
-								<span class="ss-card-meta ss-item-code">{{ it.item_code }}</span>
-								<span class="ss-card-meta"
-									>{{ num(it.qty) }} {{ it.uom }} × {{ money(it.rate)
-									}}<template
-										v-if="!item_date_field && (it.schedule_date || it.delivery_date)"
-									>
-										· ต้องการ
-										{{ thai_date(it.schedule_date || it.delivery_date) }}</template
-									></span
+					<!-- มือถือ: แถวรายการในการ์ด -->
+					<div v-else class="ss-doc-lines">
+						<div v-for="(it, i) in doc.items" :key="i" class="ss-doc-line">
+							<div class="ss-doc-row">
+								<span class="ss-doc-title">{{ it.item_name || it.item_code }}</span>
+								<b class="ss-doc-money">{{ money(it.amount) }}</b>
+							</div>
+							<span class="ss-card-meta ss-item-code">{{ it.item_code }}</span>
+							<span class="ss-card-meta"
+								>{{ num(it.qty) }} {{ it.uom }} × {{ money(it.rate)
+								}}<template
+									v-if="!item_date_field && (it.schedule_date || it.delivery_date)"
 								>
-								<span v-if="item_date_field" class="ss-card-meta"
-									>{{ item_date_label }}
-									<InlineEdit
-										fieldtype="Date"
-										:model-value="it[item_date_field]"
-										:label="item_date_label"
-										:subtitle="it.item_name || it.item_code"
-										:display="thai_date(it[item_date_field])"
-										:min="doc.date"
-										required
-										editable
-										:save="(v) => save_item(it, v)"
-								/></span>
-								<RichText
-									v-if="has_desc(it)"
-									:html="it.description"
-									:lines="4"
-									class="ss-item-desc"
-								/>
-								<div v-if="item_progress(it) || it.custom_vat_nocal" class="ss-chips">
-									<span v-if="item_progress(it)" class="ss-chip">{{
-										item_progress(it)
-									}}</span>
-									<span v-if="it.custom_vat_nocal" class="ss-chip">ไม่คิดภาษี</span>
-								</div>
+									· ต้องการ
+									{{ thai_date(it.schedule_date || it.delivery_date) }}</template
+								></span
+							>
+							<span v-if="item_date_field" class="ss-card-meta"
+								>{{ item_date_label }}
+								<InlineEdit
+									fieldtype="Date"
+									:model-value="it[item_date_field]"
+									:label="item_date_label"
+									:subtitle="it.item_name || it.item_code"
+									:display="thai_date(it[item_date_field])"
+									:min="doc.date"
+									required
+									editable
+									:save="(v) => save_item(it, v)"
+							/></span>
+							<RichText
+								v-if="has_desc(it)"
+								:html="it.description"
+								:lines="4"
+								class="ss-item-desc"
+							/>
+							<div v-if="item_progress(it) || it.custom_vat_nocal" class="ss-chips">
+								<span v-if="item_progress(it)" class="ss-chip">{{
+									item_progress(it)
+								}}</span>
+								<span v-if="it.custom_vat_nocal" class="ss-chip">ไม่คิดภาษี</span>
 							</div>
 						</div>
+					</div>
 
-						<!-- ท้ายเอกสาร: หมายเหตุ/ตัวอักษร (ซ้าย) + สรุปยอด (ขวา) แบบระบบเต็ม -->
-						<div class="ss-dv-foot">
-							<div class="ss-dv-notes">
-								<div v-if="doc.remarks || edit[remarks_field]">
-									<span class="ss-field-label">หมายเหตุ</span>
-									<InlineEdit
-										v-if="edit[remarks_field]"
-										:model-value="doc.remarks"
-										label="หมายเหตุ"
-										add_label=""
-										multiline
-										editable
-										:save="(v) => save_field(remarks_field, v)"
-										><div class="ss-text-block">{{ doc.remarks }}</div></InlineEdit
-									>
-									<div v-else class="ss-text-block">{{ doc.remarks }}</div>
-								</div>
-								<div v-if="is_mr" class="ss-dv-flags">
-									<span class="ss-flag" :class="{ 'is-on': doc.included_vat }">
-										<span class="ss-checkmark" :class="{ 'is-on': doc.included_vat }"
-											><Icon
-												v-if="doc.included_vat"
-												name="check"
-												:size="12"
-												:stroke="3.2"
-										/></span>
-										มูลค่ารวมภาษี
-									</span>
-									<span class="ss-flag" :class="{ 'is-on': doc.vat_override }">
-										<span class="ss-checkmark" :class="{ 'is-on': doc.vat_override }"
-											><Icon
-												v-if="doc.vat_override"
-												name="check"
-												:size="12"
-												:stroke="3.2"
-										/></span>
-										แก้ไขภาษี
-									</span>
-								</div>
+					<!-- ใต้ตาราง: ปุ่มของรายการ -->
+					<div class="ss-doc-items-foot">
+						<button
+							type="button"
+							class="ss-btn ss-btn--ghost ss-doc-items-btn"
+							title="ดาวน์โหลดรายการเป็นไฟล์ Excel (CSV)"
+							@click="export_items"
+						>
+							<Icon name="receive" :size="15" /> ดาวน์โหลด
+						</button>
+					</div>
+				</section>
+
+				<!-- ท้ายเอกสาร: ตัวเลือกภาษี + หมายเหตุ (ซ้าย) / สรุปยอด (ขวา) -->
+				<div class="ss-doc-foot">
+					<div class="ss-doc-notes">
+						<div v-if="is_mr" class="ss-dv-flags">
+							<span class="ss-flag" :class="{ 'is-on': doc.included_vat }">
+								<span class="ss-checkmark" :class="{ 'is-on': doc.included_vat }"
+									><Icon v-if="doc.included_vat" name="check" :size="12" :stroke="3.2"
+								/></span>
+								มูลค่ารวมภาษี
+							</span>
+							<span class="ss-flag" :class="{ 'is-on': doc.vat_override }">
+								<span class="ss-checkmark" :class="{ 'is-on': doc.vat_override }"
+									><Icon v-if="doc.vat_override" name="check" :size="12" :stroke="3.2"
+								/></span>
+								แก้ไขภาษี
+							</span>
+						</div>
+						<div v-if="doc.remarks || edit[remarks_field] || is_mr" class="ss-doc-remarks">
+							<span class="ss-doc-remarks-label"><Icon name="message" :size="17" /> หมายเหตุ</span>
+							<InlineEdit
+								v-if="edit[remarks_field]"
+								:model-value="doc.remarks"
+								label="หมายเหตุ"
+								add_label=""
+								multiline
+								editable
+								:save="(v) => save_field(remarks_field, v)"
+								><div class="ss-text-block">{{ doc.remarks || "–" }}</div></InlineEdit
+							>
+							<div v-else class="ss-text-block" :class="{ 'is-empty': !doc.remarks }">
+								{{ doc.remarks || "–" }}
 							</div>
-							<div class="ss-totals">
-								<div v-for="r in doc.summary.rows" :key="r.label">
-									<span>{{ r.label }}</span
-									><b>{{ money(r.value) }}</b>
+						</div>
+					</div>
+					<div class="ss-doc-totals">
+						<span class="ss-doc-totals-icon"><Icon name="calculator" :size="20" /></span>
+						<div class="ss-totals">
+							<div v-for="r in doc.summary.rows" :key="r.label">
+								<span>{{ r.label }}</span
+								><b>{{ money(r.value) }}</b>
+							</div>
+							<div class="is-grand">
+								<span>{{ doc.summary.grand_label }}</span
+								><b>{{ money(doc.summary.grand) }}</b>
+							</div>
+							<div v-if="doc.summary.in_words" class="ss-totals-words">
+								({{ doc.summary.in_words }})
+							</div>
+							<template v-if="doc.summary.net !== undefined">
+								<div v-for="d in doc.summary.deductions" :key="d.label" class="is-deduct">
+									<span>{{ d.label }}</span
+									><b>{{ money(d.value) }}</b>
 								</div>
-								<div class="is-grand">
-									<span>{{ doc.summary.grand_label }}</span
-									><b>{{ money(doc.summary.grand) }}</b>
+								<div class="is-net">
+									<span>{{ doc.summary.net_label }}</span
+									><b>{{ money(doc.summary.net) }}</b>
 								</div>
-								<div v-if="doc.summary.in_words" class="ss-totals-words">
-									({{ doc.summary.in_words }})
-								</div>
-								<template v-if="doc.summary.net !== undefined">
-									<div v-for="d in doc.summary.deductions" :key="d.label" class="is-deduct">
-										<span>{{ d.label }}</span
-										><b>{{ money(d.value) }}</b>
-									</div>
-									<div class="is-net">
-										<span>{{ doc.summary.net_label }}</span
-										><b>{{ money(doc.summary.net) }}</b>
-									</div>
-								</template>
-								<div v-if="doc.totals.outstanding_amount" class="is-due">
-									<span>ค้าง{{ due_word }}</span
-									><b>{{ money(doc.totals.outstanding_amount) }}</b>
-								</div>
+							</template>
+							<div v-if="doc.totals.outstanding_amount" class="is-due">
+								<span>ค้าง{{ due_word }}</span
+								><b>{{ money(doc.totals.outstanding_amount) }}</b>
 							</div>
 						</div>
 					</div>
 				</div>
-			</template>
+			</div>
+			</div>
 		</div>
 
 		<!-- sidebar ขวาแยกจากเนื้อหา: จอ ≥1480 กางค้างและดันเนื้อหา (html[data-rside]) จอเล็กกว่าเลื่อนทับพร้อมพื้นหลังมืด -->
@@ -435,8 +443,12 @@
 		</Teleport>
 
 
-		<Sheet :open="confirm" :title="`ยืนยัน${config.label}`" :subtitle="params.name" @close="confirm = false">
-			<p class="ss-muted">
+		<Sheet :open="confirm" :title="`${submit_word}${config.label}`" :subtitle="params.name" @close="confirm = false">
+			<p v-if="doc?.approval" class="ss-muted">
+				{{ submit_word }}แล้วเอกสารมีผล ({{ doc.approval.mode === "sign" ? "ชื่อและลายเซ็นของคุณขึ้นในช่องผู้อนุมัติของแบบพิมพ์" : "สั่งซื้อต่อได้" }})
+				แก้ได้เฉพาะบางช่อง (มีรูปดินสอ)
+			</p>
+			<p v-else class="ss-muted">
 				ยืนยันแล้วแก้ได้เฉพาะบางช่อง (มีรูปดินสอ) เช่น กำหนดส่ง เลขที่อ้างอิง
 				ที่เหลือต้องยกเลิกแล้วแก้ในระบบเต็ม
 			</p>
@@ -457,7 +469,89 @@
 					@click="submit"
 				>
 					<span v-if="busy" class="ss-spinner"></span>
-					<template v-else>ยืนยัน</template>
+					<template v-else>{{ submit_word }}</template>
+				</button>
+			</template>
+		</Sheet>
+
+		<!-- ไม่อนุมัติ / ส่งกลับแก้ไข: ต้องมีเหตุผล (แจ้งผู้ส่ง) -->
+		<Sheet
+			v-if="doc?.approval"
+			:open="rejecting"
+			:title="doc.approval.words[reject_mode]"
+			:subtitle="params.name"
+			@close="rejecting = false"
+		>
+			<div class="ss-form">
+				<label class="ss-field">
+					<span class="ss-field-label">เหตุผล<em>*</em></span>
+					<textarea v-model="reject_reason" class="ss-input" rows="3"></textarea>
+				</label>
+				<p class="ss-muted">
+					{{
+						reject_mode === "decline"
+							? "ปิดเอกสารนี้ ผู้ส่งแก้ไขหรือส่งใหม่ไม่ได้ (เก็บไว้เป็นประวัติ ทำซ้ำเป็นใบใหม่ได้)"
+							: "เอกสารกลับเป็นร่าง ผู้ส่งแก้ไขแล้วส่งใหม่ได้"
+					}}
+				</p>
+			</div>
+			<template #footer>
+				<button
+					type="button"
+					class="ss-btn ss-btn--danger ss-btn--block ss-btn--lg"
+					:disabled="busy || !reject_reason.trim()"
+					@click="reject"
+				>
+					<span v-if="busy" class="ss-spinner"></span>
+					<template v-else>{{ doc.approval.words[reject_mode] }}</template>
+				</button>
+			</template>
+		</Sheet>
+
+		<!-- บันทึกการลงนามแทน (เมนู ⋯): ผู้ลงนามเซ็นบนกระดาษแล้ว เจ้าหน้าที่บันทึกให้ + ไฟล์สแกน/รูป (บังคับ) -->
+		<Sheet
+			v-if="doc?.approval?.can_record"
+			:open="recording"
+			title="ลงนามแทน"
+			:subtitle="params.name"
+			@close="recording = false"
+		>
+			<div class="ss-form">
+			<p class="ss-muted">
+				สำหรับเอกสารที่ผู้ลงนามเซ็นบนกระดาษแล้ว บันทึกในระบบแทน (ผู้ลงนามได้รับแจ้งเตือน และประวัติเอกสารระบุชื่อผู้บันทึก)
+			</p>
+			<div class="ss-form-row">
+				<div class="ss-field">
+					<span class="ss-field-label">ผู้ลงนาม<em>*</em></span>
+					<SelectBox v-model="record.signer" label="ผู้ลงนาม" :options="signers" placeholder="เลือกผู้ลงนาม" />
+				</div>
+				<div class="ss-field">
+					<span class="ss-field-label">วันที่ลงนาม<em>*</em></span>
+					<DateInput v-model="record.date" label="วันที่ลงนาม" />
+				</div>
+			</div>
+			<div class="ss-field">
+				<span class="ss-field-label">ไฟล์เอกสารที่ลงนามแล้ว (สแกน/รูปถ่าย)<em>*</em></span>
+				<label class="ss-btn ss-btn--soft ss-record-file">
+					<Icon name="file" :size="16" />
+					<span>{{ record.file ? record.file.name : "เลือกไฟล์" }}</span>
+					<input type="file" accept="image/*,application/pdf" hidden @change="pick_proof" />
+				</label>
+			</div>
+			<label class="ss-field">
+				<span class="ss-field-label">หมายเหตุ</span>
+				<textarea v-model="record.note" class="ss-input" rows="2"></textarea>
+			</label>
+			</div>
+			<template #footer>
+				<button
+					type="button"
+					class="ss-btn ss-btn--primary ss-btn--block ss-btn--lg"
+					:disabled="busy || !record.signer || !record.date || !record.file"
+					@click="save_record"
+				>
+					<span v-if="busy" class="ss-spinner"></span>
+					<template v-else>บันทึกการลงนาม</template>
 				</button>
 			</template>
 		</Sheet>
@@ -481,6 +575,33 @@
 			@done="after_pay"
 		/>
 
+		<HtmlViewer
+			v-if="doc?.print_html"
+			:open="html_open"
+			:html="print_html"
+			:width="PRINT_W"
+			:height="1123"
+			:document_kind="config.doctype"
+			fit_height
+			:name="params.name"
+			:title="config.label"
+			:fetch_file="fetch_pdf"
+			:file_key="copies.join(',')"
+			@close="html_open = false"
+		>
+			<template #tools>
+				<label v-for="c in COPY_OPTIONS" :key="c.value" class="ss-checkline ss-pdf-check">
+					<input
+						type="checkbox"
+						:checked="copies.includes(c.value)"
+						:disabled="copies.length === 1 && copies.includes(c.value)"
+						@change="toggle_copy(c.value)"
+					/>
+					<span>{{ c.label }}</span>
+				</label>
+			</template>
+		</HtmlViewer>
+
 		<PdfViewer
 			:open="pdf"
 			:url="doc?.pdf_url"
@@ -495,18 +616,22 @@
 import { computed, inject, onBeforeUnmount, ref, watch } from "vue";
 import Icon from "../components/Icon.vue";
 import FormHead from "../components/FormHead.vue";
+import MiniSteps from "../components/MiniSteps.vue";
 import { LABELS, can_duplicate, doc_menu, duplicate_doc, step_actions } from "../form_actions.js";
 import TopBar from "../components/TopBar.vue";
 import Skeleton from "../components/Skeleton.vue";
 import Sheet from "../components/Sheet.vue";
 import PdfViewer from "../components/PdfViewer.vue";
+import HtmlViewer from "../components/HtmlViewer.vue";
 import DeleteSheet from "../components/DeleteSheet.vue";
 import RichText from "../components/RichText.vue";
 import DocActivity from "./DocActivity.vue";
 import PaymentSheet from "./PaymentSheet.vue";
 import InlineEdit from "../components/InlineEdit.vue";
+import SelectBox from "../components/SelectBox.vue";
+import DateInput from "../components/DateInput.vue";
 import { use_shortcuts } from "../shortcuts.js";
-import { DOC_KINDS, in_app, open_doc } from "./kinds.js";
+import { DOC_KINDS, doc_kind, doc_list_view, doc_target, go_doc, in_app, open_doc } from "./kinds.js";
 import {
 	boot,
 	call,
@@ -521,10 +646,14 @@ import {
 	state,
 	thai_date,
 	toast,
+	today,
+	upload,
 } from "../api.js";
 
 const reload_summary = inject("reload_summary");
-const params = state.route.params;
+const params = { ...state.route.params, kind: doc_kind(state.route.params.kind) };
+const list_view = doc_list_view(params.kind);
+const form_target = doc_target(DOC_KINDS[params.kind] ? params.kind : "po", "form");
 const config = DOC_KINDS[params.kind] || DOC_KINDS.po;
 
 const doc = ref(null);
@@ -540,6 +669,8 @@ mq_wide.addEventListener("change", on_media);
 onBeforeUnmount(() => mq_wide.removeEventListener("change", on_media));
 
 const is_mr = params.kind === "mr";
+const detail_title = config.section === "buy" ? "รายละเอียดการจัดซื้อ" : "รายละเอียดการขาย";
+const items_title = is_mr ? "รายการสินค้า/วัสดุ" : "รายการ";
 // รายละเอียดที่ต่างจากชื่อรายการ (ERPNext ตั้ง description = ชื่อรายการเป็นค่าเริ่มต้น)
 const has_desc = (it) => {
 	const text = html_text(it.description);
@@ -581,6 +712,9 @@ const extra_fields = computed(() =>
 );
 const item_date_field = computed(
 	() => (after.value?.items || []).find((f) => ["schedule_date", "delivery_date"].includes(f)) || null
+);
+const item_date_head = computed(() =>
+	["po", "so"].includes(params.kind) ? (params.kind === "so" ? "กำหนดส่งมอบ" : "กำหนดส่ง") : "วันที่ต้องการ"
 );
 const item_date_label = computed(() => (item_date_field.value === "delivery_date" ? "กำหนดส่ง" : "ต้องการ"));
 
@@ -656,10 +790,17 @@ const next_kind = computed(() =>
 const actions = computed(() => {
 	const d = doc.value;
 	if (!d) return [];
-	const form = (args) => go(`${config.section}-form`, { kind: params.kind, ...args });
+	const form = (args) => go_doc(params.kind, "form", args);
+	const ap = d.approval;
 	return step_actions({
-		stage: d.can_submit || d.can_edit ? "draft" : "done",
-		submit: d.can_submit && { label: LABELS.confirm, run: () => (confirm.value = true) },
+		stage: ap?.pending ? "pending" : d.docstatus === 0 ? "draft" : "done",
+		submit: d.can_submit && { label: submit_word.value, run: () => (confirm.value = true) },
+		// ขั้นอนุมัติ/ลงนาม (ใบขอซื้อ/สั่งซื้อ/แจ้งหนี้ซื้อ)
+		send: ap?.can_send && { label: ap.words.send, icon: "send", run: () => approval_step("send") },
+		withdraw: ap?.can_withdraw && { label: LABELS.withdraw, run: () => approval_step("withdraw") },
+		// ส่งกลับแก้ไข = ปุ่มรอง (ไม่ปิดเอกสาร) ไม่อนุมัติ (ปิดเลย) = ปุ่มแดง
+		reject: ap?.can_reject && { label: ap.words.reject, tone: "soft", run: () => open_reject("reject") },
+		decline: ap?.can_decline && { label: ap.words.decline, run: () => open_reject("decline") },
 		next: [
 			d.can_pay && {
 				label: params.kind === "si" ? "รับชำระ" : "จ่ายชำระ",
@@ -670,26 +811,95 @@ const actions = computed(() => {
 				label: `สร้าง${DOC_KINDS[next_kind.value].label}`,
 				icon: "plus",
 				run: () =>
-					go(`${config.section}-form`, { kind: next_kind.value, name: "new", source: params.name }),
+					go_doc(next_kind.value, "form", { name: "new", source: params.name }),
 			},
 		],
 		extra: [
+			// ลงนามแทน (ตกลง 2026-11-19): ผู้ที่ไม่ใช่ผู้ลงนามที่ระบุ ใช้กับเอกสารที่ลงนามบนกระดาษแล้ว
+			ap?.can_record && { key: "record", label: "ลงนามแทน", icon: "pen", run: open_record },
 			d.can_edit && {
 				label: "แก้ไข",
 				icon: "pen",
-				tone: d.can_submit ? "soft" : "primary",
+				tone: d.can_submit || ap?.can_send ? "soft" : "primary",
 				run: () => form({ name: params.name }),
 			},
 		],
 	});
 });
+// ---------------------------------------------------------------- พิมพ์ (ตกลง 2026-11-19 ใช้จริง)
+// แบบพิมพ์ที่ตั้งในแอปเป็น HTML ของ ConsERP (doc.print_html, ตั้งค่าจัดซื้อ > แบบฟอร์มพิมพ์ เช่น ใบสั่งซื้อรูปแบบที่ 4)
+// = หน้าตัวอย่าง iframe ของหน้าพิมพ์ Frappe (/printview เอกสารแบ่งหน้าเองด้วย paginate.js) ติ๊กต้นฉบับ/สำเนา PDF แชร์/ดาวน์โหลด = แบบเดียวกันผ่าน Chrome
+// แบบอื่น (Print Designer ฯลฯ) = PdfViewer ตามเดิม
+const PRINT_W = 794;
+function print() {
+	if (!doc.value) return;
+	if (doc.value.print_html) open_html();
+	else pdf.value = true;
+}
+const html_open = ref(false);
+const html_loading = ref(false);
+const print_html = ref("");
+const PRINT_FIX = `<style>
+.action-banner { display: none !important; }
+html, body { margin: 0 !important; padding: 0 !important; background: #fff !important; }
+.print-format-gutter { margin: 0 !important; padding: 0 !important; background: #fff !important; }
+@media screen {
+	html, body, .print-format-gutter { background: #e9ebef !important; }
+	.print-format { margin: 0 !important; padding: 0 !important; max-width: none !important; width: auto !important;
+		min-height: 0 !important; box-shadow: none !important; border-radius: 0 !important; background: none !important; }
+	.ec-sheet { margin: 0 0 14px; box-shadow: 0 1px 6px rgba(0,0,0,.18); }
+}
+</style>`;
+// ฉบับที่พิมพ์ (ติ๊กในหน้าตัวอย่าง อย่างน้อย 1 ฉบับ) ต้นฉบับ + สำเนา = ไฟล์เดียว เลขหน้านับใหม่ต่อฉบับ (purchase_order_print.copies_of)
+const COPY_OPTIONS = [
+	{ value: "original", label: "ต้นฉบับ" },
+	{ value: "copy", label: "สำเนา" },
+];
+const copies = ref(["original"]);
+function toggle_copy(value) {
+	const next = copies.value.includes(value) ? copies.value.filter((v) => v !== value) : [...copies.value, value];
+	if (!next.length) return;
+	copies.value = COPY_OPTIONS.map((c) => c.value).filter((v) => next.includes(v));
+	open_html();
+}
+const print_args = () => ({
+	doctype: config.doctype,
+	name: params.name,
+	format: doc.value.print_html.format,
+	no_letterhead: "1",
+	copies: copies.value.join(","),
+});
+const fetch_pdf = () =>
+	fetch(
+		`/api/method/frappe.utils.print_format.download_pdf?${new URLSearchParams({ ...print_args(), pdf_generator: "chrome" })}`,
+		{ credentials: "same-origin" }
+	);
+async function open_html() {
+	const q = new URLSearchParams(print_args());
+	html_loading.value = true;
+	try {
+		const res = await fetch(`/printview?${q}`, { credentials: "same-origin" });
+		if (!res.ok) throw new Error(`เปิดหน้าพิมพ์ไม่สำเร็จ (${res.status})`);
+		let html = await res.text();
+		// ลิงก์ CSS/ฟอนต์แบบ path ของไซต์ต้องอ้างจากไซต์ (iframe ที่เขียนด้วย document.write ไม่มี URL ของตัวเอง)
+		html = html.replace(/<head([^>]*)>/i, `<head$1><base href="${location.origin}/">`);
+		html = html.replace(/<\/head>/i, `${PRINT_FIX}</head>`);
+		print_html.value = html;
+		html_open.value = true;
+	} catch (error) {
+		show_error(error);
+	} finally {
+		html_loading.value = false;
+	}
+}
+
 const menu = computed(() => {
 	const d = doc.value;
 	if (!d) return [];
 	return doc_menu({
 		duplicate:
 			can_duplicate(config.doctype) &&
-			(() => duplicate_doc(config.doctype, params.name, `${config.section}-form`, { kind: params.kind })),
+			(() => duplicate_doc(config.doctype, params.name, form_target.view, { kind: form_target.kind })),
 		refresh: load,
 		desk: boot.desk !== false ? [config.doctype, params.name] : null,
 		remove: d.can_delete && (() => (deleting.value = true)),
@@ -712,7 +922,7 @@ async function after_pay(result) {
 const deleting = ref(false);
 function after_delete() {
 	reload_summary();
-	go(params.kind, {}, { replace: true });
+	go(list_view, {}, { replace: true });
 }
 
 const progress = computed(() =>
@@ -763,6 +973,30 @@ function open_link(l) {
 	else window.location.href = desk_url(l.doctype, l.name);
 }
 
+// ส่งออกรายการเป็นไฟล์ที่เปิดใน Excel ได้ (CSV UTF-8 มี BOM ให้ภาษาไทยไม่เพี้ยน)
+function export_items() {
+	const d = doc.value;
+	const head = ["#", "รหัส", "รายการ", "จำนวน", "หน่วย", "หน่วยละ", "เป็นเงิน"];
+	if (has_item_date.value) head.push(item_date_head.value);
+	const rows = d.items.map((it, i) => {
+		const r = [i + 1, it.item_code, it.item_name || "", it.qty, it.uom, it.rate, it.amount];
+		if (has_item_date.value)
+			r.push(it[item_date_field.value] || it.schedule_date || it.delivery_date || "");
+		return r;
+	});
+	const cell = (v) => {
+		const t = v == null ? "" : String(v);
+		return /[",\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t;
+	};
+	const csv = "﻿" + [head, ...rows].map((r) => r.map(cell).join(",")).join("\r\n");
+	const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+	const a = document.createElement("a");
+	a.href = url;
+	a.download = `${params.name}.csv`;
+	a.click();
+	setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
 async function load() {
 	try {
 		doc.value = await call("consbiz.site_docs.get_doc", { kind: params.kind, name: params.name });
@@ -785,12 +1019,133 @@ async function mark_sent() {
 	}
 }
 
+// ---------------------------------------------------------------- อนุมัติ/ลงนาม (consbiz/doc_approval.py)
+const submit_word = computed(() => doc.value?.approval?.words.do || LABELS.confirm);
+const signer_name = computed(() => {
+	const ap = doc.value?.approval;
+	if (ap?.signed_by_name && doc.value.docstatus === 1) return ap.signed_by_name;
+	return ap?.approver_name || (is_mr ? doc.value?.approve_by : null);
+});
+const when = (v) => (v ? thai_date(String(v).slice(0, 10), { year: true }) : "");
+const approval_banner = computed(() => {
+	const d = doc.value;
+	const ap = d?.approval;
+	if (!ap) return null;
+	if (ap.pending)
+		return {
+			tone: "amber",
+			icon: "clock",
+			title: ap.words.pending,
+			text: `ส่งโดย ${ap.sent_by_name || "-"} ${when(ap.sent_on)} · ระหว่างรอแก้ไขไม่ได้ (ผู้ส่งดึงกลับได้)`,
+		};
+	if (d.docstatus === 0 && ap.status === "Declined")
+		return {
+			tone: "rose",
+			icon: "ban",
+			title: `${ap.words.decline} (ปิดแล้ว)`,
+			text: `${ap.review_note || ""} · แก้ไข/ส่งใหม่ไม่ได้ ทำซ้ำเป็นใบใหม่ได้ (เมนู ⋯)`,
+		};
+	if (d.docstatus === 0 && ap.status === "Rejected")
+		return { tone: "rose", icon: "alert", title: ap.words.reject, text: ap.review_note || "" };
+	if (d.docstatus === 1 && ap.signed_by_name)
+		return {
+			tone: "green",
+			icon: "check",
+			title: `${ap.words.done}โดย ${ap.signed_by_name}`,
+			text:
+				when(ap.signed_on) +
+				(ap.proxy_name ? ` · บันทึกการลงนามแทนโดย ${ap.proxy_name}` : "") +
+				(ap.sent_by_name ? ` · ส่งโดย ${ap.sent_by_name}` : ""),
+		};
+	return null;
+});
+
+const APPROVAL_DONE = {
+	send: "ส่งแล้ว",
+	withdraw: "ดึงเอกสารกลับแล้ว",
+	reject: "ส่งกลับแล้ว",
+	decline: "ไม่อนุมัติแล้ว",
+};
+async function approval_step(step, args = {}) {
+	busy.value = true;
+	try {
+		doc.value = await post(`consbiz.doc_approval.${step}`, { kind: params.kind, name: params.name, ...args });
+		toast(APPROVAL_DONE[step] || "บันทึกแล้ว", "success");
+		reload_summary();
+		activity.value?.reload();
+		return true;
+	} catch (error) {
+		show_error(error);
+		return false;
+	} finally {
+		busy.value = false;
+	}
+}
+
+const rejecting = ref(false);
+const reject_reason = ref("");
+// reject = ส่งกลับแก้ไข (กลับเป็นร่าง) / decline = ไม่อนุมัติ (ปิดเลย)
+const reject_mode = ref("reject");
+function open_reject(mode) {
+	reject_mode.value = mode;
+	rejecting.value = true;
+}
+async function reject() {
+	if (await approval_step(reject_mode.value, { reason: reject_reason.value })) {
+		rejecting.value = false;
+		reject_reason.value = "";
+	}
+}
+
+const recording = ref(false);
+const signers = ref([]);
+const record = ref({ signer: null, date: null, file: null, note: "" });
+async function open_record() {
+	record.value = { signer: null, date: today(), file: null, note: "" };
+	recording.value = true;
+	try {
+		const result = await call("consbiz.doc_approval.get_signers", { kind: params.kind, name: params.name });
+		signers.value = result.options;
+		record.value.signer ??= result.default;
+	} catch (error) {
+		show_error(error);
+	}
+}
+function pick_proof(e) {
+	record.value.file = e.target.files?.[0] || null;
+	e.target.value = "";
+}
+async function save_record() {
+	busy.value = true;
+	try {
+		const file = await upload(record.value.file, { doctype: config.doctype, docname: params.name });
+		doc.value = await post("consbiz.doc_approval.record_signing", {
+			kind: params.kind,
+			name: params.name,
+			signer: record.value.signer,
+			signed_on: record.value.date,
+			proof: file.file_url,
+			note: record.value.note,
+		});
+		recording.value = false;
+		await celebrate("บันทึกการลงนามแล้ว", params.name);
+		reload_summary();
+		activity.value?.reload();
+	} catch (error) {
+		show_error(error);
+	} finally {
+		busy.value = false;
+	}
+}
+
 async function submit() {
 	busy.value = true;
 	try {
-		await post("consbiz.site_docs.submit_doc", { kind: params.kind, name: params.name });
+		// ขั้นอนุมัติ/ลงนาม: doc_approval.approve (แจ้งผู้ส่ง) อื่นๆ = submit_doc ตามเดิม
+		if (doc.value?.approval) await post("consbiz.doc_approval.approve", { kind: params.kind, name: params.name });
+		else await post("consbiz.site_docs.submit_doc", { kind: params.kind, name: params.name });
 		confirm.value = false;
-		await celebrate(`ยืนยัน${config.label}แล้ว`, params.name);
+		await celebrate(`${submit_word.value}${config.label}แล้ว`, params.name);
 		reload_summary();
 		await load();
 	} catch (error) {
@@ -804,8 +1159,8 @@ load();
 
 // คีย์ลัด (แอปออฟฟิศ): e แก้ไขร่าง, p PDF, i แผงข้อมูลเอกสาร
 use_shortcuts({
-	e: () => doc.value?.can_edit && go(`${config.section}-form`, { kind: params.kind, name: params.name }),
-	p: () => doc.value && (pdf.value = true),
+	e: () => doc.value?.can_edit && go_doc(params.kind, "form", { name: params.name }),
+	p: () => print(),
 	i: () => doc.value && toggle_side(),
 });
 </script>

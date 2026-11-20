@@ -145,6 +145,7 @@
 					class="ss-nav-item"
 					:class="{ 'is-active': tab.view === MORE ? more_active : tab.view === active_view }"
 					:title="tab.label"
+					:aria-haspopup="tab.view === MORE || tab.menu ? 'dialog' : undefined"
 					:style="{ '--i': i }"
 					@click="tap_nav(tab)"
 				>
@@ -169,34 +170,20 @@
 			</nav>
 		</Transition>
 
-		<!-- มือถือ: เมนูในกลุ่ม (แตะช่องของกลุ่มในแถบล่าง) = bottom sheet แบบเดียวกับเมนูที่เกินแถบล่าง: ช่องสี่เหลี่ยม 3 คอลัมน์ (จอแคบ 2) -->
-		<Sheet :open="!!group_sheet" :title="group_sheet?.label" @close="group_sheet = null">
+		<!-- มือถือ: ใช้ sheet เดียวสำหรับกลุ่มและเมนูอื่นๆ เพื่อคงการล็อกเลื่อนหน้าระหว่างเปิดกลุ่ม -->
+		<Sheet
+			:open="more_open || !!group_sheet"
+			:title="group_sheet?.label || 'เมนูอื่นๆ'"
+			@close="close_nav_menu"
+		>
 			<div class="ss-menu-grid">
 				<button
-					v-for="tab in group_sheet?.tabs || []"
+					v-for="tab in group_sheet?.tabs || more_tabs"
 					:key="tab.view"
 					type="button"
 					class="ss-menu-tile"
 					:class="{ 'is-active': tab.view === active_view }"
-					@click="(group_sheet = null), open_tab(tab.view)"
-				>
-					<span class="ss-menu-tile-icon"><Icon :name="tab.icon" :size="22" /></span>
-					<span class="ss-menu-tile-label">{{ tab.label }}</span>
-					<span v-if="tab.badge" class="ss-menu-tile-badge" :class="tab.badge_tone">{{ tab.badge }}</span>
-				</button>
-			</div>
-		</Sheet>
-
-		<!-- มือถือ: เมนูที่เกินแถบล่าง (เกิน NAV_MAX) -->
-		<Sheet :open="more_open" title="เมนูอื่นๆ" @close="more_open = false">
-			<div class="ss-menu-grid">
-				<button
-					v-for="tab in more_tabs"
-					:key="tab.view"
-					type="button"
-					class="ss-menu-tile"
-					:class="{ 'is-active': tab.view === active_view }"
-					@click="(more_open = false), open_tab(tab.view)"
+					@click="select_nav_item(tab)"
 				>
 					<span class="ss-menu-tile-icon"><Icon :name="tab.icon" :size="22" /></span>
 					<span class="ss-menu-tile-label">{{ tab.label }}</span>
@@ -393,9 +380,11 @@ const LOGO = "/assets/consbiz/site_app/logo-96.png";
 
 const section = computed(() => SECTIONS[state.section]);
 const view = computed(() => VIEWS[state.route.view] || VIEWS[section.value.home]);
-const route_key = computed(
-	() => `${state.route.view}:${JSON.stringify(state.route.params)}:${state.project?.name}`
-);
+const route_key = computed(() => {
+	const { view, params } = state.route;
+	const key = app.routes[view]?.query_params ? state.route_revision : JSON.stringify(params);
+	return `${view}:${key}:${state.project?.name}`;
+});
 const desktop = computed(() => is_desktop(state.section));
 // ออฟฟิศ / หน้าแรก: แสดงทั้งเปลือกแอปและหน้าโดยไม่ต้องเลือกโครงการ
 const has_shell = computed(
@@ -422,12 +411,14 @@ const visible_tabs = (s) => s.tabs.filter((tab) => !tab.sub && (!tab.when || tab
 
 // เมนูทั้งหมดของหมวด (รวมเมนูย่อยในกลุ่ม) พร้อมตัวเลข
 const all_tabs = computed(() => {
-	const summary = state.summaries[state.section];
-	return visible_tabs(section.value).map((tab) => ({
-		...tab,
-		badge: tab.badge?.(summary) || 0,
-		badge_tone: tab.alert?.(summary) ? "is-danger" : "",
-	}));
+	return visible_tabs(section.value).map((tab) => {
+		const summary = state.summaries[tab.summary || state.section];
+		return {
+			...tab,
+			badge: tab.badge?.(summary) || 0,
+			badge_tone: tab.alert?.(summary) ? "is-danger" : "",
+		};
+	});
 });
 // กลุ่มเมนู (section.groups + tab.group, ตกลง 2026-11-18 หมวดบุคคล): แถบบน/แถบล่างแสดง 1 ช่องต่อกลุ่ม
 // เมนูในกลุ่ม = dropdown ของช่องนั้นบนแถบบน (SectionTabs) / bottom sheet บนมือถือ (group_sheet) ไม่มีแถวเมนูย่อย
@@ -459,6 +450,7 @@ const tabs = computed(() => {
 		out.push({
 			view,
 			group: tab.group,
+			menu: members.length > 1 || section.value.always_group_menu,
 			label: meta.label || tab.label,
 			icon: meta.icon || tab.icon,
 			badge: members.reduce((sum, t) => sum + (Number(t.badge) || 0), 0),
@@ -473,9 +465,17 @@ const group_label = (group) => section.value?.groups?.[group]?.label || "";
 const group_sheet = ref(null);
 function tap_nav(tab) {
 	if (tab.view === MORE) more_open.value = true;
-	else if (tab.group && group_members(tab.group).length > 1)
+	else if (tab.menu)
 		group_sheet.value = { label: group_label(tab.group), tabs: group_members(tab.group) };
 	else open_tab(tab.view);
+}
+function close_nav_menu() {
+	more_open.value = false;
+	group_sheet.value = null;
+}
+function select_nav_item(tab) {
+	close_nav_menu();
+	tap_nav(tab);
 }
 // ตั้งค่าของหมวด (ตกลง 2026-11-18): เมนู ⋯ ในหัวรายการ (ListHead) ของหน้าเมนูหลัก
 // key = groups[กลุ่มที่เปิด].settings หรือ section.settings (หัวข้อใน settings_pages.js MODULE) ไม่มีสิทธิ์ = ไม่มีเมนู
@@ -659,7 +659,11 @@ function load_summaries() {
 			.forEach((key) => load_summary(key))
 	);
 }
-provide("reload_summary", (key) => load_summary(typeof key === "string" ? key : undefined));
+provide("reload_summary", (key) => {
+	const target = typeof key === "string" ? key : state.section;
+	const related = SECTIONS[target] ? visible_tabs(SECTIONS[target]).map((tab) => tab.summary).filter(Boolean) : [];
+	return Promise.all([...new Set([target, ...related])].map(load_summary));
+});
 provide("open_project_picker", () => (picker.value = true));
 provide("choose_project", (project) => choose_project(project));
 

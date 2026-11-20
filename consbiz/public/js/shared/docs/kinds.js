@@ -1,12 +1,14 @@
 // ชนิดเอกสารจัดซื้อ/ขาย ใช้ร่วมทุกแอป (ตรงกับ DOCS ใน consbiz/site_docs.py)
 // section = หมวดที่มีหน้า <section>-doc / <section>-form ของชนิดนั้น
 import { app } from "../app.js";
-import { boot, go } from "../api.js";
+import { boot, go, state } from "../api.js";
 export const DOC_KINDS = {
 	mr: {
 		doctype: "Material Request",
 		section: "buy",
 		label: "ใบขอซื้อ",
+		// แท็บรายการของขั้นอนุมัติ/ลงนาม (consbiz/doc_approval.py)
+		pending: "รออนุมัติ",
 		icon: "clipboard",
 		tone: "teal",
 		project: true,
@@ -20,6 +22,8 @@ export const DOC_KINDS = {
 		doctype: "Purchase Order",
 		section: "buy",
 		label: "ใบสั่งซื้อ",
+		// แท็บรายการของขั้นอนุมัติ/ลงนาม (consbiz/doc_approval.py)
+		pending: "รอลงนาม",
 		icon: "cart",
 		tone: "blue",
 		project: true,
@@ -35,6 +39,8 @@ export const DOC_KINDS = {
 		doctype: "Purchase Invoice",
 		section: "buy",
 		label: "ใบแจ้งหนี้ซื้อ",
+		// แท็บรายการของขั้นอนุมัติ/ลงนาม (consbiz/doc_approval.py)
+		pending: "รอลงนาม",
 		icon: "file",
 		tone: "violet",
 		project: true,
@@ -89,6 +95,27 @@ const DOC_APP_SECTION = { buy: "purchase", sell: "sales" };
 // สิทธิ์ของผู้ใช้ต่อชนิดเอกสาร (site_docs.doc_permissions) ptype = read / create / submit / export
 export const can_doc = (kind, ptype = "read") => !!boot.docs?.[kind]?.[ptype];
 
+export const ACCOUNTING_INVOICES = { "acc-si": "si", "acc-pi": "pi" };
+export const doc_kind = (view) => ACCOUNTING_INVOICES[view] || view;
+
+export function doc_list_view(kind) {
+	const alias = `acc-${kind}`;
+	return state.section === "accounting" && ACCOUNTING_INVOICES[alias] && can_doc(kind) ? alias : kind;
+}
+
+export function doc_target(kind, page) {
+	const list = doc_list_view(kind);
+	return list === kind ? { view: `${DOC_KINDS[kind].section}-${page}`, kind } : {
+		view: `acc-invoice-${page}`,
+		kind: list,
+	};
+}
+
+export function go_doc(kind, page, params, options) {
+	const target = doc_target(kind, page);
+	go(target.view, { kind: target.kind, ...params }, options);
+}
+
 // ขอซื้อจากแผนวัสดุ (หมวดทรัพยากร): ส่งแถวที่ติ๊กไปฟอร์ม ใบขอซื้อยังไม่ถูกบันทึกจนกว่าผู้ใช้จะกดเอง
 // เก็บใน sessionStorage เพราะรายการยาวเกิน URL และให้กดโหลดหน้าฟอร์มใหม่ได้
 export const PLAN_SOURCE = "plan";
@@ -137,6 +164,6 @@ export function doc_url(kind, name) {
 
 // เปิดเอกสาร: ชนิดที่แอปนี้ดูแลเปิดในแอป ที่เหลือไปแอปที่ดูแล
 export function open_doc(kind, name) {
-	if (in_app(kind)) go(`${DOC_KINDS[kind].section}-doc`, { kind, name });
+	if (in_app(kind)) go_doc(kind, "doc", { name });
 	else window.location.href = doc_url(kind, name);
 }

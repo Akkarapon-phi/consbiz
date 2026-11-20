@@ -12,7 +12,7 @@ import frappe
 from frappe import _
 from frappe.utils import add_days, date_diff, flt, getdate, nowdate
 
-from consbiz import hr_attendance, hr_payroll
+from consbiz import hr_attendance, hr_payroll, row_social
 
 # เอกสารที่ผูกกับพนักงาน: (doctype, ป้าย, ช่องวันที่, ช่องสรุป, หน้าในแอป (kind ของ hr-doc) / None = ระบบเต็ม, เฉพาะผู้ทำเงินเดือน)
 LINKS = (
@@ -30,6 +30,7 @@ LINKS = (
 )
 LIST_FIELDS = [
 	"name",
+	"modified",
 	"employee_name",
 	"image",
 	"status",
@@ -51,6 +52,7 @@ def get_employees(company=None):
 	rows = frappe.get_all(
 		"Employee", filters={"company": company}, fields=LIST_FIELDS, order_by="status asc, employee_name asc", limit_page_length=0
 	)
+	row_social.attach(rows, "Employee")
 	projects = {r.project for r in rows if r.project}
 	names = dict(frappe.get_all("Project", filters={"name": ("in", list(projects) or [""])}, fields=["name", "project_name"], as_list=True))
 	probation = set(

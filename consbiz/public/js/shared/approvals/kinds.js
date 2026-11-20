@@ -11,10 +11,17 @@ export const KINDS = {
 	attendance: { label: "แจ้งมาทำงาน", tone: "blue", module: "hr", method: "consbiz.self_home.review_attendance_request", reason: "reason" },
 	advance: { label: "ใบเบิก", tone: "green", module: "hr", method: "consbiz.self_advance.review_advance", reason: "reason" },
 	claim: { label: "เคลียร์/สำรองจ่าย", tone: "violet", module: "hr", method: "consbiz.self_advance.review_claim", reason: "reason" },
+	// เอกสารจัดซื้อ (consbiz/doc_approval.py): แตะ = เปิดหน้าเอกสารในหมวดจัดซื้อ (page) อนุมัติ/ลงนามที่นั่น
+	mr: { label: "ใบขอซื้อ", tone: "teal", module: "purchase", page: "mr" },
+	po: { label: "ใบสั่งซื้อ", tone: "blue", module: "purchase", page: "po" },
+	pi: { label: "ใบแจ้งหนี้ซื้อ", tone: "violet", module: "purchase", page: "pi" },
 };
+// หน้าเอกสารจัดซื้อ (bundle ออฟฟิศ) ของรายการในโมดูลอนุมัติ
+export const doc_page_url = (item) => `/conserp/purchase/buy-doc/${item.kind}/${encodeURIComponent(item.row.name)}`;
 // โมดูลเจ้าของเอกสาร = เมนูย่อยของโมดูลอนุมัติ (view = approve-<key>)
 export const MODULES = {
 	hr: { label: "บุคคล", icon: "users" },
+	purchase: { label: "จัดซื้อ", icon: "cart" },
 };
 export const kinds_of = (module) => Object.keys(KINDS).filter((k) => !module || KINDS[k].module === module);
 
@@ -62,6 +69,14 @@ export function to_item(kind, row, history = false) {
 	} else if (kind === "advance") {
 		Object.assign(item, { title: TYPE[row.advance_type], sub: row.purpose, amount: row.advance_amount, date: row.posting_date });
 		item.status = history ? advance_status(row) : row.over_limit ? { label: "เกินวงเงิน", tone: "violet" } : null;
+	} else if (KINDS[kind].page) {
+		Object.assign(item, {
+			title: `${row.action} ${KINDS[kind].label}`,
+			sub: [row.name, row.party || row.title].filter(Boolean).join(" · "),
+			amount: row.amount,
+			date: history ? row.signed_on || row.date : row.sent_on || row.date,
+		});
+		if (history) item.status = { label: row.result, tone: row.docstatus === 1 ? "green" : "rose" };
 	} else {
 		Object.assign(item, {
 			title: row.total_advance_amount ? "เคลียร์เงินทดรองจ่าย" : "เบิกสำรองจ่าย",

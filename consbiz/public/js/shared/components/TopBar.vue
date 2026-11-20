@@ -47,6 +47,8 @@
 			<div v-if="subtitle" class="ss-topbar-sub" :class="{ 'is-project': sub_is_project }">
 				{{ subtitle }}
 			</div>
+			<!-- ป้ายสถานะของเอกสาร (หน้าดู/ฟอร์ม) ต่อจากเลขที่ -->
+			<slot name="status" />
 		</div>
 		<!-- จอ ≥768 หน้าเมนูหลัก: แท็บเมนูของหมวดแทนชื่อหน้า (ชื่อหน้า = แท็บที่เลือก) -->
 		<SectionTabs v-if="show_tabs" />

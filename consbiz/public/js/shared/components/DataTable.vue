@@ -20,7 +20,7 @@
 							/>
 						</th>
 						<th
-							v-for="c in columns"
+							v-for="c in list_columns"
 							:key="c.key"
 							:class="c.class"
 							:aria-sort="aria_sort(c)"
@@ -29,6 +29,7 @@
 								v-if="c.sort"
 								type="button"
 								class="ss-th-sort"
+								:aria-label="c.aria_label"
 								@click="set_sort(c)"
 							>
 								{{ c.label }}
@@ -80,6 +81,7 @@
 						<td v-for="c in columns" :key="c.key" :class="c.class">
 							<slot :name="c.key" :row="row">{{ row[c.key] }}</slot>
 						</td>
+						<ModifiedCell :value="row.modified" :row="row" />
 					</tr>
 				</tbody>
 			</table>
@@ -118,6 +120,7 @@
 <script setup>
 import { computed, ref, watch } from "vue";
 import Icon from "./Icon.vue";
+import ModifiedCell from "./ModifiedCell.vue";
 import { app } from "../app.js";
 
 const props = defineProps({
@@ -137,6 +140,10 @@ const emit = defineEmits(["open", "update:selected"]);
 const sort_key = ref(null);
 const order = ref("asc");
 const page = ref(0);
+const list_columns = computed(() => [
+	...props.columns,
+	{ key: "modified", class: "col-modified", sort: true, aria_label: "แก้ไขล่าสุด" },
+]);
 
 function compare(a, b) {
 	if (typeof a === "number" && typeof b === "number") return a - b;
@@ -144,7 +151,7 @@ function compare(a, b) {
 }
 
 const sorted = computed(() => {
-	const column = props.columns.find((c) => c.key === sort_key.value);
+	const column = list_columns.value.find((c) => c.key === sort_key.value);
 	if (!column) return props.rows;
 	const value = typeof column.sort === "function" ? column.sort : (row) => row[column.key];
 	const direction = order.value === "asc" ? 1 : -1;

@@ -22,7 +22,7 @@
 				<Icon :name="tab.icon" :size="16" :stroke="tab.view === active ? 2.4 : 2" />
 				<span class="ss-sectab-label">{{ tab.label }}</span>
 				<span v-if="tab.badge" class="ss-sectab-badge" :class="tab.badge_tone">{{ tab.badge }}</span>
-				<Icon v-if="is_group(tab)" class="ss-sectab-caret" name="chevron-down" :size="14" :stroke="2.4" />
+				<Icon v-if="is_group(tab)" class="ss-sectab-caret" name="chevron-down" :size="12" :stroke="2.4" />
 			</button>
 			<button
 				v-if="hidden.length"
@@ -50,7 +50,7 @@
 				<Icon :name="tab.icon" :size="16" />
 				<span class="ss-sectab-label">{{ tab.label }}</span>
 				<span v-if="tab.badge" class="ss-sectab-badge">{{ tab.badge }}</span>
-				<Icon v-if="is_group(tab)" class="ss-sectab-caret" name="chevron-down" :size="14" />
+				<Icon v-if="is_group(tab)" class="ss-sectab-caret" name="chevron-down" :size="12" />
 			</span>
 			<span class="ss-sectab ss-sectab--more"><Icon name="more" :size="18" /></span>
 		</div>
@@ -89,7 +89,7 @@ const shown = computed(() => {
 	return out;
 });
 const hidden = computed(() => tabs.value.filter((t) => !shown.value.includes(t)));
-const is_group = (tab) => !!tab.group && (nav.group_members?.(tab.group).length || 0) > 1;
+const is_group = (tab) => !!tab.menu;
 const item_of = (t) => ({
 	key: t.view,
 	label: t.badge ? `${t.label} (${t.badge})` : t.label,
@@ -99,13 +99,17 @@ const item_of = (t) => ({
 });
 // เมนูที่ล้น: เมนูเดี่ยวรวมกลุ่มเดียว กลุ่มเมนูแยกเป็นหัวข้อ
 const menu_groups = computed(() => {
-	const single = hidden.value.filter((t) => !is_group(t));
-	return [
-		...(single.length ? [{ items: single.map(item_of) }] : []),
-		...hidden.value
-			.filter(is_group)
-			.map((t) => ({ label: nav.group_label(t.group), items: nav.group_members(t.group).map(item_of) })),
-	];
+	const groups = [];
+	for (const tab of hidden.value) {
+		if (is_group(tab)) {
+			groups.push({ label: nav.group_label(tab.group), items: nav.group_members(tab.group).map(item_of) });
+		} else if (groups.length && !groups.at(-1).label) {
+			groups.at(-1).items.push(item_of(tab));
+		} else {
+			groups.push({ items: [item_of(tab)] });
+		}
+	}
+	return groups;
 });
 const group_menu = ref(null);
 function click_tab(tab, event) {

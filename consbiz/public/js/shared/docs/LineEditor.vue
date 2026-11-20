@@ -3,20 +3,9 @@
        - ลากที่จับ (⋮⋮) ย้ายลำดับแถว (emit reorder), ช่องติ๊กเลือกหลายแถวแล้วลบ (emit remove [rows])
        - ปากกา = รายละเอียดของแถว (emit detail) เช่น คำอธิบาย WBS
        - แถวล่างสุดพิมพ์ค้นหาแล้วเพิ่ม (↑↓ / Enter / Esc) Enter ในช่องจำนวน → ราคา → กลับช่องค้นหา
-     มือถือ: การ์ดต่อรายการ เพิ่มจาก sheet (emit browse) -->
+     มือถือ: การ์ดต่อรายการ ปุ่มเพิ่ม/เลือกหลายรายการอยู่ใต้ตารางในหน้า (DocForm) ติ๊กไม่คิดภาษีอยู่ในรายละเอียดแถว (จอกว้าง) -->
 <template>
 	<div v-if="wide" ref="root" class="ss-grid-wrap">
-		<div v-if="picked.size" class="ss-grid-bulk">
-			<span
-				>เลือก <b>{{ picked.size }}</b> แถว</span
-			>
-			<button type="button" class="ss-btn ss-btn--ghost ss-btn--sm" @click="picked = new Set()">
-				ยกเลิกเลือก
-			</button>
-			<button type="button" class="ss-btn ss-btn--danger ss-btn--sm" @click="remove_picked">
-				<Icon name="trash" :size="15" /> ลบที่เลือก
-			</button>
-		</div>
 		<table class="ss-grid">
 			<colgroup>
 				<col class="c-grip" />
@@ -28,7 +17,6 @@
 				<col class="c-rate" />
 				<col class="c-amount" />
 				<col v-if="date_field" class="c-date" />
-				<col v-if="is_mr" class="c-flag" />
 				<col class="c-tools" />
 			</colgroup>
 			<thead>
@@ -51,7 +39,6 @@
 					<th class="is-num">หน่วยละ</th>
 					<th class="is-num">เป็นเงิน</th>
 					<th v-if="date_field">{{ date_label }}</th>
-					<th v-if="is_mr" class="is-center">ไม่คิดภาษี</th>
 					<th><span class="ss-sr">คำสั่ง</span></th>
 				</tr>
 			</thead>
@@ -97,10 +84,31 @@
 					</td>
 					<td class="is-idx">{{ i + 1 }}</td>
 					<td class="is-item">
+						<!-- แถวว่าง (ปุ่มเพิ่มรายการ): พิมพ์ค้นหาสินค้าในช่องนี้ -->
+						<input
+							v-if="!row.item_code"
+							:value="txt"
+							class="ss-cell ss-cell--search"
+							type="search"
+							placeholder="พิมพ์รหัสหรือชื่อสินค้า…"
+							aria-label="ค้นหาสินค้าของแถวนี้"
+							autocomplete="off"
+							role="combobox"
+							data-col="search"
+							:aria-expanded="open"
+							@input="search($event, row)"
+							@focus="focus_search_row($event, row)"
+							@blur="close_soon"
+							@keydown.down.prevent="move(1)"
+							@keydown.up.prevent="move(-1)"
+							@keydown.enter.prevent="pick(results[active])"
+							@keydown.esc="open = false"
+						/>
+						<template v-else>
 						<b :title="row.item_name">{{ row.item_name || row.item_code }}</b>
 						<small
 							>{{ row.item_code
-							}}<template v-if="row.custom_wbs"> · WBS {{ row.custom_wbs }}</template></small
+							}}<template v-if="row.custom_wbs"> · WBS {{ row.custom_wbs }}</template><template v-if="is_mr && row.custom_vat_nocal"> · ไม่คิดภาษี</template></small
 						>
 						<RichText
 							v-if="has_desc(row)"
@@ -109,9 +117,11 @@
 							class="ss-item-desc"
 						/>
 						<small v-if="show_errors && error(row)" class="is-error-text">{{ error(row) }}</small>
+						</template>
 					</td>
 					<td>
 						<input
+							v-if="row.item_code"
 							v-model.number="row.qty"
 							class="ss-cell ss-cell--num"
 							type="number"
@@ -126,6 +136,7 @@
 					</td>
 					<td>
 						<SelectBox
+							v-if="row.item_code"
 							v-model="row.uom"
 							variant="cell"
 							:label="`หน่วย ${row.item_name}`"
@@ -134,6 +145,7 @@
 					</td>
 					<td>
 						<MoneyInput
+							v-if="row.item_code"
 							v-model="row.rate"
 							class="ss-cell ss-cell--num"
 							:aria-label="`หน่วยละ ${row.item_name}`"
@@ -147,16 +159,6 @@
 							v-model="row[date_field]"
 							variant="cell"
 							:label="`${date_label} ${row.item_name}`"
-						/>
-					</td>
-					<td v-if="is_mr" class="is-center">
-						<input
-							v-model="row.custom_vat_nocal"
-							type="checkbox"
-							class="ss-check"
-							:true-value="1"
-							:false-value="0"
-							:aria-label="`ไม่คิดภาษี ${row.item_name}`"
 						/>
 					</td>
 					<td class="is-tools">
@@ -181,62 +183,37 @@
 					</td>
 				</tr>
 			</tbody>
-			<tfoot>
-				<tr class="ss-grid-add">
-					<td colspan="3" class="is-idx"><Icon name="plus" :size="15" :stroke="2.6" /></td>
-					<td :colspan="span">
-						<div class="ss-typeahead">
-							<input
-								ref="search_input"
-								v-model="txt"
-								class="ss-cell ss-cell--search"
-								type="search"
-								placeholder="พิมพ์รหัสหรือชื่อสินค้าเพื่อเพิ่มรายการ…"
-								aria-label="เพิ่มรายการ"
-								autocomplete="off"
-								role="combobox"
-								:aria-expanded="open"
-								@input="search"
-								@focus="txt && (open = true)"
-								@blur="close_soon"
-								@keydown.down.prevent="move(1)"
-								@keydown.up.prevent="move(-1)"
-								@keydown.enter.prevent="pick(results[active])"
-								@keydown.esc="open = false"
-							/>
-							<button type="button" class="ss-link" @click="$emit('browse')">
-								เลือกหลายรายการ
-							</button>
-							<ul
-								v-if="open && (results.length || loading)"
-								class="ss-typeahead-list"
-								role="listbox"
-							>
-								<li v-if="loading && !results.length" class="is-note">กำลังค้นหา…</li>
-								<li
-									v-for="(it, i) in results"
-									:key="it.item_code"
-									role="option"
-									:aria-selected="i === active"
-									:class="{ 'is-active': i === active }"
-									@mousedown.prevent="pick(it)"
-									@mouseenter="active = i"
-								>
-									<span>
-										<b>{{ it.item_name }}</b>
-										<small>{{ it.item_code }} · {{ it.item_group }}</small>
-									</span>
-									<span class="is-num">
-										<template v-if="it.rate">{{ money(it.rate) }}</template>
-										<small>{{ it.stock_uom }}</small>
-									</span>
-								</li>
-							</ul>
-						</div>
-					</td>
-				</tr>
-			</tfoot>
 		</table>
+		<!-- รายการค้นหาอยู่ชั้นบนสุด (ตารางเลื่อนซ้าย-ขวาได้ จึงตัดรายการที่ล้นถ้าอยู่ในตาราง) -->
+		<Teleport to="#ss-layer">
+		<ul
+			v-if="open && (results.length || loading)"
+			ref="list_el"
+			class="ss-typeahead-list ss-typeahead-list--fixed"
+			:style="list_style"
+			role="listbox"
+		>
+			<li v-if="loading && !results.length" class="is-note">กำลังค้นหา…</li>
+			<li
+				v-for="(it, i) in results"
+				:key="it.item_code"
+				role="option"
+				:aria-selected="i === active"
+				:class="{ 'is-active': i === active }"
+				@mousedown.prevent="pick(it)"
+				@mouseenter="active = i"
+			>
+				<span>
+					<b>{{ it.item_name }}</b>
+					<small>{{ it.item_code }} · {{ it.item_group }}<em v-if="it.fuzzy" class="ss-fuzzy">ใกล้เคียง</em></small>
+				</span>
+				<span class="is-num">
+					<template v-if="it.rate">{{ money(it.rate) }}</template>
+					<small>{{ it.stock_uom }}</small>
+				</span>
+			</li>
+		</ul>
+		</Teleport>
 	</div>
 
 	<div v-else>
@@ -309,14 +286,11 @@
 				<div v-if="show_errors && error(row)" class="ss-field-error">{{ error(row) }}</div>
 			</div>
 		</TransitionGroup>
-		<button type="button" class="ss-add-row" @click="$emit('browse')">
-			<Icon name="plus" :size="20" :stroke="2.6" /> เพิ่มรายการ
-		</button>
 	</div>
 </template>
 
 <script setup>
-import { computed, nextTick, ref } from "vue";
+import { nextTick, onBeforeUnmount, onMounted, ref } from "vue";
 import Icon from "../components/Icon.vue";
 import SelectBox from "../components/SelectBox.vue";
 import DateInput from "../components/DateInput.vue";
@@ -337,10 +311,9 @@ const props = defineProps({
 	// (txt) => Promise<items> จาก site_docs.search_items
 	search_fn: { type: Function, required: true },
 });
-const emit = defineEmits(["add", "remove", "reorder", "detail", "browse", "focus-row"]);
+const emit = defineEmits(["add", "fill", "add-row", "remove", "reorder", "detail", "browse", "focus-row"]);
 
 const root = ref(null);
-const search_input = ref(null);
 const txt = ref("");
 const results = ref([]);
 const loading = ref(false);
@@ -349,8 +322,18 @@ const active = ref(0);
 let timer = null;
 let request = 0;
 
-// คอลัมน์ที่ช่องค้นหาคลุม (รายการ ถึง ก่อนปุ่มท้ายแถว)
-const span = computed(() => 5 + (props.date_field ? 1 : 0) + (props.is_mr ? 1 : 0) + 1);
+// แถวว่างที่กำลังค้นหา + ตำแหน่งรายการผลค้นหา (fixed ใต้ช่อง)
+const target = ref(null);
+const list_style = ref({});
+function place(input) {
+	const r = input.getBoundingClientRect();
+	list_style.value = { top: `${r.bottom + 4}px`, left: `${r.left}px`, width: `${Math.max(r.width, 360)}px` };
+}
+function focus_search_row(event, row) {
+	target.value = row;
+	place(event.target);
+	if (txt.value) open.value = true;
+}
 
 // รายละเอียดที่ต่างจากชื่อรายการ (ERPNext ตั้ง description = ชื่อรายการเป็นค่าเริ่มต้น)
 const has_desc = (row) => {
@@ -407,7 +390,13 @@ function drag_end() {
 
 // ---------------------------------------------------------------- ค้นหาเพิ่มรายการ
 
-function search() {
+// อ่านค่าจากช่องตรงๆ (v-model รอคีย์บอร์ดไทย/IME ยืนยันตัวอักษร ทำให้ไม่ค้นหาจนกด Enter)
+function search(event, row) {
+	if (row) target.value = row;
+	if (event?.target) {
+		txt.value = event.target.value;
+		place(event.target);
+	}
 	clearTimeout(timer);
 	open.value = !!txt.value.trim();
 	if (!open.value) return;
@@ -431,26 +420,44 @@ function move(delta) {
 	active.value = (active.value + delta + results.value.length) % results.value.length;
 }
 
-// เพิ่มแล้วไปช่องจำนวนของแถวใหม่
+// เลือกสินค้าให้แถวว่าง แล้วไปช่องจำนวนของแถวนั้น
 async function pick(it) {
-	if (!it) return;
-	emit("add", it);
+	if (!it || !target.value) return;
+	const row = target.value;
+	emit("fill", row, it);
 	txt.value = "";
 	results.value = [];
 	open.value = false;
 	await nextTick();
-	root.value?.querySelector('tbody tr:last-child input[data-col="qty"]')?.focus();
+	const index = props.items.indexOf(row);
+	root.value?.querySelectorAll("tbody tr")[index]?.querySelector('input[data-col="qty"]')?.focus();
 }
 
 function close_soon() {
 	setTimeout(() => (open.value = false), 150);
 }
 
-// Enter: จำนวน → ราคา → ช่องค้นหา
-function next(event, target) {
-	if (target === "search") return search_input.value?.focus();
-	event.target.closest("tr")?.querySelector(`input[data-col="${target}"]`)?.focus();
+// Enter: จำนวน → ราคา → แถวว่างใหม่ (ค้นหาสินค้าถัดไป)
+function next(event, col) {
+	if (col === "search") return emit("add-row");
+	event.target.closest("tr")?.querySelector(`input[data-col="${col}"]`)?.focus();
 }
 
-defineExpose({ focus_search: () => search_input.value?.focus() });
+// เลื่อนหน้า = ย้ายรายการผลค้นหาตามช่อง (ยกเว้นเลื่อนในรายการเอง)
+const list_el = ref(null);
+const on_scroll = (e) => {
+	if (!open.value || list_el.value?.contains(e.target)) return;
+	const el = root.value?.querySelector('input[data-col="search"]');
+	if (el) place(el);
+};
+onMounted(() => window.addEventListener("scroll", on_scroll, true));
+onBeforeUnmount(() => window.removeEventListener("scroll", on_scroll, true));
+
+// แถวที่ติ๊กเลือก: ปุ่ม ลบรายการ / ยกเลิกที่เลือก อยู่ใต้ตารางในหน้า (DocForm)
+defineExpose({
+	focus_blank: () => root.value?.querySelector('input[data-col="search"]')?.focus(),
+	picked,
+	clear_picked: () => (picked.value = new Set()),
+	remove_picked,
+});
 </script>

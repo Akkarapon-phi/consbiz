@@ -9569,8 +9569,18 @@ input[type="number"] {
 	white-space: nowrap;
 }
 .ss-table--list .col-modified {
-	color: var(--ss-muted);
-	font-size: var(--ss-fs);
+	color: color-mix(in srgb, var(--ss-muted) 45%, var(--ss-text-2));
+	font-size: var(--ss-fs-sm);
+	font-variant-numeric: tabular-nums;
+	text-align: right;
+}
+.ss-table--list .col-modified .ss-th-sort .is-idle {
+	opacity: 0.75;
+}
+@media (max-width: 767px) {
+	.ss-table--list .col-modified {
+		display: none;
+	}
 }
 .ss-table--list .col-pct .ss-table-pct i {
 	width: 40px;
@@ -9639,13 +9649,27 @@ input[type="number"] {
 	max-width: 1px;
 	min-width: 160px;
 }
+/* The party column takes the space left by the compact document columns. */
+.ss-table--list .col-flex-party {
+	width: 100%;
+}
+.ss-table--list td.col-flex-party {
+	max-width: 1px;
+}
+.ss-table--list .col-flex-party .ss-cell-main,
+.ss-table--list .col-flex-party small {
+	display: block;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
 .ss-table--list th,
 .ss-table--list td {
 	padding-left: 10px;
 	padding-right: 10px;
 }
 /* ตารางต้องพอดีกรอบ ไม่เลื่อนซ้าย-ขวา: ดูความกว้างกรอบตาราง (เปลี่ยนตาม sidebar ปักหมุด/แผงตัวอย่าง) ไม่ใช่ความกว้างจอ
-   ลดทีละขั้น: แถบ % เหลือตัวเลข → ซ่อนมอบหมาย/แก้ไขล่าสุด → ซ่อน % (สถานะบอกอยู่แล้ว) */
+   ลดทีละขั้น: แถบ % เหลือตัวเลข → ซ่อนมอบหมาย → ซ่อน % (สถานะบอกอยู่แล้ว) */
 .ss-table-wrap:has(> .ss-table--list) {
 	container: doclist / inline-size;
 }
@@ -13934,6 +13958,7 @@ html[data-theme="dark"] .ss-work-variance.is-rose { color: #f0a0a6; background: 
 .ss-work-followups th:first-child,
 .ss-work-followups td:first-child { padding-left: 0; }
 .ss-work-followups td:last-child { width: 20px; padding-right: 0; color: var(--ss-work-muted); }
+.ss-work-followups td.col-modified { width: 1%; text-align: right; font-size: var(--ss-fs-sm); }
 .ss-work-followups tr:last-child td { border-bottom: 0; }
 .ss-work-followups tbody tr.is-clickable { cursor: pointer; }
 .ss-work-followups tbody tr.is-clickable:hover { background: var(--ss-brand-soft); }
@@ -13991,6 +14016,7 @@ html[data-theme="dark"] .ss-work-variance.is-rose { color: #f0a0a6; background: 
 	.ss-work-followups td:nth-child(4) { grid-area: status; font-size: var(--ss-fs-sm); }
 	.ss-work-followups td:nth-child(5) { display: none; }
 	.ss-work-followups td:nth-child(6) { grid-area: chev; width: auto; }
+	.ss-work-followups td.col-modified { display: none; }
 }
 @media (max-width: 767px) {
 	.ss-work-greeting h1 { font-size: var(--ss-fs-xl); }
@@ -15396,6 +15422,9 @@ html[data-look="new"] .ss-segmented button.is-active {
 	.ss-app[data-look="new"] .ss-sectab:not(.ss-sectab--more) > .ss-icon {
 		display: none;
 	}
+	.ss-app[data-section="accounting"] .ss-sectab:not(.ss-sectab--more) > .ss-sectab-caret {
+		display: block;
+	}
 	.ss-app[data-look="new"] .ss-sectab .ss-sectab-label,
 	.ss-app[data-look="new"] .ss-sectab:not(.is-active) .ss-sectab-label {
 		display: inline;
@@ -15482,6 +15511,9 @@ html[data-theme="dark"][data-look="new"] .ss-option--project:not(.is-active) .ss
 /* ปุ่ม/ตัวเลือกบริษัท (กลุ่มออฟฟิศ): โลโก้บริษัทบนพื้นขาว ไม่มีโลโก้ = อักษรย่อ */
 .ss-avatar.has-logo,
 html[data-look="new"] .ss-avatar.has-logo {
+	aspect-ratio: 1;
+	contain: size;
+	grid-template: minmax(0, 1fr) / minmax(0, 1fr);
 	padding: 3px;
 	background: #fff;
 	overflow: hidden;
@@ -15942,4 +15974,663 @@ html[data-look="new"] .ss-avatar.has-logo {
 	align-items: center;
 	gap: 4px;
 	white-space: nowrap;
+}
+
+/* ---------------------------------------------------------------- 2026-11-18 หน้าเอกสารซื้อ-ขายแบบการ์ด (DocView ดู / DocForm แก้)
+   .ss-doc-frame = แท็บหัวฟอร์ม + การ์ดเนื้อหา (.ss-doc-sheet) ต่อกันเป็นชิ้นเดียว (ยกเว้นกติกา "หัวฟอร์มแยกจากการ์ด" ของหน้าอื่น)
+   ในการ์ด: แถบขั้นตอนเล็ก → [ข้อมูลเอกสาร | รายละเอียดการจัดซื้อ/ขาย] → รายการ (ปุ่มใต้ตาราง) → [ตัวเลือก+หมายเหตุ | สรุปยอด]
+   หน้าดู = ข้อความล้วน, หน้าแก้ = เฉพาะช่องที่แก้ได้เป็นช่องกรอก เลขที่ + สถานะอยู่แถบบน
+   ติดบนจอเฉพาะแถวแท็บ (จอ ≥768) เนื้อหาที่เลื่อนขึ้นไม่โผล่เหนือแถวแท็บ ไม่มีแถบปุ่มด้านล่าง */
+.ss-doc-frame {
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+}
+.ss-content .ss-doc-stick > .ss-form-head {
+	border-bottom-left-radius: 0;
+	border-bottom-right-radius: 0;
+}
+.ss-app[data-look="new"] .ss-content .ss-doc-stick > .ss-form-head {
+	border-radius: 22px 22px 0 0;
+}
+/* แถวแท็บทึบ (หัวรายการปกติโปร่ง + เบลอ) พื้นกั้นด้านหลังจึงไม่โผล่ผ่าน */
+.ss-content .ss-doc-stick > .ss-form-head {
+	background: var(--ss-work-card, var(--ss-surface));
+	backdrop-filter: none;
+	-webkit-backdrop-filter: none;
+}
+@media (min-width: 768px) {
+	.ss-doc-frame > .ss-doc-stick {
+		position: sticky;
+		top: calc(var(--ss-head-h, 64px) + 6px);
+		z-index: 6;
+		background: var(--ss-work-canvas, var(--ss-bg));
+	}
+	/* พื้นหน้ากั้นเหนือแถวแท็บถึงแถบบน: เนื้อหาที่เลื่อนขึ้นหายใต้แถวแท็บ ไม่โผล่ในช่องว่าง (แถบบน z-index สูงกว่า) */
+	.ss-doc-frame > .ss-doc-stick::before {
+		content: "";
+		position: absolute;
+		left: -2px;
+		right: -2px;
+		bottom: 100%;
+		height: calc(var(--ss-head-h, 64px) + 8px);
+		background: inherit;
+		pointer-events: none;
+	}
+}
+.ss-doc-sheet {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+	min-width: 0;
+	padding: 12px 16px 16px;
+	border: 1px solid var(--ss-work-line, var(--ss-border));
+	border-top: 0;
+	border-radius: 0 0 22px 22px;
+	background: var(--ss-work-card, var(--ss-surface));
+}
+.ss-doc-sheet > .ss-docform-body {
+	min-width: 0;
+}
+.ss-doc-sheet .ss-docform-main {
+	gap: 12px;
+}
+
+/* แถบขั้นตอนขนาดเล็ก (MiniSteps.vue) บนสุดของการ์ดเนื้อหา */
+.ss-mini-steps {
+	display: flex;
+	align-items: center;
+	width: min(100%, 760px);
+	margin: 0 auto;
+	padding: 2px 0;
+	list-style: none;
+	overflow-x: auto;
+	scrollbar-width: none;
+}
+.ss-mini-steps::-webkit-scrollbar {
+	display: none;
+}
+.ss-mini-steps li {
+	flex: 1 1 0;
+	min-width: max-content;
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	font-size: var(--ss-fs-sm);
+	color: var(--ss-muted);
+	white-space: nowrap;
+}
+.ss-mini-steps li:not(:last-child)::after {
+	content: "";
+	flex: 1 1 auto;
+	min-width: 16px;
+	height: 2px;
+	margin: 0 8px 0 2px;
+	border-radius: 2px;
+	background: var(--ss-work-line, var(--ss-border));
+}
+.ss-mini-steps li.is-done:not(:last-child)::after {
+	background: var(--ss-brand);
+}
+.ss-mini-steps li:last-child {
+	flex: 0 0 auto;
+}
+.ss-mini-step-dot {
+	flex: 0 0 auto;
+	display: grid;
+	place-items: center;
+	width: 20px;
+	height: 20px;
+	border-radius: 50%;
+	border: 1.5px solid var(--ss-border-strong, #cfd4dc);
+	background: var(--ss-work-card, var(--ss-surface));
+	font-size: var(--ss-fs-sm);
+	font-weight: 700;
+	line-height: 1;
+	color: var(--ss-muted);
+}
+.ss-mini-steps li:is(.is-done, .is-current) .ss-mini-step-dot {
+	border-color: var(--ss-brand);
+	background: var(--ss-brand);
+	color: #fff;
+}
+.ss-mini-steps li.is-current .ss-mini-step-dot {
+	box-shadow: 0 0 0 3px color-mix(in srgb, var(--ss-brand) 16%, transparent);
+}
+.ss-mini-steps li.is-error .ss-mini-step-dot {
+	border-color: var(--ss-danger, #d24f57);
+	background: var(--ss-danger, #d24f57);
+	color: #fff;
+}
+.ss-mini-steps li:is(.is-done, .is-current) .ss-mini-step-label {
+	color: var(--ss-text);
+	font-weight: 600;
+}
+.ss-mini-steps li.is-current .ss-mini-step-label {
+	font-weight: 700;
+}
+.ss-mini-steps small {
+	color: var(--ss-muted);
+	font-size: var(--ss-fs-sm);
+}
+
+/* แถบบน: เลขที่เอกสาร + ป้ายสถานะต่อจากชื่อหน้า */
+html[data-look="new"] .ss-topbar-sub {
+	flex: 0 1 auto;
+	color: var(--ss-muted);
+	font-weight: 600;
+	font-variant-numeric: tabular-nums;
+}
+.ss-topbar-title > .ss-tag {
+	align-self: center;
+	flex: 0 0 auto;
+}
+@media (max-width: 767px) {
+	html[data-look="new"] .ss-topbar-title > .ss-topbar-sub {
+		display: none;
+	}
+}
+
+/* กล่องย่อยในการ์ดเนื้อหา */
+.ss-doc-cards {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr));
+	gap: 12px;
+}
+.ss-doc-card {
+	min-width: 0;
+	padding: 12px 16px 14px;
+	border: 1px solid var(--ss-work-line, var(--ss-border));
+	border-radius: 14px;
+	background: var(--ss-work-card, var(--ss-surface));
+}
+.ss-doc-card-title {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin: 0 0 10px;
+	font-size: var(--ss-fs-title);
+	font-weight: 700;
+	color: var(--ss-text);
+}
+.ss-doc-card-title > .ss-icon {
+	color: var(--ss-brand);
+}
+
+/* ช่องข้อมูล 2 คอลัมน์ (ช่องยาว = เต็มแถว) ระยะบน-ล่างกระชับ */
+.ss-doc-fields {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 8px 16px;
+	margin: 0;
+}
+.ss-doc-fields > .is-wide {
+	grid-column: 1 / -1;
+}
+@media (max-width: 520px) {
+	.ss-doc-fields {
+		grid-template-columns: minmax(0, 1fr);
+	}
+}
+.ss-doc-fields > div > dt,
+.ss-doc-fields .ss-field-label {
+	margin: 0 0 2px;
+	font-size: var(--ss-fs-sm);
+	font-weight: 500;
+	line-height: 1.4;
+	color: var(--ss-muted);
+}
+.ss-doc-fields > div > dd {
+	margin: 0;
+	font-size: var(--ss-fs);
+	font-weight: 600;
+	line-height: 1.5;
+	color: var(--ss-text);
+	overflow-wrap: anywhere;
+}
+.ss-doc-fields dd small,
+.ss-doc-value small {
+	font-weight: 500;
+	color: var(--ss-muted);
+}
+.ss-doc-fields dd.is-empty,
+.ss-doc-value.is-empty {
+	color: var(--ss-muted);
+	font-weight: 500;
+}
+.ss-doc-fields dd.is-due {
+	color: var(--ss-danger, #d24f57);
+}
+.ss-doc-person {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+}
+.ss-doc-person > .ss-icon {
+	color: var(--ss-muted);
+}
+/* หน้าแก้: ช่องกรอกสูง 28px (จอ ≥768 ทั้งเมาส์และสัมผัส, ผู้ใช้เลือก 2026-11-18) มือถือ 36px มีกรอบ */
+.ss-doc-fields.is-edit {
+	--ss-doc-input-h: 36px;
+	align-items: end;
+}
+@media (min-width: 768px) {
+	.ss-doc-fields.is-edit {
+		--ss-doc-input-h: 28px;
+	}
+}
+.ss-doc-fields.is-edit > .ss-field,
+.ss-doc-fields.is-edit > .ss-picker-wrap,
+.ss-doc-fields.is-edit > .ss-picker-wrap > .ss-field {
+	min-width: 0;
+	margin: 0;
+	gap: 0;
+}
+.ss-doc-fields.is-edit :is(.ss-input, .ss-select--field, .ss-picker-value) {
+	min-height: var(--ss-doc-input-h);
+	height: var(--ss-doc-input-h);
+	padding-top: 0;
+	padding-bottom: 0;
+	border: 1px solid var(--ss-border-strong, #d5d9e0);
+	border-radius: 9px;
+	background: var(--ss-work-card, var(--ss-surface));
+}
+.ss-doc-fields.is-edit .ss-picker-value {
+	display: flex;
+	align-items: center;
+}
+.ss-doc-fields.is-edit :is(.ss-input, .ss-select--field, .ss-picker-value):focus-within,
+.ss-doc-fields.is-edit .ss-input:focus {
+	border-color: var(--ss-brand);
+}
+.ss-doc-value {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	height: var(--ss-doc-input-h, 28px);
+	padding: 0 12px;
+	border-radius: 9px;
+	background: var(--ss-surface-2);
+	font-weight: 600;
+	color: var(--ss-text);
+	overflow: hidden;
+	white-space: nowrap;
+	text-overflow: ellipsis;
+}
+
+/* รายการ: ตารางเต็มกว้างกล่อง หัวตารางเทาอ่อน ตัวหนาสีเข้ม (แบบตัวอย่าง) */
+.ss-doc-card--items {
+	padding: 12px 0 0;
+}
+.ss-doc-card--items > .ss-doc-card-title {
+	padding: 0 16px;
+}
+.ss-doc-card--items > :is(.ss-empty, .ss-doc-lines, div:not([class])) {
+	padding: 0 12px;
+}
+.ss-doc-table-wrap,
+.ss-doc-card--items .ss-grid-wrap {
+	border-radius: 0;
+	background: transparent;
+	box-shadow: none;
+	overflow-x: auto;
+}
+.ss-doc-card--items :is(.ss-doc-table, .ss-grid) {
+	width: 100%;
+}
+/* แท็บเล็ต: ตารางแก้กว้างอย่างน้อยเท่านี้ เลื่อนซ้าย-ขวาแทนการเปลี่ยนเป็นการ์ด */
+.ss-doc-card--items .ss-grid {
+	min-width: 1000px;
+}
+.ss-doc-card--items .ss-grid .c-idx { width: 40px; }
+.ss-doc-card--items .ss-grid .c-qty { width: 96px; }
+.ss-doc-card--items .ss-grid .c-uom { width: 112px; }
+.ss-doc-card--items .ss-grid .c-rate { width: 120px; }
+.ss-doc-card--items .ss-grid .c-amount { width: 124px; }
+.ss-doc-card--items .ss-grid .c-date { width: 144px; }
+.ss-doc-card--items .ss-grid .c-tools { width: 72px; }
+.ss-doc-card--items :is(.ss-doc-table, .ss-grid) thead th {
+	padding-top: 10px;
+	padding-bottom: 10px;
+	background: var(--ss-surface-2, #f1f3f6);
+	border-top: 1px solid var(--ss-work-line, var(--ss-border));
+	border-bottom: 1px solid var(--ss-work-line, var(--ss-border));
+	font-size: var(--ss-fs);
+	font-weight: 700;
+	color: var(--ss-text);
+}
+.ss-doc-card--items :is(.ss-doc-table, .ss-grid) tbody td {
+	border-bottom: 1px solid var(--ss-work-line, var(--ss-border));
+	vertical-align: middle;
+}
+.ss-doc-card--items .ss-doc-table :is(th, td):first-child {
+	padding-left: 16px;
+}
+.ss-doc-card--items .ss-doc-table :is(th, td):last-child {
+	padding-right: 16px;
+}
+.ss-doc-card--items .ss-doc-table tbody td {
+	padding-top: 8px;
+	padding-bottom: 8px;
+}
+.ss-doc-card--items .ss-grid tbody td {
+	padding-top: 6px;
+	padding-bottom: 6px;
+}
+.ss-doc-card--items :is(.ss-doc-table, .ss-grid) .is-item b {
+	font-weight: 600;
+}
+/* ช่องกรอกในตาราง: มีกรอบเสมอ */
+.ss-doc-card--items .ss-grid :is(.ss-cell, .ss-select--cell) {
+	height: 28px;
+	min-height: 28px;
+	border: 1px solid var(--ss-border-strong, #d5d9e0);
+	border-radius: 8px;
+	background: var(--ss-work-card, var(--ss-surface));
+}
+.ss-doc-card--items .ss-grid .ss-cell:focus {
+	border-color: var(--ss-brand);
+}
+.ss-typeahead-list.ss-typeahead-list--fixed {
+	position: fixed;
+	z-index: 60;
+}
+/* ใต้ตาราง: ปุ่มของรายการ ชิดขวา */
+.ss-doc-items-foot {
+	display: flex;
+	align-items: center;
+	justify-content: flex-start;
+	flex-wrap: wrap;
+	gap: 8px;
+	padding: 10px 12px 12px;
+}
+.ss-doc-items-btn {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+}
+/* มือถือ: แถวรายการในกล่อง (ไม่ซ้อนการ์ด) ช่องกรอกมีกรอบแบบเดียวกับตาราง */
+.ss-doc-lines {
+	display: flex;
+	flex-direction: column;
+}
+.ss-doc-line {
+	display: flex;
+	flex-direction: column;
+	align-items: stretch;
+	gap: 3px;
+	padding: 10px 4px;
+	text-align: left;
+	border-top: 1px solid var(--ss-work-line, var(--ss-border));
+}
+.ss-doc-line > .ss-doc-row {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: 12px;
+}
+.ss-doc-line .ss-doc-title {
+	flex: 1;
+	min-width: 0;
+	font-weight: 600;
+}
+.ss-doc-card--items .ss-lines {
+	gap: 0;
+}
+.ss-doc-card--items .ss-lines > .ss-line {
+	padding: 10px 4px;
+	border: 0;
+	border-top: 1px solid var(--ss-work-line, var(--ss-border));
+	border-radius: 0;
+	background: none;
+	box-shadow: none;
+}
+.ss-doc-card--items .ss-lines :is(.ss-input, .ss-select--field) {
+	min-height: 36px;
+	height: 36px;
+	padding-top: 0;
+	padding-bottom: 0;
+	border: 1px solid var(--ss-border-strong, #d5d9e0);
+	border-radius: 9px;
+	background: var(--ss-work-card, var(--ss-surface));
+}
+
+/* ท้ายเอกสาร */
+.ss-doc-foot {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) minmax(300px, 400px);
+	gap: 12px 20px;
+	align-items: start;
+}
+@media (max-width: 899px) {
+	.ss-doc-foot {
+		grid-template-columns: minmax(0, 1fr);
+	}
+}
+.ss-doc-notes {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+	min-width: 0;
+	padding-top: 2px;
+}
+.ss-doc-notes .ss-dv-flags {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px 24px;
+}
+.ss-doc-remarks {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+}
+.ss-doc-remarks-label {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	font-weight: 700;
+	color: var(--ss-text);
+}
+.ss-doc-remarks-label > .ss-icon {
+	color: var(--ss-brand);
+}
+.ss-doc-remarks .ss-text-block {
+	padding: 0;
+	border: 0;
+	background: none;
+	box-shadow: none;
+	white-space: pre-wrap;
+}
+.ss-doc-remarks .ss-text-block.is-empty {
+	color: var(--ss-muted);
+}
+.ss-doc-textarea {
+	position: relative;
+	display: block;
+}
+.ss-doc-textarea .ss-input {
+	min-height: 72px;
+	padding-bottom: 20px;
+	border: 1px solid var(--ss-border-strong, #d5d9e0);
+	border-radius: 9px;
+	background: var(--ss-work-card, var(--ss-surface));
+	resize: vertical;
+}
+.ss-doc-textarea .ss-input:focus {
+	border-color: var(--ss-brand);
+}
+.ss-doc-textarea small {
+	position: absolute;
+	right: 12px;
+	bottom: 5px;
+	font-size: var(--ss-fs-sm);
+	color: var(--ss-muted);
+	pointer-events: none;
+}
+.ss-doc-totals {
+	display: flex;
+	gap: 12px;
+	padding: 12px 16px;
+	border: 1px solid var(--ss-work-line, var(--ss-border));
+	border-radius: 14px;
+	background: var(--ss-work-card, var(--ss-surface));
+}
+.ss-doc-totals-icon {
+	flex: 0 0 auto;
+	color: var(--ss-brand);
+	padding-top: 2px;
+}
+.ss-doc-totals > .ss-totals {
+	flex: 1;
+	min-width: 0;
+	gap: 6px;
+	padding: 0;
+	border-radius: 0;
+	background: none;
+	box-shadow: none;
+}
+/* ป้ายเยื้องเข้าขวา ตัวเลขเยื้องเข้าซ้าย ตรงกับแถวรวมเป็นเงิน (ผู้ใช้ขอ 2026-11-18) */
+.ss-doc-totals > .ss-totals > div:not(.ss-totals-words) {
+	padding-left: 12px;
+	padding-right: 12px;
+}
+.ss-doc-totals > .ss-totals > div:not(.is-grand):not(.ss-totals-words) {
+	padding-bottom: 6px;
+	border-bottom: 1px solid var(--ss-work-line, var(--ss-border));
+}
+.ss-doc-totals > .ss-totals .is-grand {
+	align-items: center;
+	padding: 8px 12px;
+	border-top: 0;
+	border-radius: 9px;
+	background: var(--ss-accent-soft, #fef3d7);
+	font-size: var(--ss-fs-title);
+}
+.ss-doc-totals > .ss-totals .is-grand b {
+	font-size: var(--ss-fs-lg);
+	color: var(--ss-text);
+}
+.ss-doc-totals .ss-totals-words {
+	padding-right: 12px;
+	justify-content: flex-end;
+	text-align: right;
+	font-size: var(--ss-fs-sm);
+	color: var(--ss-muted);
+}
+
+/* ปุ่มทุกปุ่มในหน้าเอกสาร (แถวแท็บ + ใต้ตาราง) สูง 28px ทุกจอ ≥768 (ผู้ใช้เลือก 2026-11-18) */
+@media (min-width: 768px) {
+	.ss-doc-frame :is(.ss-btn:not(.ss-btn--lg):not(.ss-btn--block), .ss-list-create) {
+		height: 28px;
+		min-height: 28px;
+		padding: 0 12px;
+		border-radius: 999px;
+		font-size: var(--ss-fs-sm);
+	}
+	.ss-doc-frame .ss-form-head .ss-icon-btn {
+		width: 28px;
+		height: 28px;
+	}
+	.ss-doc-frame .ss-ie-form > :is(.ss-input, .ss-date) {
+		min-height: 28px;
+		height: 28px;
+		padding-top: 0;
+		padding-bottom: 0;
+	}
+	.ss-doc-frame .ss-ie-actions .ss-icon-btn {
+		width: 28px;
+		height: 28px;
+	}
+}
+.ss-doc-items-btn[disabled] {
+	opacity: 0.45;
+}
+
+/* ช่องเลือกแบบพิมพ์ค้นหา (ComboBox.vue) */
+.ss-combo {
+	min-width: 0;
+}
+.ss-combo-box {
+	position: relative;
+	display: block;
+}
+.ss-combo-input {
+	width: 100%;
+	padding-right: 52px;
+	text-overflow: ellipsis;
+	cursor: text;
+}
+.ss-combo-caret {
+	position: absolute;
+	right: 10px;
+	top: 50%;
+	transform: translateY(-50%);
+	color: var(--ss-muted);
+	pointer-events: none;
+	transition: transform 0.15s ease;
+}
+.ss-combo.is-open .ss-combo-caret {
+	transform: translateY(-50%) rotate(180deg);
+}
+.ss-combo-clear {
+	position: absolute;
+	right: 30px;
+	top: 50%;
+	transform: translateY(-50%);
+	display: grid;
+	place-items: center;
+	width: 20px;
+	height: 20px;
+	border-radius: 50%;
+	color: var(--ss-muted);
+}
+.ss-combo-clear:hover {
+	color: var(--ss-text);
+	background: var(--ss-surface-2);
+}
+.ss-combo-list li {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+}
+.ss-combo-list li > span {
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+}
+.ss-combo-list li.is-chosen b {
+	color: var(--ss-brand);
+}
+.ss-combo-list li > .ss-icon {
+	flex: none;
+	color: var(--ss-brand);
+}
+/* ผลค้นหาสินค้าที่ไม่ตรงทุกคำ (ค้นแบบเผื่อพิมพ์ผิด) */
+.ss-fuzzy {
+	margin-left: 6px;
+	padding: 0 6px;
+	border-radius: 99px;
+	background: var(--ss-accent-soft, #fef3d7);
+	color: var(--ss-text-2, var(--ss-text));
+	font-style: normal;
+	font-size: var(--ss-fs-sm);
+}
+
+/* ตัวเลือกของเอกสารในแถบหน้าตัวอย่าง (HtmlViewer slot tools) เช่น ฉบับที่พิมพ์ ต้นฉบับ/สำเนา */
+.ss-pdf-tools {
+	display: flex;
+	align-items: center;
+	gap: 14px;
+	margin-right: 10px;
+}
+.ss-pdf-check {
+	white-space: nowrap;
+	font-size: var(--ss-fs);
+}
+@media (max-width: 560px) {
+	.ss-pdf-tools {
+		gap: 8px;
+		margin-right: 4px;
+	}
 }

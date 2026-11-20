@@ -16,7 +16,7 @@ import frappe
 from frappe import _
 from frappe.utils import add_days, cint, flt, getdate, nowdate
 
-from consbiz import store_app
+from consbiz import row_social, store_app
 
 PAGE = 30
 SOON_DAYS = 7
@@ -94,6 +94,8 @@ DOCS = {
 	},
 }
 KIND_OF = {config["doctype"]: kind for kind, config in DOCS.items()}
+# ชนิดที่มีขั้นอนุมัติ/ลงนาม (consbiz/doc_approval.py FLOWS) = แท็บ "รออนุมัติ/รอลงนาม" ในรายการ
+APPROVAL_DOCTYPES = ("Material Request", "Purchase Order", "Purchase Invoice")
 # ช่องลิงก์คู่ค้า (กรองตามผู้ขาย/ลูกค้าที่เลือก) config["party"] เป็นชื่อสำหรับแสดง
 PARTY_LINK = {
 	"Purchase Order": "supplier",
@@ -148,7 +150,10 @@ def doc_permissions():
 	"""สิทธิ์ต่อชนิดเอกสารของผู้ใช้ (boot.docs) หน้าจอซ่อนเมนู/ปุ่มตามนี้ ส่วน API ตรวจซ้ำทุกคำขอ"""
 	doctypes = {**{kind: config["doctype"] for kind, config in DOCS.items()}, "boq": "BOQ"}
 	return {
-		kind: {ptype: bool(frappe.has_permission(doctype, ptype)) for ptype in ("read", "create", "submit", "export")}
+		kind: {
+			ptype: bool(frappe.has_permission(doctype, ptype))
+			for ptype in ("read", "create", "submit", "export")
+		}
 		for kind, doctype in doctypes.items()
 	}
 
@@ -160,6 +165,19 @@ def status_of(status, docstatus):
 		return STATUS["Cancelled"]
 	label, tone = STATUS.get(status, (status or "ส่งแล้ว", "gray"))
 	return _(label), tone
+
+
+def approval_status(row, doctype):
+	"""ร่างที่รออนุมัติ/ลงนาม หรือถูกส่งกลับ (consbiz/doc_approval.py) = ป้ายของขั้นนั้นแทน "ร่าง" """
+	from consbiz.doc_approval import status_label
+
+	if doctype == "Material Request" and row.get("material_request_type") not in (
+		None,
+		"Purchase",
+		"Customer Provided",
+	):
+		return None
+	return status_label(row.status, row.docstatus, row.get("approval"), doctype)
 
 
 def config_of(kind):
@@ -189,6 +207,8 @@ def list_fields(config):
 	if config["project"]:
 		fields.append(f"{config['project']} as project")
 	fields += list(config.get("progress", ())) + list(config.get("extra", ()))
+	if frappe.get_meta(config["doctype"]).has_field("custom_approval_status"):
+		fields.append("custom_approval_status as approval")
 	return fields
 
 
@@ -240,14 +260,16 @@ def decorate(rows, config):
 	for row in rows:
 		row.project_name = project_names.get(row.get("project"))
 		row.assigned = people(user_list(row.pop("_assign", None)))
-		liked = user_list(row.pop("_liked_by", None))
+		liked = user_list(row.get("_liked_by"))
 		row.liked = me in liked
 		row.likes = len(liked)
 		if row.get("material_request_type"):
 			row.purpose = _(PURPOSE.get(row.material_request_type, row.material_request_type))
 			if employer_supplied(row):
 				received_as_received(row)
-		row.status_label, row.status_tone = status_of(row.status, row.docstatus)
+		row.status_label, row.status_tone = approval_status(row, config["doctype"]) or status_of(
+			row.status, row.docstatus
+		)
 		row.overdue = bool(
 			row.docstatus == 1
 			and row.get("due")
@@ -258,7 +280,7 @@ def decorate(rows, config):
 
 
 # คอลัมน์ที่เรียงได้ (key ของแอป → ช่องของเอกสาร ตาม config)
-SORTS = ("date", "due", "name", "party", "amount", "outstanding", "status")
+SORTS = ("date", "due", "name", "party", "amount", "outstanding", "status", "modified")
 PAGE_SIZES = (30, 50, 100)
 EXPORT_LIMIT = 5000
 
@@ -272,6 +294,7 @@ def sort_field(config, sort):
 		"amount": config["amount"],
 		"outstanding": config.get("outstanding"),
 		"status": "status",
+		"modified": "modified",
 	}.get(sort)
 	return field or config["date"]
 
@@ -297,6 +320,10 @@ def list_filters(
 		filters.update(config["todo"])
 	elif filter == "draft":
 		filters["docstatus"] = 0
+	elif filter == "pending":
+		# รออนุมัติ/รอลงนาม (consbiz/doc_approval.py)
+		filters["docstatus"] = 0
+		filters["custom_approval_status"] = "Pending"
 	elif filter == "done":
 		filters["docstatus"] = 1
 		todo_names = frappe.get_list(
@@ -393,7 +420,7 @@ def get_docs(
 	page_size = cint(page_size) if cint(page_size) in PAGE_SIZES else PAGE
 	order = "asc" if order == "asc" else "desc"
 	field = sort_field(config, sort if sort in SORTS else None)
-	rows = frappe.get_list(
+	rows = row_social.get_list(
 		doctype,
 		filters=filters,
 		or_filters=or_filters,
@@ -428,6 +455,10 @@ def get_docs(
 		tab: count(doctype, list_filters(config, project, scope, tab, **extra), or_filters)
 		for tab in ("todo", "draft", "done", "all")
 	}
+	if doctype in APPROVAL_DOCTYPES:
+		counts["pending"] = count(
+			doctype, list_filters(config, project, scope, "pending", **extra), or_filters
+		)
 	total = counts[filter] if filter in counts else count(doctype, filters, or_filters)
 	return {
 		"rows": rows,
@@ -469,6 +500,21 @@ def submit_docs(kind, names):
 			results.append({"name": name, "ok": False, "error": message[:200]})
 		frappe.local.message_log = []
 	return results
+
+
+def to_approve(scoped):
+	from consbiz.doc_approval import has_role, settings_of
+
+	out = {}
+	for kind in ("mr", "po", "pi"):
+		doctype = DOCS[kind]["doctype"]
+		if frappe.get_meta(doctype).has_field("custom_approval_status") and has_role(
+			settings_of(doctype)["roles"]
+		):
+			out[kind] = count_and_sum(
+				kind, scoped(kind, {"docstatus": 0, "custom_approval_status": "Pending"})
+			)["count"]
+	return out
 
 
 def count_and_sum(kind, filters, field=None):
@@ -533,6 +579,8 @@ def get_summary(section, project=None, scope="project", company=None):
 				"pi", scoped("pi", {**DOCS["pi"]["todo"], "due_date": ("<", today)}), "outstanding_amount"
 			),
 			"drafts_by_kind": drafts(("mr", "po", "pi")),
+			# รออนุมัติ/รอลงนามที่ผู้ใช้นี้กดได้ (consbiz/doc_approval.py) = ตัวเลขแดงที่เมนู
+			"to_approve": to_approve(scoped),
 			# PO ที่แก้ตามใบงานเพิ่ม ผรม. แล้วยังไม่ส่งฉบับใหม่ให้ผู้รับเหมา (งานกลางของฝ่ายจัดซื้อ)
 			"po_resend": top(
 				"po", scoped("po", {"docstatus": 1, "custom_revision_pending": 1}), "modified asc"
@@ -763,6 +811,12 @@ def steps_of(doc, kind):
 		ordered = {"Ordered": 100, "Partially Ordered": 50}.get(doc.status, 0)
 		flow, labels = [("ลูกค้าสั่งซื้อ", ordered)], ("ร่าง", "เสนอราคาแล้ว")
 
+	from consbiz.doc_approval import flow_of, words
+
+	# ขั้นอนุมัติ/ลงนาม (consbiz/doc_approval.py): ขั้นที่ 2 = อนุมัติแล้ว/ลงนามแล้ว ระหว่างรอ = รออนุมัติ/รอลงนาม
+	approval = words(doc) if flow_of(doc) else None
+	if approval:
+		labels = (labels[0], approval["done"])
 	steps = [{"label": _(labels[0])}, {"label": _(labels[1])}]
 	for label, field in flow:
 		steps.append({"label": _(label), "pct": flt(field if not isinstance(field, str) else doc.get(field))})
@@ -770,6 +824,11 @@ def steps_of(doc, kind):
 
 	if doc.docstatus == 2:
 		return [{**steps[0], "state": "done"}, {"label": _("ยกเลิก"), "state": "error"}]
+	if doc.docstatus == 0 and approval and doc.get("custom_approval_status") == "Declined":
+		return [{**steps[0], "state": "done"}, {"label": approval["decline"], "state": "error"}]
+	if doc.docstatus == 0 and approval and doc.get("custom_approval_status") == "Pending":
+		steps[1]["label"] = approval["pending"]
+		return [{**s, "state": ("done", "current")[i] if i < 2 else "todo"} for i, s in enumerate(steps)]
 	if doc.docstatus == 0:
 		return [{**s, "state": "current" if i == 0 else "todo"} for i, s in enumerate(steps)]
 	closed = doc.status in ("Completed", "Closed", "Paid", "Received", "Ordered", "Delivered")
@@ -799,13 +858,17 @@ def progress_of(doc, config):
 
 @frappe.whitelist()
 def get_doc(kind, name):
-	from consbiz import accounting_app
+	from consbiz import accounting_app, doc_approval
 	from consbiz.site_app import pdf_url
 
 	config = config_of(kind)
 	doc = frappe.get_doc(config["doctype"], name)
 	doc.check_permission("read")
-	label, tone = status_of(doc.status, doc.docstatus)
+	approval = doc_approval.info(doc)
+	state = frappe._dict(
+		status=doc.status, docstatus=doc.docstatus, approval=doc.get("custom_approval_status")
+	)
+	label, tone = (approval and approval_status(state, doc.doctype)) or status_of(doc.status, doc.docstatus)
 	before, after = links_of(doc)
 	items = [
 		{"name": row.name, **{field: row.get(field) for field in ITEM_FIELDS if row.meta.has_field(field)}}
@@ -858,14 +921,25 @@ def get_doc(kind, name):
 		else None,
 		"before": before,
 		"after": after,
-		"can_submit": bool(doc.docstatus == 0 and frappe.has_permission(doc.doctype, "submit", doc)),
-		"can_edit": bool(doc.docstatus == 0 and frappe.has_permission(doc.doctype, "write", doc)),
-		"can_delete": store_app.can_delete(doc),
+		# ขั้นอนุมัติ/ลงนาม: ยืนยัน = ผู้มีสิทธิ์อนุมัติ/ลงนาม, รออยู่ = แก้ไม่ได้ (ดึงกลับก่อน)
+		"approval": approval,
+		"can_submit": bool(approval["can_approve"])
+		if approval
+		else bool(doc.docstatus == 0 and frappe.has_permission(doc.doctype, "submit", doc)),
+		"can_edit": bool(
+			doc.docstatus == 0
+			and frappe.has_permission(doc.doctype, "write", doc)
+			and not (approval and (approval["pending"] or approval["closed"]))
+		),
+		# ไม่อนุมัติแล้ว = เก็บเป็นประวัติ (doc_approval.guard_trash)
+		"can_delete": store_app.can_delete(doc)
+		and not (approval and approval["closed"] and "System Manager" not in frappe.get_roles()),
 		"after_submit": after_submit_info(doc, kind),
 		"next_kind": next_of(doc, kind),
 		# รับ/จ่ายชำระต่อจากใบแจ้งหนี้ (consbiz/accounting_app.py)
 		"can_pay": kind in ("si", "pi") and accounting_app.can_pay(doc),
 		"pdf_url": pdf_url(doc.doctype, doc.name),
+		"print_html": print_html_of(doc.doctype),
 		"revision": revision_of(doc) if kind == "po" else None,
 	}
 
@@ -1102,7 +1176,16 @@ FORM = {
 	},
 	"po": {
 		"party": "supplier",
-		"header": ("supplier", "transaction_date", "schedule_date", "taxes_and_charges", DISCOUNT, *DEDUCT),
+		"header": (
+			"supplier",
+			"transaction_date",
+			"schedule_date",
+			"taxes_and_charges",
+			DISCOUNT,
+			*DEDUCT,
+			# ผู้ลงนาม (consbiz/doc_approval.py)
+			"custom_approver",
+		),
 		"item": ("item_code", "qty", "uom", "rate", "schedule_date", "description"),
 	},
 	"pi": {
@@ -1120,6 +1203,7 @@ FORM = {
 			DISCOUNT,
 			*DEDUCT,
 			"remarks",
+			"custom_approver",
 		),
 		"item": ("item_code", "qty", "uom", "rate", "description"),
 		"remarks": "remarks",
@@ -1235,7 +1319,9 @@ def new_doc(kind, project, company=None):
 def plan_request(project, plan_rows):
 	"""ใบขอซื้อใหม่จากแถวแผนวัสดุที่ติ๊กในหมวดทรัพยากร ยังไม่บันทึก
 	ซื้อเอง/ผู้ว่าจ้างจัดหาปนกัน = ทำทีละใบ (ใบแรกก่อน รายการที่เหลือยังค้างให้ขอต่อ) จำนวนที่เหลืออยู่ใน flags.plan_others"""
-	from consbiz.consbiz.doctype.construction_material_plan.construction_material_plan import requests_for_rows
+	from consbiz.consbiz.doctype.construction_material_plan.construction_material_plan import (
+		requests_for_rows,
+	)
 	from consbiz.site_app import check_project
 
 	_info, cm = check_project(project)
@@ -1462,6 +1548,9 @@ def serialize_form(doc, kind):
 		**header,
 		"request_by_label": signature_name(doc.get("custom_request_by")),
 		"approve_by_label": signature_name(doc.get("custom_approve_by")),
+		"approver_label": frappe.utils.get_fullname(doc.get("custom_approver"))
+		if doc.get("custom_approver")
+		else None,
 		"project_name": frappe.db.get_value("Project", project_of(doc, kind), "project_name")
 		if project_of(doc, kind)
 		else None,
@@ -1493,6 +1582,16 @@ def item_uoms(item_code):
 	return list(dict.fromkeys([stock_uom, *uoms]))
 
 
+def print_html_of(doctype):
+	"""แบบพิมพ์ที่ใช้ในแอปเป็น HTML ของ ConsERP ที่แบ่งหน้าเอง (print_settings.COPIES_FORMATS) = ปุ่มพิมพ์เปิดหน้าตัวอย่าง iframe
+	(คม เร็ว ติ๊กต้นฉบับ/สำเนา) ไม่ใช่ = None (ปุ่มพิมพ์เปิด PdfViewer ตามเดิม)"""
+	from consbiz.print_settings import COPIES_FORMATS
+	from consbiz.site_app import print_options
+
+	print_format, _generator = print_options(doctype)
+	return {"format": print_format, "copies": 1} if print_format in COPIES_FORMATS else None
+
+
 @frappe.whitelist()
 def get_form(kind, name=None, source=None, project=None, company=None, plan_rows=None):
 	"""ข้อมูลฟอร์มสร้าง/แก้ไข: เอกสาร (ยังไม่บันทึก) + ตัวเลือกภาษี"""
@@ -1504,6 +1603,8 @@ def get_form(kind, name=None, source=None, project=None, company=None, plan_rows
 	out["fields"] = [field for field in FORM[kind]["header"] if doc.meta.has_field(field)]
 	out["tax_templates"] = tax_templates(doc)
 	out["can_submit"] = frappe.has_permission(doc.doctype, "submit")
+	# แถบขั้นตอนใต้หัวฟอร์ม (ร่าง = ขั้นแรก) ชุดเดียวกับหน้าดู
+	out["steps"] = steps_of(doc, kind)
 	return out
 
 
@@ -1570,7 +1671,9 @@ def save_doc(kind, data, submit=0):
 	if wanted:
 		keep_request_rates(doc, wanted)
 	if doc.flags.plan_lines:
-		from consbiz.consbiz.doctype.construction_material_plan.construction_material_plan import link_request_rows
+		from consbiz.consbiz.doctype.construction_material_plan.construction_material_plan import (
+			link_request_rows,
+		)
 
 		link_request_rows(doc, doc.flags.plan_lines)
 	if cint(submit):
@@ -1578,34 +1681,29 @@ def save_doc(kind, data, submit=0):
 	return {"name": doc.name, "docstatus": doc.docstatus}
 
 
-@frappe.whitelist()
-def search_items(kind, txt=None, project=None):
-	"""สินค้า/บริการสำหรับเลือกในฟอร์ม พร้อมราคาแนะนำ (ซื้อ = ราคาซื้อล่าสุด, ขาย = ราคาขายมาตรฐาน)"""
-	config = config_of(kind)
-	buying = config["section"] == "buy"
+ITEM_FIELDS = [
+	"name as item_code",
+	"item_name",
+	"item_group",
+	"stock_uom",
+	"last_purchase_rate",
+	"standard_rate",
+]
+
+
+def item_filters(kind):
+	"""Item ที่เลือกในเอกสารชนิดนี้ได้ (ซื้อ/ขายได้ ไม่ใช่ template ไม่ใช่ Item คู่ผู้ว่าจ้างจัดหา)"""
+	buying = config_of(kind)["section"] == "buy"
 	filters = {"disabled": 0, "has_variants": 0}
 	filters["is_purchase_item" if buying else "is_sales_item"] = 1
 	if frappe.get_meta("Item").has_field("custom_base_item"):
 		filters["custom_base_item"] = ("is", "not set")
-	or_filters = None
-	if txt:
-		like = f"%{txt.strip()}%"
-		or_filters = {"name": ("like", like), "item_name": ("like", like), "item_group": ("like", like)}
-	rows = frappe.get_list(
-		"Item",
-		filters=filters,
-		or_filters=or_filters,
-		fields=[
-			"name as item_code",
-			"item_name",
-			"item_group",
-			"stock_uom",
-			"last_purchase_rate",
-			"standard_rate",
-		],
-		order_by="modified desc",
-		limit_page_length=40,
-	)
+	return filters
+
+
+def with_rates(rows, kind):
+	"""ราคาแนะนำ (ซื้อ = ราคาซื้อล่าสุด, ขาย = ราคาขายมาตรฐาน) + หน่วยที่เลือกได้"""
+	buying = config_of(kind)["section"] == "buy"
 	prices = {}
 	if rows and not buying:
 		price_list = (
@@ -1624,9 +1722,178 @@ def search_items(kind, txt=None, project=None):
 			flt(row.last_purchase_rate) if buying else flt(prices.get(row.item_code) or row.standard_rate)
 		)
 		row.uoms = item_uoms(row.item_code)
-		row.pop("last_purchase_rate")
-		row.pop("standard_rate")
+		row.pop("last_purchase_rate", None)
+		row.pop("standard_rate", None)
 	return rows
+
+
+def item_text(row):
+	return f"{row.item_code} {row.item_name or ''} {row.item_group or ''}".lower()
+
+
+def coverage(query, text):
+	"""สัดส่วนตัวอักษรของคำค้นที่พบเรียงตามลำดับในข้อความ (พิมพ์ผิด/ขาดบางตัวยังได้คะแนนสูง)"""
+	from difflib import SequenceMatcher
+
+	if not query:
+		return 0
+	blocks = SequenceMatcher(None, query, text, autojunk=False).get_matching_blocks()
+	return sum(b.size for b in blocks if b.size >= 2) / len(query)
+
+
+@frappe.whitelist()
+def search_items(kind, txt=None, project=None):
+	"""สินค้า/บริการสำหรับเลือกในฟอร์ม พร้อมราคาแนะนำ (ตกลง 2026-11-18: ค้นหาแบบเผื่อพิมพ์ผิด)
+	1. ทุกคำ (เว้นวรรค) ต้องพบในรหัส/ชื่อ/กลุ่ม ลำดับใดก็ได้ เรียง รหัสตรง > ขึ้นต้นด้วย > ที่เหลือ
+	2. พบน้อย = เติมรายการใกล้เคียง (fuzzy = 1) จากคำค้นบางส่วน ให้คะแนนด้วย coverage"""
+	filters = item_filters(kind)
+	query = " ".join((txt or "").lower().split())
+	if not query:
+		rows = frappe.get_list(
+			"Item", filters=filters, fields=ITEM_FIELDS, order_by="modified desc", limit_page_length=40
+		)
+		return with_rates(rows, kind)
+
+	tokens = query.split()
+	longest = max(tokens, key=len)
+	pool = frappe.get_list(
+		"Item",
+		filters=filters,
+		or_filters={f: ("like", f"%{longest}%") for f in ("name", "item_name", "item_group")},
+		fields=ITEM_FIELDS,
+		order_by="modified desc",
+		limit_page_length=300,
+	)
+	hits = [r for r in pool if all(t in item_text(r) for t in tokens)]
+
+	def rank(r):
+		code, name = r.item_code.lower(), (r.item_name or "").lower()
+		if code == query:
+			return 0
+		if code.startswith(query) or name.startswith(query):
+			return 1
+		return 2
+
+	hits.sort(key=rank)
+	hits = hits[:40]
+
+	if len(hits) < 8:
+		seen = {r.item_code for r in hits}
+		# ส่วนของคำค้น 3 ตัวอักษร (ขึ้นต้น/กลาง/ท้ายของแต่ละคำ) ใช้ดึงรายการที่อาจพิมพ์ผิดมาให้คะแนน
+		parts = set()
+		for t in tokens:
+			if len(t) <= 3:
+				parts.add(t)
+			else:
+				parts.update({t[:3], t[len(t) // 2 - 1 : len(t) // 2 + 2], t[-3:]})
+		candidates = {}
+		for part in list(parts)[:8]:
+			for r in frappe.get_list(
+				"Item",
+				filters=filters,
+				or_filters={f: ("like", f"%{part}%") for f in ("name", "item_name")},
+				fields=ITEM_FIELDS,
+				order_by="modified desc",
+				limit_page_length=150,
+			):
+				if r.item_code not in seen:
+					candidates[r.item_code] = r
+		scored = []
+		for r in candidates.values():
+			score = max(coverage(query, item_text(r)), coverage(query, (r.item_name or "").lower()))
+			if score >= 0.6:
+				r.fuzzy = 1
+				scored.append((score, r))
+		scored.sort(key=lambda x: -x[0])
+		hits += [r for _, r in scored[: 40 - len(hits)]]
+	return with_rates(hits, kind)
+
+
+IMPORT_COLUMNS = {
+	"item_code": ("รหัส", "รหัสสินค้า", "item code", "item_code", "code", "sku"),
+	"item_name": ("รายการ", "ชื่อ", "ชื่อสินค้า", "item name", "item_name", "name", "description"),
+	"qty": ("จำนวน", "qty", "quantity"),
+	"uom": ("หน่วย", "uom", "unit"),
+	"rate": ("หน่วยละ", "ราคา", "ราคาต่อหน่วย", "rate", "price", "unit price"),
+}
+
+
+def read_table(filename, content):
+	"""แถวของไฟล์ .xlsx / .csv (แถวแรกที่มีชื่อคอลัมน์ = หัวตาราง)"""
+	import base64
+	import csv
+	import io
+
+	data = base64.b64decode(content)
+	if filename.lower().endswith((".xlsx", ".xlsm")):
+		from frappe.utils.xlsxutils import read_xlsx_file_from_attached_file
+
+		return read_xlsx_file_from_attached_file(fcontent=data)
+	if filename.lower().endswith(".csv"):
+		text = data.decode("utf-8-sig", errors="replace")
+		return list(csv.reader(io.StringIO(text)))
+	frappe.throw(_("รองรับเฉพาะไฟล์ .xlsx หรือ .csv"))
+
+
+@frappe.whitelist(methods=["POST"])
+def import_items(kind, filename, content):
+	"""นำเข้ารายการจาก Excel/CSV (หัวตาราง: รหัส, รายการ, จำนวน, หน่วย, หน่วยละ ไฟล์ส่งออกของแอปใช้ได้ทันที)
+	จับคู่ Item: รหัสตรง > ชื่อตรง > ผลค้นหาอันดับแรก (ใกล้เคียง = approx) ไม่พบ = ส่งชื่อกลับใน missing"""
+	rows = [[("" if c is None else str(c)).strip() for c in r] for r in read_table(filename, content) or []]
+	rows = [r for r in rows if any(r)]
+	if not rows:
+		frappe.throw(_("ไม่พบข้อมูลในไฟล์"))
+	head = [c.lower() for c in rows[0]]
+	cols = {}
+	for key, names in IMPORT_COLUMNS.items():
+		for i, h in enumerate(head):
+			if h in names and i not in cols.values():
+				cols[key] = i
+				break
+	if "item_code" in cols or "item_name" in cols:
+		body = rows[1:]
+	else:
+		# ไม่มีหัวตาราง: ลำดับแบบไฟล์ส่งออก (#, รหัส, รายการ, จำนวน, หน่วย, หน่วยละ)
+		cols = {"item_code": 1, "item_name": 2, "qty": 3, "uom": 4, "rate": 5}
+		body = rows
+	if len(body) > 500:
+		frappe.throw(_("นำเข้าได้ครั้งละไม่เกิน 500 แถว"))
+
+	filters = item_filters(kind)
+	cell = lambda r, key: r[cols[key]] if key in cols and cols[key] < len(r) else ""
+	out, missing = [], []
+	for r in body:
+		code, name = cell(r, "item_code"), cell(r, "item_name")
+		if not code and not name:
+			continue
+		found, approx = None, False
+		if code:
+			found = frappe.get_list(
+				"Item", filters={**filters, "name": code}, pluck="name", limit_page_length=1
+			)
+		if not found and name:
+			found = frappe.get_list(
+				"Item", filters={**filters, "item_name": name}, pluck="name", limit_page_length=1
+			)
+		if not found:
+			hits = search_items(kind, code or name)
+			if hits:
+				found, approx = [hits[0].item_code], True
+		if not found:
+			missing.append(code or name)
+			continue
+		item = with_rates(
+			frappe.get_list("Item", filters={"name": found[0]}, fields=ITEM_FIELDS, limit_page_length=1), kind
+		)[0]
+		uom = cell(r, "uom")
+		item.qty = flt(cell(r, "qty").replace(",", "")) or 1
+		if cell(r, "rate"):
+			item.rate = flt(cell(r, "rate").replace(",", ""))
+		item.uom = uom if uom in item.uoms else item.stock_uom
+		item.approx = 1 if approx else 0
+		item.source_text = code or name
+		out.append(item)
+	return {"rows": out, "missing": missing}
 
 
 @frappe.whitelist()

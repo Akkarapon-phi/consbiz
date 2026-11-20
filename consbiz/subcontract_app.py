@@ -10,7 +10,7 @@ import frappe
 from frappe import _
 from frappe.utils import cint, flt
 
-from consbiz import store_app, subcontract
+from consbiz import row_social, store_app, subcontract
 
 LIST_LIMIT = 500
 KINDS = {
@@ -156,7 +156,7 @@ def get_list(kind, company=None, project=None, agreement=None):
 		filters["project"] = project
 	if agreement and kind in ("claims", "variations"):
 		filters["subcontract_agreement"] = agreement
-	rows = frappe.get_list(
+	rows = row_social.get_list(
 		config["doctype"],
 		filters=filters,
 		fields=["name", "docstatus", "modified", *config["list"]],

@@ -20,8 +20,9 @@ import json
 
 import frappe
 from frappe import _
-from frappe.utils import add_days, cint, flt, getdate, nowdate, nowtime
+from frappe.utils import add_days, cint, flt, get_system_timezone, getdate, nowdate, nowtime
 
+from consbiz import row_social
 from consbiz.consbiz.doctype.concrete_usage.concrete_usage import CONCRETE_GROUP, concrete_item_filters
 from consbiz.consbiz.doctype.construction_management.construction_management import get_task_options
 from consbiz.consbiz.doctype.equipment_borrowing.equipment_borrowing import get_outstanding
@@ -61,7 +62,7 @@ def item_images(codes):
 		for r in frappe.get_all(
 			"Item",
 			filters={"name": ("in", codes)},
-			fields=["name", "item_name", "image", "stock_uom", "custom_base_item", "is_customer_provided_item"],
+			fields=["name", "item_name", "image", "stock_uom", "custom_base_item", "is_customer_provided_item", "modified"],
 		)
 	}
 
@@ -114,6 +115,7 @@ def boot_data():
 		"user_image": user.user_image,
 		"can": can,
 		"today": nowdate(),
+		"time_zone": get_system_timezone(),
 		"desk": bool(frappe.has_permission("Stock Entry", "read")),
 	}
 
@@ -206,6 +208,7 @@ def pending_purchase_orders(project):
 			po.supplier_name,
 			po.transaction_date,
 			po.schedule_date,
+			po.modified,
 			po.per_received,
 			poi.item_name,
 			poi.schedule_date.as_("item_schedule_date"),
@@ -218,11 +221,7 @@ def pending_purchase_orders(project):
 		.orderby(po.schedule_date)
 		.orderby(poi.idx)
 	).run(as_dict=True)
-	allowed = set(
-		frappe.get_list(
-			"Purchase Order", filters={"name": ("in", list({r.name for r in rows}) or [""])}, pluck="name"
-		)
-	)
+	allowed = row_social.by_name("Purchase Order", {r.name for r in rows})
 	return group_pending(rows, allowed, "Purchase Order", "supplier_name", "per_received")
 
 
@@ -241,6 +240,7 @@ def pending_employer_requests(project):
 			mr.customer.as_("supplier_name"),
 			mr.transaction_date,
 			mr.schedule_date,
+			mr.modified,
 			mr.per_ordered.as_("per_received"),
 			mri.item_name,
 			mri.schedule_date.as_("item_schedule_date"),
@@ -253,11 +253,7 @@ def pending_employer_requests(project):
 		.orderby(mr.schedule_date)
 		.orderby(mri.idx)
 	).run(as_dict=True)
-	allowed = set(
-		frappe.get_list(
-			"Material Request", filters={"name": ("in", list({r.name for r in rows}) or [""])}, pluck="name"
-		)
-	)
+	allowed = row_social.by_name("Material Request", {r.name for r in rows})
 	return group_pending(rows, allowed, "Material Request", "supplier_name", "per_received")
 
 
@@ -269,11 +265,12 @@ def group_pending(rows, allowed, doctype, party_field, progress_field):
 		doc = docs.setdefault(
 			row.name,
 			{
-				"doctype": doctype,
+				**row_social.metadata(allowed[row.name]),
 				"name": row.name,
 				"party": row.get(party_field) or row.supplier,
 				"date": row.transaction_date,
 				"schedule_date": row.schedule_date,
+				"modified": row.modified,
 				"progress": flt(row.get(progress_field)),
 				"employer": doctype == "Material Request",
 				"_items": [],
@@ -476,21 +473,21 @@ def get_receipt_history(project, days=HISTORY_DAYS):
 	since = add_days(nowdate(), -cint(days))
 	out = []
 	if frappe.has_permission("Purchase Receipt", "read"):
-		docs = frappe.get_list(
+		docs = row_social.get_list(
 			"Purchase Receipt",
 			filters={"docstatus": 1, "posting_date": (">=", since), "is_return": 0},
 			or_filters=[["project", "=", project], ["Purchase Receipt Item", "project", "=", project]],
-			fields=["name", "supplier_name", "posting_date", "posting_time", "supplier_delivery_note"],
+			fields=["name", "supplier_name", "posting_date", "posting_time", "supplier_delivery_note", "modified"],
 			order_by="posting_date desc, posting_time desc",
 			limit_page_length=100,
 			distinct=True,
 		)
 		out += history_rows(docs, "Purchase Receipt", "Purchase Receipt Item", "supplier_name", "supplier_delivery_note")
 	if frappe.has_permission("Stock Entry", "read"):
-		docs = frappe.get_list(
+		docs = row_social.get_list(
 			"Stock Entry",
 			filters={"docstatus": 1, "purpose": "Material Receipt", "project": project, "posting_date": (">=", since)},
-			fields=["name", "custom_delivered_by", "posting_date", "posting_time", "custom_supplier_delivery_note"],
+			fields=["name", "custom_delivered_by", "posting_date", "posting_time", "custom_supplier_delivery_note", "modified"],
 			order_by="posting_date desc, posting_time desc",
 			limit_page_length=100,
 		)
@@ -516,11 +513,12 @@ def history_rows(docs, doctype, child, party_field, note_field):
 		employer = any((codes.get(r.item_code) or {}).get("custom_base_item") for r in rows)
 		out.append(
 			{
-				"doctype": doctype,
+				**row_social.metadata(doc),
 				"name": doc.name,
 				"party": doc.get(party_field) or "",
 				"date": doc.posting_date,
 				"time": hhmm(doc.posting_time),
+				"modified": doc.modified,
 				"delivery_note": doc.get(note_field),
 				"items": preview(r.item_name for r in rows),
 				"rejected": any(flt(r.custom_site_rejected_qty) for r in rows),
@@ -599,9 +597,11 @@ def get_stock(project):
 				"used": flt(r["used"]),
 				"pending": flt(r["company"]["pending"]) + flt(r["employer"]["pending"]),
 				"need": flt(r["need"]),
+				"modified": (images.get(r["item_code"]) or {}).get("modified"),
 				"image": (images.get(r["item_code"]) or {}).get("image"),
 			}
 		)
+	row_social.attach(rows, "Item", name_field="item_code")
 	return {
 		"company": info.company,
 		"warehouse": project_warehouse(project),
@@ -654,7 +654,7 @@ def get_issue_history(project, days=HISTORY_DAYS):
 	check_project(project)
 	if not frappe.has_permission("Stock Entry", "read"):
 		return []
-	docs = frappe.get_list(
+	docs = row_social.get_list(
 		"Stock Entry",
 		filters={
 			"docstatus": 1,
@@ -662,7 +662,7 @@ def get_issue_history(project, days=HISTORY_DAYS):
 			"project": project,
 			"posting_date": (">=", add_days(nowdate(), -cint(days))),
 		},
-		fields=["name", "posting_date", "posting_time", "remarks", "owner"],
+		fields=["name", "posting_date", "posting_time", "remarks", "owner", "modified"],
 		order_by="posting_date desc, posting_time desc",
 		limit_page_length=100,
 	)
@@ -682,9 +682,11 @@ def get_issue_history(project, days=HISTORY_DAYS):
 		rows = [r for r in items if r.parent == doc.name]
 		out.append(
 			{
+				**row_social.metadata(doc),
 				"name": doc.name,
 				"date": doc.posting_date,
 				"time": hhmm(doc.posting_time),
+				"modified": doc.modified,
 				"remarks": doc.remarks,
 				"owner": frappe.utils.get_fullname(doc.owner),
 				"items": [
@@ -705,7 +707,7 @@ def get_concrete(project):
 	cm = construction_management_of(project)
 	if not cm or not frappe.has_permission("Concrete Usage", "read"):
 		return {"construction_management": cm, "docs": []}
-	docs = frappe.get_list(
+	docs = row_social.get_list(
 		"Concrete Usage",
 		filters={"construction_management": cm, "docstatus": ("<", 2)},
 		fields=[
@@ -721,6 +723,7 @@ def get_concrete(project):
 			"planned_qty",
 			"docstatus",
 			"supplier",
+			"modified",
 		],
 		order_by="date desc, creation desc",
 		limit_page_length=100,
@@ -844,7 +847,7 @@ def get_borrowings(project):
 	check_project(project)
 	if not frappe.has_permission("Equipment Borrowing", "read"):
 		return {"outstanding": [], "returned": []}
-	returned = frappe.get_list(
+	returned = row_social.get_list(
 		"Equipment Borrowing",
 		filters={"project": project, "docstatus": 1, "status": "Returned"},
 		fields=["name", "borrower_name", "date", "due_date", "status", "modified"],

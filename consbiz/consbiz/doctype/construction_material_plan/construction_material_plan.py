@@ -19,6 +19,7 @@
 import frappe
 from frappe import _
 from frappe.model.document import Document
+from frappe.query_builder.functions import Coalesce
 from frappe.utils import add_days, cint, flt, getdate, nowdate
 
 from consbiz.consbiz.doctype.daily_report.daily_report import get_leaf_tasks
@@ -102,6 +103,8 @@ def get_supply(project, item_codes):
 		.select(mr.name, mr.material_request_type, mr.docstatus, mr.status, mri.item_code, mri.stock_qty, mri.ordered_qty)
 		.where(
 			(mr.docstatus < 2)
+			# ใบที่ไม่อนุมัติ (ปิดแล้ว, consbiz/doc_approval.py) ไม่นับเป็นยอดขอ
+			& (Coalesce(mr.custom_approval_status, "") != "Declined")
 			& mr.material_request_type.isin(("Purchase", "Customer Provided"))
 			& ((mr.custom_project == project) | (mri.project == project))
 			& mri.item_code.isin(item_codes)

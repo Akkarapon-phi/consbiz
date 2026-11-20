@@ -1,4 +1,4 @@
-// แบ่งสัญญาจ้างเป็นแผ่น A4 (ตกลง 2026-11-18) ชุดเดียวใช้ 2 ที่ ห้ามใช้ import / ตัวแปรภายนอก:
+// แบ่งเอกสารเป็นแผ่น A4 (ตกลง 2026-11-18: สัญญาจ้าง, ใบสั่งซื้อ purchase_order_print.py) ชุดเดียวใช้ 2 ที่ ห้ามใช้ import / ตัวแปรภายนอก:
 // - ตัวอย่างในแอป (ContractPreview.vue เรียกกับ document ของ iframe, guides = เส้นประขอบพื้นที่พิมพ์)
 // - PDF / หน้าพิมพ์ (consbiz/contract_terms.py ฝังโค้ดไฟล์นี้ในหน้า ตัด "export " ออก เรียกตอน load ก่อน Chrome พิมพ์)
 // ต้นฉบับใน #ec-src (data-page / data-margins เป็น มม.): .ec-src-head หัวกระดาษ, .ec-src-foot ท้ายกระดาษทุกหน้า,
@@ -57,13 +57,24 @@ export function ec_paginate(doc, options) {
 	box.appendChild(flow);
 	probe.appendChild(box);
 	var count = Math.max(1, Math.round((flow.scrollWidth + GAP) / (w + GAP)));
+	// หน้าที่มีเนื้อหาจริง (แถวตาราง/ย่อหน้า) หน้าที่มีแต่ท้ายเอกสาร = ซ่อน .ec-hide-if-empty ของหัวกระดาษ (เช่น หัวตารางรายการ)
+	var filled = {};
+	var fl = flow.getBoundingClientRect().left;
+	flow.querySelectorAll("tr, p, li, h1, h2, h3").forEach(function (el) {
+		var r = el.getBoundingClientRect();
+		if (r.height > 0) filled[Math.floor(((r.left - fl) / scale + 1) / (w + GAP))] = true;
+	});
 	probe.remove();
 
 	var place = function (el, css) {
 		el.style.cssText += ";position:absolute;left:0;right:0;" + css;
 		return el;
 	};
+	// หลายฉบับ (data-copies="ต้นฉบับ|สำเนา"): ชุดแผ่นซ้ำต่อฉบับ ใส่ชื่อฉบับที่ .copy-label เลขหน้านับใหม่ทุกฉบับ
+	var copies = (src.getAttribute("data-copies") || "").split("|").filter(Boolean);
+	if (!copies.length) copies = [""];
 	var sheets = [];
+	for (var c = 0; c < copies.length; c++)
 	for (var i = 0; i < count; i++) {
 		var is_last = i === count - 1;
 		var sheet = doc.createElement("div");
@@ -72,7 +83,29 @@ export function ec_paginate(doc, options) {
 		area.className = "ec-sheet-area";
 		area.style.cssText =
 			"position:absolute;overflow:hidden;top:" + t + "mm;left:" + l + "mm;width:" + w + "px;height:" + h + "px";
-		if (head) area.appendChild(place(head.cloneNode(true), "top:0"));
+		// เลขหน้า (.page / .topage) ใส่ได้ทั้งหัวและท้ายกระดาษ (ใบสั่งซื้อมีเลขหน้าที่หัวกระดาษ)
+		var label = copies[c];
+		var number = function (el) {
+			if (label)
+				el.querySelectorAll(".copy-label").forEach(function (x) {
+					x.textContent = label;
+				});
+			el.querySelectorAll(".page").forEach(function (x) {
+				x.textContent = i + 1;
+			});
+			el.querySelectorAll(".topage").forEach(function (x) {
+				x.textContent = count;
+			});
+			return el;
+		};
+		if (head) {
+			var h_el = place(head.cloneNode(true), "top:0");
+			if (!filled[i])
+				h_el.querySelectorAll(".ec-hide-if-empty").forEach(function (x) {
+					x.style.visibility = "hidden";
+				});
+			area.appendChild(number(h_el));
+		}
 		var view = doc.createElement("div");
 		place(view, "top:" + head_h + "px;height:" + body_h + "px;overflow:hidden");
 		var copy = flow.cloneNode(true);
@@ -82,14 +115,7 @@ export function ec_paginate(doc, options) {
 		area.appendChild(view);
 		var f = is_last ? foot_last : foot;
 		if (f) {
-			var el = place(f.cloneNode(true), "bottom:0");
-			el.querySelectorAll(".page").forEach(function (x) {
-				x.textContent = i + 1;
-			});
-			el.querySelectorAll(".topage").forEach(function (x) {
-				x.textContent = count;
-			});
-			area.appendChild(el);
+			area.appendChild(number(place(f.cloneNode(true), "bottom:0")));
 		}
 		if (opts.guides) {
 			var guide = doc.createElement("div");
@@ -105,5 +131,5 @@ export function ec_paginate(doc, options) {
 	sheets.forEach(function (s) {
 		pages.appendChild(s);
 	});
-	return count;
+	return count * copies.length;
 }
